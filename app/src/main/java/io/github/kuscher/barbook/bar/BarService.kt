@@ -119,8 +119,9 @@ class BarController(private val service: AccessibilityService) {
     val placed = HashMap<String, Rect>()
 
     private val scanNow = Runnable { scan() }
+    /** Status bar icons come and go without window changes: re-read it every 2 s while shown. */
     private val poll = object : Runnable {
-        override fun run() { scan(); main.postDelayed(this, 5_000) }
+        override fun run() { scan(); main.postDelayed(this, if (strip.shown) 2_000 else 5_000) }
     }
     private val expandOnHover = Runnable { if (hovering) expanded.value = true }
     private val collapse = Runnable { if (!hovering && menuKey == null) { expanded.value = false; pinned = false } }
@@ -150,7 +151,7 @@ class BarController(private val service: AccessibilityService) {
             }
         }
         scan()
-        main.postDelayed(poll, 5_000)
+        main.postDelayed(poll, 2_000)
     }
 
     fun stop() {
@@ -169,14 +170,11 @@ class BarController(private val service: AccessibilityService) {
     fun onEvent(e: AccessibilityEvent) {
         when (e.eventType) {
             AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
+                if (Log.isLoggable("BarBookEvents", Log.DEBUG)) Log.d(tag, "windows changed id=${e.windowId} changes=0x${Integer.toHexString(e.windowChanges)} ours=${e.windowId in overlayIds}")
                 if (e.windowId in overlayIds) return // our own windows resizing
-                main.removeCallbacks(scanNow); main.postDelayed(scanNow, 120)
-            }
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
-                val s = snap
-                if (e.packageName == SYSTEMUI && (s == null || e.windowId == s.windowId)) {
-                    main.removeCallbacks(scanNow); main.postDelayed(scanNow, 300)
-                }
+                // The status bar animates in and out: look again as the animation settles.
+                main.removeCallbacks(scanNow)
+                for (delay in longArrayOf(100, 450, 900)) main.postDelayed(scanNow, delay)
             }
         }
     }
@@ -198,18 +196,26 @@ class BarController(private val service: AccessibilityService) {
         val screenW = metrics.bounds.width()
         val inset = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top
         val maxH = (if (inset > 0) inset else (48 * density).toInt()) + 4
+        // Without content-change events the node cache can go stale: read the status bar fresh.
+        service.clearCache()
         val windows = runCatching { service.windows }.getOrDefault(emptyList())
         overlayIds = windows.filter { it.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY }.map { it.id }.toSet()
         val s = runCatching { StatusBarScan.scan(service, screenW, maxH) }.onFailure { Log.w(tag, "scan failed", it) }.getOrNull()
         val newWindow = s?.windowId != snap?.windowId
         snap = s
         val cfg = Store.config.value
-        val show = s != null && cfg.enabled && pm.isInteractive && !km.isKeyguardLocked
+        // On tablets the shade and Quick Settings slide over the status bar; our overlay would sit
+        // on top of them. (On the desktop bar they open as popups below it and don't count.)
+        val covered = s != null && windows.any { w ->
+            val r = Rect().also { w.getBoundsInScreen(it) }
+            w.type == AccessibilityWindowInfo.TYPE_SYSTEM && w.id != s.windowId && Rect.intersects(r, s.free)
+        }
+        val show = s != null && !covered && cfg.enabled && pm.isInteractive && !km.isKeyguardLocked
         if (show) {
             place(s!!, screenW)
             if (newWindow || sampled == null) { main.removeCallbacks(sample); main.postDelayed(sample, 250) }
         } else {
-            if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} enabled=${cfg.enabled} locked=${km.isKeyguardLocked})")
+            if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=$covered enabled=${cfg.enabled} locked=${km.isKeyguardLocked})")
             closeMenu()
             strip.hide()
             Ticker.stop("bar")
@@ -459,6 +465,10 @@ class BarController(private val service: AccessibilityService) {
             "hover" -> { events.hover(cmd.getOrNull(1) == "on"); "ok" }
             "close" -> { closeMenu(); "ok" }
             "scan" -> { scan(); "snap=$snap" }
+            "windows" -> service.windows.joinToString(" | ") { w ->
+                val r = Rect().also { w.getBoundsInScreen(it) }
+                "${w.id}:t${w.type}:${w.title}:${r.toShortString()}"
+            }
             "sample" -> { sampleColor(); "sampling" }
             else -> "unknown"
         }

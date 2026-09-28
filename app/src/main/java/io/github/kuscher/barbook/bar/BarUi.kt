@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,6 +35,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -196,6 +199,11 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     var bounds by remember { mutableStateOf(Rect()) }
+    // Numbers change width every second; hold the widest size for a while so neighbours don't jump
+    // (and the window doesn't resize every tick).
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    var widest by remember { mutableStateOf(0) }
+    var widestAt by remember { mutableStateOf(0L) }
     val alert = s.tone == Tone.ALERT
     val color = when (s.tone) {
         Tone.ALERT -> look.alertFg
@@ -208,6 +216,11 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val showText = display != Display.ICON && !s.text.isNullOrEmpty()
     Row(
         Modifier.fillMaxHeight()
+            .widthIn(min = with(density) { widest.toDp() })
+            .onSizeChanged { size ->
+                val now = android.os.SystemClock.uptimeMillis()
+                if (size.width > widest || now - widestAt > 15_000) { widest = size.width; widestAt = now }
+            }
             .onGloballyPositioned { bounds = it.boundsInWindow().toRect(); events.placed(entry.item.id, bounds) }
             .clip(RoundedCornerShape(10.dp))
             .background(when {
@@ -220,6 +233,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
             .semantics(mergeDescendants = true) { contentDescription = s.desc.ifEmpty { s.text.orEmpty() }; role = Role.Button }
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
         if (showIcon) {
             val img = s.image

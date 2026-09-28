@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Least privilege: BarBook listens only for window changes and for content changes in SystemUI (the
-  status bar), reads only the status bar window, and never filters keys or observes motion events.
-  canTakeScreenshot is used for one thing: a screenshot of the status bar WINDOW (not the screen) to
-  copy its text colour.
+  Least privilege: BarBook subscribes only to "windows changed" (which windows exist and where; no
+  app content), reads only the status bar window (re-reading it every 2 s while shown, for icons that
+  come and go), and never filters keys or observes motion events. canTakeScreenshot is used for one
+  thing: a screenshot of the status bar WINDOW (not the screen) to copy its text colour.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowsChanged|typeWindowContentChanged"
+    android:accessibilityEventTypes="typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagRetrieveInteractiveWindows|flagReportViewIds|flagIncludeNotImportantViews"
     android:canRetrieveWindowContent="true"
     android:canTakeScreenshot="true"
-    android:notificationTimeout="200"
+    android:notificationTimeout="0"
     android:isAccessibilityTool="false"
     android:settingsActivity="io.github.kuscher.barbook.ui.MainActivity"
     android:summary="@string/a11y_summary"

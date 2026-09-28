@@ -10,7 +10,8 @@ enum class Tone { NORMAL, ACCENT, WARN, ALERT }
 /** What one item shows right now. */
 data class ItemState(
     val icon: String? = null,
-    val filled: Boolean = false,
+    /** Filled glyphs match the system's status bar icons; outlined reads as "off". */
+    val filled: Boolean = true,
     val text: String? = null,
     /** Spoken description and tooltip. */
     val desc: String = "",

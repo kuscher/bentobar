@@ -111,7 +111,9 @@ class NetSampler {
     }
 
     /** "Wi-Fi", "Ethernet", … plus metered state, from the default network. */
-    fun describe(context: Context): String {
+    fun describe(context: Context): String = runCatching { describeOrThrow(context) }.getOrDefault("Network")
+
+    private fun describeOrThrow(context: Context): String {
         val cm = context.getSystemService(ConnectivityManager::class.java) ?: return "Unknown"
         val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return "Offline"
         val kind = when {

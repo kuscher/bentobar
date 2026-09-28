@@ -89,7 +89,7 @@ object Defaults {
         items = listOf(
             ItemConfig(Store.newId(), "timer", Section.HIDDEN, whenActive = true),
             ItemConfig(Store.newId(), "event", Section.HIDDEN, whenActive = true),
-            ItemConfig(Store.newId(), "network", Section.SHOWN),
+            ItemConfig(Store.newId(), "network", Section.SHOWN, display = Display.TEXT),
             ItemConfig(Store.newId(), "battery", Section.HIDDEN),
             ItemConfig(Store.newId(), "memory", Section.HIDDEN),
             ItemConfig(Store.newId(), "caffeine", Section.SHOWN, display = Display.ICON),

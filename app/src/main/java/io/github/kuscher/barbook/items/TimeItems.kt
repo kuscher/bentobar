@@ -69,7 +69,6 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
-import java.time.temporal.IsoFields
 import java.time.temporal.WeekFields
 import java.util.Locale
 
@@ -190,8 +189,9 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
         val e = d.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         return Calendar.on(s, e, d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
     }
+    val weekOf = WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear()
     MenuCard(Sym.CALENDAR_MONTH, today.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault())),
-        "Week ${today.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)}") {
+        "Week ${today.get(weekOf)}") {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(month.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + month.year,
                 style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
@@ -214,7 +214,7 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
         for (r in 0 until rows) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 val firstDay = month.atDay(1).plusDays((r * 7 - lead).toLong())
-                if (weeks) Text(firstDay.plusDays(3).get(IsoFields.WEEK_OF_WEEK_BASED_YEAR).toString(), Modifier.width(28.dp),
+                if (weeks) Text(firstDay.get(weekOf).toString(), Modifier.width(28.dp),
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                 for (c in 0 until 7) {
                     val i = r * 7 + c - lead

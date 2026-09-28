@@ -1,4 +1,4 @@
-# BarBook: Android platform research (official docs)
+# DiscoBar: Android platform research (official docs)
 
 Research date: 2026-09-28. Target: Googlebook OS (Android 17 / API 37, desktop mode), app delivered as a normal sideloaded APK (GitHub; maybe Play later), no adb grants, no root.
 
@@ -40,7 +40,7 @@ Status: complete (all 8 topics + gotchas).
 
 ### 1.3 `android:isAccessibilityTool`
 - `R.attr.isAccessibilityTool` (API 31, default false): *"If this flag is false, system will show a notification after a duration to inform the user about the privacy implications of the service"* ([R.attr](https://developer.android.com/reference/android/R.attr#isAccessibilityTool)).
-- Play allows it only for apps whose **primary purpose** is disability support (screen readers, switch, voice, Braille). Play names *"automation tools, assistants, … launchers"* as non-tools ([Play Help 10964491](https://support.google.com/googleplay/android-developer/answer/10964491)). **BarBook must not set it.**
+- Play allows it only for apps whose **primary purpose** is disability support (screen readers, switch, voice, Braille). Play names *"automation tools, assistants, … launchers"* as non-tools ([Play Help 10964491](https://support.google.com/googleplay/android-developer/answer/10964491)). **DiscoBar must not set it.**
 
 ### 1.4 Google Play AccessibilityService policy
 Sources: [Play Help 10964491](https://support.google.com/googleplay/android-developer/answer/10964491) and [Permissions and APIs that Access Sensitive Information](https://support.google.com/googleplay/android-developer/answer/9888170).
@@ -50,7 +50,7 @@ Sources: [Play Help 10964491](https://support.google.com/googleplay/android-deve
   - changing the UI *"in a way that is deceptive"*
   - remote call-audio recording
   - autonomous agents (deterministic "if X then Y" automation is allowed)
-- The use must be documented in the listing. Apps *"must use more narrowly scoped APIs … when possible"*. BarBook's case is that `TYPE_APPLICATION_OVERLAY` sits *"below critical system windows like the status bar"* ([LayoutParams](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_APPLICATION_OVERLAY)).
+- The use must be documented in the listing. Apps *"must use more narrowly scoped APIs … when possible"*. DiscoBar's case is that `TYPE_APPLICATION_OVERLAY` sits *"below critical system windows like the status bar"* ([LayoutParams](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_APPLICATION_OVERLAY)).
 - **Prominent disclosure** (non-tools only):
   - inside the app, shown in normal use and not buried in settings
   - describes the data accessed and how it is used or shared
@@ -69,7 +69,7 @@ Sources: [Play Help 10964491](https://support.google.com/googleplay/android-deve
 - Offer two options, consent and "Not now", and degrade gracefully if the user declines.
 - Say "Agree", not "Allow access" or "Got it". Don't make it look like system UI.
 - Order the content **Why → What → How**. Clarity beats brevity; aim for the reading level of a 13-year-old. Mind consent fatigue.
-- BarBook's substance: it reads the status-bar layout and window list only to place its own items; it doesn't read or store app content; nothing leaves the device. Also tell users about the reminder in §1.7.
+- DiscoBar's substance: it reads the status-bar layout and window list only to place its own items; it doesn't read or store app content; nothing leaves the device. Also tell users about the reminder in §1.7.
 
 ### 1.6 Overlay z-order and window APIs
 - `TYPE_ACCESSIBILITY_OVERLAY` (2032) is *"overlaid only by a connected AccessibilityService … without changing the windows an accessibility service can introspect"* ([LayoutParams](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_ACCESSIBILITY_OVERLAY)).
@@ -88,7 +88,7 @@ Sources: [Play Help 10964491](https://support.google.com/googleplay/android-deve
   | `SECURE_SYSTEM_OVERLAY` | 33 |
   | `POINTER` | 35 |
 
-  BarBook's items therefore draw **over the shade, QS and lock screen** unless BarBook hides them.
+  DiscoBar's items therefore draw **over the shade, QS and lock screen** unless DiscoBar hides them.
 - API 34 adds `attachAccessibilityOverlayToDisplay(displayId, SurfaceControl)` and `…ToWindow` ([AccessibilityService](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService)).
 - `getWindows()` (default display, top-most first) and `getWindowsOnAllDisplays()` (API 30) need `canRetrieveWindowContent` **and** `FLAG_RETRIEVE_INTERACTIVE_WINDOWS`. Without the flag the list is empty and no `TYPE_WINDOWS_CHANGED` arrives ([AccessibilityServiceInfo](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#FLAG_RETRIEVE_INTERACTIVE_WINDOWS)).
 - Window types include `TYPE_SYSTEM` and `TYPE_WINDOW_CONTROL` (API 36, e.g. desktop captions) ([AccessibilityWindowInfo](https://developer.android.com/reference/android/view/accessibility/AccessibilityWindowInfo)).
@@ -147,7 +147,7 @@ Sources: [Play Help 10964491](https://support.google.com/googleplay/android-deve
 **Qualifying use cases** (guide): Live Updates are for **ongoing, user-initiated, time-sensitive** activities such as navigation, calls, rides or deliveries.
 - Explicitly not: *"Ads, promotions, chat messages, alerts, upcoming calendar events, and quick access to app features"*. Also not *"ambient information"*. For quick access, use a widget or a **QS tile**.
 - The Settings reference says promotion is *"reserved for user initiated ongoing activities like navigation, phone calls, and ride sharing"*.
-- **BarBook:** use them for user-started timers, stopwatches, focus sessions or transfers, not for permanent meters. No Live-Update-specific Play policy text was found **(unverified)**.
+- **DiscoBar:** use them for user-started timers, stopwatches, focus sessions or transfers, not for permanent meters. No Live-Update-specific Play policy text was found **(unverified)**.
 
 ## 3. Android 17 `StatusBarManager` agent-task API (`android.agenticon`)
 
@@ -166,8 +166,8 @@ Sources: [StatusBarManager](https://developer.android.com/reference/android/app/
   - `AgentTaskState`: **one icon** with optional looping or interrupting animation, a content description, and a click `PendingIntent`.
   - `AgentTaskEvent`: a transient pill of leading icons + text + trailing icons. It may be dropped if events are too frequent, the bar is hidden, or more critical information needs the space.
   - `AgentTaskOutcome` reports `isStateChanged()` and `isEventShown()`.
-- **Related API.** `StatusBarManager.showPowerMenu()` (37) needs `SHOW_POWER_MENU`, which is *"granted to the current holder of the ASSISTANT role"* ([Manifest.permission](https://developer.android.com/reference/android/Manifest.permission#SHOW_POWER_MENU)). BarBook can open the same menu with `performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)`.
-- **Verdict: not usable.** Any app with an exported `ACTION_ASSIST` activity qualifies for ROLE_ASSISTANT ([AssistantRoleBehavior.java, android17-release](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android17-release/PermissionController/role-controller/java/com/android/role/controller/behavior/AssistantRoleBehavior.java)). But the user would have to make BarBook the digital assistant, replacing Gemini, to get a single icon.
+- **Related API.** `StatusBarManager.showPowerMenu()` (37) needs `SHOW_POWER_MENU`, which is *"granted to the current holder of the ASSISTANT role"* ([Manifest.permission](https://developer.android.com/reference/android/Manifest.permission#SHOW_POWER_MENU)). DiscoBar can open the same menu with `performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)`.
+- **Verdict: not usable.** Any app with an exported `ACTION_ASSIST` activity qualifies for ROLE_ASSISTANT ([AssistantRoleBehavior.java, android17-release](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android17-release/PermissionController/role-controller/java/com/android/role/controller/behavior/AssistantRoleBehavior.java)). But the user would have to make DiscoBar the digital assistant, replacing Gemini, to get a single icon.
 
 ## 4. Quick Settings tiles
 
@@ -193,7 +193,7 @@ From the [QS tiles guide](https://developer.android.com/develop/ui/views/quickse
 - **Large screens and desktop.** No developer page describes tile behaviour specific to desktop or large screens **(unverified)**. Pixel uses tile categories; *"OEMs can either use or disregard"* them.
 - **Accessibility-service tie-ins** ([AccessibilityManagerService.java, android17-release](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java)).
   - An enabled service that targets above Q and sets `FLAG_REQUEST_ACCESSIBILITY_BUTTON` is **auto-assigned to the floating accessibility button**. Only **tools** that declare a `tileService` are assigned to QS instead.
-  - So BarBook should **not** request the accessibility button.
+  - So DiscoBar should **not** request the accessibility button.
 
 ## 5. Special app access a user can grant in Settings (no adb)
 
@@ -202,7 +202,7 @@ From the [QS tiles guide](https://developer.android.com/develop/ui/views/quickse
 | **WRITE_SETTINGS** (`Settings.System`, e.g. brightness, screen timeout) | Declare `WRITE_SETTINGS`. Send the user to `Settings.ACTION_MANAGE_WRITE_SETTINGS` (`"android.settings.action.MANAGE_WRITE_SETTINGS"`, API 23) with data `package:<pkg>`. Check with `Settings.System.canWrite()`. | No |
 | **Do Not Disturb / Modes access** | `ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS` (API 23; *"Managed profiles cannot grant"*). Check with `NotificationManager.isNotificationPolicyAccessGranted()`. | No |
 | **Notification listener** | `ACTION_NOTIFICATION_LISTENER_SETTINGS` for the list, or `ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS` (API 30) + `EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME` for the per-app page. Check with `isNotificationListenerAccessGranted(cn)`. | **Yes** (`OPSTR_ACCESS_NOTIFICATIONS`). One "Allow restricted settings" unlock is **per package**, so it also covers the accessibility service (`clearRestriction` sets the whole app NOT_GUARDED). |
-| **SCHEDULE_EXACT_ALARM** | `ACTION_REQUEST_SCHEDULE_EXACT_ALARM` (API 31) with `package:` data. The result is `RESULT_OK` if granted. Check with `AlarmManager.canScheduleExactAlarms()`. Since Android 14 it is *"denied by default"* for new installs targeting 33+ ([14 changes](https://developer.android.com/about/versions/14/behavior-changes-all)). BarBook doesn't need it; a clock UI can use `ACTION_TIME_TICK`/`Handler`. | No |
+| **SCHEDULE_EXACT_ALARM** | `ACTION_REQUEST_SCHEDULE_EXACT_ALARM` (API 31) with `package:` data. The result is `RESULT_OK` if granted. Check with `AlarmManager.canScheduleExactAlarms()`. Since Android 14 it is *"denied by default"* for new installs targeting 33+ ([14 changes](https://developer.android.com/about/versions/14/behavior-changes-all)). DiscoBar doesn't need it; a clock UI can use `ACTION_TIME_TICK`/`Handler`. | No |
 | **READ_CALENDAR** | Ordinary runtime permission (`requestPermissions`). | No |
 | **`MediaSessionManager.getActiveSessions(cn)`** | Requires `MEDIA_CONTENT_CONTROL` (system only) **or** being an enabled notification listener and passing its `ComponentName` ([MediaSessionManager](https://developer.android.com/reference/android/media/session/MediaSessionManager#getActiveSessions(android.content.ComponentName))). Pair it with `addOnActiveSessionsChangedListener`. | Via the listener: yes |
 | **`AudioManager.dispatchMediaKeyEvent(KeyEvent)`** | No permission. Send DOWN then UP; the event goes to the current media-button consumer ([AudioManager](https://developer.android.com/reference/android/media/AudioManager#dispatchMediaKeyEvent(android.view.KeyEvent))). | No |
@@ -213,7 +213,7 @@ All intent docs: [Settings](https://developer.android.com/reference/android/prov
 
 **Android 15 DND change** ([behavior-changes-15](https://developer.android.com/about/versions/15/behavior-changes-15)): apps targeting 35+ *"can no longer change the global state or policy of Do Not Disturb"*.
 - Calls to `setInterruptionFilter`/`setNotificationPolicy` now *"result in the creation or update of an implicit AutomaticZenRule"*. The system merges it under most-restrictive-wins.
-- Consequence: a BarBook "DND" toggle can turn *its own* mode on and off, but `INTERRUPTION_FILTER_ALL` cannot switch off DND that the user or another app started.
+- Consequence: a DiscoBar "DND" toggle can turn *its own* mode on and off, but `INTERRUPTION_FILTER_ALL` cannot switch off DND that the user or another app started.
 
 **Android 17 background audio hardening** ([bg-audio](https://developer.android.com/about/versions/17/changes/bg-audio)): this matters for volume and mute items.
 - `setStreamVolume`, `adjustStreamVolume`, `adjustVolume`, `adjustSuggestedStreamVolume`, `setStreamMute` and `setRingerMode` are **silently ignored**. This applies to all apps unless they have a visible activity or a non-`SHORT_SERVICE` FGS. Apps targeting 37 also need a **while-in-use** FGS when in the background.
@@ -251,7 +251,7 @@ All intent docs: [Settings](https://developer.android.com/reference/android/prov
   - A display is desktop-first when a keyboard **and** a touchpad or mouse are connected. External displays usually default to desktop-first.
   - Convertibles can switch on posture ("keyboard flipped back" means touch-first).
   - Desktop-first always uses the **Desktop Taskbar**; touch-first uses the transient taskbar.
-  - **BarBook must re-layout when the mode, display or posture changes.** Each connected display can host its own bars; use `getWindowsOnAllDisplays()` and `attachAccessibilityOverlayToDisplay()`.
+  - **DiscoBar must re-layout when the mode, display or posture changes.** Each connected display can host its own bars; use `getWindowsOnAllDisplays()` and `attachAccessibilityOverlayToDisplay()`.
 - **Keyboard shortcuts:** `Meta+Ctrl+Down` enters desktop windowing and `Meta+H` exits (support guide); `Alt+Tab` switches windows ([Multitasking](https://developer.android.com/design/ui/desktop/guides/system/multi-task)). Apps should support Tab and arrow navigation, **Esc to dismiss menus and popovers**, and list their shortcuts in the Keyboard Shortcuts Helper ([Keyboard interaction](https://developer.android.com/design/ui/desktop/guides/interaction/keyboard)).
   - The helper is fed through `Activity.onProvideKeyboardShortcuts`, so a service-only overlay can't use it.
   - Global hotkeys need the accessibility key filter: `FLAG_REQUEST_FILTER_KEY_EVENTS` + `canRequestFilterKeyEvents`, handled in `onKeyEvent` ([AccessibilityServiceInfo](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo)). Expect Play scrutiny.
@@ -279,20 +279,20 @@ All intent docs: [Settings](https://developer.android.com/reference/android/prov
 | **Next meeting** | `READ_CALENDAR` + `CalendarContract.Instances`. You *"need to specify a range time for the query in the URI"* (`Instances.CONTENT_URI` + begin/end, or `Instances.query(cr, proj, begin, end)`). The table is read-only ([Instances](https://developer.android.com/reference/android/provider/CalendarContract.Instances), [Calendar provider guide](https://developer.android.com/identity/providers/calendar-provider)). Re-query on `PROVIDER_CHANGED` or a `ContentObserver`. |
 | **Next alarm** | `AlarmManager.getNextAlarmClock()` returns the next alarm from *any* app's `setAlarmClock()`, or null. It needs no permission. Watch `ACTION_NEXT_ALARM_CLOCK_CHANGED` ([AlarmManager](https://developer.android.com/reference/android/app/AlarmManager#getNextAlarmClock())). |
 | **Wi-Fi strength** | Since API 31 `WifiManager.getConnectionInfo()` is deprecated. Read `WifiInfo` from `NetworkCapabilities.getTransportInfo()` via `NetworkCallback.onCapabilitiesChanged` (needs `ACCESS_NETWORK_STATE`). **Without** location permission and `FLAG_INCLUDE_LOCATION_INFO`, only location-sensitive fields are redacted: SSID becomes `UNKNOWN_SSID` and BSSID `02:00:00:00:00:00`. **`getRssi()` (dBm) stays available**; `WifiManager.calculateSignalLevel(rssi)` (API 30) maps it to bars ([WifiInfo](https://developer.android.com/reference/android/net/wifi/WifiInfo), [NetworkCallback](https://developer.android.com/reference/android/net/ConnectivityManager.NetworkCallback#FLAG_INCLUDE_LOCATION_INFO), [WifiManager](https://developer.android.com/reference/android/net/wifi/WifiManager)). Showing the SSID needs location permission. |
-| **Text colour** | `WallpaperManager.getWallpaperColors(FLAG_SYSTEM)` (27) can return **null** (colours still processing, live wallpaper). It is IPC, so don't call it on the UI thread. `WallpaperColors.getColorHints() & HINT_SUPPORTS_DARK_TEXT` (31) means *"dark text is preferred"* ([WallpaperManager](https://developer.android.com/reference/android/app/WallpaperManager), [WallpaperColors](https://developer.android.com/reference/android/app/WallpaperColors)). Listen with `addOnColorsChangedListener`. This only helps when the bar sits over the wallpaper; over maximized app windows SystemUI changes its tint, and BarBook must follow it (e.g. by sampling a status-bar screenshot) **(unverified approach)**. |
+| **Text colour** | `WallpaperManager.getWallpaperColors(FLAG_SYSTEM)` (27) can return **null** (colours still processing, live wallpaper). It is IPC, so don't call it on the UI thread. `WallpaperColors.getColorHints() & HINT_SUPPORTS_DARK_TEXT` (31) means *"dark text is preferred"* ([WallpaperManager](https://developer.android.com/reference/android/app/WallpaperManager), [WallpaperColors](https://developer.android.com/reference/android/app/WallpaperColors)). Listen with `addOnColorsChangedListener`. This only helps when the bar sits over the wallpaper; over maximized app windows SystemUI changes its tint, and DiscoBar must follow it (e.g. by sampling a status-bar screenshot) **(unverified approach)**. |
 
-## Gotchas for BarBook
+## Gotchas for DiscoBar
 
 1. **Onboarding takes 6 steps.** GitHub APKs installed through Chrome or Files are ECM-guarded. The user must: tap the switch → see "Restricted setting" → App info → ⋮ → **Allow restricted settings** → PIN → enable. The ⋮ item only appears after the dialog. Guide each step and re-check state in `onResume`. One unlock covers the notification listener too.
 2. **Advanced Protection kills the product.** It blocks sideloading, and on 17 it blocks non-tool services. Detect it and fall back to tiles and notifications. **Never set `isAccessibilityTool`.**
-3. **Overlays sit above everything** (layer 31, above the status bar, shade/QS, lock screen, volume dialog and taskbar). Hide BarBook's items whenever the shade, QS, keyguard, a fullscreen app or the capture UI is active. Drive this from `TYPE_WINDOWS_CHANGED`.
+3. **Overlays sit above everything** (layer 31, above the status bar, shade/QS, lock screen, volume dialog and taskbar). Hide DiscoBar's items whenever the shade, QS, keyguard, a fullscreen app or the capture UI is active. Drive this from `TYPE_WINDOWS_CHANGED`.
 4. **Don't cover or imitate system UI.** Keep clear of the notification indicator, privacy dots, the screen-share chip and Live Update chips. Play bans using the API to *"work around … privacy controls and notifications"* or to deceive.
 5. **The desktop status bar is undocumented OEM UI.**
    - Derive free space at runtime from `getWindowsOnAllDisplays()` and the SystemUI node tree.
    - Re-layout when windows, config, locale or IME, or chips change; on desktop-first ↔ touch-first switches; and per external display.
 6. **Users will see "Review app with full device access"** about a day after enabling, and again after each re-enable, with a **Remove access** button. Pre-warn them.
 7. **Keep the service lean and crash-proof.** A crash marks it `crashed`. Android 17 kills apps over memory limits (`MemoryLimiter:AnonSwap`) and for excessive CPU. Keep IPC-heavy calls (calendar, storage stats, wallpaper colours) off the main thread.
-8. **Volume and mute calls may silently no-op on 17.** Test them with `cmd audio set-enable-hardening throw`. On 15+ a DND toggle drives only BarBook's own implicit mode.
+8. **Volume and mute calls may silently no-op on 17.** Test them with `cmd audio set-enable-hardening throw`. On 15+ a DND toggle drives only DiscoBar's own implicit mode.
 9. **There is no true device CPU %.** `/proc/stat` is blocked. `getCpuHeadroom()` is an estimate, may be unsupported, and is rate-limited.
 10. **Live Updates aren't a permanent slot.** They must be user-initiated and time-sensitive, the chip is ≤ 96 dp and about 7 characters, and users can demote them.
 11. **The agent-task icon and `showPowerMenu` need ROLE_ASSISTANT** (and the agent API is 37.2, while the device reports 37.1). Use `performGlobalAction(GLOBAL_ACTION_POWER_DIALOG / _NOTIFICATIONS / _QUICK_SETTINGS)` instead.

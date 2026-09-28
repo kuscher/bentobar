@@ -9,6 +9,6 @@ javac --release 17 -Xlint:all,-options -encoding UTF-8 -cp "$C/android-37.jar" -
 java -cp "$C/r8.jar" com.android.tools.r8.D8 --release --min-api 34 --lib "$C/android-37.jar" --output $OUT/dex $(find $OUT/classes -name '*.class')
 python3 -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'a',zipfile.ZIP_DEFLATED); z.write(sys.argv[2],'classes.dex')" $OUT/app.apk $OUT/dex/classes.dex
 zipalign -f 4 $OUT/app.apk $OUT/aligned.apk
-[[ -f barprobe.jks ]] || keytool -genkeypair -keystore barprobe.jks -storepass barprobe -keypass barprobe -alias key -keyalg RSA -keysize 2048 -validity 365 -dname "CN=BarBook probe" 2>/dev/null
+[[ -f barprobe.jks ]] || keytool -genkeypair -keystore barprobe.jks -storepass barprobe -keypass barprobe -alias key -keyalg RSA -keysize 2048 -validity 365 -dname "CN=DiscoBar probe" 2>/dev/null
 apksigner sign --ks barprobe.jks --ks-pass pass:barprobe --key-pass pass:barprobe --out barprobe.apk $OUT/aligned.apk
 rm -f barprobe.apk.idsig; ls -la barprobe.apk

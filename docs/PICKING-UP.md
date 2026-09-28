@@ -1,13 +1,24 @@
-# Picking up BarBook
+# Picking up DiscoBar
 
 The dev VM can restart mid-task. This file is the status and the next steps; keep it current and
 commit at every milestone.
 
 ## Where things live
-- Repo `~/barbook` (local git, not pushed yet: ask the user before creating a GitHub repo).
-- Release key `~/.config/barbook/keystore.jks` + `keystore.pass` (not in git; not backed up privately yet; ask the user).
+- Repo `~/discobar` (local git, not pushed yet: ask the user before creating a GitHub repo).
+- Release key `~/.config/discobar/keystore.jks` + `keystore.pass` (not in git). Keystore backed
+  up to a private folder (id (private), checksum
+  verified); the password is for the user's password manager.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
+
+## 0.2 (2026-09-28): renamed DiscoBar, tighter bar
+- The user asked: call it DiscoBar; fix spacing (the finished timer's "Done" sat far from its icon,
+  other things too big); hover reveal off by default; the release key backed up. All done.
+- Cause of the gaps: Compose `remember` in the strip was positional, so an item popping in
+  inherited a neighbour's held width. Now keyed by item id; width holding only for ticking numbers
+  (`ItemState.widthKey`), 5 s. Icons 15 sp (measured against the system's glyphs), spacing 12 dp,
+  menus more compact.
+- DiscoBar 0.2 release is installed and enabled on the HP (fresh install: notifications not granted).
 
 ## Status: 0.1 works on the device (2026-09-28)
 Verified on the HP Googlebook 14 (Android 17, SDK 37.1):

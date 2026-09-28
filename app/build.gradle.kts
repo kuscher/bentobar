@@ -5,19 +5,19 @@ plugins {
 }
 
 android {
-    namespace = "io.github.kuscher.barbook"
+    namespace = "io.github.kuscher.discobar"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.kuscher.barbook"
+        applicationId = "io.github.kuscher.discobar"
         minSdk = 34
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.2"
     }
 
-    // Release signing from ~/.config/barbook (never committed). Absent -> unsigned release build.
-    val keyDir = File(System.getProperty("user.home"), ".config/barbook")
+    // Release signing from ~/.config/discobar (never committed). Absent -> unsigned release build.
+    val keyDir = File(System.getProperty("user.home"), ".config/discobar")
     val keyFile = File(keyDir, "keystore.jks")
     val keyPassFile = File(keyDir, "keystore.pass")
     signingConfigs {
@@ -26,7 +26,7 @@ android {
                 storeFile = keyFile
                 val pw = keyPassFile.readText().trim()
                 storePassword = pw
-                keyAlias = "barbook"
+                keyAlias = "discobar"
                 keyPassword = pw
             }
         }

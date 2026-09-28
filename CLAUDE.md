@@ -64,5 +64,6 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   items skip recomposition; items hold their widest text width for 15 s so neighbours don't jump.
   The release build uses about 0.8% of one core with network speed on (debug builds are 3–4×
   slower; measure release).
-- Another session's StudioSnap helper (`~/studiosnap/ss enable`) used to overwrite the whole
-  `enabled_accessibility_services` list and switch BarBook off. `./bar enable` adds to the list.
+- StudioSnap's helper (`~/studiosnap/ss enable`) used to overwrite the whole
+  `enabled_accessibility_services` list and switch BarBook off; fixed there on 2026-09-28. Both
+  helpers now add or remove only their own entry (short or full component form).

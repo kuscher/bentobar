@@ -19,6 +19,8 @@ data class BarSnapshot(
     val clock: Rect?,
     /** A short fingerprint of the bar's items, for logs. */
     val summary: String,
+    /** The desktop bar's spacer node: refreshing just this is a cheap "did anything move?" check. */
+    val spacerNode: AccessibilityNodeInfo? = null,
 )
 
 object StatusBarScan {
@@ -36,6 +38,7 @@ object StatusBarScan {
         val bar = Rect().also { w.getBoundsInScreen(it) }
         val root = w.root ?: return BarSnapshot(w.id, bar, Rect(bar), null, "no-tree")
         var spacer: Rect? = null
+        var spacerNode: AccessibilityNodeInfo? = null
         var clock: Rect? = null
         val parts = ArrayList<Rect>()
         val names = StringBuilder()
@@ -47,7 +50,7 @@ object StatusBarScan {
             visited++
             val r = Rect().also { n.getBoundsInScreen(it) }
             val id = n.viewIdResourceName.orEmpty()
-            if (id.endsWith("DesktopStatusBarSpacer")) spacer = Rect(r)
+            if (id.endsWith("DesktopStatusBarSpacer")) { spacer = Rect(r); spacerNode = n }
             val text = n.text?.toString().orEmpty()
             if (clock == null && text.isNotEmpty() && timeRe.containsMatchIn(text)) clock = Rect(r)
             // Leaf-ish pieces that take room: anything clickable or labelled that isn't the whole bar.
@@ -59,7 +62,7 @@ object StatusBarScan {
             for (i in n.childCount - 1 downTo 0) n.getChild(i)?.let { stack.add(it to depth + 1) }
         }
         val free = spacer?.takeIf { it.width() > 0 } ?: widestGap(bar, parts)
-        return BarSnapshot(w.id, bar, free, clock, names.toString().trim())
+        return BarSnapshot(w.id, bar, free, clock, names.toString().trim(), spacerNode)
     }
 
     /** The widest horizontal stretch of the bar that no item covers. */

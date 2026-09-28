@@ -65,7 +65,7 @@ object Ticker {
     private fun runOnce() {
         val now = SystemClock.elapsedRealtime()
         try {
-            Env.tick(now)
+            Env.tick(now, Store.config.value.items.filter { it.section != Section.OFF }.mapTo(HashSet()) { it.type })
             Timers.check()
             Caffeine.check()
         } catch (e: Exception) {

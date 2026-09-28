@@ -7,7 +7,8 @@ import io.github.kuscher.barbook.data.ItemConfig
 /** How an item's text is coloured in the bar. */
 enum class Tone { NORMAL, ACCENT, WARN, ALERT }
 
-/** What one item shows right now. */
+/** What one item shows right now. Immutable (never mutate [image]), so Compose can skip unchanged items. */
+@androidx.compose.runtime.Immutable
 data class ItemState(
     val icon: String? = null,
     /** Filled glyphs match the system's status bar icons; outlined reads as "off". */

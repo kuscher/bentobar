@@ -19,9 +19,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.composed
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +61,7 @@ import io.github.kuscher.barbook.util.Sym
 import io.github.kuscher.barbook.util.SymIcon
 
 /** Colours and sizes for the strip, matched to the status bar. */
+@androidx.compose.runtime.Immutable
 data class StripLook(
     val fg: Color,
     /** True when [fg] is light, i.e. the bar behind it is dark. */
@@ -74,6 +78,7 @@ data class StripLook(
     val alertFg: Color get() = if (lightText) Color(0xFF690005) else Color.White
 }
 
+@androidx.compose.runtime.Immutable
 data class StripEntry(val item: ItemConfig, val state: ItemState)
 
 /** What the strip reports back to [BarController]. Rects are in window coordinates. */
@@ -200,10 +205,13 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val hovered by source.collectIsHoveredAsState()
     var bounds by remember { mutableStateOf(Rect()) }
     // Numbers change width every second; hold the widest size for a while so neighbours don't jump
-    // (and the window doesn't resize every tick).
+    // (and the window doesn't resize every tick), then ease back to the natural width.
     val density = androidx.compose.ui.platform.LocalDensity.current
+    var natural by remember { mutableStateOf(0) }
     var widest by remember { mutableStateOf(0) }
-    var widestAt by remember { mutableStateOf(0L) }
+    LaunchedEffect(widest) {
+        if (widest > natural) { kotlinx.coroutines.delay(15_000); widest = natural }
+    }
     val alert = s.tone == Tone.ALERT
     val color = when (s.tone) {
         Tone.ALERT -> look.alertFg
@@ -216,11 +224,6 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val showText = display != Display.ICON && !s.text.isNullOrEmpty()
     Row(
         Modifier.fillMaxHeight()
-            .widthIn(min = with(density) { widest.toDp() })
-            .onSizeChanged { size ->
-                val now = android.os.SystemClock.uptimeMillis()
-                if (size.width > widest || now - widestAt > 15_000) { widest = size.width; widestAt = now }
-            }
             .onGloballyPositioned { bounds = it.boundsInWindow().toRect(); events.placed(entry.item.id, bounds) }
             .clip(RoundedCornerShape(10.dp))
             .background(when {
@@ -247,14 +250,25 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
         if (showIcon && showText && (s.image != null || !s.icon.isNullOrEmpty())) Spacer(Modifier.width(5.dp))
         if (showText) {
             Text(s.text!!, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                modifier = Modifier.widthIn(min = with(density) { widest.toDp() }),
+                onTextLayout = { r ->
+                    val w = kotlin.math.ceil(r.getLineRight(0) - r.getLineLeft(0)).toInt()
+                    natural = w
+                    if (w > widest) widest = w
+                },
                 style = TextStyle(fontFamily = Fonts.bar, fontSize = look.textSp, fontFeatureSettings = "tnum", lineHeight = look.textSp))
         }
     }
 }
 
 /** Primary click, secondary click (right button or touch long-press) and mouse-wheel steps. */
-private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll: ((Int) -> Unit)?): Modifier =
-    pointerInput(onClick, onContext, onScroll) {
+private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll: ((Int) -> Unit)?): Modifier = composed {
+    // Keep the gesture coroutine running across recompositions; call the latest callbacks.
+    val click by rememberUpdatedState(onClick)
+    val context by rememberUpdatedState(onContext)
+    val scroll by rememberUpdatedState(onScroll)
+    pointerInput(Unit) {
         awaitPointerEventScope {
             var down = 0L
             var secondary = false
@@ -274,17 +288,18 @@ private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll
                         val inside = c != null && c.position.x >= 0 && c.position.y >= 0 &&
                             c.position.x <= size.width && c.position.y <= size.height
                         val longPress = c != null && c.uptimeMillis - down > 550 && c.type == androidx.compose.ui.input.pointer.PointerType.Touch
-                        if (inside) { if (secondary || longPress) onContext() else onClick() }
+                        if (inside) { if (secondary || longPress) context() else click() }
                         e.changes.forEach { it.consume() }
                     }
-                    PointerEventType.Scroll -> if (onScroll != null) {
+                    PointerEventType.Scroll -> scroll?.let { onWheel ->
                         val dy = e.changes.firstOrNull()?.scrollDelta?.y ?: 0f
-                        if (dy != 0f) onScroll(if (dy < 0) 1 else -1)
+                        if (dy != 0f) onWheel(if (dy < 0) 1 else -1)
                         e.changes.forEach { it.consume() }
                     }
                 }
             }
         }
     }
+}
 
 private fun androidx.compose.ui.geometry.Rect.toRect() = Rect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())

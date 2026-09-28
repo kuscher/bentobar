@@ -45,19 +45,22 @@ install() {
 }
 
 # Adds or removes only BarBook's service; other enabled services (StudioSnap, TalkBack…) stay.
+# Entries may use the short (pkg/.Class) or full (pkg/pkg.Class) form; both mean BarBook.
+SVC_SHORT="$PKG/.bar.BarService"
+others() { # the enabled list without BarBook, colon-separated
+  A shell settings get --user current secure enabled_accessibility_services | tr -d '\r' | tr ':' '\n' |
+    grep -v -x -F -e "$SVC" -e "$SVC_SHORT" -e null | grep -v '^$' | paste -sd: || true
+}
 enable() {
-  local cur; cur=$(A shell settings get --user current secure enabled_accessibility_services | tr -d '\r')
-  [ "$cur" = null ] && cur=""
-  case ":$cur:" in *":$SVC:"*) ;; *) cur="${cur:+$cur:}$SVC";; esac
-  A shell settings put --user current secure enabled_accessibility_services "$cur"
+  local rest; rest=$(others)
+  A shell settings put --user current secure enabled_accessibility_services "${rest:+$rest:}$SVC"
   A shell settings put --user current secure accessibility_enabled 1
   echo "service enabled"
 }
 disable() {
-  local cur; cur=$(A shell settings get --user current secure enabled_accessibility_services | tr -d '\r')
-  cur=$(printf '%s' "$cur" | tr ':' '\n' | grep -v -x -F "$SVC" | grep -v '^null$' | paste -sd: || true)
-  if [ -z "$cur" ]; then A shell settings delete --user current secure enabled_accessibility_services >/dev/null
-  else A shell settings put --user current secure enabled_accessibility_services "$cur"; fi
+  local rest; rest=$(others)
+  if [ -z "$rest" ]; then A shell settings delete --user current secure enabled_accessibility_services >/dev/null
+  else A shell settings put --user current secure enabled_accessibility_services "$rest"; fi
   echo "service disabled"
 }
 

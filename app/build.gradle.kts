@@ -12,8 +12,8 @@ android {
         applicationId = "io.github.kuscher.discobar"
         minSdk = 34
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3"
+        versionCode = 4
+        versionName = "0.4"
     }
 
     // Release signing from ~/.config/discobar (never committed). Absent -> unsigned release build.

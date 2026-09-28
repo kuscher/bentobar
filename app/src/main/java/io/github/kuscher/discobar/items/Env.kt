@@ -240,7 +240,8 @@ class CpuSampler {
             clusters = policies.mapIndexed { i, (span, f) -> Cluster(span, readLong(f) ?: 0L, maxKhz[i]) }
             gpu = runCatching {
                 val parts = java.io.File("/sys/class/kgsl/kgsl-3d0/gpubusy").readText().trim().split(Regex("\\s+")).map { it.toDouble() }
-                if (parts.size >= 2 && parts[1] > 0) (parts[0] / parts[1]).coerceIn(0.0, 1.0) else null
+                // "busy total" over the last window; an idle GPU reports "0 0".
+                if (parts.size < 2) null else if (parts[1] > 0) (parts[0] / parts[1]).coerceIn(0.0, 1.0) else 0.0
             }.getOrNull()
             gpu?.let { gpuHistory.add(it) }
         }

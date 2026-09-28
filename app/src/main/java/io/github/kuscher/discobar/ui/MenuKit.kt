@@ -52,6 +52,8 @@ fun MenuCard(
     title: String,
     subtitle: String? = null,
     trailing: (@Composable () -> Unit)? = null,
+    /** A drawable instead of the [icon] symbol (DiscoBar's own mark). */
+    iconRes: Int? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
@@ -60,7 +62,11 @@ fun MenuCard(
                 Modifier.size(30.dp).clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
-            ) { SymIcon(icon, size = 17.sp, filled = true, color = MaterialTheme.colorScheme.onPrimaryContainer) }
+            ) {
+                if (iconRes != null) androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(iconRes), null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(20.dp))
+                else SymIcon(icon, size = 17.sp, filled = true, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)

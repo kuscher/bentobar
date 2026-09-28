@@ -24,11 +24,17 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
     (Add, Look, Setup, About), `Theme`, `MenuKit` and `Controls` (shared UI pieces).
   - `tile/Tiles.kt`: the DiscoBar, Keep awake and Timer tiles.
   - `util/`: `Sym.kt` (generated), `Ui.kt` (fonts, `SymIcon`), `Fmt.kt`, `DebugReceiver.kt`.
-- `tools/logo.py`: draws the disco-ball icon (launcher foreground, monochrome, background, and the
-  24 dp `ic_disco` used by the tile and the app).
+- `tools/logo.py`: draws the icon (a status bar pill over the Tools glyph, white on blue): launcher
+  foreground/monochrome/background, `ic_discobar` (24 dp, app header) and `ic_tile_bar` (the QS
+  tile), plus docs/images/icon.png for the README.
 - `tools/icons.py`: subsets Material Symbols Rounded into `assets/fonts` (outlined and filled),
   writes `Sym.kt`, and exports some glyphs as vector drawables (`res/drawable/sym_*.xml`, for
   tiles and notifications). Add an icon name there, then rerun it.
+- `tools/readme_images.py`: composes docs/images/*.png (README) from raw captures in
+  ~/.cache/discobar/shots (see its docstring). Capture with a **demo layout** (`./disco debug cfg` to
+  save the user's, `./disco debug import <base64>` to load the demo and later restore theirs) so no
+  calendar titles or other personal data show, and with `./disco debug winshot [title|app]`, which
+  returns a PNG of DiscoBar's own window (no pointer, no other apps) base64 in the broadcast result.
 - `docs/research/`: the device findings (probe results) and the official-docs research, with URLs.
 - `probe/`: the throwaway feasibility probe (Gradle-free build). Not part of the app.
 

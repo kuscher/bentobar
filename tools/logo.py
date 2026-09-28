@@ -1,107 +1,123 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Draws DiscoBar's disco-ball icon as Android vector drawables.
+"""Draws DiscoBar's icons as Android vector drawables.
 
-The ball is a grid of mirror facets clipped to a circle. Facet edges follow the sine of
-longitude and latitude, so facets narrow towards the rim like on a sphere.
+The mark is a status bar pill (a ‹ and three item dots cut out of it) above the "handyman" tools
+glyph from Material Symbols Rounded (Apache-2.0), the same glyph as the bar's Tools item: a tool
+for your status bar. The launcher icon is white on a Settings-style blue gradient, laid out
+inside the adaptive icon's 66 dp safe zone.
 
 Writes app/src/main/res/drawable/:
-  ic_launcher_foreground.xml   the ball with a silver shine and two sparkles (adaptive icon, 108 dp)
-  ic_launcher_monochrome.xml   the same shapes in one colour (themed icons)
-  ic_launcher_background.xml   the night-club gradient
-  ic_disco.xml                 a 24 dp single-colour ball for tiles, notifications and the app
+  ic_launcher_background.xml   the blue gradient
+  ic_launcher_foreground.xml   the mark (adaptive icon, 108 dp)
+  ic_launcher_monochrome.xml   the mark in one colour (themed icons)
+  ic_discobar.xml              the mark at 24 dp (settings header, About)
+  ic_tile_bar.xml              just the pill at 24 dp (Quick Settings tile)
+and docs/images/icon.png (512 px, for the README) when rsvg-convert is available.
 
-    python3 tools/logo.py
+    python3 tools/logo.py     (needs fonttools; the Material Symbols font comes from tools/icons.py's cache)
 """
-import math
+import os
 import pathlib
+import shutil
+import subprocess
+import tempfile
+
+from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.pens.transformPen import TransformPen
+from fontTools.ttLib import TTFont
+from fontTools.varLib import instancer
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RES = ROOT / "app/src/main/res/drawable"
+CACHE = pathlib.Path(os.environ.get("DISCOBAR_CACHE", pathlib.Path.home() / ".cache/discobar"))
+VF = "MaterialSymbolsRounded[FILL,GRAD,opsz,wght]"
+BLUE_LIGHT, BLUE_DARK, WHITE = "#FF5B77F0", "#FF2B3DB3", "#FFFFFFFF"
 
 
-def facets(cx, cy, r, cols=9, rows=9, gap=0.9):
-    """Rectangles (x0, y0, x1, y1) of the facets, before clipping to the circle."""
-    xs = [cx + r * math.sin(math.radians(-90 + 180 * i / cols)) for i in range(cols + 1)]
-    ys = [cy + r * math.sin(math.radians(-90 + 180 * j / rows)) for j in range(rows + 1)]
-    out = []
-    for j in range(rows):
-        for i in range(cols):
-            x0, x1 = xs[i] + gap / 2, xs[i + 1] - gap / 2
-            y0, y1 = ys[j] + gap / 2, ys[j + 1] - gap / 2
-            if x1 - x0 > 0.3 and y1 - y0 > 0.3:
-                out.append((x0, y0, x1, y1))
+def glyph(name):
+    """SVG path of a filled Material Symbol on a 960 unit box (y down)."""
+    cps = {l.split()[0]: int(l.split()[1], 16) for l in (CACHE / f"{VF}.codepoints").read_text().splitlines()}
+    font = instancer.instantiateVariableFont(TTFont(CACHE / f"{VF}.ttf"), {"FILL": 1, "GRAD": 0, "opsz": 48, "wght": 500})
+    glyphs = font.getGlyphSet()
+    pen = SVGPathPen(glyphs)
+    glyphs[font.getBestCmap()[cps[name]]].draw(TransformPen(pen, (1, 0, 0, -1, 0, 960)))
+    return pen.getCommands()
+
+
+def pill(x, y, w, h):
+    """A rounded bar with a ‹ and three dots, as one path meant for evenOdd filling (they're holes)."""
+    r = h / 2
+    out = f"M{x + r:.2f},{y:.2f}H{x + w - r:.2f}A{r:.2f},{r:.2f} 0 0 1 {x + w - r:.2f},{y + h:.2f}H{x + r:.2f}A{r:.2f},{r:.2f} 0 0 1 {x + r:.2f},{y:.2f}Z"
+    cy, d, step = y + h / 2, h * 0.19, h * 0.59
+    for cx in (x + w - r - 2 * step, x + w - r - step, x + w - r):
+        out += f"M{cx - d:.2f},{cy:.2f}a{d:.2f},{d:.2f} 0 1,0 {2 * d:.2f},0a{d:.2f},{d:.2f} 0 1,0 {-2 * d:.2f},0Z"
+    c, t, a = x + r, h * 0.13, h * 0.26
+    out += (f"M{c + a:.2f},{cy - a - t * 0.2:.2f}L{c + a + t:.2f},{cy - a + t * 0.8:.2f}L{c + t * 1.2:.2f},{cy:.2f}"
+            f"L{c + a + t:.2f},{cy + a - t * 0.8:.2f}L{c + a:.2f},{cy + a + t * 0.2:.2f}L{c - t * 0.3:.2f},{cy:.2f}Z")
     return out
 
 
-def rects_path(rects):
-    return "".join(f"M{x0:.2f},{y0:.2f}H{x1:.2f}V{y1:.2f}H{x0:.2f}Z" for x0, y0, x1, y1 in rects)
+def mark(tools, fill, box):
+    """Pill + tools, scaled from the 108 dp design grid into a viewport of size [box]."""
+    s = box / 108
+    k = 34 / 960  # the tools glyph is 34 dp wide on the 108 grid
+    return (f'  <group android:scaleX="{s:.4f}" android:scaleY="{s:.4f}">\n'
+            f'    <path android:fillColor="{fill}" android:fillType="evenOdd" android:pathData="{pill(29, 31, 50, 12)}"/>\n'
+            f'    <group android:translateX="{54 - 17:.2f}" android:translateY="{64 - 17:.2f}" android:scaleX="{k:.5f}" android:scaleY="{k:.5f}">\n'
+            f'      <path android:fillColor="{fill}" android:pathData="{tools}"/>\n'
+            f'    </group>\n  </group>\n')
 
 
-def circle_path(cx, cy, r):
-    return f"M{cx - r:.2f},{cy:.2f}a{r:.2f},{r:.2f} 0 1,0 {2 * r:.2f},0a{r:.2f},{r:.2f} 0 1,0 {-2 * r:.2f},0Z"
-
-
-def sparkle(cx, cy, s):
-    """A four-point star."""
-    k = s * 0.22
-    return (f"M{cx:.2f},{cy - s:.2f}L{cx + k:.2f},{cy - k:.2f}L{cx + s:.2f},{cy:.2f}L{cx + k:.2f},{cy + k:.2f}"
-            f"L{cx:.2f},{cy + s:.2f}L{cx - k:.2f},{cy + k:.2f}L{cx - s:.2f},{cy:.2f}L{cx - k:.2f},{cy - k:.2f}Z")
-
-
-HEADER = '<?xml version="1.0" encoding="utf-8"?>\n<!-- Generated by tools/logo.py: DiscoBar\'s disco ball. -->\n'
-
-
-def ball(cx, cy, r, fill, cols, gap, extra=""):
-    return (f'  <group>\n    <clip-path android:pathData="{circle_path(cx, cy, r)}"/>\n'
-            f'    <path android:pathData="{rects_path(facets(cx, cy, r, cols, cols, gap))}"{fill}{extra}</path>\n'
-            f'  </group>\n')
+def vector(size_dp, viewport, body, tint=False, aapt=False):
+    head = ('<?xml version="1.0" encoding="utf-8"?>\n'
+            '<!-- Generated by tools/logo.py. Tools glyph: Material Symbols Rounded "handyman" (Apache-2.0, Google). -->\n'
+            '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n')
+    if aapt:
+        head += '    xmlns:aapt="http://schemas.android.com/aapt"\n'
+    head += f'    android:width="{size_dp}dp" android:height="{size_dp}dp" android:viewportWidth="{viewport}" android:viewportHeight="{viewport}"'
+    if tint:
+        head += '\n    android:tint="?android:attr/colorControlNormal"'
+    return head + ">\n" + body + "</vector>\n"
 
 
 def main():
     RES.mkdir(parents=True, exist_ok=True)
-    cx, cy, r = 54, 58, 24
-    silver = (
-        '>\n      <aapt:attr name="android:fillColor">\n'
-        f'        <gradient android:type="radial" android:centerX="{cx - 8}" android:centerY="{cy - 9}" android:gradientRadius="30"\n'
-        '            android:startColor="#FFFFFFFF" android:centerColor="#FFE3E6F0" android:endColor="#FF9AA3B8"/>\n'
-        '      </aapt:attr>\n    ')
-    string = f'  <path android:fillColor="#CCFFFFFF" android:pathData="M{cx - 0.8},{cy - r - 12}h1.6v12h-1.6z"/>\n'
-    sparkles = (f'  <path android:fillColor="#FFFFFFFF" android:pathData="{sparkle(80, 37, 7)}"/>\n'
-                f'  <path android:fillColor="#DDFFFFFF" android:pathData="{sparkle(28, 46, 4.5)}"/>\n')
-    (RES / "ic_launcher_foreground.xml").write_text(
-        HEADER + '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
-        '    xmlns:aapt="http://schemas.android.com/aapt"\n'
-        '    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">\n'
-        + string + ball(cx, cy, r, silver, 9, 0.9) + sparkles + '</vector>\n')
-
-    mono = ' android:fillColor="#FFFFFFFF">\n    '
-    (RES / "ic_launcher_monochrome.xml").write_text(
-        HEADER + '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
-        '    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">\n'
-        + string + ball(cx, cy, r, mono, 9, 1.1)
-        + f'  <path android:fillColor="#FFFFFFFF" android:pathData="{sparkle(80, 37, 7)}"/>\n</vector>\n')
-
-    (RES / "ic_launcher_background.xml").write_text(
-        HEADER + '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
-        '    xmlns:aapt="http://schemas.android.com/aapt"\n'
-        '    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">\n'
+    tools = glyph("handyman")
+    (RES / "ic_launcher_background.xml").write_text(vector(108, 108, (
         '  <path android:pathData="M0,0h108v108h-108z">\n'
         '    <aapt:attr name="android:fillColor">\n'
         '      <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="108" android:endY="108"\n'
-        '          android:startColor="#FF3B1C8C" android:centerColor="#FF8E24AA" android:endColor="#FFE0407E"/>\n'
-        '    </aapt:attr>\n  </path>\n</vector>\n')
-
-    # 24 dp: fewer, bigger facets so it still reads as a mirror ball when small.
-    (RES / "ic_disco.xml").write_text(
-        HEADER + '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n'
-        '    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24"\n'
-        '    android:tint="?android:attr/colorControlNormal">\n'
-        '  <path android:fillColor="@android:color/white" android:pathData="M11.4,1h1.2v3.2h-1.2z"/>\n'
-        + ball(12, 13.5, 9.5, ' android:fillColor="@android:color/white">\n    ', 6, 0.9)
-        + f'  <path android:fillColor="@android:color/white" android:pathData="{sparkle(20.5, 4.5, 2.8)}"/>\n</vector>\n')
-    for n in ("ic_launcher_foreground", "ic_launcher_monochrome", "ic_launcher_background", "ic_disco"):
+        f'          android:startColor="{BLUE_LIGHT}" android:endColor="{BLUE_DARK}"/>\n'
+        '    </aapt:attr>\n  </path>\n'), aapt=True))
+    (RES / "ic_launcher_foreground.xml").write_text(vector(108, 108, mark(tools, WHITE, 108)))
+    (RES / "ic_launcher_monochrome.xml").write_text(vector(108, 108, mark(tools, WHITE, 108)))
+    # 24 dp: the mark enlarged to fill the icon box (the 108 grid's content spans about 30..78).
+    body = ('  <group android:translateX="-9.5" android:translateY="-8.6" android:scaleX="1.63" android:scaleY="1.63">\n'
+            + mark(tools, "@android:color/white", 24) + '  </group>\n')
+    (RES / "ic_discobar.xml").write_text(vector(24, 24, body, tint=True))
+    (RES / "ic_tile_bar.xml").write_text(vector(24, 24,
+        f'  <path android:fillColor="@android:color/white" android:fillType="evenOdd" android:pathData="{pill(2, 7.5, 20, 9)}"/>\n', tint=True))
+    for n in ("ic_launcher_background", "ic_launcher_foreground", "ic_launcher_monochrome", "ic_discobar", "ic_tile_bar"):
         print(f"res/drawable/{n}.xml")
+
+    # A 512 px PNG of the launcher icon (circle mask) for the README.
+    if shutil.which("rsvg-convert"):
+        k = 34 / 960
+        svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="18 18 72 72">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="108" y2="108" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#{BLUE_LIGHT[3:]}"/><stop offset="1" stop-color="#{BLUE_DARK[3:]}"/></linearGradient>
+<clipPath id="m"><circle cx="54" cy="54" r="36"/></clipPath></defs>
+<g clip-path="url(#m)"><rect width="108" height="108" fill="url(#bg)"/>
+<path fill="#fff" fill-rule="evenodd" d="{pill(29, 31, 50, 12)}"/>
+<path fill="#fff" transform="translate(37,47) scale({k:.5f})" d="{tools}"/></g></svg>'''
+        out = ROOT / "docs/images/icon.png"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
+            f.write(svg)
+        subprocess.run(["rsvg-convert", f.name, "-o", str(out)], check=True)
+        os.unlink(f.name)
+        print(out.relative_to(ROOT))
 
 
 if __name__ == "__main__":

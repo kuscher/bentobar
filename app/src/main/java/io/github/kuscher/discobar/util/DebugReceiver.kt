@@ -23,10 +23,15 @@ class DebugReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Env.init(context)
         val args = intent.getStringExtra("c").orEmpty().trim().split(Regex("\\s+"))
+        if (args[0] == "winshot") return winshot(args.drop(1).joinToString(" ").ifEmpty { "DiscoBar menu" })
         val bar = (Env.service as? BarService)?.controller()
         val out = try {
             when (args[0]) {
                 "cfg" -> Store.export()
+                "import" -> { // a whole layout, base64 JSON (e.g. to restore one saved with cfg)
+                    val json = String(android.util.Base64.decode(args[1], android.util.Base64.DEFAULT))
+                    if (Store.import(json)) "imported" else "not a DiscoBar layout"
+                }
                 "reset" -> { Store.update { Defaults.config().copy(onboarded = it.onboarded) }; "reset" }
                 "add" -> Store.add(args[1], args.getOrNull(2)?.let { Section.valueOf(it.uppercase()) } ?: Section.SHOWN)
                 "set" -> {
@@ -97,5 +102,33 @@ class DebugReceiver : BroadcastReceiver() {
             "failed: $e"
         }
         Log.i("DiscoBar", "debug ${args.joinToString(" ")} -> $out")
+    }
+
+    /**
+     * One of DiscoBar's own windows as a PNG, returned base64 in the broadcast result (for README
+     * screenshots). Window screenshots include the window's shadow and transparency but not the
+     * mouse pointer, and never show other apps.
+     */
+    private fun winshot(title: String) {
+        val svc = Env.service ?: run { resultData = "service not running"; return }
+        val w = (if (title == "app") svc.windows.firstOrNull { // the settings window (its own surface, without the caption)
+            it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.root?.packageName == svc.packageName
+        } else svc.windows.firstOrNull {
+            it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY && it.title?.toString() == title
+        }) ?: run { resultData = "no DiscoBar window titled $title"; return }
+        val pending = goAsync()
+        svc.takeScreenshotOfWindow(w.id, java.util.concurrent.Executors.newSingleThreadExecutor(),
+            object : android.accessibilityservice.AccessibilityService.TakeScreenshotCallback {
+                override fun onSuccess(r: android.accessibilityservice.AccessibilityService.ScreenshotResult) {
+                    val hb = r.hardwareBuffer
+                    val bmp = android.graphics.Bitmap.wrapHardwareBuffer(hb, r.colorSpace)!!.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                    hb.close()
+                    val out = java.io.ByteArrayOutputStream()
+                    bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    pending.resultData = android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+                    pending.finish()
+                }
+                override fun onFailure(code: Int) { pending.resultData = "failed $code"; pending.finish() }
+            })
     }
 }

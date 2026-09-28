@@ -117,7 +117,7 @@ class MainActivity : ComponentActivity() {
         Row(Modifier.fillMaxSize().safeDrawingPadding()) {
             NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxHeight()) {
                 Spacer(Modifier.height(12.dp))
-                androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(io.github.kuscher.discobar.R.drawable.ic_disco), contentDescription = "DiscoBar",
+                androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(io.github.kuscher.discobar.R.drawable.ic_discobar), contentDescription = "DiscoBar",
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(30.dp))
                 Spacer(Modifier.height(20.dp))
                 val pages = listOf(Sym.WYSIWYG to "Bar", Sym.ADD to "Add", Sym.PALETTE to "Look", Sym.TUNE to "Setup", Sym.INFO to "About")

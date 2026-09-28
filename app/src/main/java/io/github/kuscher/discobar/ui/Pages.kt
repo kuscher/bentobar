@@ -283,7 +283,7 @@ fun AboutPage() {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center) {
-                androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(io.github.kuscher.discobar.R.drawable.ic_disco),
+                androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(io.github.kuscher.discobar.R.drawable.ic_discobar),
                     contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(32.dp))
             }
             Spacer(Modifier.width(16.dp))

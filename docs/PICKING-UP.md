@@ -4,12 +4,18 @@ The dev VM can restart mid-task. This file is the status and the next steps; kee
 commit at every milestone.
 
 ## Where things live
-- Repo `~/discobar` (local git, not pushed yet: ask the user before creating a GitHub repo).
+- Repo `~/discobar`, GitHub github.com/kuscher/discobar (private; the user flips it public).
+  Releases carry `DiscoBar.apk` (stable name for releases/latest/download/DiscoBar.apk) + SHA256SUMS.
 - Release key `~/.config/discobar/keystore.jks` + `keystore.pass` (not in git). Keystore backed
   up to a private folder (id (private), checksum
   verified); the password is for the user's password manager.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
+
+## 0.4 (2026-09-28): new icon, README with screenshots, first GitHub release
+- Icon: status bar pill over the Tools glyph on blue (tools/logo.py). README images from a demo
+  layout (tools/readme_images.py); the user's layout was saved and restored byte-identical.
+- History was rewritten before the first push to the noreply identity with co-author trailers.
 
 ## 0.3 (2026-09-28): CPU item, width and collapse fixes, 3× lighter
 - User reported: items cut off; ‹ overlapping the timer when expanded; random collapsing; asked

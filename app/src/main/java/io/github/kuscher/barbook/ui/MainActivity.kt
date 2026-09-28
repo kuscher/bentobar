@@ -57,6 +57,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        current = this
         Env.init(this)
         Notify.channels(this)
         enableEdgeToEdge()
@@ -85,6 +86,11 @@ class MainActivity : ComponentActivity() {
         if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") page = 2
     }
 
+    override fun onDestroy() {
+        if (current === this) current = null
+        super.onDestroy()
+    }
+
     override fun onResume() {
         super.onResume()
         resumes.intValue++
@@ -110,7 +116,7 @@ class MainActivity : ComponentActivity() {
         Row(Modifier.fillMaxSize().safeDrawingPadding()) {
             NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxHeight()) {
                 Spacer(Modifier.height(12.dp))
-                SymIcon(Sym.WYSIWYG, size = 28.sp, filled = true, color = MaterialTheme.colorScheme.primary)
+                SymIcon(Sym.LOCAL_BAR, size = 28.sp, filled = true, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(20.dp))
                 val pages = listOf(Sym.WYSIWYG to "Bar", Sym.ADD to "Add", Sym.PALETTE to "Look", Sym.TUNE to "Setup", Sym.INFO to "About")
                 pages.forEachIndexed { i, (icon, label) ->
@@ -146,6 +152,8 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        /** The open settings window, for the adb test hooks. */
+        @Volatile var current: MainActivity? = null
         const val EXTRA_ITEM = "item"
         const val EXTRA_EDIT = "edit"
         const val EXTRA_REQUEST = "request"

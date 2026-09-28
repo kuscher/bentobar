@@ -34,7 +34,7 @@ volume_off volume_up warning widgets wifi wysiwyg local_bar
 """.split()
 
 # Symbols also exported as vector drawables (tiles, notifications, launcher icon), from the filled font.
-DRAWABLES = ["local_bar", "coffee", "timer"]
+DRAWABLES = ["local_bar", "coffee", "timer", "avg_pace", "event", "pause", "play_arrow", "add", "stop", "videocam", "open_in_new"]
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CACHE = pathlib.Path(os.environ.get("BARBOOK_CACHE", pathlib.Path.home() / ".cache/barbook"))

@@ -41,7 +41,9 @@ object Ticker {
         override fun run() {
             runOnce()
             val now = System.currentTimeMillis()
-            main.postAtTime(this, TAG, SystemClock.uptimeMillis() + (1000 - now % 1000) + 5)
+            // On the second boundary; every other second under battery saver.
+            val period = if (Env.powerSave(SystemClock.elapsedRealtime())) 2000 else 1000
+            main.postAtTime(this, TAG, SystemClock.uptimeMillis() + (period - now % period) + 5)
         }
     }
 

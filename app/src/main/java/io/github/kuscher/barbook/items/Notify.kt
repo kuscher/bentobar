@@ -81,7 +81,30 @@ object Glyphs {
         return b
     }
 
-    fun icon(sym: String): Icon = synchronized(cache) { cache.getOrPut(sym) { Icon.createWithBitmap(bitmap(sym, 96)) } }
+    /**
+     * Notification icons. Resource icons where BarBook ships the glyph as a vector drawable: the
+     * status bar's Live Update chip only appears for those (verified on Googlebook OS; a bitmap
+     * icon gave a promoted notification but no chip).
+     */
+    fun icon(sym: String): Icon = synchronized(cache) {
+        cache.getOrPut(sym) {
+            val res = drawables[sym]
+            if (res != null) Icon.createWithResource(Env.app, res) else Icon.createWithBitmap(bitmap(sym, 96))
+        }
+    }
+
+    private val drawables = mapOf(
+        Sym.TIMER to io.github.kuscher.barbook.R.drawable.sym_timer,
+        Sym.AVG_PACE to io.github.kuscher.barbook.R.drawable.sym_avg_pace,
+        Sym.EVENT to io.github.kuscher.barbook.R.drawable.sym_event,
+        Sym.COFFEE to io.github.kuscher.barbook.R.drawable.sym_coffee,
+        Sym.PAUSE to io.github.kuscher.barbook.R.drawable.sym_pause,
+        Sym.PLAY_ARROW to io.github.kuscher.barbook.R.drawable.sym_play_arrow,
+        Sym.ADD to io.github.kuscher.barbook.R.drawable.sym_add,
+        Sym.STOP to io.github.kuscher.barbook.R.drawable.sym_stop,
+        Sym.VIDEOCAM to io.github.kuscher.barbook.R.drawable.sym_videocam,
+        Sym.OPEN_IN_NEW to io.github.kuscher.barbook.R.drawable.sym_open_in_new,
+    )
 }
 
 /**

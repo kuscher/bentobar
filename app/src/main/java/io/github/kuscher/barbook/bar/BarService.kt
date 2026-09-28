@@ -461,6 +461,10 @@ class BarController(private val service: AccessibilityService) {
                 if (cmd[0] == "open") events.click(item, at) else events.context(item, at); "ok"
             }
             "chevron" -> { events.chevron(Rect()); "expanded=${expanded.value}" }
+            "scroll" -> {
+                val item = first(cmd.getOrElse(1) { "" }) ?: return "no such item"
+                events.scroll(item, cmd.getOrNull(2)?.toIntOrNull() ?: 1); "ok"
+            }
             "barmenu" -> { events.chevronContext(placed["chevron"] ?: Rect(0, 0, 40, 40)); "ok" }
             "hover" -> { events.hover(cmd.getOrNull(1) == "on"); "ok" }
             "close" -> { closeMenu(); "ok" }

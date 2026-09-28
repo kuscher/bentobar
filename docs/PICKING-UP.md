@@ -11,6 +11,13 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 0.3 (2026-09-28): CPU item, width and collapse fixes, 3× lighter
+- User reported: items cut off; ‹ overlapping the timer when expanded; random collapsing; asked
+  for a CPU load item; asked whether memory/CPU readings reflect other apps (yes: device-wide;
+  the Linux VM alone holds ~12 GB of the 31 GB; DiscoBar ~26 MB).
+- Causes and fixes are in CHANGELOG 0.3 and CLAUDE.md ("Window width", "CPU load", "CPU cost").
+- The user's own settings on the HP: position CENTER, chevron OFF, spacing 9, CPU item shown.
+
 ## 0.2 (2026-09-28): renamed DiscoBar, tighter bar
 - The user asked: call it DiscoBar; fix spacing (the finished timer's "Done" sat far from its icon,
   other things too big); hover reveal off by default; the release key backed up. All done.

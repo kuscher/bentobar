@@ -48,7 +48,7 @@ data class ItemConfig(
 
 @Serializable
 data class BarConfig(
-    val version: Int = 1,
+    val version: Int = 2,
     /** Master switch (the Quick Settings tile flips it, e.g. for presenting). */
     val enabled: Boolean = true,
     val items: List<ItemConfig> = emptyList(),
@@ -57,8 +57,8 @@ data class BarConfig(
     val chevron: Boolean = true,
     /** Reveal hidden items while the pointer rests on DiscoBar's strip (off by default: it can surprise). */
     val revealOnHover: Boolean = false,
-    /** Collapse revealed items again after this many seconds (0 = stay open). */
-    val autoCollapseSec: Int = 8,
+    /** Hide revealed items again after this many seconds; 0 (default) keeps them until ‹ is clicked. */
+    val autoCollapseSec: Int = 0,
     val textSize: TextSize = TextSize.DEFAULT,
     val pill: Pill = Pill.NONE,
     val color: ColorMode = ColorMode.AUTO,

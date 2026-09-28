@@ -32,6 +32,7 @@ object Env {
     @Volatile var service: AccessibilityService? = null
 
     val net = NetSampler()
+    val cpu = CpuSampler()
     val mem = MemSampler()
     val battery = BatterySampler()
     val storage = StorageSampler()
@@ -50,6 +51,7 @@ object Env {
     /** Samples only what the configured items use ([types]); menus ask for theirs while open. */
     fun tick(now: Long, types: Set<String>) {
         if ("network" in types) net.sample(now)
+        if ("cpu" in types) cpu.sample(now)
         if ("memory" in types) mem.sample(app, now)
         if ("battery" in types) battery.sample(app, now)
         if ("storage" in types) storage.sample(now)
@@ -148,6 +150,100 @@ class NetSampler {
         val vpn = if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) " · VPN" else ""
         val metered = if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) " · metered" else ""
         return kind + vpn + metered
+    }
+}
+
+/**
+ * Device-wide CPU load. Apps can't read /proc/stat (Android 8+) and SystemHealthManager's CPU
+ * headroom is unsupported on Googlebooks, but each core's idle-state residency in sysfs
+ * (cpuN/cpuidle/stateM/time, microseconds) is readable: load = 1 − idle time / wall time.
+ * Also reads each cluster's clock (cpufreq) and, on Qualcomm, the GPU's busy counter.
+ */
+class CpuSampler {
+    private val root = java.io.File("/sys/devices/system/cpu")
+    private var cores = IntArray(0)
+    /** Idle-state residency files, kept open: sysfs regenerates a value on each read from offset 0. */
+    private var idleFiles: Array<Array<java.io.RandomAccessFile>> = emptyArray()
+    private var policies: List<Pair<String, java.io.File>> = emptyList()
+    private var maxKhz: List<Long> = emptyList()
+    private var lastIdle = LongArray(0)
+    private var lastAt = 0L
+    private var initialised = false
+    private val buf = ByteArray(32)
+    /** False when this device doesn't expose idle-state counters. */
+    var available = true; private set
+    var total = 0.0; private set
+    var perCore = DoubleArray(0); private set
+    val history = History()
+    val gpuHistory = History()
+    /** GPU busy fraction, or null when the device doesn't expose it. */
+    var gpu: Double? = null; private set
+    /** Clocks and GPU are read only while someone looks at them (the CPU menu). */
+    @Volatile var detail = 0
+
+    data class Cluster(val cores: String, val curKhz: Long, val maxKhz: Long)
+    var clusters: List<Cluster> = emptyList(); private set
+
+    private fun readLong(f: java.io.File): Long? = try {
+        f.bufferedReader().use { it.readLine() }?.trim()?.toLongOrNull()
+    } catch (e: Exception) { null }
+
+    private fun readLong(f: java.io.RandomAccessFile): Long {
+        f.seek(0)
+        val n = f.read(buf)
+        var v = 0L
+        for (i in 0 until n) { val c = buf[i].toInt(); if (c in 48..57) v = v * 10 + (c - 48) else if (v > 0 || c == 10) break }
+        return v
+    }
+
+    private fun init() {
+        initialised = true
+        val present = runCatching { java.io.File(root, "present").readText().trim() }.getOrDefault("0")
+        cores = present.split(',').flatMap { part ->
+            val (a, b) = if ('-' in part) part.split('-').map { it.trim().toInt() } else listOf(part.trim().toInt(), part.trim().toInt())
+            (a..b).toList()
+        }.toIntArray()
+        idleFiles = Array(cores.size) { i ->
+            (0 until 8).mapNotNull { st ->
+                runCatching { java.io.RandomAccessFile(java.io.File(root, "cpu${cores[i]}/cpuidle/state$st/time"), "r") }.getOrNull()
+            }.toTypedArray()
+        }
+        available = idleFiles.isNotEmpty() && idleFiles.all { it.isNotEmpty() }
+        // Clock domains (policies) are fixed: find them once.
+        policies = (0 until 32).mapNotNull { p ->
+            val dir = java.io.File(root, "cpufreq/policy$p")
+            if (!java.io.File(dir, "scaling_cur_freq").exists()) return@mapNotNull null
+            val related = runCatching { java.io.File(dir, "related_cpus").readText().trim().split(' ').mapNotNull { it.toIntOrNull() } }
+                .getOrDefault(listOf(p))
+            val span = if (related.size > 1) "${related.first()}–${related.last()}" else "${related.firstOrNull() ?: p}"
+            span to java.io.File(dir, "scaling_cur_freq")
+        }
+        maxKhz = policies.map { (_, f) -> readLong(java.io.File(f.parentFile, "cpuinfo_max_freq")) ?: 0L }
+    }
+
+    fun sample(now: Long) {
+        if (!initialised) init()
+        if (!available) return
+        val t = android.os.SystemClock.elapsedRealtimeNanos() / 1000
+        val idle = LongArray(cores.size) { i -> var sum = 0L; for (f in idleFiles[i]) sum += runCatching { readLong(f) }.getOrDefault(0L); sum }
+        if (lastAt > 0) {
+            val dt = (t - lastAt).toDouble()
+            if (dt in 200_000.0..10_000_000.0) {
+                perCore = DoubleArray(cores.size) { i -> (1 - (idle[i] - lastIdle[i]) / dt).coerceIn(0.0, 1.0) }
+                total = perCore.average()
+                history.add(total)
+            }
+        }
+        lastIdle = idle
+        lastAt = t
+        if (detail > 0) {
+            clusters = policies.mapIndexed { i, (span, f) -> Cluster(span, readLong(f) ?: 0L, maxKhz[i]) }
+            gpu = runCatching {
+                val parts = java.io.File("/sys/class/kgsl/kgsl-3d0/gpubusy").readText().trim().split(Regex("\\s+")).map { it.toDouble() }
+                if (parts.size >= 2 && parts[1] > 0) (parts[0] / parts[1]).coerceIn(0.0, 1.0) else null
+            }.getOrNull()
+            gpu?.let { gpuHistory.add(it) }
+        }
     }
 }
 

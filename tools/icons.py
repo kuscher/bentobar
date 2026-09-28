@@ -30,7 +30,7 @@ music_note network_check notifications open_in_new palette pause play_arrow powe
 public push_pin refresh remove replay restart_alt rocket_launch schedule screenshot_monitor search
 settings skip_next skip_previous space_bar speed star stop swap_vert text_fields thermostat timer
 title toggle_on touch_app tune update videocam visibility visibility_off volume_down volume_mute
-volume_off volume_up warning widgets wifi wysiwyg
+volume_off volume_up warning widgets wifi wysiwyg memory_alt
 """.split()
 
 # Symbols also exported as vector drawables (tiles, notifications, launcher icon), from the filled font.

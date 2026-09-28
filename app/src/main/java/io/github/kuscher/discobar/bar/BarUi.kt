@@ -158,9 +158,10 @@ private fun FitRow(maxWidthPx: Int, keepEnd: Boolean, spacing: Dp, content: @Com
         val keep = BooleanArray(placeables.size)
         var used = 0
         val order = if (keepEnd) placeables.indices.reversed() else placeables.indices
+        val limit = minOf(maxWidthPx, constraints.maxWidth).coerceAtLeast(0)
         for (i in order) {
             val w = placeables[i].width + if (used > 0) gap else 0
-            if (used + w > maxWidthPx.coerceAtLeast(0)) break
+            if (used + w > limit) break
             keep[i] = true
             used += w
         }
@@ -307,3 +308,19 @@ private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll
 }
 
 private fun androidx.compose.ui.geometry.Rect.toRect() = Rect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
+
+/**
+ * Measures [content] at its natural width and reports it, so the window can be sized exactly.
+ * (A WRAP_CONTENT window is first measured at the system's dialog width, 580 dp here, and Compose
+ * doesn't ask for more, which cut the strip off and slid items under the chevron.) While the
+ * window catches up, the content is aligned by [bias]: -1 start, 0 centre, 1 end.
+ */
+@Composable
+fun MeasuredStrip(bias: Float, onWidth: (Int) -> Unit, content: @Composable () -> Unit) {
+    Layout(content) { measurables, constraints ->
+        val p = measurables.first().measure(Constraints(minHeight = constraints.minHeight, maxHeight = constraints.maxHeight))
+        onWidth(p.width)
+        val w = if (constraints.hasBoundedWidth) constraints.maxWidth else p.width
+        layout(w, p.height) { p.place((((w - p.width) * (1 + bias)) / 2).toInt(), 0) }
+    }
+}

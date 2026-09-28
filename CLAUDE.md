@@ -70,6 +70,20 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   don't jump; the held width is keyed by item id (`key()` in the strip) and resets when the key changes.
   The release build uses about 0.8% of one core with network speed on (debug builds are 3–4×
   slower; measure release).
+- **Window width:** never WRAP_CONTENT for overlay windows. ViewRootImpl first measures a WRAP_CONTENT
+  window at `config_prefDialogWidth` (580 dp here) and Compose never reports MEASURED_STATE_TOO_SMALL,
+  so a wider strip was cut off and pushed under the chevron. `MeasuredStrip` reports the natural
+  width and the controller sets it exactly; menus get their exact width too.
+- **CPU load:** /proc/stat, /proc/loadavg, /proc/uptime and /proc/pressure are denied to apps, and
+  `SystemHealthManager.getCpuHeadroom()` throws UnsupportedOperationException here. Readable:
+  `/sys/devices/system/cpu/cpuN/cpuidle/stateM/time` (idle residency, µs), cpufreq
+  `scaling_cur_freq`, and `/sys/class/kgsl/kgsl-3d0/gpubusy` (Adreno). Load = 1 − Δidle/Δwall per
+  core; it matched `top` within ~1 point under load (reads a few points high at idle).
+  `./disco debug cpuprobe` checks what's readable on a new device.
+- **CPU cost:** measure release builds after `cmd package compile -m speed -f` (adb installs are
+  only verified, so JIT dominates at first). The big costs were full node-tree scans on every
+  window event (title changes included) and sampling folded items; now ~0.5% of one core with CPU
+  and network ticking. The manifest is `profileable` by the shell for simpleperf.
 - StudioSnap's helper (`~/studiosnap/ss enable`) used to overwrite the whole
   `enabled_accessibility_services` list and switch DiscoBar off; fixed there on 2026-09-28. Both
   helpers now add or remove only their own entry (short or full component form).

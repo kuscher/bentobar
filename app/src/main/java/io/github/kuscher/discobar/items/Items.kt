@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 /** Every item type, in catalog order. */
 object Items {
     val all: List<ItemType> = listOf(
-        NetworkItem, BatteryItem, MemoryItem, StorageItem,
+        CpuItem, NetworkItem, BatteryItem, MemoryItem, StorageItem,
         CalendarItem, EventItem, ClockItem, TimerItem, CountdownItem,
         CaffeineItem, SoundItem, ToolsItem, FolderItem, AppItem, TextItem, SpacerItem,
     )
@@ -36,6 +36,23 @@ object Ticker {
 
     val states: StateFlow<Map<String, ItemState>> get() = _states
     val tick: StateFlow<Long> get() = _tick
+
+    /** Hidden items are on screen (bar expanded, or DiscoBar's menu lists them): sample them too. */
+    @Volatile var revealHidden = false
+    /** The item whose menu is open, sampled even when it's hidden. */
+    @Volatile var focusItem: String? = null
+
+    /**
+     * Items worth sampling now: what's visible or could pop out (shown, revealed, "when active",
+     * an open menu), or everything while the settings preview is open. A folded-away battery or
+     * memory item costs nothing.
+     */
+    private fun needed(items: List<ItemConfig>): List<ItemConfig> {
+        val all = "settings" in users
+        return items.filter {
+            it.section != Section.OFF && (all || it.section == Section.SHOWN || it.whenActive || revealHidden || it.id == focusItem)
+        }
+    }
 
     private val loop = object : Runnable {
         override fun run() {
@@ -64,19 +81,19 @@ object Ticker {
 
     private fun runOnce() {
         val now = SystemClock.elapsedRealtime()
+        val cfg = Store.config.value
+        val live = needed(cfg.items)
         try {
-            Env.tick(now, Store.config.value.items.filter { it.section != Section.OFF }.mapTo(HashSet()) { it.type })
+            Env.tick(now, live.mapTo(HashSet()) { it.type })
             Timers.check()
             Caffeine.check()
         } catch (e: Exception) {
             Log.w(TAG, "sampling failed", e)
         }
         val next = HashMap(_states.value)
-        val cfg = Store.config.value
         val ids = HashSet<String>()
-        for (item in cfg.items) {
-            ids += item.id
-            if (item.section == Section.OFF && item.id in next) continue
+        cfg.items.forEach { ids += it.id }
+        for (item in live) {
             val type = Items.of(item.type) ?: continue
             val last = lastRun[item.id] ?: 0L
             if (item.id in next && now - last < type.refreshMs) continue

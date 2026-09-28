@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3 (2026-09-28)
+
+- **CPU load item:** device-wide load from each core's idle-state counters (Android blocks
+  /proc/stat and the CPU headroom API isn't supported on Googlebooks), with a chart, per-core bars,
+  clock speeds and, on Qualcomm, GPU load. Memory now has a RAM icon.
+- Fixed items being cut off and the ‹ button overlapping items when the bar got wide: Android
+  capped the bar's window at its 580 dp dialog width. The window now takes the exact width.
+- Revealed items stay until you click ‹ again; hiding them after a few seconds is an option
+  (existing setups move from the old 8 s default to this).
+- Without the ‹ button, hidden items only appear while active (nothing can fold them back).
+- DiscoBar no longer hides itself for small system windows near the top; only a shade covers it.
+- About 3× lighter: it reacts only to windows appearing, going or moving; reads the status bar
+  in one call instead of ~40; and doesn't sample folded-away items.
+
 ## 0.2 (2026-09-28)
 
 - Renamed to **DiscoBar** (package `io.github.kuscher.discobar`), with a disco-ball icon.

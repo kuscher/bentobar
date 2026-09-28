@@ -40,6 +40,31 @@ class DebugReceiver : BroadcastReceiver() {
                     }
                     Ticker.refresh(); "ok"
                 }
+                "cpuprobe" -> { // which CPU-load sources this app may read
+                    val out = StringBuilder()
+                    val shm = context.getSystemService(android.os.health.SystemHealthManager::class.java)
+                    runCatching {
+                        out.append("minInterval=${shm.cpuHeadroomMinIntervalMillis} window=${shm.cpuHeadroomCalculationWindowRange} ")
+                        out.append("cpuHeadroom=${shm.getCpuHeadroom(android.os.CpuHeadroomParams.Builder().build())} ")
+                    }.onFailure { out.append("cpuHeadroom=$it ") }
+                    runCatching { out.append("gpuHeadroom=${shm.getGpuHeadroom(android.os.GpuHeadroomParams.Builder().build())} ") }
+                        .onFailure { out.append("gpuHeadroom=$it ") }
+                    val extra = (args.getOrNull(1)?.split(",") ?: emptyList())
+                    for (f in listOf("/proc/stat", "/proc/loadavg", "/proc/uptime", "/proc/pressure/cpu", "/sys/devices/system/cpu/present",
+                        "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
+                        "/sys/devices/system/cpu/cpu0/cpuidle/state0/time", "/sys/devices/system/cpu/cpu0/cpuidle/state1/time",
+                        "/sys/devices/system/cpu/cpu0/cpuidle/state0/name", "/sys/devices/system/cpu/cpu5/cpuidle/state2/time",
+                        "/sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state", "/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage",
+                        "/sys/class/kgsl/kgsl-3d0/gpubusy", "/proc/self/stat") + extra) {
+                        out.append("| $f: ").append(runCatching { java.io.File(f).bufferedReader().use { it.readLine() }?.take(60) }
+                            .getOrElse { "DENIED ${it.javaClass.simpleName}" })
+                    }
+                    out.toString()
+                }
+                "state" -> { // what an item shows right now
+                    val item = Store.config.value.items.firstOrNull { it.type == args[1] || it.id == args[1] } ?: error("no item")
+                    Ticker.stateOf(item).let { "${it.text} active=${it.active}" }
+                }
                 "finish" -> { io.github.kuscher.discobar.ui.MainActivity.current?.finish(); "ok" }
                 "bar" -> { Store.update { it.copy(enabled = args.getOrNull(1) != "off") }; "ok" }
                 "look" -> {
@@ -50,6 +75,10 @@ class DebugReceiver : BroadcastReceiver() {
                             "color" -> c.copy(color = io.github.kuscher.discobar.data.ColorMode.valueOf(args[2].uppercase()))
                             "size" -> c.copy(textSize = io.github.kuscher.discobar.data.TextSize.valueOf(args[2].uppercase()))
                             "chips" -> c.copy(chipMode = io.github.kuscher.discobar.data.ChipMode.valueOf(args[2].uppercase()))
+                            "chevron" -> c.copy(chevron = args[2] == "on")
+                            "hover" -> c.copy(revealOnHover = args[2] == "on")
+                            "collapse" -> c.copy(autoCollapseSec = args[2].toInt())
+                            "spacing" -> c.copy(spacing = args[2].toInt())
                             else -> c
                         }
                     }; "ok"

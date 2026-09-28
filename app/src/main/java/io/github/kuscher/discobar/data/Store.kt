@@ -32,6 +32,12 @@ object Store {
                 .onFailure { e -> Log.w(TAG, "settings unreadable, starting fresh", e) }
                 .getOrNull()
         } ?: Defaults.config()
+        // v1 → v2: timed hiding of revealed items became opt-in; 8 s was only the old default.
+        if (state.value.version < 2) {
+            val c = state.value
+            state.value = c.copy(version = 2, autoCollapseSec = if (c.autoCollapseSec == 8) 0 else c.autoCollapseSec)
+            save(state.value)
+        }
         if (raw == null) save(state.value)
     }
 

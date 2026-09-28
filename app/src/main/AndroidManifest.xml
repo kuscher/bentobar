@@ -25,6 +25,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DiscoBar">
 
+        <!-- Lets the shell (adb) profile release builds with simpleperf; no effect for users. -->
+        <profileable android:shell="true" />
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"

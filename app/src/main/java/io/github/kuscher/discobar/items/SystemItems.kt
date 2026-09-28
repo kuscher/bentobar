@@ -7,7 +7,13 @@ import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.MaterialTheme
 import io.github.kuscher.discobar.data.ItemConfig
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import io.github.kuscher.discobar.ui.ChoiceRow
+import io.github.kuscher.discobar.ui.CoreBars
+import io.github.kuscher.discobar.ui.SectionLabel
 import io.github.kuscher.discobar.ui.InfoRow
 import io.github.kuscher.discobar.ui.MenuCard
 import io.github.kuscher.discobar.ui.MenuDivider
@@ -61,20 +67,61 @@ object NetworkItem : ItemType("network", "Network speed", Sym.SWAP_VERT, "Downlo
     }
 }
 
-object MemoryItem : ItemType("memory", "Memory", Sym.MEMORY, "How much RAM is in use") {
+object CpuItem : ItemType("cpu", "CPU load", Sym.MEMORY, "How busy the processor is, per core, with clock speeds") {
+    override val canBeActive = true
+
+    override fun state(item: ItemConfig): ItemState {
+        val c = Env.cpu
+        if (!c.available) return ItemState(icon = Sym.MEMORY, text = "–", desc = "This device doesn't share CPU load with apps")
+        val limit = item.optInt("activePct", 80) / 100.0
+        return ItemState(icon = Sym.MEMORY, text = Fmt.percent(c.total), active = c.total >= limit,
+            tone = if (c.total >= 0.9) Tone.WARN else Tone.NORMAL, widthKey = "cpu", desc = "CPU ${Fmt.percent(c.total)} busy")
+    }
+
+    override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
+        rememberTick()
+        val c = Env.cpu
+        androidx.compose.runtime.DisposableEffect(Unit) { c.detail++; onDispose { c.detail-- } }
+        MenuCard(Sym.MEMORY, "CPU", if (c.available) "${Fmt.percent(c.total)} busy · ${c.perCore.size} cores" else "Not available on this device") {
+            if (c.available) {
+                Sparkline(c.history.toList(), max = 1.0)
+                Spacer(Modifier.height(8.dp))
+                SectionLabel("Cores")
+                CoreBars(c.perCore)
+                Spacer(Modifier.height(6.dp))
+                c.clusters.forEach { cl ->
+                    InfoRow("Cores ${cl.cores}", String.format(Locale.ROOT, "%.2f of %.2f GHz", cl.curKhz / 1e6, cl.maxKhz / 1e6))
+                }
+                c.gpu?.let { g ->
+                    MenuDivider()
+                    InfoRow("Graphics (GPU)", Fmt.percent(g), MaterialTheme.colorScheme.tertiary)
+                    Sparkline(c.gpuHistory.toList(), color = MaterialTheme.colorScheme.tertiary, max = 1.0)
+                }
+            }
+            MenuDivider()
+            MenuEntry(Sym.BOLT, "Battery usage by app") { host.close(); Env.launch(Intent(Intent.ACTION_POWER_USAGE_SUMMARY)) }
+        }
+    }
+
+    override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
+        SliderRow("Counts as active above", item.optInt("activePct", 80), 30..99, { "$it%" }) { set(item.with("activePct", it.toString())) }
+    }
+}
+
+object MemoryItem : ItemType("memory", "Memory", Sym.MEMORY_ALT, "How much RAM is in use") {
     override val canBeActive = true
 
     override fun state(item: ItemConfig): ItemState {
         val m = Env.mem
         val limit = item.optInt("activePct", 85) / 100.0
-        return ItemState(icon = Sym.MEMORY, text = Fmt.percent(m.used), active = m.used >= limit || m.low, widthKey = "mem",
+        return ItemState(icon = Sym.MEMORY_ALT, text = Fmt.percent(m.used), active = m.used >= limit || m.low, widthKey = "mem",
             tone = if (m.low) Tone.WARN else Tone.NORMAL, desc = "Memory ${Fmt.percent(m.used)} used")
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
         rememberTick()
         val m = Env.mem
-        MenuCard(Sym.MEMORY, "Memory", "${Fmt.percent(m.used)} in use") {
+        MenuCard(Sym.MEMORY_ALT, "Memory", "${Fmt.percent(m.used)} in use") {
             Meter(m.used.toFloat(), if (m.low) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
             InfoRow("Used", Fmt.bytes((m.total - m.avail).toDouble()))
             InfoRow("Available", Fmt.bytes(m.avail.toDouble()))

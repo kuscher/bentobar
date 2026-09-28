@@ -54,3 +54,18 @@ Checked over adb with the throwaway probe in `probe/` (package local.discobar.pr
 - **Agent task API (`StatusBarManager#setAgentTask`, `android.agenticon`) is NOT on this device**
   (NoSuchMethodError). It is in the platform-37.2 SDK stubs, but the device runs 37.1. So compile
   against 37.2 stubs carefully: guard or avoid anything newer than the device.
+
+## More findings (2026-09-28, DiscoBar 0.3)
+- `config_prefDialogWidth` is 580 dp (652 px): a WRAP_CONTENT overlay window is capped there unless
+  its view reports MEASURED_STATE_TOO_SMALL (Compose doesn't). Use exact window widths.
+- CPU load sources, tested from the app (untrusted_app): /proc/stat, /proc/loadavg, /proc/uptime,
+  /proc/pressure/cpu → denied. SystemHealthManager.getCpuHeadroom / getGpuHeadroom →
+  UnsupportedOperationException. Readable: /sys/devices/system/cpu/present ("0-11"),
+  cpuN/cpuidle/state{0,1}/time (WFI, cpu-sleep-0), cpufreq policyN/scaling_cur_freq,
+  /sys/class/kgsl/kgsl-3d0/gpubusy ("busy total"). Idle-residency load matched `top` (55–61% vs
+  56–62% with 6 of 12 cores spinning).
+- Window events: WINDOWS_CHANGE_* flags seen in practice are mostly LAYER (0x10), TITLE and
+  focus; only ADDED/REMOVED/BOUNDS matter for the status bar. Node prefetch
+  (`getRoot(FLAG_PREFETCH_DESCENDANTS_DEPTH_FIRST | FLAG_PREFETCH_UNINTERRUPTIBLE)`) reads the
+  ~35-node status bar tree in one round trip.
+- Memory for context: 31.4 GB RAM; the Linux Terminal VM (crosvm_debian) held 12.2 GB RSS.

@@ -57,6 +57,7 @@ object Sym {
     const val LOCAL_CAFE = "\ueb44"
     const val LOCK = "\ue899"
     const val MEMORY = "\ue322"
+    const val MEMORY_ALT = "\uf7a3"
     const val MENU = "\ue5d2"
     const val MOUSE = "\ue323"
     const val MUSIC_NOTE = "\ue405"

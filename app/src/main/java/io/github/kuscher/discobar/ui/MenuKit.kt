@@ -218,3 +218,22 @@ fun rememberTick(): Long {
     val t by io.github.kuscher.discobar.items.Ticker.tick.collectAsState()
     return t
 }
+
+/** One small bar per CPU core (0..1 each). */
+@Composable
+fun CoreBars(values: DoubleArray, color: Color = MaterialTheme.colorScheme.primary) {
+    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    Canvas(Modifier.fillMaxWidth().height(36.dp)) {
+        if (values.isEmpty()) return@Canvas
+        val gap = 3.dp.toPx()
+        val w = (size.width - gap * (values.size - 1)) / values.size
+        values.forEachIndexed { i, v ->
+            val x = i * (w + gap)
+            drawRoundRect(track, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Size(w, size.height),
+                androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
+            val h = (v.coerceIn(0.0, 1.0) * size.height).toFloat()
+            if (h > 0.5f) drawRoundRect(color, androidx.compose.ui.geometry.Offset(x, size.height - h), androidx.compose.ui.geometry.Size(w, h),
+                androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
+        }
+    }
+}

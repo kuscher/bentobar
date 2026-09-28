@@ -28,15 +28,22 @@ object StatusBarScan {
 
     /** The status bar window: a system window along the top edge, shorter than [maxHeight]. */
     fun findWindow(service: AccessibilityService, screenWidth: Int, maxHeight: Int): AccessibilityWindowInfo? =
-        service.windows.firstOrNull { w ->
+        findWindow(service.windows, screenWidth, maxHeight)
+
+    fun findWindow(windows: List<AccessibilityWindowInfo>, screenWidth: Int, maxHeight: Int): AccessibilityWindowInfo? =
+        windows.firstOrNull { w ->
             val r = Rect().also { w.getBoundsInScreen(it) }
             w.type == AccessibilityWindowInfo.TYPE_SYSTEM && r.top == 0 && r.height() in 1..maxHeight && r.width() >= screenWidth / 2
         }
 
-    fun scan(service: AccessibilityService, screenWidth: Int, maxHeight: Int): BarSnapshot? {
-        val w = findWindow(service, screenWidth, maxHeight) ?: return null
+    fun scan(service: AccessibilityService, screenWidth: Int, maxHeight: Int): BarSnapshot? =
+        findWindow(service, screenWidth, maxHeight)?.let { scan(it) }
+
+    fun scan(w: AccessibilityWindowInfo): BarSnapshot {
         val bar = Rect().also { w.getBoundsInScreen(it) }
-        val root = w.root ?: return BarSnapshot(w.id, bar, Rect(bar), null, "no-tree")
+        // One round trip: prefetch the (small, ~35 node) tree instead of an IPC per getChild().
+        val root = w.getRoot(AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_DEPTH_FIRST or
+            AccessibilityNodeInfo.FLAG_PREFETCH_UNINTERRUPTIBLE) ?: return BarSnapshot(w.id, bar, Rect(bar), null, "no-tree")
         var spacer: Rect? = null
         var spacerNode: AccessibilityNodeInfo? = null
         var clock: Rect? = null

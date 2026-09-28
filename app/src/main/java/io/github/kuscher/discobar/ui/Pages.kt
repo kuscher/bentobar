@@ -76,7 +76,7 @@ private fun Page(content: @Composable () -> Unit) {
 fun AddPage(onAdded: (String) -> Unit) {
     val cfg by Store.config.collectAsState()
     val groups = listOf(
-        "System" to listOf("network", "battery", "memory", "storage"),
+        "System" to listOf("cpu", "network", "memory", "battery", "storage"),
         "Time" to listOf("calendar", "event", "clock", "timer", "countdown"),
         "Tools" to listOf("caffeine", "sound", "tools", "folder", "app", "text", "spacer"),
     )
@@ -142,9 +142,13 @@ fun LookPage() {
             Store.update { it.copy(pill = v) }
         }
         SectionLabel("Hidden items")
-        SwitchRow("Show the ‹ button", cfg.chevron, help = "It appears when you have hidden items") { v -> Store.update { it.copy(chevron = v) } }
+        SwitchRow("Show the ‹ button", cfg.chevron,
+            help = "Click it to show or hide your hidden items. Without it, hidden items only appear while active.") { v ->
+            Store.update { it.copy(chevron = v) }
+        }
+        ChoiceRow("After revealing, hide them again", listOf(0 to "Only when I click ‹", 5 to "After 5 s", 10 to "After 10 s", 30 to "After 30 s"),
+            if (cfg.autoCollapseSec in listOf(0, 5, 10, 30)) cfg.autoCollapseSec else 0) { v -> Store.update { it.copy(autoCollapseSec = v) } }
         SwitchRow("Reveal them when the pointer rests on DiscoBar", cfg.revealOnHover) { v -> Store.update { it.copy(revealOnHover = v) } }
-        SliderRow("Hide them again after", cfg.autoCollapseSec, 0..30, { if (it == 0) "Never" else "$it s" }) { v -> Store.update { it.copy(autoCollapseSec = v) } }
         SectionLabel("Live Update chip")
         ChoiceRow("Timer or meeting chip", listOf(ChipMode.OFF to "Off", ChipMode.FALLBACK to "When DiscoBar is off", ChipMode.ALWAYS to "Always"),
             cfg.chipMode, help = "Android shows one chip per app next to the system icons, and hides it while that app's own window is open. DiscoBar uses it for a running timer, or a meeting that starts within 15 minutes.") { v ->

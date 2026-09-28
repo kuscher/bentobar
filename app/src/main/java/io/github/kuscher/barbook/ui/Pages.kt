@@ -147,7 +147,7 @@ fun LookPage() {
         SliderRow("Hide them again after", cfg.autoCollapseSec, 0..30, { if (it == 0) "Never" else "$it s" }) { v -> Store.update { it.copy(autoCollapseSec = v) } }
         SectionLabel("Live Update chip")
         ChoiceRow("Timer or meeting chip", listOf(ChipMode.OFF to "Off", ChipMode.FALLBACK to "When BarBook's bar is off", ChipMode.ALWAYS to "Always"),
-            cfg.chipMode, help = "Android shows one chip per app next to the system icons. BarBook uses it for a running timer, or a meeting that starts within 15 minutes.") { v ->
+            cfg.chipMode, help = "Android shows one chip per app next to the system icons, and hides it while that app's own window is open. BarBook uses it for a running timer, or a meeting that starts within 15 minutes.") { v ->
             Store.update { it.copy(chipMode = v) }
         }
         SectionLabel("Backup")
@@ -205,6 +205,16 @@ fun SetupPage(activity: Activity, running: Boolean) {
     val granted = { p: String -> activity.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED }
     if (running && !Store.config.value.onboarded) Store.update { it.copy(onboarded = true) }
     Page {
+        if (Env.advancedProtection()) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                Column(Modifier.padding(18.dp)) {
+                    Text("Advanced Protection is on", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text("It allows only assistive accessibility services, so BarBook's bar can't run. The Live Update chip " +
+                        "and the Quick Settings tiles still work.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                }
+            }
+        }
         Step(1, "Turn on BarBook's bar", running) {
             Body("Android lets apps draw on the status bar only through an accessibility service, so turning BarBook on " +
                 "happens in Accessibility settings. Android will say BarBook can \"view and control your screen\"; here is what it actually does with that:")
@@ -220,11 +230,16 @@ fun SetupPage(activity: Activity, running: Boolean) {
                 TextButton(onClick = { MainActivity.openAppInfo(activity) }) { Text("App info") }
             }
             if (!running) {
-                Spacer(Modifier.height(6.dp))
-                Text("Switch greyed out, or \"Restricted setting\"? Android asks this for apps installed from outside the Play Store. " +
-                    "Open App info, choose ⋮ (top right) › Allow restricted settings, confirm, then come back and turn BarBook on.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.height(10.dp))
+                Text("Installed BarBook from a download? Android guards this switch for such apps:", style = MaterialTheme.typography.bodyMedium)
+                Bullet("In Accessibility, open BarBook bar and tap the switch. Android says \"Restricted setting\"; tap OK.")
+                Bullet("Tap App info above, then ⋮ (top right) › Allow restricted settings, and confirm with your PIN.")
+                Bullet("Come back to Accessibility › BarBook bar and turn it on.")
             }
+            Spacer(Modifier.height(8.dp))
+            Text("About a day later, Android asks you to review apps with full device access. That's a standard check for every app " +
+                "like this; keep BarBook if you're happy with what it does.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Step(2, "Notifications", Notify.allowed(activity)) {
             Body("For timer alerts, and the Live Update chip that shows a running timer when BarBook's bar is off.")

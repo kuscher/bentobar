@@ -40,6 +40,7 @@ class DebugReceiver : BroadcastReceiver() {
                     }
                     Ticker.refresh(); "ok"
                 }
+                "finish" -> { io.github.kuscher.barbook.ui.MainActivity.current?.finish(); "ok" }
                 "bar" -> { Store.update { it.copy(enabled = args.getOrNull(1) != "off") }; "ok" }
                 "look" -> {
                     Store.update { c ->

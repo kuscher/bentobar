@@ -68,6 +68,26 @@ object Env {
     }
 
     fun global(action: Int): Boolean = service?.performGlobalAction(action) ?: false
+
+    /**
+     * Advanced Protection (Android 17) turns off accessibility services that aren't assistive
+     * tools, BarBook's included; its chip and tiles keep working.
+     */
+    fun advancedProtection(): Boolean = android.os.Build.VERSION.SDK_INT >= 36 && runCatching {
+        app.getSystemService(android.security.advancedprotection.AdvancedProtectionManager::class.java)?.isAdvancedProtectionEnabled == true
+    }.getOrDefault(false)
+
+    private var powerSaveAt = 0L
+    private var powerSave = false
+
+    /** Battery saver, re-read at most every 30 s. Items then refresh every 2 s instead of 1. */
+    fun powerSave(now: Long): Boolean {
+        if (now - powerSaveAt > 30_000) {
+            powerSaveAt = now
+            powerSave = app.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
+        }
+        return powerSave
+    }
 }
 
 /** A fixed-size history of samples for the small charts in menus. */

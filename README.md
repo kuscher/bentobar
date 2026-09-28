@@ -20,7 +20,11 @@
   <img src="https://img.shields.io/badge/Googlebook_OS-Android_17-4F6BED" alt="Googlebook OS, Android 17">
   <img src="https://img.shields.io/badge/internet_permission-none-2E7D32" alt="No internet permission">
   <img src="https://img.shields.io/badge/license-MIT-555555" alt="MIT license">
+  <img src="https://img.shields.io/badge/developed_entirely_on-a_Googlebook-E0407E" alt="Developed entirely on a Googlebook">
 </p>
+
+<p align="center"><sub>A personal hobby project by <a href="https://github.com/kuscher">Alexander Kuscher</a>, proudly developed entirely on a Googlebook.
+Not affiliated with or endorsed by any employer (<a href="#about-this-project">more</a>).</sub></p>
 
 <p align="center">
   <img src="docs/images/hero.png" width="880" alt="DiscoBar's items in the Googlebook status bar, with the CPU menu open under the CPU item">
@@ -165,6 +169,19 @@ Needs JDK 21 and the Android SDK (platform 37).
 `./disco` is the development helper (build, install, enable, test hooks, screenshots) for a
 Googlebook connected over Wireless debugging. [CLAUDE.md](CLAUDE.md) explains how the code is
 organised, and [docs/research](docs/research) has the platform findings behind the design.
+
+## About this project
+
+DiscoBar is my personal hobby project, made by me, [Alexander Kuscher](https://github.com/kuscher).
+It has no affiliation with my employer: my employer didn't make, sponsor, review or endorse it,
+and DiscoBar doesn't endorse my employer or its products either. The views, choices and any
+mistakes here are mine alone.
+
+It was proudly developed entirely on a Googlebook: written, built and tested on the device
+itself, in its Linux terminal and on its own Android, from the first probe of the status bar to
+this release.
+
+— Alexander ([@kuscher](https://github.com/kuscher))
 
 ## License
 

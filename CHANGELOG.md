@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 (2026-09-28)
+
+- Says clearly who made DiscoBar: a personal hobby project by Alexander Kuscher, not affiliated with
+  or endorsed by the author's employer (and not endorsing it either), proudly developed entirely on
+  a Googlebook. In the README, the app's About page and the license.
+
 ## 0.4 (2026-09-28)
 
 - **New icon:** a status bar with a ‹ and item dots over the Tools glyph, white on a Settings-style

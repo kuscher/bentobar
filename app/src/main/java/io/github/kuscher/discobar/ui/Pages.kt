@@ -306,7 +306,12 @@ fun AboutPage() {
         Bullet("Material Symbols, © Google, Apache License 2.0")
         Bullet("Jetpack Compose and AndroidX, © The Android Open Source Project, Apache License 2.0")
         Bullet("Kotlin and kotlinx.serialization, © JetBrains, Apache License 2.0")
+        SectionLabel("Who made this")
+        Body("DiscoBar is a personal hobby project by Alexander Kuscher (github.com/kuscher), proudly developed entirely on a Googlebook.")
+        Spacer(Modifier.height(6.dp))
+        Body("It isn't affiliated with the author's employer: that employer didn't make, sponsor or endorse it, and DiscoBar doesn't " +
+            "endorse that employer or its products either. The views and choices in it are the author's own.")
         SectionLabel("Not affiliated")
-        Body("DiscoBar is an independent project, not made by or affiliated with Google or with Surtees Studios, the makers of Bartender for Mac.")
+        Body("DiscoBar is an independent project, not made by or affiliated with Google, or with Surtees Studios (Bartender) or Bjango (iStat Menus).")
     }
 }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BarBook</string>
+    <string name="a11y_label">BarBook bar</string>
+    <string name="a11y_summary">Draws your BarBook items in the status bar</string>
+    <string name="a11y_description">BarBook draws the items you add (network speed, timer, calendar, tools…) on top of the status bar. Android only allows that through an accessibility service.\n\nWhat BarBook does with it: it reads the layout of the status bar, and nothing else, to find free space; it copies the colour of the status bar clock so your items match; and it runs system actions such as screenshot or lock when you pick them in its Tools menu.\n\nIt does not read other apps\' windows, does not watch your keyboard, mouse or touches, and has no internet access.</string>
+    <string name="tile_bar">BarBook</string>
+    <string name="tile_awake">Keep awake</string>
+    <string name="tile_timer">Timer</string>
+</resources>

@@ -1,0 +1,10 @@
+build/
+*.apk
+*.jks
+*.keystore
+*.idsig
+.gradle/
+local.properties
+.kotlin/
+app/build/
+executables/

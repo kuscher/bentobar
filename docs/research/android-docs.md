@@ -2,57 +2,78 @@
 
 Research date: 2026-09-28. Target: Googlebook OS (Android 17 / API 37, desktop mode), app delivered as a normal sideloaded APK (GitHub; maybe Play later), no adb grants, no root.
 
-Sources are official Google pages (developer.android.com, android-developers.googleblog.com, support.google.com, source.android.com, cs.android.com / android.googlesource.com). Anything not confirmed on an official page is marked **(unverified)**.
+Sources are official Google pages (developer.android.com, android-developers.googleblog.com, support.google.com, source.android.com, cs.android.com / android.googlesource.com). Anything not confirmed on an official page is marked **(unverified)**. A few device facts are tagged **(probe)**; they come from the on-device probe on 2026-09-27 (SDK 37.1 build CL3B.260622.270), not from docs.
 
-Status: in progress (sections are appended as each topic is finished).
+Status: complete (all 8 topics + gotchas).
 
 ## 1. Accessibility services for sideloaded apps (Android 13–17)
 
-### 1.1 Restricted settings (Android 13–14) and Enhanced Confirmation Mode (ECM, Android 15+)
-- **What the user sees:** for a guarded app, the switch for its accessibility service (or notification listener) is greyed out. Tapping it opens a dialog titled **"Restricted setting"** with the text *"For your security, this setting is currently unavailable."* Strings: `enhanced_confirmation_dialog_title` / `_desc` in PermissionController ([strings.xml, android16-release](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android16-release/PermissionController/res/values/strings.xml)).
-- **How to unlock:** Settings > Apps > (app) > ⋮ **More** > **Allow restricted settings**, then follow the prompts (Android 13+) ([Android Help 12623953](https://support.google.com/android/answer/12623953)). Google's warning there: allowing restricted settings gives the app access to sensitive info, so only do it for developers you trust.
-- **Order matters:** the ⋮ menu item appears **only after** the user has tried to turn the setting on and seen the dialog. Showing the dialog calls `setClearRestrictionAllowed()` ([EnhancedConfirmationDialogActivity.kt](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android16-release/PermissionController/src/com/android/permissioncontroller/ecm/EnhancedConfirmationDialogActivity.kt)). Settings shows the item only when `isClearRestrictionAllowed()` is true (on 13–14: app-op `ACCESS_RESTRICTED_SETTINGS` == `MODE_IGNORED`). Tapping it requires the lock-screen credential (`showLockScreen`) and then shows a toast ([AppInfoDashboardFragment.java, android16-release](https://android.googlesource.com/platform/packages/apps/Settings/+/refs/heads/android16-release/src/com/android/settings/applications/appinfo/AppInfoDashboardFragment.java)). **Onboarding must be: try to enable → dismiss dialog → App info → ⋮ → Allow restricted settings → PIN → enable again.**
-- **Which installs are guarded** (`isPackageEcmGuarded`, [EnhancedConfirmationService.java android15/16/17-release](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android17-release/service/java/com/android/ecm/EnhancedConfirmationService.java)):
-  - Never guarded: preinstalled/system apps, and packages or installers allow-listed by certificate in `/system/etc/sysconfig/enhanced-confirmation.xml`.
-  - Always guarded: `InstallSourceInfo.getPackageSource()` is `PACKAGE_SOURCE_LOCAL_FILE` or `PACKAGE_SOURCE_DOWNLOADED_FILE`. That is the normal "APK from browser or file manager" path. The constants are documented in [PackageInstaller](https://developer.android.com/reference/android/content/pm/PackageInstaller) (API 33): *"comes from a file that was downloaded to the device by the user"* and *"a local file on the device"*.
-  - Otherwise, guarded unless the immediate installer is preinstalled or allow-listed. If the XML lists **no** trusted installers, every installer counts as trusted. So third-party stores (Obtainium, F-Droid) are guarded on Android 15+ only when the device ships a trusted-installer list. `adb install` goes through shell, a system package, so it is not guarded.
-  - ECM is off on TV (`FEATURE_LEANBACK`) and Automotive. Android 17 adds OEM config `config_enhancedConfirmationModeExemptSettings`, which can exempt individual settings, or all of them with `"*"` (android17-release source above).
-- **Settings ECM protects per package** (15, 16 and 17 lists are identical): SMS permissions, `BIND_DEVICE_ADMIN`, app-ops `BIND_ACCESSIBILITY_SERVICE`, `ACCESS_NOTIFICATIONS` (notification listener), **`SYSTEM_ALERT_WINDOW`**, `GET_USAGE_STATS`, `LOADER_USAGE_STATS`, and the dialer/SMS roles (same source). Whether each Settings screen actually checks ECM for SAW or usage access is **(unverified)** for Googlebook.
-- **Scam-call guard (16+, flag-gated):** during an ongoing call from an untrusted number, turning on a **non-tool** accessibility service is blocked with *"Can't complete action during call… Scammers may try to take control of your device by asking you to allow accessibility access for an app."* (`UNTRUSTED_CALL_RESTRICTED_SETTINGS`, same source + strings.xml). This has little effect on a laptop.
+### 1.1 Restricted settings (13–14) and Enhanced Confirmation Mode (ECM, 15+)
+- **What the user sees:** the service's switch is greyed out. Tapping it shows **"Restricted setting"**: *"For your security, this setting is currently unavailable."* ([PermissionController strings.xml](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android16-release/PermissionController/res/values/strings.xml)).
+- **How to unlock:** Settings > Apps > (app) > ⋮ **More** > **Allow restricted settings**, then follow the prompts. Google warns to do this only for developers you trust ([Android Help 12623953](https://support.google.com/android/answer/12623953)).
+- **Order matters:**
+  - The ⋮ item appears **only after** the user has hit the dialog once. Showing the dialog calls `setClearRestrictionAllowed()` ([EnhancedConfirmationDialogActivity.kt](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android16-release/PermissionController/src/com/android/permissioncontroller/ecm/EnhancedConfirmationDialogActivity.kt)).
+  - Settings shows the item when `isClearRestrictionAllowed()` is true; on 13–14 the test is app-op `ACCESS_RESTRICTED_SETTINGS == MODE_IGNORED`.
+  - Tapping it asks for the lock-screen credential ([AppInfoDashboardFragment.java](https://android.googlesource.com/platform/packages/apps/Settings/+/refs/heads/android16-release/src/com/android/settings/applications/appinfo/AppInfoDashboardFragment.java)).
+  - The unlock is **per package**: `clearRestriction` marks the whole app NOT_GUARDED.
+- **Which installs are guarded** (`isPackageEcmGuarded` in [EnhancedConfirmationService.java](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android17-release/service/java/com/android/ecm/EnhancedConfirmationService.java), android15/16/17-release):
+  - Never guarded: preinstalled apps, and packages or installers allow-listed by certificate in `/system/etc/sysconfig/enhanced-confirmation.xml`.
+  - **Always guarded:** `PACKAGE_SOURCE_LOCAL_FILE` or `PACKAGE_SOURCE_DOWNLOADED_FILE`, i.e. an APK opened from a browser or file manager ([PackageInstaller](https://developer.android.com/reference/android/content/pm/PackageInstaller), API 33).
+  - Otherwise, guarded unless the immediate installer is preinstalled or allow-listed. With **no** trusted installers listed, every installer is trusted.
+  - `adb install` (shell) is not guarded.
+  - **(probe)** On the Googlebook, `enhanced-confirmation.xml` lists **no trusted installers**, so only the LOCAL_FILE/DOWNLOADED_FILE rule applies: Chrome/Files installs are guarded. Installs through a store app are guarded only if that store sets one of those sources **(unverified per store)**.
+  - ECM is off on TV and Automotive. Android 17 adds OEM overlay `config_enhancedConfirmationModeExemptSettings`, which can exempt single settings or all of them (`"*"`).
+- **Protected per package** (the 15, 16 and 17 lists are identical):
+  - SMS permissions and `BIND_DEVICE_ADMIN`
+  - app-ops `BIND_ACCESSIBILITY_SERVICE` and `ACCESS_NOTIFICATIONS` (notification listener)
+  - `SYSTEM_ALERT_WINDOW`, `GET_USAGE_STATS`, `LOADER_USAGE_STATS`
+  - the dialer and SMS roles
 
-### 1.2 Android 17 changes: Advanced Protection Mode (AAPM) vs non-tool services
-- User-facing: Advanced Protection *"Restricts accessibility services to verified accessibility tools"*, and *"will block the installation of apps from unknown sources and will block updates for apps originally installed from unknown sources"* ([Android Help 16339980](https://support.google.com/android/answer/16339980)). Dev page: AAPM launched in Android 16 and includes "Blocked app sideloading" ([Advanced Protection Mode](https://developer.android.com/privacy-and-security/advanced-protection-mode)).
-- Mechanism (Android 17 source): when AAPM feature `FEATURE_ID_RESTRICT_NON_TOOL_A11Y_SERVICES` is on, `AccessibilityManagerService` sets the global user restriction `DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE`. It permits only packages that are **system or `isAccessibilityTool`, and that contain no non-tool service**, and shuts down already-enabled non-tool services ([AccessibilityManagerService.java, android17-release](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java), `handleAdvancedProtectionModeStateChanged`, `getPermittedServicesStrictApm`). Press reports quote the blocked-toggle text as "Restricted by Advanced Protection" **(unverified wording)**.
-- **Result for BarBook:** with AAPM on, BarBook can't be sideloaded at all. Even a Play install cannot enable its service. Detect this with `AdvancedProtectionManager.isAdvancedProtectionEnabled()` plus `registerAdvancedProtectionCallback()`, which need `<uses-permission android:name="android.permission.QUERY_ADVANCED_PROTECTION_MODE"/>` (API 36, [dev page](https://developer.android.com/privacy-and-security/advanced-protection-mode), [reference](https://developer.android.com/reference/android/security/advancedprotection/AdvancedProtectionManager)). Degrade to Quick Settings tiles and notifications only.
-- There are no other Android 17 accessibility or ECM behaviour changes on the 17 pages, apart from text-change types for CJKV IMEs ([behavior-changes-17](https://developer.android.com/about/versions/17/behavior-changes-17)).
+  Whether Googlebook's Settings enforces SAW and usage access is **(unverified)**.
+- **Scam-call guard (16+, flag-gated):** during a call from an untrusted number, enabling a **non-tool** service is blocked (*"Can't complete action during call"*).
+
+### 1.2 Android 17: Advanced Protection Mode (AAPM) vs non-tool services
+- Official help: AAPM *"Restricts accessibility services to verified accessibility tools"* and *"will block the installation of apps from unknown sources and … updates for apps originally installed from unknown sources"* ([Android Help 16339980](https://support.google.com/android/answer/16339980); [dev page](https://developer.android.com/privacy-and-security/advanced-protection-mode): "Blocked app sideloading").
+- Android 17 source: `FEATURE_ID_RESTRICT_NON_TOOL_A11Y_SERVICES` makes `AccessibilityManagerService` set the global user restriction `DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE`. It permits only packages that are **system or `isAccessibilityTool`, and contain no non-tool service**, and shuts down non-tool services that are already enabled ([AccessibilityManagerService.java, android17-release](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java), `getPermittedServicesStrictApm`). The press quotes the toggle text as "Restricted by Advanced Protection" **(unverified)**.
+- Detect it with `AdvancedProtectionManager.isAdvancedProtectionEnabled()` and `registerAdvancedProtectionCallback()`, which need the `QUERY_ADVANCED_PROTECTION_MODE` permission (API 36, [reference](https://developer.android.com/reference/android/security/advancedprotection/AdvancedProtectionManager)).
+- Android 17 has no other accessibility or ECM behaviour changes, apart from CJKV text-change types ([behavior-changes-17](https://developer.android.com/about/versions/17/behavior-changes-17)).
 
 ### 1.3 `android:isAccessibilityTool`
-- `R.attr.isAccessibilityTool` (API 31): *"whether the accessibility service is used to assist users with disabilities. This criteria might be defined by the installer. The default is false. Note: If this flag is false, system will show a notification after a duration to inform the user about the privacy implications of the service."* ([R.attr](https://developer.android.com/reference/android/R.attr#isAccessibilityTool)).
-- **BarBook must NOT set it.** Play allows it only for apps whose primary purpose is supporting people with disabilities (screen readers, switch, voice or Braille access). It explicitly lists *"automation tools, assistants, … launchers"* as not accessibility tools ([Play: Use of the AccessibilityService API](https://support.google.com/googleplay/android-developer/answer/10964491)).
+- `R.attr.isAccessibilityTool` (API 31, default false): *"If this flag is false, system will show a notification after a duration to inform the user about the privacy implications of the service"* ([R.attr](https://developer.android.com/reference/android/R.attr#isAccessibilityTool)).
+- Play allows it only for apps whose **primary purpose** is disability support (screen readers, switch, voice, Braille). Play names *"automation tools, assistants, … launchers"* as non-tools ([Play Help 10964491](https://support.google.com/googleplay/android-developer/answer/10964491)). **BarBook must not set it.**
 
-### 1.4 Google Play AccessibilityService policy (for a later Play release)
+### 1.4 Google Play AccessibilityService policy
 Sources: [Play Help 10964491](https://support.google.com/googleplay/android-developer/answer/10964491) and [Permissions and APIs that Access Sensitive Information](https://support.google.com/googleplay/android-developer/answer/9888170).
-- **The API may not be used to:** change user settings without permission, or stop users from disabling or uninstalling apps; *"work around Android built-in platform security controls, privacy controls and notifications"*; *"change or leverage the user interface in a way that is deceptive"*. It also may not be used for remote call-audio recording or for apps that *"autonomously initiate, plan, and execute actions"*. Deterministic rule-based automation is allowed.
-- The Play listing must document the use. Apps *"must use more narrowly scoped APIs and permissions in lieu of the Accessibility API when possible."* BarBook's argument: nothing else can draw in the status-bar band, because `TYPE_APPLICATION_OVERLAY` sits *"below critical system windows like the status bar"* ([WindowManager.LayoutParams](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_APPLICATION_OVERLAY)).
-- **Prominent disclosure** (required for non-tools). It must be:
-  - in the app itself, and shown in normal use rather than hidden in settings
-  - describe the data accessed through the API and how it is used or shared
-  - require affirmative consent (tap to accept or tick a box)
-  - not only in a privacy policy or ToS
+- **Forbidden uses:**
+  - changing settings without permission, or blocking disable or uninstall
+  - *"work around Android built-in platform security controls, privacy controls and notifications"*
+  - changing the UI *"in a way that is deceptive"*
+  - remote call-audio recording
+  - autonomous agents (deterministic "if X then Y" automation is allowed)
+- The use must be documented in the listing. Apps *"must use more narrowly scoped APIs … when possible"*. BarBook's case is that `TYPE_APPLICATION_OVERLAY` sits *"below critical system windows like the status bar"* ([LayoutParams](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_APPLICATION_OVERLAY)).
+- **Prominent disclosure** (non-tools only):
+  - inside the app, shown in normal use and not buried in settings
+  - describes the data accessed and how it is used or shared
+  - requires affirmative consent
+  - not only in the privacy policy or ToS
   - not bundled with other disclosures
-  - never replaced by the service's `android:description`/`htmlDescription`.
-- **Declaration form** (Play Console > App content): why the app needs the API (e.g. "App functionality"); whether personal or sensitive data is collected or shared via the API (Yes/No, then data types); a **video link** showing app open → disclosure (all text readable) → consent and grant → decline and re-trigger → a core feature that uses the API. The form must be resubmitted whenever usage changes.
+  - never replaced by the service `description`
+- **Declaration form** (Play Console > App content):
+  - Why the API is needed (e.g. "App functionality").
+  - Whether data is collected or shared through it; if yes, which types.
+  - A **video**: app opens → full disclosure → consent and grant → decline and re-trigger → core feature.
+  - Resubmit whenever usage changes.
 
-### 1.5 Disclosure copy best practices ([Play Help 11150561](https://support.google.com/googleplay/android-developer/answer/11150561))
-- Show it right before sending the user to Settings, at the point where you explain the grant steps.
-- Give two choices: consent, and decline with a way to grant later ("Not now"). Degrade gracefully if the user declines.
-- Use "Agree", not "Allow access" or "Got it". The prompt must not look like Android system UI; use app colours.
-- Content: **Why** comes first, then **What** data and **How** it is used. Clarity beats brevity; write at the reading level of a 13-year-old. Mind consent fatigue.
-- Suggested BarBook substance: it reads the layout of the system status bar and window list only to position its own items; it does not read or store other apps' content; nothing leaves the device.
+### 1.5 Disclosure copy ([Play Help 11150561](https://support.google.com/googleplay/android-developer/answer/11150561))
+- Show it right before sending the user to Settings.
+- Offer two options, consent and "Not now", and degrade gracefully if the user declines.
+- Say "Agree", not "Allow access" or "Got it". Don't make it look like system UI.
+- Order the content **Why → What → How**. Clarity beats brevity; aim for the reading level of a 13-year-old. Mind consent fatigue.
+- BarBook's substance: it reads the status-bar layout and window list only to place its own items; it doesn't read or store app content; nothing leaves the device. Also tell users about the reminder in §1.7.
 
 ### 1.6 Overlay z-order and window APIs
-- `TYPE_ACCESSIBILITY_OVERLAY` (2032) is *"overlaid only by a connected AccessibilityService for interception of user interactions without changing the windows an accessibility service can introspect"* ([LayoutParams](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_ACCESSIBILITY_OVERLAY)). A touchable overlay therefore does not hide the windows beneath it from `getWindows()`.
-- **Z-order** (`getWindowLayerFromTypeLw`, [WindowManagerPolicy.java android17-release](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/core/java/com/android/server/policy/WindowManagerPolicy.java)), bottom to top:
+- `TYPE_ACCESSIBILITY_OVERLAY` (2032) is *"overlaid only by a connected AccessibilityService … without changing the windows an accessibility service can introspect"* ([LayoutParams](https://developer.android.com/reference/android/view/WindowManager.LayoutParams#TYPE_ACCESSIBILITY_OVERLAY)).
+- **Z-order**, bottom to top (`getWindowLayerFromTypeLw`, [WindowManagerPolicy.java android17-release](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/core/java/com/android/server/policy/WindowManagerPolicy.java)):
 
   | Window type | Layer |
   |---|---|
@@ -63,100 +84,90 @@ Sources: [Play Help 10964491](https://support.google.com/googleplay/android-deve
   | `VOLUME_OVERLAY` | 22 |
   | `NAVIGATION_BAR` | 24 |
   | `SCREENSHOT` | 26 |
-  | `DRAG` | 30 |
   | **`ACCESSIBILITY_OVERLAY`** | **31** |
   | `SECURE_SYSTEM_OVERLAY` | 33 |
   | `POINTER` | 35 |
 
-  So BarBook items draw **above the status bar and above the notification shade, Quick Settings and the lock screen**. BarBook must hide them itself when those surfaces open.
-- API 34 adds `attachAccessibilityOverlayToDisplay(displayId, SurfaceControl)` (via `SurfaceControlViewHost`, ordered with `Transaction.setLayer`) and `attachAccessibilityOverlayToWindow(...)` ([AccessibilityService](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService)). Use them for multi-display, or to tie an item to a window.
-- `getWindows()` returns only interactive windows on the default display, top-most first. `getWindowsOnAllDisplays()` (API 30) covers every display. Both need `canRetrieveWindowContent="true"` **and** `FLAG_RETRIEVE_INTERACTIVE_WINDOWS`; without the flag the list is empty, `TYPE_WINDOWS_CHANGED` is not delivered and `AccessibilityNodeInfo.getWindow()` returns null ([AccessibilityServiceInfo](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#FLAG_RETRIEVE_INTERACTIVE_WINDOWS)).
-- `AccessibilityWindowInfo` types: `TYPE_SYSTEM` (status bar and taskbar will appear as this), `TYPE_ACCESSIBILITY_OVERLAY`, and `TYPE_WINDOW_CONTROL` (API 36, a system window that controls another window, e.g. desktop captions) ([AccessibilityWindowInfo](https://developer.android.com/reference/android/view/accessibility/AccessibilityWindowInfo)).
-- The dev guide warns that `typeAllMask` *"can be resource intensive"*. Subscribe to the minimum event types ([Create an accessibility service](https://developer.android.com/guide/topics/ui/accessibility/service)).
+  BarBook's items therefore draw **over the shade, QS and lock screen** unless BarBook hides them.
+- API 34 adds `attachAccessibilityOverlayToDisplay(displayId, SurfaceControl)` and `…ToWindow` ([AccessibilityService](https://developer.android.com/reference/android/accessibilityservice/AccessibilityService)).
+- `getWindows()` (default display, top-most first) and `getWindowsOnAllDisplays()` (API 30) need `canRetrieveWindowContent` **and** `FLAG_RETRIEVE_INTERACTIVE_WINDOWS`. Without the flag the list is empty and no `TYPE_WINDOWS_CHANGED` arrives ([AccessibilityServiceInfo](https://developer.android.com/reference/android/accessibilityservice/AccessibilityServiceInfo#FLAG_RETRIEVE_INTERACTIVE_WINDOWS)).
+- Window types include `TYPE_SYSTEM` and `TYPE_WINDOW_CONTROL` (API 36, e.g. desktop captions) ([AccessibilityWindowInfo](https://developer.android.com/reference/android/view/accessibility/AccessibilityWindowInfo)).
+- `typeAllMask` *"can be resource intensive"* ([guide](https://developer.android.com/guide/topics/ui/accessibility/service)).
 
 ### 1.7 "App is using accessibility" reminders
-- **With Safety Center enabled** (the Googlebook has it, per the earlier device probe), the framework's own reminder is switched off: `sendNotification = !isSafetyCenterEnabled()` ([AccessibilityManagerService.java, android17-release](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java)). PermissionController's `AccessibilitySourceService` takes over ([source, android16-release](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android16-release/PermissionController/src/com/android/permissioncontroller/privacysources/AccessibilitySourceService.kt)):
-  - It runs a periodic job every **1 day** by default (DeviceConfig `sc_accessibility_job_interval_millis`, flex 10%).
-  - For enabled **non-tool** services it posts **one notification per service**, titled *"Review app with full device access"* with the text *"<App> can view your screen and perform actions on your device. Accessibility apps need this type of access to function as intended."* The notification has a **Remove access** action.
-  - Notifications are at least about 0.8 days apart, and only one shows at a time.
-  - The service is then marked "notified". If it is **disabled and re-enabled**, it drops off that list and gets reminded again.
-  - Safety Center also keeps an **information-level issue card** for each enabled non-tool service.
-- **Without Safety Center:** `PolicyWarningUIController` sets a one-shot alarm **24 h after binding** (`SEND_NOTIFICATION_DELAY_HOURS = 24`). Once the notification is dismissed or tapped, the service is remembered in `Settings.Secure.NOTIFIED_NON_ACCESSIBILITY_CATEGORY_SERVICES` and not notified again ([PolicyWarningUIController.java, android17-release](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/PolicyWarningUIController.java)).
-- Onboarding copy should warn the user about this one-time reminder so it doesn't alarm them.
+- **With Safety Center on** (on the Googlebook **(probe)**), the framework reminder is disabled (`!isSafetyCenterEnabled()` in AccessibilityManagerService). PermissionController's `AccessibilitySourceService` takes over ([source](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android16-release/PermissionController/src/com/android/permissioncontroller/privacysources/AccessibilitySourceService.kt)):
+  - A **daily** job (DeviceConfig `sc_accessibility_job_interval_millis`) posts **one notification per enabled non-tool service**: *"Review app with full device access"* / *"<App> can view your screen and perform actions on your device…"*, with a **Remove access** button.
+  - These notifications are at least about 0.8 days apart, one at a time.
+  - **Disabling and re-enabling re-arms it.**
+  - Safety Center also shows an info-level card while the service is enabled.
+- **Without Safety Center:** a one-shot notification **24 h after bind**, never repeated once dismissed (`NOTIFIED_NON_ACCESSIBILITY_CATEGORY_SERVICES`) ([PolicyWarningUIController.java](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/PolicyWarningUIController.java)).
 
 ## 2. Live Updates (promoted ongoing notifications, 16+) and Android 17 `MetricStyle`
 
-**Eligibility.** All requirements below are from the [Live Updates guide](https://developer.android.com/develop/ui/views/notifications/live-update):
+**Eligibility** ([Live Updates guide](https://developer.android.com/develop/ui/views/notifications/live-update)):
 - The style is standard, `BigTextStyle`, `CallStyle`, `ProgressStyle` or `MetricStyle`.
-- The manifest declares `POST_PROMOTED_NOTIFICATIONS`. Its protection level is `normal|appops`, it was added in 36.1, and it is needed *in addition to* `POST_NOTIFICATIONS` ([Manifest.permission](https://developer.android.com/reference/android/Manifest.permission#POST_PROMOTED_NOTIFICATIONS)).
-- The notification requests promotion with `setRequestPromotedOngoing(true)` / `EXTRA_REQUEST_PROMOTED_ONGOING` (36.1).
-- It is ongoing, with `FLAG_ONGOING_EVENT` set.
-- It has a `contentTitle`.
-- It has no custom `RemoteViews`, is not a group summary, and is not `setColorized(true)`.
+- The app declares `POST_PROMOTED_NOTIFICATIONS`. It is `normal|appops`, added in 36.1, and needed **in addition to** `POST_NOTIFICATIONS` ([Manifest.permission](https://developer.android.com/reference/android/Manifest.permission#POST_PROMOTED_NOTIFICATIONS)).
+- The notification calls `setRequestPromotedOngoing(true)` (36.1).
+- It is ongoing and has a `contentTitle`.
+- It has no custom `RemoteViews`, is not a group summary, and is not colorized.
 - Its channel is not `IMPORTANCE_MIN`.
 - *"OEMs can enforce additional criteria."*
 
-**Checks.**
-- `Notification.hasPromotableCharacteristics()`: if it returns false, the notification is never promoted; if true, promotion is still not guaranteed, and user settings are ignored ([Notification](https://developer.android.com/reference/android/app/Notification#hasPromotableCharacteristics())).
-- `FLAG_PROMOTED_ONGOING` is set by the system when the notification is actually promoted.
+**Checks:**
+- `Notification.hasPromotableCharacteristics()`: false means it will never be promoted; it ignores user settings.
+- `FLAG_PROMOTED_ONGOING` is set by the system when promotion actually happens ([Notification](https://developer.android.com/reference/android/app/Notification#hasPromotableCharacteristics())).
 - `NotificationManager.canPostPromotedNotifications()` reflects the user toggle ([NotificationManager](https://developer.android.com/reference/android/app/NotificationManager#canPostPromotedNotifications())).
-- To send the user to the toggle, use `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` (`"android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS"`, API 36) with `EXTRA_APP_PACKAGE`. The reference warns *"a matching Activity may not exist"* ([Settings](https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)). The guide's name `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS` is not in the API reference; use the reference name.
+- To send the user to the toggle, use `Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS` (`"android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS"`, API 36) with `EXTRA_APP_PACKAGE`. The activity may not exist ([Settings](https://developer.android.com/reference/android/provider/Settings#ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS)). The guide's `ACTION_MANAGE_APP_PROMOTED_NOTIFICATIONS` is not in the API reference.
 
-**What the chip shows** ([`setShortCriticalText`](https://developer.android.com/reference/android/app/Notification.Builder#setShortCriticalText(java.lang.String)), API 36, plus the guide):
-- **Priority 1:** `shortCriticalText`. Suggested max 7 characters. `""` forces an icon-only chip.
-- **Priority 2:** the `MetricStyle` critical metric.
-- **Priority 3:** `when`. The chronometer shows if `setUsesChronometer` is true and the value is positive. With `setShowWhen`, the time remaining until `when` shows if positive; a `when` at least 2 min ahead renders as "5min".
-- The chip always has the small icon. It is at most **96 dp** wide.
-- Text under 7 characters shows in full. If less than half the text fits, the chip is icon-only; otherwise it shows as much text as fits.
-- Users can demote or dismiss the notification. Don't repost after the user dismisses it; use `setDeleteIntent`.
-- There is no desktop or large-screen chip documentation. How Googlebook's desktop status bar renders chips is **(unverified)**.
+**The status-bar chip:**
+- **Content priority:**
+  1. `setShortCriticalText()` (API 36; suggested ≤ 7 characters; `""` means icon only).
+  2. The `MetricStyle` critical metric.
+  3. `when`: a positive chronometer, or the time remaining (a `when` at least 2 min ahead shows as "5min").
+
+  Sources: [Notification.Builder](https://developer.android.com/reference/android/app/Notification.Builder#setShortCriticalText(java.lang.String)) and the guide.
+- **Layout:** the chip always shows the small icon and is at most **96 dp** wide. Text under 7 characters shows in full; text that is less than half visible is dropped.
+- **Dismissal:** users can demote or dismiss the notification. Don't repost; use `setDeleteIntent`.
+- **Desktop:** no desktop or large-screen chip documentation exists **(unverified on Googlebook)**.
 
 **`Notification.MetricStyle` (API 37)** ([MetricStyle](https://developer.android.com/reference/android/app/Notification.MetricStyle), [Metric](https://developer.android.com/reference/android/app/Notification.Metric)):
-- Shows *"up to 3 metrics when expanded"*. It needs at least one `Metric`, or `build()` rejects it. It doesn't show the large icon.
-- *"If … promoted ongoing, then one of its metrics might be displayed in the status bar chip."* `setCriticalMetric(index)` picks that metric. The default is the first metric; `METRIC_INDEX_NONE` = -1 picks none.
-- Constructor: `Metric(MetricValue value, CharSequence label[, int semanticStyle])`. Keep labels to 10 characters or fewer.
-- `MetricValue` subclasses:
+- Shows up to 3 metrics when expanded. It needs at least one, and it doesn't show the large icon.
+- When promoted, the critical metric (`setCriticalMetric(index)`, default first, `METRIC_INDEX_NONE` = −1) *"might be displayed in the status bar chip"*.
+- Constructor: `Metric(value, label[, semanticStyle])`. Keep labels to 10 characters or fewer.
+- Values:
+  - `FixedText(text[, unit])`
+  - `FixedInt(int[, unit])`
+  - `FixedFloat(float[, unit[, minFrac, maxFrac]])`
+  - `FixedDate(LocalDate[, FORMAT_AUTOMATIC/SHORT_DATE/LONG_DATE])`
+  - `FixedTime(LocalTime)`, shown as hours:minutes
+  - `TimeDifference.forTimer(end, fmt)` and `forStopwatch(start, fmt)`, taking an `Instant` or an elapsedRealtime `long`; plus `forPausedTimer` and `forPausedStopwatch(Duration, fmt)`
+  - formats `FORMAT_ADAPTIVE` ("1h 5m") and `FORMAT_CHRONOMETER` ("2:00:00")
+- **Semantic styles (37):** `SEMANTIC_STYLE_UNSPECIFIED/INFO/SAFE/CAUTION/DANGER`, meaning blue, green, orange, red. They apply to `Metric`, `ProgressStyle.Point`/`Segment`, and text through `Notification.createSemanticStyleAnnotation()`, but only when the notification is promoted ([17 features](https://developer.android.com/about/versions/17/features)).
 
-  | Class | Form | Notes |
-  |---|---|---|
-  | `FixedText` | `(text[, unit])` | |
-  | `FixedInt` | `(int[, unit])` | |
-  | `FixedFloat` | `(float[, unit[, minFrac, maxFrac]])` | 0–2 fraction digits by default |
-  | `FixedDate` | `(LocalDate[, FORMAT_AUTOMATIC / SHORT_DATE / LONG_DATE])` | |
-  | `FixedTime` | `(LocalTime)` | hours:minutes in the user's 12/24 h format |
-  | `TimeDifference` | `forTimer(endTime, fmt)`, `forStopwatch(startTime, fmt)` | `Instant` or `elapsedRealtime` long; also `forPausedTimer` / `forPausedStopwatch(Duration, fmt)`; formats `FORMAT_ADAPTIVE` ("1h 5m") and `FORMAT_CHRONOMETER` ("2:00:00") |
-
-- **Semantic colours (API 37):**
-  - `Notification.SEMANTIC_STYLE_UNSPECIFIED/INFO/SAFE/CAUTION/DANGER` apply to `Metric`, `ProgressStyle.Point` and `ProgressStyle.Segment`.
-  - For text, use spans from `Notification.createSemanticStyleAnnotation(style)`.
-  - The colours map to green = safe, orange = caution, red = danger, blue = info ([17 features](https://developer.android.com/about/versions/17/features)).
-  - They apply *"when the notification is promoted"*.
-
-**Which use cases qualify** (guide). Use Live Updates for activities that are **ongoing, user-initiated and time-sensitive**, e.g. navigation, calls, rideshare, delivery.
-- Explicitly **inappropriate:** *"Ads, promotions, chat messages, alerts, upcoming calendar events, and quick access to app features"*.
-- Also: *"Don't show ambient information, such as … the user's environment, interests, or upcoming events"*. For quick access, the guide says to use a widget or a **custom Quick Settings tile**.
-- The Settings reference repeats that promotion is *"reserved for user initiated ongoing activities like navigation, phone calls, and ride sharing"*.
-- **For BarBook:** a permanent CPU, network or battery meter as a Live Update goes against the guidance. Good fits are user-started timers, stopwatches, focus sessions and running transfers. No Play policy text specific to Live Updates was found **(unverified)**.
+**Qualifying use cases** (guide): Live Updates are for **ongoing, user-initiated, time-sensitive** activities such as navigation, calls, rides or deliveries.
+- Explicitly not: *"Ads, promotions, chat messages, alerts, upcoming calendar events, and quick access to app features"*. Also not *"ambient information"*. For quick access, use a widget or a **QS tile**.
+- The Settings reference says promotion is *"reserved for user initiated ongoing activities like navigation, phone calls, and ride sharing"*.
+- **BarBook:** use them for user-started timers, stopwatches, focus sessions or transfers, not for permanent meters. No Live-Update-specific Play policy text was found **(unverified)**.
 
 ## 3. Android 17 `StatusBarManager` agent-task API (`android.agenticon`)
 
-All from [StatusBarManager](https://developer.android.com/reference/android/app/StatusBarManager) and the [android.agenticon package](https://developer.android.com/reference/android/agenticon/package-summary).
-- **Added in "version 37.2".** That is the Android 17 minor SDK that ships with QPR2, still in beta as of 2026-09 ([QPR2 release notes](https://developer.android.com/about/versions/17/qpr2/release-notes): *"Android 17 QPR2 includes a minor SDK release"*). The earlier device probe reported **SDK 37.1** on the Googlebook, so these APIs are probably **absent on the device today**. Gate on `Build.VERSION.SDK_INT_FULL` ([Build.VERSION](https://developer.android.com/reference/android/os/Build.VERSION#SDK_INT_FULL)).
-- **Who may call it.** `canSetAgentTask()` returns true only if **all** of these hold:
+Sources: [StatusBarManager](https://developer.android.com/reference/android/app/StatusBarManager) and [android.agenticon](https://developer.android.com/reference/android/agenticon/package-summary).
+- **Availability.** Added in **"version 37.2"**, the minor SDK that ships with Android 17 QPR2, still in beta ([QPR2 notes](https://developer.android.com/about/versions/17/qpr2/release-notes)). The Googlebook reports **SDK 37.1** **(probe)**, so gate on `Build.VERSION.SDK_INT_FULL`.
+- **Who may call it.** `canSetAgentTask()` is true only if all three hold:
   1. the caller holds **`RoleManager.ROLE_ASSISTANT`**;
-  2. it has an enabled activity that filters `ACTION_AGENT_TASK_MAIN` (`"android.app.action.AGENT_TASK_MAIN"`). That activity's icon becomes the default, non-animated state; `setAgentTask(null, …)` returns to it;
+  2. it has an enabled activity that filters `ACTION_AGENT_TASK_MAIN` (`"android.app.action.AGENT_TASK_MAIN"`), whose icon is the default, non-animated state;
   3. *"the corresponding user setting is enabled"*.
-- **Device support.** `isAgentTaskFeatureSupported()` reports device support; devices with the PersonalContextManager service must support it. `isAgentTaskLaunchSupported()`: when false, click `PendingIntent`s are ignored.
-- **Calls.**
-  - `setAgentTask(AgentTaskUpdate, Executor, OutcomeReceiver<AgentTaskOutcome, Throwable>)` is best-effort; the last request wins; current user only. To pair it with a notification, set `Notification.Builder.setAgentInteractionFlags(FLAG_AGENT_TASK_INTERACTION_HIDE_STATUS_BAR_ICON | …_HIDE_VISUAL_ALERTS)`.
-  - `getAgentStateScreenLocation(displayId)` returns the icon's on-screen `Rect`. It can take seconds, so call it off the main thread.
+- **Device support.** `isAgentTaskFeatureSupported()` reports device support. `isAgentTaskLaunchSupported()` returning false means click `PendingIntent`s are ignored.
+- **`setAgentTask(AgentTaskUpdate, Executor, OutcomeReceiver<AgentTaskOutcome,Throwable>)`**:
+  - Best effort; the last request wins; current user only. `null` resets to the default.
+  - Pair it with `Notification.Builder.setAgentInteractionFlags(FLAG_AGENT_TASK_INTERACTION_HIDE_STATUS_BAR_ICON | …HIDE_VISUAL_ALERTS)`.
+  - `getAgentStateScreenLocation(displayId)` returns the icon's `Rect`. It can be slow, so call it on a worker thread.
 - **What the status bar shows.**
-  - **`AgentTaskState`:** a status-bar **icon** with an optional loop or interrupting animation, a content description, and a click `PendingIntent` that opens the agent app.
-  - **`AgentTaskEvent`:** a short-lived pill of leading icons + text + trailing icons, with a background and a click action. It may cover the state icon. It may be dropped when events are too frequent, the status bar is hidden, or more critical information needs the space.
-  - **`AgentTaskUpdate`:** carries the state and/or the event.
-  - **`AgentTaskOutcome`:** reports `isStateChanged()` and `isEventShown()`.
-- **Related 37 API, `StatusBarManager.showPowerMenu(Executor, OutcomeReceiver<Integer,Throwable>)`.** It needs `SHOW_POWER_MENU`, which is *"granted to the current holder of the ASSISTANT role"*, or `SHOW_POWER_MENU_PRIVILEGED` ([Manifest.permission](https://developer.android.com/reference/android/Manifest.permission#SHOW_POWER_MENU)). BarBook can reach the same dialog with its accessibility service instead: `performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)`.
-- **Can BarBook use the agent-task API?** Only by becoming the default digital assistant. ROLE_ASSISTANT qualifies any app with an **exported `ACTION_ASSIST` activity** or a qualifying `VoiceInteractionService` ([AssistantRoleBehavior.java, android17-release](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android17-release/PermissionController/role-controller/java/com/android/role/controller/behavior/AssistantRoleBehavior.java)). The user would have to pick BarBook as "Digital assistant app", displacing Gemini, and it would get **one** icon. That is a poor trade and against the API's intent. Treat the API as not applicable.
+  - `AgentTaskState`: **one icon** with optional looping or interrupting animation, a content description, and a click `PendingIntent`.
+  - `AgentTaskEvent`: a transient pill of leading icons + text + trailing icons. It may be dropped if events are too frequent, the bar is hidden, or more critical information needs the space.
+  - `AgentTaskOutcome` reports `isStateChanged()` and `isEventShown()`.
+- **Related API.** `StatusBarManager.showPowerMenu()` (37) needs `SHOW_POWER_MENU`, which is *"granted to the current holder of the ASSISTANT role"* ([Manifest.permission](https://developer.android.com/reference/android/Manifest.permission#SHOW_POWER_MENU)). BarBook can open the same menu with `performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)`.
+- **Verdict: not usable.** Any app with an exported `ACTION_ASSIST` activity qualifies for ROLE_ASSISTANT ([AssistantRoleBehavior.java, android17-release](https://android.googlesource.com/platform/packages/modules/Permission/+/refs/heads/android17-release/PermissionController/role-controller/java/com/android/role/controller/behavior/AssistantRoleBehavior.java)). But the user would have to make BarBook the digital assistant, replacing Gemini, to get a single icon.
 
 ## 4. Quick Settings tiles
 
@@ -213,21 +224,20 @@ All intent docs: [Settings](https://developer.android.com/reference/android/prov
 
 ## 6. Background execution for an accessibility-service app (14–17)
 
-**No foreground service is needed.** While the user keeps the service enabled, the system itself binds it with `BIND_AUTO_CREATE | BIND_FOREGROUND_SERVICE_WHILE_AWAKE | BIND_ALLOW_BACKGROUND_ACTIVITY_STARTS | BIND_INCLUDE_CAPABILITIES`. It also calls `setAllowAppSwitches` for the service's uid ([AccessibilityServiceConnection.java, android17-release](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/AccessibilityServiceConnection.java)). In practice:
-- **Priority:** while the device is awake, the process is treated like a bound foreground service and inherits system_server's capabilities. When the device is asleep it drops to a normal bound service. The exact oom_adj value is **(unverified)**.
-- **Activity launches:** it may start activities from the background (popovers, settings). The [BAL page](https://developer.android.com/guide/components/activities/background-starts) lists *"The app is bound by a service that has been granted permission to start background activities"* and *"has a visible window"* as exceptions.
-- **Process death:** if the process dies, the connection is marked `crashed` and `mCrashedServices` is skipped on rebinds ([AccessibilityManagerService.java](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java)). **A crash can leave BarBook dead until re-enabled or updated, so keep the service process crash-proof** (the exact UX is **(unverified)**).
-- **Android 17 limits:** memory limits apply to all apps. A kill shows as `REASON_OTHER` with description `"MemoryLimiter:AnonSwap"` ([17 all-apps](https://developer.android.com/about/versions/17/behavior-changes-all)). Android 17 also kills apps for *"abnormal and excessive CPU usage"*; `ProfilingManager` `TRIGGER_TYPE_KILL_EXCESSIVE_CPU_USAGE` reports it ([17 features](https://developer.android.com/about/versions/17/features)).
-- **Standby buckets and Doze:** no developer page says whether they spare an accessibility-bound process **(unverified)**. Avoid `AlarmManager`/`JobScheduler` in the tick path.
-
-**Ticks and battery.** There is no accessibility-specific guidance, so this follows from the platform docs:
-- **Don't** drive a clock with `Choreographer.postFrameCallback`; every callback asks for a vsync frame. Use `Handler.postAtTime()` aligned to the next minute (or second) boundary. Better, use broadcasts: `ACTION_TIME_TICK` (per minute, runtime-registered only), `ACTION_TIME_CHANGED`, `ACTION_TIMEZONE_CHANGED`.
-- Each redraw of an overlay window triggers composition. Batch updates, and invalidate only the views whose text changed.
-- The closest official numbers are for always-visible surfaces: Wear watch faces should use about **15 fps** for animations and treat **≥90 s CPU/hour** as excessive ([Excessive battery usage](https://developer.android.com/topic/performance/vitals/excessive-battery-usage)).
-- `PowerManager` ([reference](https://developer.android.com/reference/android/os/PowerManager)):
-  - `isInteractive()` is false when *"dozing or asleep"*, and each change is announced by `ACTION_SCREEN_ON`/`OFF`, which *"refer to … the overall interactive state"*. *"Services may use the non-interactive state as a hint to conserve power."* **Stop all polling when non-interactive.**
-  - `isPowerSaveMode()`: *"applications should reduce their functionality"*. Watch `ACTION_POWER_SAVE_MODE_CHANGED` and slow meters, e.g. network or CPU from 1 s to 5 s.
-- Also pause when BarBook's overlay is hidden (fullscreen app, shade open, lock screen), and when the status-bar window is absent from `getWindows()`.
+- **No foreground service is needed.** While the service is enabled, system_server binds it with `BIND_AUTO_CREATE | BIND_FOREGROUND_SERVICE_WHILE_AWAKE | BIND_ALLOW_BACKGROUND_ACTIVITY_STARTS | BIND_INCLUDE_CAPABILITIES` and calls `setAllowAppSwitches` for its uid ([AccessibilityServiceConnection.java, android17-release](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/AccessibilityServiceConnection.java)).
+  - **Priority:** while awake it has foreground-service priority and inherits system_server's capabilities; while asleep it is a normal bound service. The exact oom_adj is **(unverified)**.
+  - **Activity launches:** it can start activities from the background. The [BAL page](https://developer.android.com/guide/components/activities/background-starts) exempts apps *"bound by a service that has been granted permission to start background activities"* and apps with a visible window.
+- **Death.** A crashed service is flagged `crashed` and skipped on rebinds ([AccessibilityManagerService.java](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/android17-release/services/accessibility/java/com/android/server/accessibility/AccessibilityManagerService.java)). Recovery UX is **(unverified)**.
+- **Android 17 kill reasons:** memory-limit kills (`REASON_OTHER`, `"MemoryLimiter:AnonSwap"`, [17 all-apps](https://developer.android.com/about/versions/17/behavior-changes-all)) and kills for *"abnormal and excessive CPU usage"* (`TRIGGER_TYPE_KILL_EXCESSIVE_CPU_USAGE`, [17 features](https://developer.android.com/about/versions/17/features)).
+- **Standby buckets and Doze:** no page says whether they exempt accessibility-bound processes **(unverified)**. Keep `AlarmManager` and `JobScheduler` out of the UI path.
+- **Ticks:**
+  - Use `Handler.postAtTime()` aligned to the minute or second boundary, or `ACTION_TIME_TICK` (runtime-registered) + `TIME_CHANGED` / `TIMEZONE_CHANGED`.
+  - Avoid `Choreographer.postFrameCallback` loops: each one requests a vsync frame.
+  - Invalidate only the views that changed; each overlay redraw costs a composition.
+  - The only official "always-visible UI" numbers are for Wear watch faces: animations at about 15 fps, and ≥ 90 s of CPU per hour counts as excessive ([Excessive battery usage](https://developer.android.com/topic/performance/vitals/excessive-battery-usage)).
+- **Power state** ([PowerManager](https://developer.android.com/reference/android/os/PowerManager)):
+  - `isInteractive()` is false when *"dozing or asleep"*. `ACTION_SCREEN_ON`/`OFF` actually track that interactive state. *"Services may use the non-interactive state as a hint to conserve power"*, so **stop polling** then.
+  - `isPowerSaveMode()` means *"applications should reduce their functionality"*. Watch `ACTION_POWER_SAVE_MODE_CHANGED` and stretch meter intervals.
 
 ## 7. Desktop windowing (16–17): status bar, taskbar, input conventions
 
@@ -235,6 +245,7 @@ All intent docs: [Settings](https://developer.android.com/reference/android/prov
   - The **taskbar** at the bottom: pinned and running apps; right-click an icon for pin, new window, close and app shortcuts.
   - The **header bar** on freeform windows (minimize, maximize, close; customisable insets via `APPEARANCE_TRANSPARENT_CAPTION_BAR_BACKGROUND` and `WindowInsets.isCaptionBarVisible`).
   - Sources: [Desktop system bars](https://developer.android.com/design/ui/desktop/guides/system/system-bars), [Support desktop windowing](https://developer.android.com/develop/adaptive-apps/guides/support-desktop-windowing).
+  - The only documented status-bar chips are Live Update chips (§2) and the **media-projection chip** (15 QPR1+): *"A new, prominent status bar chip makes users aware of any ongoing screen projection. Users can tap the chip to stop"* ([15 features](https://developer.android.com/about/versions/15/features)).
   - Treat Googlebook's status-bar layout as OEM SystemUI that can change with any update **(unverified in docs)**, and discover it at runtime from the accessibility tree.
 - **Desktop-first vs touch-first** is a per-display mode ([AOSP Desktop windowing](https://source.android.com/docs/core/display/desktop-windowing)):
   - A display is desktop-first when a keyboard **and** a touchpad or mouse are connected. External displays usually default to desktop-first.
@@ -254,4 +265,49 @@ All intent docs: [Settings](https://developer.android.com/reference/android/prov
   - Desktop interactive PiP (`USE_PINNED_WINDOWING_LAYER`).
   - A bubble bar in the taskbar.
   - `CONFIG_UI_MODE` changes to or from `UI_MODE_TYPE_DESK` no longer restart activities unless the app opts in with `android:recreateOnConfigChanges`.
+
+## 8. Public data sources for status items and their limits
+
+| Item | API and verified limits |
+|---|---|
+| **Network throughput** | `TrafficStats.getTotalRxBytes()`/`getTotalTxBytes()` are **device-wide**: *"Counts packets across all network interfaces"*, monotonic since boot, reset on reboot. `getUidRxBytes` covers **only the calling UID** since N and returns `UNSUPPORTED` for others ([TrafficStats](https://developer.android.com/reference/android/net/TrafficStats)). Take deltas each second, and only while the screen is on. |
+| **CPU usage** | **`/proc/stat` is not readable.** SELinux `neverallow all_untrusted_apps { proc_stat proc_loadavg proc_uptime proc_vmstat … }`. The policy comments *"These have been disallowed since Android O"* ([app_neverallows.te](https://android.googlesource.com/platform/system/sepolicy/+/refs/heads/android17-release/private/app_neverallows.te), [untrusted_app_all.te](https://android.googlesource.com/platform/system/sepolicy/+/refs/heads/android17-release/private/untrusted_app_all.te)). The best public proxy is **`SystemHealthManager.getCpuHeadroom(params)`** (API 36): *"estimate of available CPU capacity headroom of the device"*, 0–100 (0 means no capacity left), `NaN` if unavailable, **`UnsupportedOperationException` if unsupported**. Each call is at least one binder call of over 1 ms; respect `getCpuHeadroomMinIntervalMillis()` ([SystemHealthManager](https://developer.android.com/reference/android/os/health/SystemHealthManager)). Show it as "CPU load ≈ 100 − headroom" and label it an estimate. |
+| **Memory** | `ActivityManager.getMemoryInfo(MemoryInfo)` gives `availMem` (*"should not be considered absolute"*), `totalMem`, `threshold`, `lowMemory`, and `advertisedMem` (retail RAM size) ([MemoryInfo](https://developer.android.com/reference/android/app/ActivityManager.MemoryInfo)). |
+| **Battery** | `BatteryManager.getIntProperty/getLongProperty` ([BatteryManager](https://developer.android.com/reference/android/os/BatteryManager)).<br>• `CURRENT_NOW` and `CURRENT_AVERAGE`: **microamperes**, positive while charging, negative while discharging.<br>• `CAPACITY`: %. `CHARGE_COUNTER`: µAh. `ENERGY_COUNTER`: nWh. `STATUS` (26).<br>• Unsupported properties return `Integer.MIN_VALUE` on target P and later.<br>• `computeChargeTimeRemaining()` (API 28): ms, or −1 while discharging or without enough data.<br>• `ACTION_BATTERY_CHANGED` sticky extras include `EXTRA_CYCLE_COUNT` and `EXTRA_CHARGING_STATUS` (both API 34). |
+| **Thermal** | `PowerManager.getCurrentThermalStatus()` (29) returns `THERMAL_STATUS_*`; there is also `addThermalStatusListener`. `getThermalHeadroom(forecastSeconds)` (30): 1.0 means severe throttling. Calling it more than about once a second *"may result in the function returning NaN"* ([PowerManager](https://developer.android.com/reference/android/os/PowerManager)). |
+| **Disk** | `StatFs.getAvailableBytes()`/`getTotalBytes()` (18). For display, `StorageStatsManager.getFreeBytes(UUID_DEFAULT)` and `getTotalBytes(…)` are *"best suited for visual display to end users"*. They need no permission and can take seconds, so call them off the main thread ([StorageStatsManager](https://developer.android.com/reference/android/app/usage/StorageStatsManager)). |
+| **Next meeting** | `READ_CALENDAR` + `CalendarContract.Instances`. You *"need to specify a range time for the query in the URI"* (`Instances.CONTENT_URI` + begin/end, or `Instances.query(cr, proj, begin, end)`). The table is read-only ([Instances](https://developer.android.com/reference/android/provider/CalendarContract.Instances), [Calendar provider guide](https://developer.android.com/identity/providers/calendar-provider)). Re-query on `PROVIDER_CHANGED` or a `ContentObserver`. |
+| **Next alarm** | `AlarmManager.getNextAlarmClock()` returns the next alarm from *any* app's `setAlarmClock()`, or null. It needs no permission. Watch `ACTION_NEXT_ALARM_CLOCK_CHANGED` ([AlarmManager](https://developer.android.com/reference/android/app/AlarmManager#getNextAlarmClock())). |
+| **Wi-Fi strength** | Since API 31 `WifiManager.getConnectionInfo()` is deprecated. Read `WifiInfo` from `NetworkCapabilities.getTransportInfo()` via `NetworkCallback.onCapabilitiesChanged` (needs `ACCESS_NETWORK_STATE`). **Without** location permission and `FLAG_INCLUDE_LOCATION_INFO`, only location-sensitive fields are redacted: SSID becomes `UNKNOWN_SSID` and BSSID `02:00:00:00:00:00`. **`getRssi()` (dBm) stays available**; `WifiManager.calculateSignalLevel(rssi)` (API 30) maps it to bars ([WifiInfo](https://developer.android.com/reference/android/net/wifi/WifiInfo), [NetworkCallback](https://developer.android.com/reference/android/net/ConnectivityManager.NetworkCallback#FLAG_INCLUDE_LOCATION_INFO), [WifiManager](https://developer.android.com/reference/android/net/wifi/WifiManager)). Showing the SSID needs location permission. |
+| **Text colour** | `WallpaperManager.getWallpaperColors(FLAG_SYSTEM)` (27) can return **null** (colours still processing, live wallpaper). It is IPC, so don't call it on the UI thread. `WallpaperColors.getColorHints() & HINT_SUPPORTS_DARK_TEXT` (31) means *"dark text is preferred"* ([WallpaperManager](https://developer.android.com/reference/android/app/WallpaperManager), [WallpaperColors](https://developer.android.com/reference/android/app/WallpaperColors)). Listen with `addOnColorsChangedListener`. This only helps when the bar sits over the wallpaper; over maximized app windows SystemUI changes its tint, and BarBook must follow it (e.g. by sampling a status-bar screenshot) **(unverified approach)**. |
+
+## Gotchas for BarBook
+
+1. **Onboarding takes 6 steps.** GitHub APKs installed through Chrome or Files are ECM-guarded. The user must: tap the switch → see "Restricted setting" → App info → ⋮ → **Allow restricted settings** → PIN → enable. The ⋮ item only appears after the dialog. Guide each step and re-check state in `onResume`. One unlock covers the notification listener too.
+2. **Advanced Protection kills the product.** It blocks sideloading, and on 17 it blocks non-tool services. Detect it and fall back to tiles and notifications. **Never set `isAccessibilityTool`.**
+3. **Overlays sit above everything** (layer 31, above the status bar, shade/QS, lock screen, volume dialog and taskbar). Hide BarBook's items whenever the shade, QS, keyguard, a fullscreen app or the capture UI is active. Drive this from `TYPE_WINDOWS_CHANGED`.
+4. **Don't cover or imitate system UI.** Keep clear of the notification indicator, privacy dots, the screen-share chip and Live Update chips. Play bans using the API to *"work around … privacy controls and notifications"* or to deceive.
+5. **The desktop status bar is undocumented OEM UI.**
+   - Derive free space at runtime from `getWindowsOnAllDisplays()` and the SystemUI node tree.
+   - Re-layout when windows, config, locale or IME, or chips change; on desktop-first ↔ touch-first switches; and per external display.
+6. **Users will see "Review app with full device access"** about a day after enabling, and again after each re-enable, with a **Remove access** button. Pre-warn them.
+7. **Keep the service lean and crash-proof.** A crash marks it `crashed`. Android 17 kills apps over memory limits (`MemoryLimiter:AnonSwap`) and for excessive CPU. Keep IPC-heavy calls (calendar, storage stats, wallpaper colours) off the main thread.
+8. **Volume and mute calls may silently no-op on 17.** Test them with `cmd audio set-enable-hardening throw`. On 15+ a DND toggle drives only BarBook's own implicit mode.
+9. **There is no true device CPU %.** `/proc/stat` is blocked. `getCpuHeadroom()` is an estimate, may be unsupported, and is rate-limited.
+10. **Live Updates aren't a permanent slot.** They must be user-initiated and time-sensitive, the chip is ≤ 96 dp and about 7 characters, and users can demote them.
+11. **The agent-task icon and `showPowerMenu` need ROLE_ASSISTANT** (and the agent API is 37.2, while the device reports 37.1). Use `performGlobalAction(GLOBAL_ACTION_POWER_DIALOG / _NOTIFICATIONS / _QUICK_SETTINGS)` instead.
+12. **Config hygiene.**
+    - No `flagRequestAccessibilityButton`, which auto-adds the floating button.
+    - No `typeAllMask`.
+    - Set `canRetrieveWindowContent` plus `flagRetrieveInteractiveWindows`, or `getWindows()` is empty.
+13. **Battery.**
+    - Stop all tickers when `!isInteractive()` or when the overlay is hidden; slow them under `isPowerSaveMode()`.
+    - Use `TIME_TICK` or aligned `postAtTime` for the clock, never Choreographer loops.
+    - Call thermal headroom no more than once per second.
+14. **Play readiness.**
+    - Accessibility declaration with a video (disclosure, accept and decline paths, the feature).
+    - A standalone "Agree / Not now" disclosure.
+    - Use documented in the listing.
+    - Be ready to argue that no narrower API works.
+15. **Wrap every Settings intent in try/catch.** The reference warns *"a matching Activity may not exist"*. Use the reference names; the Live Update guide's intent name is wrong.
 

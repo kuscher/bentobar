@@ -5,8 +5,8 @@ import kotlin.math.abs
 
 /** Short, width-stable number formats for a 36 dp tall bar. */
 object Fmt {
-    /** Bytes per second as "840K", "1.2M", "12M". */
-    fun rate(bytesPerSec: Double): String = compact(bytesPerSec)
+    /** Bytes per second as "0K", "840K", "1.2M", "12M". */
+    fun rate(bytesPerSec: Double): String = if (bytesPerSec < 1000) "0K" else compact(bytesPerSec)
 
     /** Bytes as "840 KB", "1.2 GB". */
     fun bytes(b: Double): String {

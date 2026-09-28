@@ -10,6 +10,7 @@
 #   ./bar logs [N]            BarBook's log lines
 #   ./bar shot [FILE] [H]     the top H px of the screen (status bar + menus; default 60), cropped
 #   ./bar menushot [FILE]     the open menu's area
+#   ./bar appshot [FILE]      the settings window
 #
 # adb's server listens on a Unix socket (VSCodeBook's), never tcp:5037: the Linux terminal
 # forwards every TCP port to Android, where any app could reach it.
@@ -82,6 +83,17 @@ menushot() { # the BarBook menu window's frame, from dumpsys
   rm -f "$out.full"; echo "$out"
 }
 
+appshot() { # BarBook's settings window (the app's largest window)
+  local out=${1:-$TMP/barbook-app.png}
+  read -r x1 y1 x2 y2 < <(A shell dumpsys window windows | awk -v pkg="$PKG/" '/Window #/ { m = index($0, pkg) > 0 } m && /frame=\[/ { print }' |
+    grep -o 'frame=\[[0-9-]*,[0-9-]*\]\[[0-9]*,[0-9]*\]' | tr -c '0-9\n-' ' ' |
+    awk '{ a = ($3 - $1) * ($4 - $2); if (a > best) { best = a; line = $1 " " $2 " " $3 " " $4 } } END { print line }')
+  [ -n "${x1:-}" ] || { echo "settings not open" >&2; exit 1; }
+  A exec-out screencap -p > "$out.full"
+  python3 -c "import sys; from PIL import Image; Image.open(sys.argv[1]).crop(tuple(max(0, int(v)) for v in sys.argv[3:7])).save(sys.argv[2])" "$out.full" "$out" "$x1" "$y1" "$x2" "$y2"
+  rm -f "$out.full"; echo "$out"
+}
+
 case "${1:-}" in
   build) shift; build "$@" ;;
   install) shift; install "$@" ;;
@@ -94,5 +106,6 @@ case "${1:-}" in
   logs) A shell "logcat -d -s BarBook:V AndroidRuntime:E" | tail -"${2:-40}" ;;
   shot) shift; shot "$@" ;;
   menushot) shift; menushot "$@" ;;
+  appshot) shift; appshot "$@" ;;
   *) sed -n '3,15p' "$0"; exit 1 ;;
 esac

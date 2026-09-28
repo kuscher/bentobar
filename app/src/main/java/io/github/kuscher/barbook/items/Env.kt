@@ -47,11 +47,12 @@ object Env {
         Calendar.init(app)
     }
 
-    fun tick(now: Long) {
-        net.sample(now)
-        mem.sample(app, now)
-        battery.sample(app, now)
-        storage.sample(now)
+    /** Samples only what the configured items use ([types]); menus ask for theirs while open. */
+    fun tick(now: Long, types: Set<String>) {
+        if ("network" in types) net.sample(now)
+        if ("memory" in types) mem.sample(app, now)
+        if ("battery" in types) battery.sample(app, now)
+        if ("storage" in types) storage.sample(now)
     }
 
     /** Starts an activity from a non-activity context. */

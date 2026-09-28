@@ -29,6 +29,7 @@ enum class ChipMode { OFF, FALLBACK, ALWAYS }
 
 /** One item the user added. [id] is unique per instance; [type] picks the [ItemType]. */
 @Serializable
+@androidx.compose.runtime.Immutable
 data class ItemConfig(
     val id: String,
     val type: String,

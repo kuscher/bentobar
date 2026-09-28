@@ -119,9 +119,24 @@ class BarController(private val service: AccessibilityService) {
     val placed = HashMap<String, Rect>()
 
     private val scanNow = Runnable { scan() }
-    /** Status bar icons come and go without window changes: re-read it every 2 s while shown. */
+    /**
+     * Status bar icons come and go without window changes. Every 2 s while shown, refresh just the
+     * spacer node (one call) and read the whole bar again only if it moved, or every 30 s.
+     */
     private val poll = object : Runnable {
-        override fun run() { scan(); main.postDelayed(this, if (strip.shown) 2_000 else 5_000) }
+        override fun run() {
+            if (strip.shown) lightCheck() else scan()
+            main.postDelayed(this, if (strip.shown) 2_000 else 5_000)
+        }
+    }
+    private var lastFullScan = 0L
+
+    private fun lightCheck() {
+        val s = snap ?: return scan()
+        val node = s.spacerNode
+        if (node == null || SystemClock.uptimeMillis() - lastFullScan > 30_000 || !node.refresh()) return scan()
+        val r = Rect().also { node.getBoundsInScreen(it) }
+        if (r != s.free) scan()
     }
     private val expandOnHover = Runnable { if (hovering) expanded.value = true }
     private val collapse = Runnable { if (!hovering && menuKey == null) { expanded.value = false; pinned = false } }
@@ -192,6 +207,7 @@ class BarController(private val service: AccessibilityService) {
 
     private fun scan() {
         if (!started) return
+        lastFullScan = SystemClock.uptimeMillis()
         val metrics = wm.currentWindowMetrics
         val screenW = metrics.bounds.width()
         val inset = metrics.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top

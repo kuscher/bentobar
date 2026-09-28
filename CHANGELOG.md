@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4 (2026-09-28)
+
+- **New icon:** a status bar with a ‹ and item dots over the Tools glyph, white on a Settings-style
+  blue ("a tool for your status bar"); the Quick Settings tile shows the bar.
+- README with screenshots and an install guide; first GitHub release.
+- The CPU menu shows an idle GPU as 0% instead of hiding the line; DiscoBar's own menu uses its icon.
+- Nothing runs while the screen is off (the status bar check pauses too).
+
 ## 0.3 (2026-09-28)
 
 - **CPU load item:** device-wide load from each core's idle-state counters (Android blocks

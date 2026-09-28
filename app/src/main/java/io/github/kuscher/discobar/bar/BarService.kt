@@ -132,6 +132,7 @@ class BarController(private val service: AccessibilityService) {
      */
     private val poll = object : Runnable {
         override fun run() {
+            if (!pm.isInteractive) return // screen off: nothing to show; SCREEN_ON restarts this
             if (strip.shown) lightCheck() else check(full = false)
             main.postDelayed(this, if (strip.shown) 2_000 else 5_000)
         }
@@ -159,6 +160,7 @@ class BarController(private val service: AccessibilityService) {
         override fun onReceive(c: Context, i: Intent) {
             if (i.action == Intent.ACTION_SCREEN_OFF) closeMenu()
             main.post(scanNow)
+            if (i.action == Intent.ACTION_SCREEN_ON) { main.removeCallbacks(poll); main.postDelayed(poll, 2_000) }
         }
     }
     private val wallpaper = WallpaperManager.OnColorsChangedListener { _, _ -> main.postDelayed(sample, 300) }

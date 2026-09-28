@@ -97,7 +97,8 @@ fun ItemContextMenu(itemId: String, host: MenuHost, openMenu: () -> Unit) {
 @Composable
 fun DiscoBarMenu(host: MenuHost, hidden: List<ItemConfig>, openItem: (ItemConfig) -> Unit, hideBar: () -> Unit) {
     val states by Ticker.states.collectAsState()
-    MenuCard(Sym.WYSIWYG, "DiscoBar", if (hidden.isEmpty()) "No hidden items" else "${hidden.size} hidden") {
+    MenuCard(Sym.WYSIWYG, "DiscoBar", if (hidden.isEmpty()) "No hidden items" else "${hidden.size} hidden",
+        iconRes = io.github.kuscher.discobar.R.drawable.ic_discobar) {
         if (hidden.isNotEmpty()) {
             SectionLabel("Hidden items")
             hidden.forEach { item ->

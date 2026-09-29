@@ -51,7 +51,7 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   behind it, so don't publish them.
 - Release: `./gradlew :app:assembleRelease`, signed with `~/.config/bentobar/keystore.jks` and
   `keystore.pass` (not in git; alias `discobar` from before the rename, cert SHA-256 4F:2B:24:07:…:E9:B3:35:C5). The
-  keystore is backed up in the user's Drive folder "BentoBar release key"
+  keystore is backed up in the user's Drive folder "BentoBar release key (formerly DiscoBar)", file discobar-keystore.jks,
   (https://drive.google.com/drive/folders/1DnbGwls_3wZeVpJaNWeOT9jHdoozhSM7) with a README; the
   password is not, it belongs in the user's password manager. A debug and a release install
   can't replace each other (different keys), so uninstall first.

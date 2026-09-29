@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5 (2026-09-29): DiscoBar is now BentoBar
+
+- **New name: BentoBar.** Like a bento box, it keeps your status bar items neatly in their
+  compartments. The package is now `io.github.kuscher.bentobar`, so BentoBar installs as a new app
+  next to DiscoBar instead of updating it. To move over: in DiscoBar, **Look › Copy settings**; in
+  BentoBar, **Look › Paste settings**; turn BentoBar on in Setup; uninstall DiscoBar. Same signing
+  key as before.
+- **New icon:** a bento box seen from above, with a status bar compartment (‹ and item dots) over
+  the compartments for the items it holds: rice, salmon, tamago and edamame in an ink-blue box. The
+  themed icon, the settings header, the ‹ menu and the Quick Settings tile use the same shape.
+- The splash screen shows the icon on its ink background.
+- The GitHub repository is now github.com/kuscher/bentobar (old links redirect).
+
 ## 0.4.1 (2026-09-28)
 
 - Says clearly who made DiscoBar: a personal hobby project by Alexander Kuscher, not affiliated with

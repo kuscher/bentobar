@@ -1,77 +1,101 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Draws DiscoBar's icons as Android vector drawables.
+"""Draws BentoBar's icons as Android vector drawables.
 
-The mark is a status bar pill (a ‹ and three item dots cut out of it) above the "handyman" tools
-glyph from Material Symbols Rounded (Apache-2.0), the same glyph as the bar's Tools item: a tool
-for your status bar. The launcher icon is white on a Settings-style blue gradient, laid out
+The mark is a bento box seen from above: a long compartment on top that is a status bar (a ‹ and
+three item dots cut out of it), and three compartments below for the items it holds. Rice,
+salmon, tamago and edamame in an ink-blue box. The ‹ and dots are real holes (evenOdd), so the
+single-colour versions (themed icon, header, Quick Settings tile) keep them. Everything sits
 inside the adaptive icon's 66 dp safe zone.
 
 Writes app/src/main/res/drawable/:
-  ic_launcher_background.xml   the blue gradient
-  ic_launcher_foreground.xml   the mark (adaptive icon, 108 dp)
-  ic_launcher_monochrome.xml   the mark in one colour (themed icons)
-  ic_discobar.xml              the mark at 24 dp (settings header, About)
-  ic_tile_bar.xml              just the pill at 24 dp (Quick Settings tile)
+  ic_launcher_background.xml   the ink gradient
+  ic_launcher_foreground.xml   the compartments (adaptive icon, 108 dp)
+  ic_launcher_monochrome.xml   the compartments in one colour (themed icons)
+  ic_bentobar.xml              the mark at 24 dp (settings header, About, the ‹ menu)
+  ic_tile_bar.xml              the mark at 24 dp for the Quick Settings tile
 and docs/images/icon.png (512 px, for the README) when rsvg-convert is available.
 
-    python3 tools/logo.py     (needs fonttools; the Material Symbols font comes from tools/icons.py's cache)
+    python3 tools/logo.py
 """
+import math
 import os
 import pathlib
 import shutil
 import subprocess
 import tempfile
 
-from fontTools.pens.svgPathPen import SVGPathPen
-from fontTools.pens.transformPen import TransformPen
-from fontTools.ttLib import TTFont
-from fontTools.varLib import instancer
-
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RES = ROOT / "app/src/main/res/drawable"
-CACHE = pathlib.Path(os.environ.get("DISCOBAR_CACHE", pathlib.Path.home() / ".cache/discobar"))
-VF = "MaterialSymbolsRounded[FILL,GRAD,opsz,wght]"
-BLUE_LIGHT, BLUE_DARK, WHITE = "#FF5B77F0", "#FF2B3DB3", "#FFFFFFFF"
+INK = ("#FF34397E", "#FF181B45")  # box, top left to bottom right
+# Compartments top to bottom: bar (rice), tall (salmon), small (tamago), small (edamame).
+FOOD = [("#FFFFFDF7", "#FFF1EBDD"), ("#FFFF7E5F", "#FFF4533F"), ("#FFFFD25A", "#FFFDB62F"), ("#FF74CC6E", "#FF4DB05A")]
+# The grid on the 108 dp canvas, drawn at 0.92 around the centre for breathing room in round masks.
+X0, X1, Y0, Y1, GAP, BAR, R, SCALE = 29, 79, 30, 78, 4, 12, 6, 0.92
 
 
-def glyph(name):
-    """SVG path of a filled Material Symbol on a 960 unit box (y down)."""
-    cps = {l.split()[0]: int(l.split()[1], 16) for l in (CACHE / f"{VF}.codepoints").read_text().splitlines()}
-    font = instancer.instantiateVariableFont(TTFont(CACHE / f"{VF}.ttf"), {"FILL": 1, "GRAD": 0, "opsz": 48, "wght": 500})
-    glyphs = font.getGlyphSet()
-    pen = SVGPathPen(glyphs)
-    glyphs[font.getBestCmap()[cps[name]]].draw(TransformPen(pen, (1, 0, 0, -1, 0, 960)))
-    return pen.getCommands()
+def rrect(x, y, w, h, r):
+    return (f"M{x + r:.2f},{y:.2f}H{x + w - r:.2f}A{r:.2f},{r:.2f} 0 0 1 {x + w:.2f},{y + r:.2f}V{y + h - r:.2f}"
+            f"A{r:.2f},{r:.2f} 0 0 1 {x + w - r:.2f},{y + h:.2f}H{x + r:.2f}A{r:.2f},{r:.2f} 0 0 1 {x:.2f},{y + h - r:.2f}"
+            f"V{y + r:.2f}A{r:.2f},{r:.2f} 0 0 1 {x + r:.2f},{y:.2f}Z")
 
 
-def pill(x, y, w, h):
-    """A rounded bar with a ‹ and three dots, as one path meant for evenOdd filling (they're holes)."""
-    r = h / 2
-    out = f"M{x + r:.2f},{y:.2f}H{x + w - r:.2f}A{r:.2f},{r:.2f} 0 0 1 {x + w - r:.2f},{y + h:.2f}H{x + r:.2f}A{r:.2f},{r:.2f} 0 0 1 {x + r:.2f},{y:.2f}Z"
-    cy, d, step = y + h / 2, h * 0.19, h * 0.59
-    for cx in (x + w - r - 2 * step, x + w - r - step, x + w - r):
-        out += f"M{cx - d:.2f},{cy:.2f}a{d:.2f},{d:.2f} 0 1,0 {2 * d:.2f},0a{d:.2f},{d:.2f} 0 1,0 {-2 * d:.2f},0Z"
-    c, t, a = x + r, h * 0.13, h * 0.26
-    out += (f"M{c + a:.2f},{cy - a - t * 0.2:.2f}L{c + a + t:.2f},{cy - a + t * 0.8:.2f}L{c + t * 1.2:.2f},{cy:.2f}"
-            f"L{c + a + t:.2f},{cy + a - t * 0.8:.2f}L{c + a:.2f},{cy + a + t * 0.2:.2f}L{c - t * 0.3:.2f},{cy:.2f}Z")
-    return out
+def circle(cx, cy, r):
+    return f"M{cx - r:.2f},{cy:.2f}a{r:.2f},{r:.2f} 0 1,0 {2 * r:.2f},0a{r:.2f},{r:.2f} 0 1,0 {-2 * r:.2f},0Z"
 
 
-def mark(tools, fill, box):
-    """Pill + tools, scaled from the 108 dp design grid into a viewport of size [box]."""
-    s = box / 108
-    k = 34 / 960  # the tools glyph is 34 dp wide on the 108 grid
-    return (f'  <group android:scaleX="{s:.4f}" android:scaleY="{s:.4f}">\n'
-            f'    <path android:fillColor="{fill}" android:fillType="evenOdd" android:pathData="{pill(29, 31, 50, 12)}"/>\n'
-            f'    <group android:translateX="{54 - 17:.2f}" android:translateY="{64 - 17:.2f}" android:scaleX="{k:.5f}" android:scaleY="{k:.5f}">\n'
-            f'      <path android:fillColor="{fill}" android:pathData="{tools}"/>\n'
-            f'    </group>\n  </group>\n')
+def chevron(x, cy, a, t):
+    """The outline of a round-capped ‹ stroke: tip at (x, cy), arms [a] long in x and y, [t] thick.
+    One closed path, so it can be a hole (strokes can't)."""
+    h = t / 2
+    k = h / math.sqrt(2)
+    p0, p1, p2 = (x + a, cy - a), (x, cy), (x + a, cy + a)
+    n1, n2 = (-k, -k), (-k, k)  # outward normals of the two arms
+
+    def at(p, n, s=1):
+        return f"{p[0] + s * n[0]:.2f},{p[1] + s * n[1]:.2f}"
+    arc = f"A{h:.2f},{h:.2f} 0 0 0 "
+    return (f"M{at(p0, n1)}L{at(p1, n1)}{arc}{at(p1, n2)}L{at(p2, n2)}{arc}{at(p2, n2, -1)}"
+            f"L{x + h * math.sqrt(2):.2f},{cy:.2f}L{at(p0, n1, -1)}{arc}{at(p0, n1)}Z")
+
+
+def compartments():
+    """Path data of the four compartments, bar first (with its holes)."""
+    cy = Y0 + BAR / 2
+    bar = (rrect(X0, Y0, X1 - X0, BAR, BAR / 2) + chevron(X0 + 5.2, cy, 3.4, 2.4)
+           + "".join(circle(cx, cy, 2.1) for cx in (X1 - 18, X1 - 11.5, X1 - 5)))
+    mid, top = (X0 + X1) / 2, Y0 + BAR + GAP
+    half = (Y1 - top - GAP) / 2
+    return [bar,
+            rrect(X0, top, mid - GAP / 2 - X0, Y1 - top, R),
+            rrect(mid + GAP / 2, top, X1 - mid - GAP / 2, half, R),
+            rrect(mid + GAP / 2, top + half + GAP, X1 - mid - GAP / 2, half, R)]
+
+
+def gradient(start, end, x1, y1, x2, y2, pad="    "):
+    return (f'{pad}<aapt:attr name="android:fillColor">\n'
+            f'{pad}  <gradient android:type="linear" android:startX="{x1}" android:startY="{y1}" android:endX="{x2}" android:endY="{y2}"\n'
+            f'{pad}      android:startColor="{start}" android:endColor="{end}"/>\n'
+            f'{pad}</aapt:attr>\n')
+
+
+def mark(fill=None, pivot=54, translate=0.0, scale=SCALE):
+    """The compartments in a group scaled around the canvas centre. [fill] = one colour, else the food gradients."""
+    out = (f'  <group android:pivotX="{pivot}" android:pivotY="{pivot}" android:scaleX="{scale:.4f}" android:scaleY="{scale:.4f}"'
+           f' android:translateX="{translate:.2f}" android:translateY="{translate:.2f}">\n')
+    for d, (start, end) in zip(compartments(), FOOD):
+        if fill:
+            out += f'    <path android:fillColor="{fill}" android:fillType="evenOdd" android:pathData="{d}"/>\n'
+        else:
+            out += (f'    <path android:fillType="evenOdd" android:pathData="{d}">\n'
+                    + gradient(start, end, 0, Y0, 0, Y1, pad="      ")
+                    + '    </path>\n')
+    return out + '  </group>\n'
 
 
 def vector(size_dp, viewport, body, tint=False, aapt=False):
     head = ('<?xml version="1.0" encoding="utf-8"?>\n'
-            '<!-- Generated by tools/logo.py. Tools glyph: Material Symbols Rounded "handyman" (Apache-2.0, Google). -->\n'
+            '<!-- Generated by tools/logo.py. -->\n'
             '<vector xmlns:android="http://schemas.android.com/apk/res/android"\n')
     if aapt:
         head += '    xmlns:aapt="http://schemas.android.com/aapt"\n'
@@ -81,40 +105,40 @@ def vector(size_dp, viewport, body, tint=False, aapt=False):
     return head + ">\n" + body + "</vector>\n"
 
 
+def svg_icon(size=512):
+    """The launcher icon as SVG in a circle mask (what the Googlebook shelf shows)."""
+    hexc = lambda c: "#" + c[3:]
+    defs = (f'<linearGradient id="bg" x1="18" y1="18" x2="90" y2="90" gradientUnits="userSpaceOnUse">'
+            f'<stop offset="0" stop-color="{hexc(INK[0])}"/><stop offset="1" stop-color="{hexc(INK[1])}"/></linearGradient>')
+    paths = ""
+    for i, (d, (start, end)) in enumerate(zip(compartments(), FOOD)):
+        defs += (f'<linearGradient id="f{i}" x1="0" y1="{Y0}" x2="0" y2="{Y1}" gradientUnits="userSpaceOnUse">'
+                 f'<stop offset="0" stop-color="{hexc(start)}"/><stop offset="1" stop-color="{hexc(end)}"/></linearGradient>')
+        paths += f'<path fill="url(#f{i})" fill-rule="evenodd" d="{d}"/>'
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="18 18 72 72">'
+            f'<defs>{defs}<clipPath id="m"><circle cx="54" cy="54" r="36"/></clipPath></defs>'
+            f'<g clip-path="url(#m)"><rect width="108" height="108" fill="url(#bg)"/>'
+            f'<g transform="translate(54 54) scale({SCALE}) translate(-54 -54)">{paths}</g></g></svg>')
+
+
 def main():
     RES.mkdir(parents=True, exist_ok=True)
-    tools = glyph("handyman")
     (RES / "ic_launcher_background.xml").write_text(vector(108, 108, (
-        '  <path android:pathData="M0,0h108v108h-108z">\n'
-        '    <aapt:attr name="android:fillColor">\n'
-        '      <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="108" android:endY="108"\n'
-        f'          android:startColor="{BLUE_LIGHT}" android:endColor="{BLUE_DARK}"/>\n'
-        '    </aapt:attr>\n  </path>\n'), aapt=True))
-    (RES / "ic_launcher_foreground.xml").write_text(vector(108, 108, mark(tools, WHITE, 108)))
-    (RES / "ic_launcher_monochrome.xml").write_text(vector(108, 108, mark(tools, WHITE, 108)))
-    # 24 dp: the mark enlarged to fill the icon box (the 108 grid's content spans about 30..78).
-    body = ('  <group android:translateX="-9.5" android:translateY="-8.6" android:scaleX="1.63" android:scaleY="1.63">\n'
-            + mark(tools, "@android:color/white", 24) + '  </group>\n')
-    (RES / "ic_discobar.xml").write_text(vector(24, 24, body, tint=True))
-    (RES / "ic_tile_bar.xml").write_text(vector(24, 24,
-        f'  <path android:fillColor="@android:color/white" android:fillType="evenOdd" android:pathData="{pill(2, 7.5, 20, 9)}"/>\n', tint=True))
-    for n in ("ic_launcher_background", "ic_launcher_foreground", "ic_launcher_monochrome", "ic_discobar", "ic_tile_bar"):
+        '  <path android:pathData="M0,0h108v108h-108z">\n' + gradient(*INK, 18, 18, 90, 90) + '  </path>\n'), aapt=True))
+    (RES / "ic_launcher_foreground.xml").write_text(vector(108, 108, mark(), aapt=True))
+    (RES / "ic_launcher_monochrome.xml").write_text(vector(108, 108, mark("#FFFFFFFF")))
+    # 24 dp: the mark (50 x 48 on the 108 grid) scaled to about 21 dp and centred.
+    small = mark("@android:color/white", translate=12 - 54, scale=21 / 50)
+    (RES / "ic_bentobar.xml").write_text(vector(24, 24, small, tint=True))
+    (RES / "ic_tile_bar.xml").write_text(vector(24, 24, small, tint=True))
+    for n in ("ic_launcher_background", "ic_launcher_foreground", "ic_launcher_monochrome", "ic_bentobar", "ic_tile_bar"):
         print(f"res/drawable/{n}.xml")
 
-    # A 512 px PNG of the launcher icon (circle mask) for the README.
     if shutil.which("rsvg-convert"):
-        k = 34 / 960
-        svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="18 18 72 72">
-<defs><linearGradient id="bg" x1="0" y1="0" x2="108" y2="108" gradientUnits="userSpaceOnUse">
-<stop offset="0" stop-color="#{BLUE_LIGHT[3:]}"/><stop offset="1" stop-color="#{BLUE_DARK[3:]}"/></linearGradient>
-<clipPath id="m"><circle cx="54" cy="54" r="36"/></clipPath></defs>
-<g clip-path="url(#m)"><rect width="108" height="108" fill="url(#bg)"/>
-<path fill="#fff" fill-rule="evenodd" d="{pill(29, 31, 50, 12)}"/>
-<path fill="#fff" transform="translate(37,47) scale({k:.5f})" d="{tools}"/></g></svg>'''
         out = ROOT / "docs/images/icon.png"
         out.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile("w", suffix=".svg", delete=False) as f:
-            f.write(svg)
+            f.write(svg_icon())
         subprocess.run(["rsvg-convert", f.name, "-o", str(out)], check=True)
         os.unlink(f.name)
         print(out.relative_to(ROOT))

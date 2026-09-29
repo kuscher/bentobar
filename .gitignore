@@ -8,3 +8,4 @@ local.properties
 .kotlin/
 app/build/
 executables/
+__pycache__/

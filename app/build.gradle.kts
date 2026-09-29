@@ -5,19 +5,19 @@ plugins {
 }
 
 android {
-    namespace = "io.github.kuscher.discobar"
+    namespace = "io.github.kuscher.bentobar"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.github.kuscher.discobar"
+        applicationId = "io.github.kuscher.bentobar"
         minSdk = 34
         targetSdk = 37
-        versionCode = 5
-        versionName = "0.4.1"
+        versionCode = 6
+        versionName = "0.5"
     }
 
-    // Release signing from ~/.config/discobar (never committed). Absent -> unsigned release build.
-    val keyDir = File(System.getProperty("user.home"), ".config/discobar")
+    // Release signing from ~/.config/bentobar (never committed). Absent -> unsigned release build.
+    val keyDir = File(System.getProperty("user.home"), ".config/bentobar")
     val keyFile = File(keyDir, "keystore.jks")
     val keyPassFile = File(keyDir, "keystore.pass")
     signingConfigs {
@@ -26,7 +26,7 @@ android {
                 storeFile = keyFile
                 val pw = keyPassFile.readText().trim()
                 storePassword = pw
-                keyAlias = "discobar"
+                keyAlias = "discobar" // the key predates the rename to BentoBar; same key, same signature
                 keyPassword = pw
             }
         }

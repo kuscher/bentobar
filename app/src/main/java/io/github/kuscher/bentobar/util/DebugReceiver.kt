@@ -1,0 +1,134 @@
+package io.github.kuscher.bentobar.util
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.util.Log
+import io.github.kuscher.bentobar.bar.BarService
+import io.github.kuscher.bentobar.data.Defaults
+import io.github.kuscher.bentobar.data.Section
+import io.github.kuscher.bentobar.data.Store
+import io.github.kuscher.bentobar.items.Caffeine
+import io.github.kuscher.bentobar.items.Env
+import io.github.kuscher.bentobar.items.Ticker
+import io.github.kuscher.bentobar.items.Timers
+
+/**
+ * Test hooks for development over adb. The receiver requires android.permission.DUMP, which only
+ * the shell (adb) and the system hold, so apps on the device can't use it.
+ *
+ *   adb shell am broadcast -a io.github.kuscher.bentobar.DEBUG -p io.github.kuscher.bentobar --es c 'dump'
+ */
+class DebugReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        Env.init(context)
+        val args = intent.getStringExtra("c").orEmpty().trim().split(Regex("\\s+"))
+        if (args[0] == "winshot") return winshot(args.drop(1).joinToString(" ").ifEmpty { "BentoBar menu" })
+        val bar = (Env.service as? BarService)?.controller()
+        val out = try {
+            when (args[0]) {
+                "cfg" -> Store.export()
+                "import" -> { // a whole layout, base64 JSON (e.g. to restore one saved with cfg)
+                    val json = String(android.util.Base64.decode(args[1], android.util.Base64.DEFAULT))
+                    if (Store.import(json)) "imported" else "not a BentoBar layout"
+                }
+                "reset" -> { Store.update { Defaults.config().copy(onboarded = it.onboarded) }; "reset" }
+                "add" -> Store.add(args[1], args.getOrNull(2)?.let { Section.valueOf(it.uppercase()) } ?: Section.SHOWN)
+                "set" -> {
+                    val (k, v) = args[2].split('=', limit = 2)
+                    val item = Store.config.value.items.firstOrNull { it.id == args[1] || it.type == args[1] } ?: error("no item")
+                    when (k) {
+                        "section" -> Store.updateItem(item.id) { it.copy(section = Section.valueOf(v.uppercase())) }
+                        "whenActive" -> Store.updateItem(item.id) { it.copy(whenActive = v.toBoolean()) }
+                        "display" -> Store.updateItem(item.id) { it.copy(display = io.github.kuscher.bentobar.data.Display.valueOf(v.uppercase())) }
+                        else -> Store.updateItem(item.id) { it.with(k, v.ifEmpty { null }) }
+                    }
+                    Ticker.refresh(); "ok"
+                }
+                "cpuprobe" -> { // which CPU-load sources this app may read
+                    val out = StringBuilder()
+                    val shm = context.getSystemService(android.os.health.SystemHealthManager::class.java)
+                    runCatching {
+                        out.append("minInterval=${shm.cpuHeadroomMinIntervalMillis} window=${shm.cpuHeadroomCalculationWindowRange} ")
+                        out.append("cpuHeadroom=${shm.getCpuHeadroom(android.os.CpuHeadroomParams.Builder().build())} ")
+                    }.onFailure { out.append("cpuHeadroom=$it ") }
+                    runCatching { out.append("gpuHeadroom=${shm.getGpuHeadroom(android.os.GpuHeadroomParams.Builder().build())} ") }
+                        .onFailure { out.append("gpuHeadroom=$it ") }
+                    val extra = (args.getOrNull(1)?.split(",") ?: emptyList())
+                    for (f in listOf("/proc/stat", "/proc/loadavg", "/proc/uptime", "/proc/pressure/cpu", "/sys/devices/system/cpu/present",
+                        "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
+                        "/sys/devices/system/cpu/cpu0/cpuidle/state0/time", "/sys/devices/system/cpu/cpu0/cpuidle/state1/time",
+                        "/sys/devices/system/cpu/cpu0/cpuidle/state0/name", "/sys/devices/system/cpu/cpu5/cpuidle/state2/time",
+                        "/sys/devices/system/cpu/cpufreq/policy0/stats/time_in_state", "/sys/class/kgsl/kgsl-3d0/gpu_busy_percentage",
+                        "/sys/class/kgsl/kgsl-3d0/gpubusy", "/proc/self/stat") + extra) {
+                        out.append("| $f: ").append(runCatching { java.io.File(f).bufferedReader().use { it.readLine() }?.take(60) }
+                            .getOrElse { "DENIED ${it.javaClass.simpleName}" })
+                    }
+                    out.toString()
+                }
+                "state" -> { // what an item shows right now
+                    val item = Store.config.value.items.firstOrNull { it.type == args[1] || it.id == args[1] } ?: error("no item")
+                    Ticker.stateOf(item).let { "${it.text} active=${it.active}" }
+                }
+                "finish" -> { io.github.kuscher.bentobar.ui.MainActivity.current?.finish(); "ok" }
+                "bar" -> { Store.update { it.copy(enabled = args.getOrNull(1) != "off") }; "ok" }
+                "look" -> {
+                    Store.update { c ->
+                        when (args[1]) {
+                            "position" -> c.copy(position = io.github.kuscher.bentobar.data.Position.valueOf(args[2].uppercase()))
+                            "pill" -> c.copy(pill = io.github.kuscher.bentobar.data.Pill.valueOf(args[2].uppercase()))
+                            "color" -> c.copy(color = io.github.kuscher.bentobar.data.ColorMode.valueOf(args[2].uppercase()))
+                            "size" -> c.copy(textSize = io.github.kuscher.bentobar.data.TextSize.valueOf(args[2].uppercase()))
+                            "chips" -> c.copy(chipMode = io.github.kuscher.bentobar.data.ChipMode.valueOf(args[2].uppercase()))
+                            "chevron" -> c.copy(chevron = args[2] == "on")
+                            "hover" -> c.copy(revealOnHover = args[2] == "on")
+                            "collapse" -> c.copy(autoCollapseSec = args[2].toInt())
+                            "spacing" -> c.copy(spacing = args[2].toInt())
+                            else -> c
+                        }
+                    }; "ok"
+                }
+                "timer" -> { // minutes, or seconds with an "s" suffix
+                    val a = args.getOrElse(1) { "1" }
+                    Timers.startTimer(if (a.endsWith("s")) a.dropLast(1).toLong() * 1000 else a.toLong() * 60_000L); "ok"
+                }
+                "stopwatch" -> { Timers.startStopwatch(); "ok" }
+                "pomodoro" -> { Timers.startPomodoro(); "ok" }
+                "stop" -> { Timers.stop(); "ok" }
+                "awake" -> { if (args.getOrNull(1) == "off") Caffeine.off() else Caffeine.on(args.getOrNull(1)?.toIntOrNull()); "ok" }
+                else -> bar?.debug(args) ?: "bar not running"
+            }
+        } catch (e: Exception) {
+            "failed: $e"
+        }
+        Log.i("BentoBar", "debug ${args.joinToString(" ")} -> $out")
+    }
+
+    /**
+     * One of BentoBar's own windows as a PNG, returned base64 in the broadcast result (for README
+     * screenshots). Window screenshots include the window's shadow and transparency but not the
+     * mouse pointer, and never show other apps.
+     */
+    private fun winshot(title: String) {
+        val svc = Env.service ?: run { resultData = "service not running"; return }
+        val w = (if (title == "app") svc.windows.firstOrNull { // the settings window (its own surface, without the caption)
+            it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.root?.packageName == svc.packageName
+        } else svc.windows.firstOrNull {
+            it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY && it.title?.toString() == title
+        }) ?: run { resultData = "no BentoBar window titled $title"; return }
+        val pending = goAsync()
+        svc.takeScreenshotOfWindow(w.id, java.util.concurrent.Executors.newSingleThreadExecutor(),
+            object : android.accessibilityservice.AccessibilityService.TakeScreenshotCallback {
+                override fun onSuccess(r: android.accessibilityservice.AccessibilityService.ScreenshotResult) {
+                    val hb = r.hardwareBuffer
+                    val bmp = android.graphics.Bitmap.wrapHardwareBuffer(hb, r.colorSpace)!!.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                    hb.close()
+                    val out = java.io.ByteArrayOutputStream()
+                    bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    pending.resultData = android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+                    pending.finish()
+                }
+                override fun onFailure(code: Int) { pending.resultData = "failed $code"; pending.finish() }
+            })
+    }
+}

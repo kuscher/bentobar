@@ -1,31 +1,43 @@
-# Picking up DiscoBar
+# Picking up BentoBar
 
 The dev VM can restart mid-task. This file is the status and the next steps; keep it current and
 commit at every milestone.
 
 ## Where things live
-- Repo `~/discobar`, GitHub github.com/kuscher/discobar (private; the user flips it public).
-  Releases carry `DiscoBar.apk` (stable name for releases/latest/download/DiscoBar.apk) + SHA256SUMS.
-- Release key `~/.config/discobar/keystore.jks` + `keystore.pass` (not in git). Keystore backed
-  up to Drive folder "DiscoBar release key" (id 1DnbGwls_3wZeVpJaNWeOT9jHdoozhSM7, checksum
+- Repo `~/bentobar`, GitHub github.com/kuscher/bentobar (public; was kuscher/discobar, which redirects).
+  Releases carry `BentoBar.apk` (stable name for releases/latest/download/BentoBar.apk) + SHA256SUMS.
+- Release key `~/.config/bentobar/keystore.jks` + `keystore.pass` (not in git). Keystore backed
+  up to Drive folder "BentoBar release key" (id 1DnbGwls_3wZeVpJaNWeOT9jHdoozhSM7, checksum
   verified); the password is for the user's password manager.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 0.5 (2026-09-29): renamed BentoBar, new icon
+- The user asked: rename DiscoBar to BentoBar, a better and more modern icon, and the GitHub repo
+  and the app updated to the new brand.
+- New package `io.github.kuscher.bentobar` (the Kotlin namespace too), so it installs beside
+  DiscoBar; migration is Copy settings / Paste settings (Look page). Same key (alias `discobar`),
+  key dir moved to ~/.config/bentobar, helper `./disco` → `./bento`, cache ~/.cache/bentobar.
+- Icon (tools/logo.py): bento box from above (status bar compartment with ‹ and dots as holes,
+  plus three compartments), rice/salmon/tamago/edamame on ink blue; no font dependency.
+- On the HP: the user's DiscoBar layout (saved in ~/.cache/bentobar/user-layout-from-discobar.json)
+  was imported into BentoBar, calendar and notification grants carried over, DiscoBar removed.
+- The ASUS still has DiscoBar 0.4.1 (service never enabled) until it's connected again.
+
 ## 0.4 (2026-09-28): new icon, README with screenshots, first GitHub release
-- Icon: status bar pill over the Tools glyph on blue (tools/logo.py). README images from a demo
+- Icon (replaced in 0.5): status bar pill over the Tools glyph on blue (tools/logo.py). README images from a demo
   layout (tools/readme_images.py); the user's layout was saved and restored byte-identical.
 - History was rewritten before the first push to the noreply identity with co-author trailers.
 
 ## 0.3 (2026-09-28): CPU item, width and collapse fixes, 3× lighter
 - User reported: items cut off; ‹ overlapping the timer when expanded; random collapsing; asked
   for a CPU load item; asked whether memory/CPU readings reflect other apps (yes: device-wide;
-  the Linux VM alone holds ~12 GB of the 31 GB; DiscoBar ~26 MB).
+  the Linux VM alone holds ~12 GB of the 31 GB; BentoBar ~26 MB).
 - Causes and fixes are in CHANGELOG 0.3 and CLAUDE.md ("Window width", "CPU load", "CPU cost").
 - The user's own settings on the HP: position CENTER, chevron OFF, spacing 9, CPU item shown.
 
 ## 0.2 (2026-09-28): renamed DiscoBar, tighter bar
-- The user asked: call it DiscoBar; fix spacing (the finished timer's "Done" sat far from its icon,
+- The user asked: call it DiscoBar (was BarBook); fix spacing (the finished timer's "Done" sat far from its icon,
   other things too big); hover reveal off by default; the release key in Drive. All done.
 - Cause of the gaps: Compose `remember` in the strip was positional, so an item popping in
   inherited a neighbour's held width. Now keyed by item id; width holding only for ticking numbers

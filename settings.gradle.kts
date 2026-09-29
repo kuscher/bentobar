@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DiscoBar"
+rootProject.name = "BentoBar"
 include(":app")

@@ -1,10 +1,13 @@
-# DiscoBar: notes for working on the code
+# BentoBar: notes for working on the code
+
+(Called DiscoBar until 0.4.1, package `io.github.kuscher.discobar`; renamed in 0.5 with a new
+package, so it installs next to DiscoBar rather than over it. Same signing key.)
 
 A Bartender-style status bar organiser for Googlebooks (Googlebook OS = Android 17 desktop). A
 plain APK: no adb grants, root or system changes in the product (the user's hard requirement).
 
 ## Layout
-- `app/src/main/java/io/github/kuscher/discobar/`
+- `app/src/main/java/io/github/kuscher/bentobar/`
   - `bar/BarService.kt`: the AccessibilityService plus `BarController`. It scans the status bar,
     places the strip, hides it (fullscreen, keyguard, screen off, a shade covering the bar), runs
     menus, the keep-awake window and colour sampling, and has adb `debug()` hooks.
@@ -22,32 +25,33 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
     SharedPreferences, a process-wide StateFlow shared by the service and settings).
   - `ui/`: `MainActivity` (nav rail), `BarPage` (preview, sections, item detail), `Pages`
     (Add, Look, Setup, About), `Theme`, `MenuKit` and `Controls` (shared UI pieces).
-  - `tile/Tiles.kt`: the DiscoBar, Keep awake and Timer tiles.
+  - `tile/Tiles.kt`: the BentoBar, Keep awake and Timer tiles.
   - `util/`: `Sym.kt` (generated), `Ui.kt` (fonts, `SymIcon`), `Fmt.kt`, `DebugReceiver.kt`.
-- `tools/logo.py`: draws the icon (a status bar pill over the Tools glyph, white on blue): launcher
-  foreground/monochrome/background, `ic_discobar` (24 dp, app header) and `ic_tile_bar` (the QS
-  tile), plus docs/images/icon.png for the README.
+- `tools/logo.py`: draws the icon (a bento box seen from above: a status bar compartment with a ‹
+  and dots cut out, over three item compartments; rice, salmon, tamago and edamame on ink blue):
+  launcher foreground/monochrome/background, `ic_bentobar` (24 dp, app header, ‹ menu) and
+  `ic_tile_bar` (the QS tile), plus docs/images/icon.png for the README. No font needed.
 - `tools/icons.py`: subsets Material Symbols Rounded into `assets/fonts` (outlined and filled),
   writes `Sym.kt`, and exports some glyphs as vector drawables (`res/drawable/sym_*.xml`, for
   tiles and notifications). Add an icon name there, then rerun it.
 - `tools/readme_images.py`: composes docs/images/*.png (README) from raw captures in
-  ~/.cache/discobar/shots (see its docstring). Capture with a **demo layout** (`./disco debug cfg` to
-  save the user's, `./disco debug import <base64>` to load the demo and later restore theirs) so no
-  calendar titles or other personal data show, and with `./disco debug winshot [title|app]`, which
-  returns a PNG of DiscoBar's own window (no pointer, no other apps) base64 in the broadcast result.
+  ~/.cache/bentobar/shots (see its docstring). Capture with a **demo layout** (`./bento debug cfg` to
+  save the user's, `./bento debug import <base64>` to load the demo and later restore theirs) so no
+  calendar titles or other personal data show, and with `./bento debug winshot [title|app]`, which
+  returns a PNG of BentoBar's own window (no pointer, no other apps) base64 in the broadcast result.
 - `docs/research/`: the device findings (probe results) and the official-docs research, with URLs.
 - `probe/`: the throwaway feasibility probe (Gradle-free build). Not part of the app.
 
 ## Dev loop
-- `./disco app` builds the debug APK, installs it, enables the service and opens settings.
-- `./disco debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|set ID k=v|look KEY VALUE|windows`.
+- `./bento app` builds the debug APK, installs it, enables the service and opens settings.
+- `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|set ID k=v|look KEY VALUE|windows`.
   The receiver is guarded by DUMP, so only adb can call it.
-- `./disco shot`, `./disco menushot` and `./disco appshot` capture the status bar, the open menu and
+- `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
   the settings window. Menu crops include the menu's shadow margin, which can show other windows
   behind it, so don't publish them.
-- Release: `./gradlew :app:assembleRelease`, signed with `~/.config/discobar/keystore.jks` and
-  `keystore.pass` (not in git; alias discobar, cert SHA-256 4F:2B:24:07:…:E9:B3:35:C5). The
-  keystore is backed up in the user's Drive folder "DiscoBar release key"
+- Release: `./gradlew :app:assembleRelease`, signed with `~/.config/bentobar/keystore.jks` and
+  `keystore.pass` (not in git; alias `discobar` from before the rename, cert SHA-256 4F:2B:24:07:…:E9:B3:35:C5). The
+  keystore is backed up in the user's Drive folder "BentoBar release key"
   (https://drive.google.com/drive/folders/1DnbGwls_3wZeVpJaNWeOT9jHdoozhSM7) with a README; the
   password is not, it belongs in the user's password manager. A debug and a release install
   can't replace each other (different keys), so uninstall first.
@@ -61,10 +65,10 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   resize could swallow the status bar's "hidden" event.
 - Without content events, the node cache goes stale: `clearCache()` before a full scan. Every 2 s
   a light check refreshes only the spacer node; a full scan runs every 30 s or on change.
-- The status bar hides about 1.9 s after an app goes fullscreen (the system's timing); DiscoBar
+- The status bar hides about 1.9 s after an app goes fullscreen (the system's timing); BentoBar
   follows within about 100 ms of the window event.
 - Live Update chips show only ONE per app, drop text over about 7 characters, and are hidden while
-  the posting app is "visible" (uid TOP). **DiscoBar's own settings window open means no chip.**
+  the posting app is "visible" (uid TOP). **BentoBar's own settings window open means no chip.**
   With only the accessibility service running (BFGS) the chip shows.
 - The Agent-task status bar API is in the platform-37.2 SDK stubs but not on the device (37.1),
   and it needs the assistant role anyway. We compile against 37.2 stubs: check each new API on
@@ -85,11 +89,11 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   `/sys/devices/system/cpu/cpuN/cpuidle/stateM/time` (idle residency, µs), cpufreq
   `scaling_cur_freq`, and `/sys/class/kgsl/kgsl-3d0/gpubusy` (Adreno). Load = 1 − Δidle/Δwall per
   core; it matched `top` within ~1 point under load (reads a few points high at idle).
-  `./disco debug cpuprobe` checks what's readable on a new device.
+  `./bento debug cpuprobe` checks what's readable on a new device.
 - **CPU cost:** measure release builds after `cmd package compile -m speed -f` (adb installs are
   only verified, so JIT dominates at first). The big costs were full node-tree scans on every
   window event (title changes included) and sampling folded items; now ~0.5% of one core with CPU
   and network ticking. The manifest is `profileable` by the shell for simpleperf.
 - StudioSnap's helper (`~/studiosnap/ss enable`) used to overwrite the whole
-  `enabled_accessibility_services` list and switch DiscoBar off; fixed there on 2026-09-28. Both
+  `enabled_accessibility_services` list and switch BentoBar off; fixed there on 2026-09-28. Both
   helpers now add or remove only their own entry (short or full component form).

@@ -2,12 +2,12 @@
 # SPDX-License-Identifier: MIT
 """Composes the README images from raw captures of a Googlebook.
 
-Raw captures (in RAW, default ~/.cache/discobar/shots), made with a demo layout so no personal data
+Raw captures (in RAW, default ~/.cache/bentobar/shots), made with a demo layout so no personal data
 shows:
-  bar_hero.png, bar_now.png, bar_open.png   full-width screenshots, top 41 px (./disco shot F 41)
-  win_*.png                                 DiscoBar's own windows (./disco debug winshot ...), which
+  bar_hero.png, bar_now.png, bar_open.png   full-width screenshots, top 41 px (./bento shot F 41)
+  win_*.png                                 BentoBar's own windows (./bento debug winshot ...), which
                                             carry their shadow margin and no mouse pointer
-  app_*.png                                 the settings window (./disco debug winshot app)
+  app_*.png                                 the settings window (./bento debug winshot app)
   cpu_frame.txt                             "cpu menu frame: x1 y1 x2 y2" of the CPU menu window
 
 Writes docs/images/hero.png, bar.png, menus.png, settings.png and settings-pages.png.
@@ -20,7 +20,7 @@ import sys
 from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-RAW = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else pathlib.Path.home() / ".cache/discobar/shots")
+RAW = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else pathlib.Path.home() / ".cache/bentobar/shots")
 OUT = ROOT / "docs/images"
 
 
@@ -94,7 +94,7 @@ def main():
     both.save(OUT / "bar.png", optimize=True)
 
     # Menus side by side.
-    cards = [card(Image.open(RAW / f"win_{n}.png").convert("RGBA")) for n in ("network", "timer", "ctx", "tools", "discobar")
+    cards = [card(Image.open(RAW / f"win_{n}.png").convert("RGBA")) for n in ("network", "timer", "ctx", "tools", "bentobar")
              if (RAW / f"win_{n}.png").exists()]
     pad, gap = 30, 28
     W = sum(c.width for c in cards) + gap * (len(cards) - 1) + 2 * pad

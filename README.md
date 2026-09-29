@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/images/icon.png" width="112" alt="DiscoBar icon">
+  <img src="docs/images/icon.png" width="112" alt="BentoBar icon">
 </p>
 
-<h1 align="center">DiscoBar</h1>
+<h1 align="center">BentoBar</h1>
 
 <p align="center">
   <b>Add, hide and organise items in your Googlebook's status bar.</b><br>
@@ -10,34 +10,36 @@
 </p>
 
 <p align="center">
-  <a href="../../releases/latest/download/DiscoBar.apk"><b>⬇ Download DiscoBar.apk</b></a>
+  <a href="../../releases/latest/download/BentoBar.apk"><b>⬇ Download BentoBar.apk</b></a>
   &nbsp;·&nbsp; <a href="#install">Install</a>
   &nbsp;·&nbsp; <a href="#privacy">Privacy</a>
   &nbsp;·&nbsp; <a href="CHANGELOG.md">What's new</a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Googlebook_OS-Android_17-4F6BED" alt="Googlebook OS, Android 17">
+  <img src="https://img.shields.io/badge/Googlebook_OS-Android_17-34397E" alt="Googlebook OS, Android 17">
   <img src="https://img.shields.io/badge/internet_permission-none-2E7D32" alt="No internet permission">
   <img src="https://img.shields.io/badge/license-MIT-555555" alt="MIT license">
-  <img src="https://img.shields.io/badge/developed_entirely_on-a_Googlebook-E0407E" alt="Developed entirely on a Googlebook">
+  <img src="https://img.shields.io/badge/developed_entirely_on-a_Googlebook-F4533F" alt="Developed entirely on a Googlebook">
 </p>
 
 <p align="center"><sub>A personal hobby project by <a href="https://github.com/kuscher">Alexander Kuscher</a>, proudly developed entirely on a Googlebook.
-Not affiliated with or endorsed by any employer (<a href="#about-this-project">more</a>).</sub></p>
+Not affiliated with or endorsed by any employer (<a href="#about-this-project">more</a>).
+Formerly DiscoBar (<a href="#coming-from-discobar">moving over</a>).</sub></p>
 
 <p align="center">
-  <img src="docs/images/hero.png" width="880" alt="DiscoBar's items in the Googlebook status bar, with the CPU menu open under the CPU item">
+  <img src="docs/images/hero.png" width="880" alt="BentoBar's items in the Googlebook status bar, with the CPU menu open under the CPU item">
 </p>
 
 ## What it does
 
-DiscoBar puts **your own items** into the empty part of the status bar, right next to the
+BentoBar puts **your own items** into the empty part of the status bar, right next to the
 system's icons, in the same font and colour. Items you don't need all the time go **behind the ‹
-button**; one click reveals them, another folds them away.
+button**; one click reveals them, another folds them away. Like a bento box: everything in its
+compartment, and the whole thing neat.
 
 <p align="center">
-  <img src="docs/images/bar.png" width="880" alt="The status bar with DiscoBar folded, then with its hidden items revealed">
+  <img src="docs/images/bar.png" width="880" alt="The status bar with BentoBar folded, then with its hidden items revealed">
   <br><sub>Folded (top) and revealed (bottom): a world clock, battery and memory slide in next to the running timer.</sub>
 </p>
 
@@ -46,12 +48,12 @@ button**; one click reveals them, another folds them away.
 - **Click any item** for its menu: charts, details and actions.
 - **Right-click an item** to hide it, move it or change how it looks.
 - **Scroll** over the sound item to change the volume, or over the timer to add minutes.
-- **Quick Settings tiles** switch DiscoBar off (for presenting), keep the screen awake, or start a
+- **Quick Settings tiles** switch BentoBar off (for presenting), keep the screen awake, or start a
   25-minute timer.
-- **Live Update chip:** when DiscoBar is off, a running timer still shows as Android's own status
+- **Live Update chip:** when BentoBar is off, a running timer still shows as Android's own status
   bar chip.
 
-DiscoBar stays out of the way. It moves aside when the system's own icons or chips change, and
+BentoBar stays out of the way. It moves aside when the system's own icons or chips change, and
 hides when an app goes full screen or the screen locks.
 
 ## Items
@@ -75,7 +77,7 @@ hides when an app goes full screen or the screen locks.
 | **Text or emoji**, **Spacer** | anything you like | optional link |
 
 <p align="center">
-  <img src="docs/images/menus.png" width="880" alt="DiscoBar menus: network, timer, the right-click item menu, tools, and the list of hidden items">
+  <img src="docs/images/menus.png" width="880" alt="BentoBar menus: network, timer, the right-click item menu, tools, and the list of hidden items">
 </p>
 
 ## Settings
@@ -85,43 +87,52 @@ A live preview of your bar at the top; below it, your items in three groups (**i
 status bar right away.
 
 <p align="center">
-  <img src="docs/images/settings.png" width="880" alt="DiscoBar settings: the bar preview, the item list and the CPU item's options">
+  <img src="docs/images/settings.png" width="880" alt="BentoBar settings: the bar preview, the item list and the CPU item's options">
 </p>
 
 <p align="center">
   <img src="docs/images/settings-pages.png" width="880" alt="Adding items, and the look and behaviour options">
-  <br><sub>Adding items, and choosing where DiscoBar sits and how it looks.</sub>
+  <br><sub>Adding items, and choosing where BentoBar sits and how it looks.</sub>
 </p>
 
 ## Install
 
-DiscoBar is made for Googlebooks (Googlebook OS, Android 17). Other Android 14+ devices with a
+BentoBar is made for Googlebooks (Googlebook OS, Android 17). Other Android 14+ devices with a
 status bar may work, but haven't been tested.
 
 1. On your Googlebook, download
-   **[DiscoBar.apk](../../releases/latest/download/DiscoBar.apk)** from the latest release.
+   **[BentoBar.apk](../../releases/latest/download/BentoBar.apk)** from the latest release.
 2. Open it from Chrome's downloads or the Files app. If Android asks, allow Chrome (or Files) to
    install apps, then tap **Install**.
-3. Open **DiscoBar** and go to **Setup** › **Turn on**. Android opens Accessibility settings.
-4. Because DiscoBar came from a download, Android guards this switch the first time:
-   1. Open **DiscoBar** and tap the switch. Android says *"Restricted setting"*. Tap **OK**.
-   2. Back in DiscoBar, tap **App info**, then **⋮** (top right) › **Allow restricted
+3. Open **BentoBar** and go to **Setup** › **Turn on**. Android opens Accessibility settings.
+4. Because BentoBar came from a download, Android guards this switch the first time:
+   1. Open **BentoBar** and tap the switch. Android says *"Restricted setting"*. Tap **OK**.
+   2. Back in BentoBar, tap **App info**, then **⋮** (top right) › **Allow restricted
       settings**, and confirm with your PIN.
-   3. Return to Accessibility › **DiscoBar** and turn it on.
+   3. Return to Accessibility › **BentoBar** and turn it on.
 5. Optional: in **Setup**, allow notifications (timer alerts, the Live Update chip) and calendar
    access (next meeting, events in the month view).
 
 About a day later, Android shows *"Review app with full device access"*. That's a standard check
-for every app that uses an accessibility service. Keep DiscoBar if you're happy with what it does
+for every app that uses an accessibility service. Keep BentoBar if you're happy with what it does
 (below).
 
-To update, install a newer `DiscoBar.apk` over the old one; your layout stays.
+To update, install a newer `BentoBar.apk` over the old one; your layout stays.
+
+### Coming from DiscoBar?
+
+BentoBar is DiscoBar's new name (from version 0.5). It's a new package, so it installs next to
+DiscoBar rather than over it. To bring your layout along:
+
+1. In **DiscoBar**, open **Look › Copy settings**.
+2. Install and open **BentoBar**, then **Look › Paste settings**.
+3. Turn BentoBar on in **Setup**, and uninstall DiscoBar (otherwise both draw in the status bar).
 
 <a id="privacy"></a>
-## Privacy: why an accessibility service, and what DiscoBar does with it
+## Privacy: why an accessibility service, and what BentoBar does with it
 
 Android lets an app draw on top of the status bar only through an accessibility service, so
-Android warns that DiscoBar can "view and control your screen". Here is everything DiscoBar does
+Android warns that BentoBar can "view and control your screen". Here is everything BentoBar does
 with that access:
 
 - It listens only for **windows appearing, going or moving**, not their content, so it can hide
@@ -132,7 +143,7 @@ with that access:
 - It runs **system actions** (screenshot, lock, overview, all apps, power) when you pick them in
   the Tools menu.
 
-DiscoBar doesn't read other apps, doesn't watch your keyboard, mouse or touches, and has **no
+BentoBar doesn't read other apps, doesn't watch your keyboard, mouse or touches, and has **no
 internet permission**: your layout, your calendar and everything it measures stay on your
 Googlebook.
 
@@ -147,13 +158,13 @@ Googlebook.
 ## Good to know
 
 - **System icons stay.** Android doesn't let an installed app hide or reorder the system's own
-  icons (clock, Wi-Fi, battery, notifications), so DiscoBar organises its own items next to them.
+  icons (clock, Wi-Fi, battery, notifications), so BentoBar organises its own items next to them.
 - **One chip.** Android shows one Live Update chip per app, with about seven characters of text,
   and hides it while that app's own window is open.
 - **CPU load** comes from each core's idle time (Android doesn't let apps read overall CPU usage),
   and matches the system's `top` within a point or two.
 - **Advanced Protection** (Android 17) turns off accessibility services that aren't assistive
-  tools, and with it DiscoBar's bar. The chip and tiles keep working.
+  tools, and with it BentoBar's bar. The chip and tiles keep working.
 - **Light on battery:** about 0.5% of one CPU core with the CPU and network items updating every
   second, and nothing at all while the screen is off.
 
@@ -163,18 +174,18 @@ Needs JDK 21 and the Android SDK (platform 37).
 
 ```sh
 ./gradlew :app:assembleDebug      # app/build/outputs/apk/debug/app-debug.apk
-./gradlew :app:assembleRelease    # signed if ~/.config/discobar/keystore.jks and keystore.pass exist
+./gradlew :app:assembleRelease    # signed if ~/.config/bentobar/keystore.jks and keystore.pass exist
 ```
 
-`./disco` is the development helper (build, install, enable, test hooks, screenshots) for a
+`./bento` is the development helper (build, install, enable, test hooks, screenshots) for a
 Googlebook connected over Wireless debugging. [CLAUDE.md](CLAUDE.md) explains how the code is
 organised, and [docs/research](docs/research) has the platform findings behind the design.
 
 ## About this project
 
-DiscoBar is my personal hobby project, made by me, [Alexander Kuscher](https://github.com/kuscher).
+BentoBar is my personal hobby project, made by me, [Alexander Kuscher](https://github.com/kuscher).
 It has no affiliation with my employer: my employer didn't make, sponsor, review or endorse it,
-and DiscoBar doesn't endorse my employer or its products either. The views, choices and any
+and BentoBar doesn't endorse my employer or its products either. The views, choices and any
 mistakes here are mine alone.
 
 It was proudly developed entirely on a Googlebook: written, built and tested on the device
@@ -185,9 +196,9 @@ this release.
 
 ## License
 
-DiscoBar is free software under the [MIT License](LICENSE). It includes Google's
+BentoBar is free software under the [MIT License](LICENSE). It includes Google's
 [Material Symbols](https://fonts.google.com/icons) (Apache License 2.0) and uses Jetpack Compose,
 AndroidX, Kotlin and kotlinx.serialization (Apache License 2.0).
 
-DiscoBar is an independent project. It isn't made by or affiliated with Google, or with Surtees
+BentoBar is an independent project. It isn't made by or affiliated with Google, or with Surtees
 Studios (Bartender) or Bjango (iStat Menus).

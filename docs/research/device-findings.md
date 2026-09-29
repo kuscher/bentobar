@@ -1,6 +1,6 @@
-# DiscoBar: device findings (HP Googlebook 14, Android 17 / SDK 37, build CL3B.260622.270)
+# BentoBar: device findings (HP Googlebook 14, Android 17 / SDK 37, build CL3B.260622.270)
 
-Checked over adb with the throwaway probe in `probe/` (package local.discobar.probe).
+Checked over adb with the throwaway probe in `probe/` (package local.bentobar.probe).
 
 ## The desktop status bar (2026-09-27)
 - One window, `StatusBar`, type STATUS_BAR, 1920x41 px at the top (display 1920x1200, density 1.125,
@@ -10,7 +10,7 @@ Checked over adb with the throwaway probe in `probe/` (package local.discobar.pr
 - Accessibility tree of the status bar window (AccessibilityWindowInfo type 3 = TYPE_SYSTEM, bounds
   [0,0][1920,41]) exposes every item with bounds and view ids:
   - `dateTimeChip` [27..168] (clock "9:19" desc "9:19 AM", date "Sun, Sep 27"), clickable
-  - `DesktopStatusBarSpacer` [168..1681] (empty middle: where DiscoBar items can live)
+  - `DesktopStatusBarSpacer` [168..1681] (empty middle: where BentoBar items can live)
   - `ImeIndicator` [1681..1722] desc "Keyboard", text "US", clickable
   - `ContextualCursor` [1722..1763] desc "Start Magic pointer", clickable (the pointer+sparkle icon)
   - `notificationIcons` [1763..1817] desc "Notifications" (bell with unread dot), clickable
@@ -39,7 +39,7 @@ Checked over adb with the throwaway probe in `probe/` (package local.discobar.pr
   and right-click (context click) not tested yet (need a real pointer).
 - **Fullscreen apps:** when an app hides the status bar (`--windowingMode 1` + `hide(statusBars())`),
   the status bar window disappears from `getWindows()` (TYPE_WINDOWS_CHANGED). The overlay stays on
-  top of the fullscreen app unless we hide it, so DiscoBar must follow the status bar window.
+  top of the fullscreen app unless we hide it, so BentoBar must follow the status bar window.
 - **Live Update chips show on the desktop bar**, right side, just left of the IME indicator, as a
   pink-tinted pill with the small icon + text. Verified kinds: `setShortCriticalText("12.3M")`,
   a count-down chronometer (`setUsesChronometer` + `setChronometerCountDown`) showing "04:57",
@@ -55,7 +55,7 @@ Checked over adb with the throwaway probe in `probe/` (package local.discobar.pr
   (NoSuchMethodError). It is in the platform-37.2 SDK stubs, but the device runs 37.1. So compile
   against 37.2 stubs carefully: guard or avoid anything newer than the device.
 
-## More findings (2026-09-28, DiscoBar 0.3)
+## More findings (2026-09-28, BentoBar 0.3)
 - `config_prefDialogWidth` is 580 dp (652 px): a WRAP_CONTENT overlay window is capped there unless
   its view reports MEASURED_STATE_TOO_SMALL (Compose doesn't). Use exact window widths.
 - CPU load sources, tested from the app (untrusted_app): /proc/stat, /proc/loadavg, /proc/uptime,

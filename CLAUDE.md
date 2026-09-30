@@ -50,10 +50,9 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   the settings window. Menu crops include the menu's shadow margin, which can show other windows
   behind it, so don't publish them.
 - Release: `./gradlew :app:assembleRelease`, signed with `~/.config/bentobar/keystore.jks` and
-  `keystore.pass` (not in git; alias `discobar` from before the rename, cert SHA-256 4F:2B:24:07:…:E9:B3:35:C5). The
-  keystore is backed up in the user's a private folder, file discobar-keystore.jks,
-  ((private)) with a README; the
-  password is not, it belongs in the user's password manager. A debug and a release install
+  `keystore.pass` (not in git; alias `bentobar`, cert SHA-256 17:1F:D5:44:…:29:E5:F9:0C; a new key since 2026-09-30, the one Google Play uses too, so GitHub
+  installs of 0.5 and earlier must be uninstalled once). The keystore and its password are backed up in the user's
+  a private folder ((private)), file bentobar-keystore.jks, with a README. A debug and a release install
   can't replace each other (different keys), so uninstall first.
 - adb uses VSCodeBook's Unix socket (`~/.config/vscodebook/android.env`), never tcp:5037.
 

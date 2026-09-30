@@ -6,9 +6,8 @@ commit at every milestone.
 ## Where things live
 - Repo `~/bentobar`, GitHub github.com/kuscher/bentobar (public; was kuscher/discobar, which redirects).
   Releases carry `BentoBar.apk` (stable name for releases/latest/download/BentoBar.apk) + SHA256SUMS.
-- Release key `~/.config/bentobar/keystore.jks` + `keystore.pass` (not in git). Keystore backed
-  up to a private folder, file discobar-keystore.jks (id (private), checksum
-  verified); the password is for the user's password manager.
+- Release key `~/.config/bentobar/keystore.jks` + `keystore.pass` (not in git). New key since 2026-09-30
+  (also Google Play's), backed up with its password to a private folder, file bentobar-keystore.jks.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 

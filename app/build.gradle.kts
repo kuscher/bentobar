@@ -26,7 +26,7 @@ android {
                 storeFile = keyFile
                 val pw = keyPassFile.readText().trim()
                 storePassword = pw
-                keyAlias = "discobar" // the key predates the rename to BentoBar; same key, same signature
+                keyAlias = "bentobar" // the release key made on 2026-09-30 (the DiscoBar-era key was retired)
                 keyPassword = pw
             }
         }

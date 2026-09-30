@@ -1,0 +1,27 @@
+BentoBar puts your own items into the empty part of the status bar, right next to the system's icons, in the same font and colour. Items you don't need all the time go behind the ‹ button: one click reveals them, another folds them away. Like a bento box: everything in its compartment, and the whole thing neat.
+
+Items
+CPU load, network speed, memory, battery details, storage, the date with a month view of your calendar, your next meeting with a countdown, a second clock and world clocks, timers (countdown, stopwatch or Pomodoro), a countdown to a date, keep awake, sound, a Tools menu (screenshot, lock, overview, all apps, power), app folders and shortcuts, text, emoji and spacers.
+
+Show when active
+A hidden item can pop out on its own while it has something to say, such as a running timer, a meeting about to start or a busy CPU, and disappear again after.
+
+Click, right-click, scroll
+Click any item for its menu: charts, details and actions. Right-click an item to hide it, move it or change how it looks. Scroll over the sound item to change the volume, or over the timer to add minutes.
+
+Quick Settings tiles and a Live Update chip
+Tiles switch BentoBar off for presenting, keep the screen awake or start a 25-minute timer. When BentoBar is off, a running timer still shows as Android's own status bar chip.
+
+Stays out of the way
+BentoBar moves aside when the system's icons or chips change, and hides when an app goes full screen or the screen locks. It uses about half a percent of one CPU core with its busiest items updating every second, and nothing while the screen is off.
+
+Why BentoBar uses an accessibility service
+Android lets an app draw on the status bar only through an accessibility service. BentoBar uses it to draw its items there, and to run the Tools menu's actions when you pick them. It listens only for windows appearing, going or moving, not their content; it reads the status bar's layout and no other window; and it doesn't watch your keyboard, mouse or touches. You turn it on yourself in Setup.
+
+Private
+No internet permission, no accounts, no ads, no analytics. Your layout, your calendar and everything BentoBar measures stay on your device.
+
+Made for Android laptops with Android 17. Other devices with a status bar may work, but haven't been tested. The system's own icons stay where Android puts them: BentoBar organises its items next to them.
+
+Free and open source
+BentoBar is a personal hobby project by Alexander Kuscher, not affiliated with or endorsed by any employer. The code is MIT-licensed: github.com/kuscher/bentobar

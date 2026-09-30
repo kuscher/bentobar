@@ -1,0 +1,1 @@
+The first release on Google Play: your own items in the status bar, hidden items behind the ‹ button, menus with charts and actions, Quick Settings tiles, and a Live Update chip for timers.

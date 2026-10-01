@@ -67,6 +67,9 @@ abstract class ItemType(
     /** Whether "show when active" means something for this type. */
     open val canBeActive: Boolean = false
 
+    /** The "Show when…" rule in words, for types that [canBeActive]. */
+    open val trigger: Trigger? = null
+
     /** Runtime permissions the type needs to show its data (asked from settings). */
     open val permissions: List<String> = emptyList()
 
@@ -85,4 +88,29 @@ abstract class ItemType(
     open val options: (@Composable (item: ItemConfig, set: (ItemConfig) -> Unit) -> Unit)? = null
 
     open fun defaultOptions(): Map<String, String> = emptyMap()
+}
+
+/**
+ * When a hidden item with "show when active" pops into the bar, in words. [sentence] is the long
+ * form for the item's settings ("Show when CPU load is above %1$s"), [short] the row detail
+ * ("shows above %1$s CPU"). Both take the [threshold]'s value, formatted, as %1$s; rules without a
+ * threshold take no argument.
+ */
+class Trigger(@StringRes val sentence: Int, @StringRes val short: Int, val threshold: Threshold? = null) {
+    fun sentence(item: ItemConfig, value: Int? = null): String = text(sentence, item, value)
+    fun short(item: ItemConfig): String = text(short, item, null)
+    private fun text(@StringRes id: Int, item: ItemConfig, value: Int?): String =
+        threshold?.let { Env.str(id, it.format(value ?: it.shown(item))) } ?: Env.str(id)
+}
+
+/**
+ * A number the user picks for a [Trigger], stored as [key] in [ItemConfig.options]. [default] applies
+ * while the key is missing (configs saved before it existed), so it must match the old behavior.
+ */
+class Threshold(val key: String, val default: Int, val range: IntRange, val step: Int = 1, val format: (Int) -> String) {
+    /** The stored value, as is: an out-of-range value from an older config keeps working. */
+    fun of(item: ItemConfig): Int = item.optInt(key, default)
+    /** For the slider and the words: the stored value, kept in range. */
+    fun shown(item: ItemConfig): Int = of(item).coerceIn(range)
+    fun snap(v: Float): Int = (range.first + Math.round((v - range.first) / step) * step).coerceIn(range)
 }

@@ -92,6 +92,7 @@ object Caffeine {
 
 object CaffeineItem : ItemType("caffeine", R.string.item_caffeine_title, Sym.COFFEE, R.string.item_caffeine_desc) {
     override val canBeActive = true
+    override val trigger = Trigger(R.string.trigger_caffeine, R.string.trigger_caffeine_short)
     private val durations = listOf(15, 30, 60, 120, 240)
 
     override fun state(item: ItemConfig): ItemState {

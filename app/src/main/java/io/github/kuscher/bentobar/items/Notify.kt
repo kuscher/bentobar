@@ -133,7 +133,7 @@ object Chips {
         val t = Timers.state.value
         if (t != null) return timer(context, t)
         val cfg = Store.config.value
-        if (cfg.items.none { it.type == "event" && it.section != io.github.kuscher.bentobar.data.Section.OFF }) return null
+        if (cfg.items.none { it.type == EventItem.type && it.section != io.github.kuscher.bentobar.data.Section.OFF }) return null
         val now = System.currentTimeMillis()
         val e = Calendar.current(now) ?: Calendar.next(now)?.takeIf { it.begin - now <= 15 * 60_000 } ?: return null
         return event(context, e, now)

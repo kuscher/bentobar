@@ -58,6 +58,7 @@ import io.github.kuscher.bentobar.data.Pill
 import io.github.kuscher.bentobar.data.Position
 import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
+import io.github.kuscher.bentobar.data.HiddenMode
 import io.github.kuscher.bentobar.data.Uses
 import io.github.kuscher.bentobar.data.TextSize
 import io.github.kuscher.bentobar.items.Env
@@ -156,14 +157,14 @@ fun LookPage() {
             Store.update { it.copy(pill = v) }
         }
         SectionLabel(stringResource(R.string.barmenu_hidden_items))
-        SwitchRow(stringResource(R.string.look_chevron), cfg.chevron, help = stringResource(R.string.look_chevron_help)) { v ->
-            Store.update { it.copy(chevron = v) }
-        }
-        ChoiceRow(stringResource(R.string.look_collapse), listOf(0 to stringResource(R.string.look_collapse_never),
+        ChoiceRow(stringResource(R.string.look_hidden_mode), listOf(HiddenMode.SHOW_ALL to stringResource(R.string.look_hidden_show_all),
+            HiddenMode.CLICK to stringResource(R.string.look_hidden_click), HiddenMode.HOVER to stringResource(R.string.look_hidden_hover)),
+            cfg.hiddenMode, help = stringResource(R.string.look_hidden_mode_help)) { v -> Store.update { it.copy(hiddenMode = v) } }
+        // Folding back only applies when hidden items wait behind ‹.
+        if (cfg.hiddenMode != HiddenMode.SHOW_ALL) ChoiceRow(stringResource(R.string.look_collapse), listOf(0 to stringResource(R.string.look_collapse_never),
             5 to pluralStringResource(R.plurals.look_collapse_after, 5, 5), 10 to pluralStringResource(R.plurals.look_collapse_after, 10, 10),
             30 to pluralStringResource(R.plurals.look_collapse_after, 30, 30)),
             if (cfg.autoCollapseSec in listOf(0, 5, 10, 30)) cfg.autoCollapseSec else 0) { v -> Store.update { it.copy(autoCollapseSec = v) } }
-        SwitchRow(stringResource(R.string.look_reveal_hover), cfg.revealOnHover) { v -> Store.update { it.copy(revealOnHover = v) } }
         SectionLabel(stringResource(R.string.channel_live))
         ChoiceRow(stringResource(R.string.look_chip), listOf(ChipMode.OFF to stringResource(R.string.common_off),
             ChipMode.FALLBACK to stringResource(R.string.look_chip_fallback), ChipMode.ALWAYS to stringResource(R.string.look_chip_always)),

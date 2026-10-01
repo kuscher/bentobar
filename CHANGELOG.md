@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6 (2026-10-01)
 
 - **On Google Play, BentoBar is for Googlebooks and other desktop-class Android devices only**
   (devices that report themselves as a PC). The APK from GitHub still installs anywhere.

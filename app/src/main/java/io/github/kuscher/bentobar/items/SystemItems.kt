@@ -102,7 +102,9 @@ object CpuItem : ItemType("cpu", R.string.item_cpu_title, Sym.MEMORY, R.string.i
                 CoreBars(c.perCore)
                 Spacer(Modifier.height(6.dp))
                 c.clusters.forEach { cl ->
-                    InfoRow(stringResource(R.string.cpu_cluster, cl.cores), stringResource(R.string.cpu_cluster_clock,
+                    // "Cores 0–3" for a group; a core with its own clock speed (each one, on some Intel
+                    // chips) is "Core 0".
+                    InfoRow(stringResource(if (cl.cores.all { it.isDigit() }) R.string.cpu_core_one else R.string.cpu_cluster, cl.cores), stringResource(R.string.cpu_cluster_clock,
                         String.format(Locale.ROOT, "%.2f", cl.curKhz / 1e6), String.format(Locale.ROOT, "%.2f", cl.maxKhz / 1e6)))
                 }
                 c.gpu?.let { g ->

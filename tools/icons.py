@@ -23,7 +23,7 @@ ICONS = """
 add alarm apps arrow_back arrow_downward arrow_upward autorenew avg_pace battery_0_bar
 battery_charging_full battery_full bedtime bolt bookmark build calendar_month calendar_today
 check check_circle chevron_left chevron_right close coffee content_copy dark_mode data_usage
-delete desktop_windows device_thermostat do_not_disturb_on done drag_indicator edit emoji_objects
+delete desktop_windows device_thermostat directions do_not_disturb_on done drag_indicator edit emoji_objects
 event event_upcoming expand_less expand_more favorite grid_view groups hard_drive handyman help
 history hourglass_top info keyboard label light_mode link local_cafe lock memory menu mouse
 music_note network_check notifications open_in_new palette pause play_arrow power_settings_new

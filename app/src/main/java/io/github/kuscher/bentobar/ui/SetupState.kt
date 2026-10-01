@@ -9,6 +9,7 @@ import androidx.compose.runtime.Immutable
 import io.github.kuscher.bentobar.data.Uses
 import io.github.kuscher.bentobar.items.Env
 import io.github.kuscher.bentobar.items.Notify
+import io.github.kuscher.bentobar.items.Usage
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /** What Setup shows as done, read in one go. */
@@ -20,6 +21,8 @@ data class SetupState(
     val calendar: Boolean = false,
     val exactAlarms: Boolean = false,
     val advancedProtection: Boolean = false,
+    /** Optional: Usage access, for the top apps in the Network and Storage menus. */
+    val usageAccess: Boolean = false,
 )
 
 /**
@@ -44,6 +47,7 @@ object Setup {
                 Uses.on(Uses.CALENDAR),
             exactAlarms = app.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true && Uses.on(Uses.EXACT_ALARMS),
             advancedProtection = Env.advancedProtection(),
+            usageAccess = Usage.granted(app),
         )
     }
 }

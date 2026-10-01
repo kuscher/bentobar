@@ -18,5 +18,5 @@
     <string name="look_color_help">Matching reads the colour of the status bar clock</string>
     <string name="setup_turn_on_copies">copies the colour of the status bar clock so your items match it</string>
     <string name="about_tagline">Add, hide and organise items in your Googlebook\'s status bar.</string>
-    <string name="about_privacy_text">BentoBar has no internet permission. Your settings, calendar events and everything it measures stay on this device. Its accessibility service reads only the status bar (its layout, and the colour of its clock), never other apps.</string>
+    <string name="about_privacy_text">BentoBar has no internet permission. Your settings, calendar events and everything it measures stay on this device. Its accessibility service reads only the status bar (its layout, and the colour of its clock), never other apps. If you turn on Usage access, BentoBar also reads how much data and storage each app uses, for the Network and Storage menus, and nothing else with that access.</string>
 </resources>

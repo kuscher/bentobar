@@ -32,6 +32,7 @@ object Sym {
     const val DELETE = "\ue92e"
     const val DESKTOP_WINDOWS = "\ue30c"
     const val DEVICE_THERMOSTAT = "\ue1ff"
+    const val DIRECTIONS = "\ue52e"
     const val DO_NOT_DISTURB_ON = "\uf08f"
     const val DONE = "\ue876"
     const val DRAG_INDICATOR = "\ue945"

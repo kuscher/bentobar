@@ -25,9 +25,17 @@ object Calendar {
         val allDay: Boolean,
         val color: Int,
         val location: String,
-        /** A video-call or web link found in the location or description. */
+        /**
+         * A meeting: timed (not all-day), on a calendar the user can edit (contributor access or
+         * more). Not: Todoist feeds, holidays, birthdays and other subscribed calendars.
+         */
+        val meeting: Boolean,
+        /** A video-call link found in the location or description; meetings only. */
         val link: String?,
-    )
+    ) {
+        /** A place to get directions to: a meeting's location, unless that is itself a link. */
+        val place: String? get() = location.trim().takeIf { meeting && it.isNotEmpty() && !CallLinks.hasUrl(it) }
+    }
 
     private const val TAG = "BentoBar"
     private lateinit var app: Context
@@ -70,6 +78,7 @@ object Calendar {
             CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.DISPLAY_COLOR,
             CalendarContract.Instances.EVENT_LOCATION, CalendarContract.Instances.DESCRIPTION,
             CalendarContract.Instances.SELF_ATTENDEE_STATUS, CalendarContract.Instances.VISIBLE,
+            CalendarContract.Instances.CALENDAR_ACCESS_LEVEL,
         )
         val out = ArrayList<Event>()
         CalendarContract.Instances.query(app.contentResolver, projection, begin, end)?.use { c ->
@@ -77,11 +86,17 @@ object Calendar {
                 if (c.getInt(9) == 0) continue // calendar hidden by the user
                 if (c.getInt(8) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
                 val location = c.getString(6).orEmpty()
+                val allDay = c.getInt(4) != 0
+                // Tasks synced in from a task app (Todoist links each one) aren't meetings either, and
+                // a completed one (Todoist puts "✓" before its title) isn't shown at all.
+                val task = CallLinks.isTask(location + "\n" + c.getString(7).orEmpty())
+                if (task && c.getString(1).orEmpty().trimStart().startsWith("✓")) continue
+                val meeting = !allDay && c.getInt(10) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR && !task
                 out += Event(
                     eventId = c.getLong(0), title = c.getString(1).orEmpty().ifBlank { app.getString(R.string.calendar_no_title) },
-                    begin = c.getLong(2), end = c.getLong(3), allDay = c.getInt(4) != 0,
-                    color = c.getInt(5), location = location,
-                    link = findLink(location + "\n" + c.getString(7).orEmpty()),
+                    begin = c.getLong(2), end = c.getLong(3), allDay = allDay,
+                    color = c.getInt(5), location = location, meeting = meeting,
+                    link = if (meeting) CallLinks.find(location + "\n" + c.getString(7).orEmpty()) else null,
                 )
             }
         }
@@ -91,19 +106,11 @@ object Calendar {
         emptyList()
     }
 
-    private val urlRe = Regex("""https?://[^\s<>"')\]]+""")
-    private val callHosts = listOf("meet.google.com", "zoom.us", "teams.microsoft.com", "teams.live.com", "webex.com", "whereby.com", "jit.si")
+    /** Meetings (see [Event.meeting]), current and upcoming. Next meeting and the chip use only these. */
+    fun meetings(now: Long) = events.filter { it.meeting && it.end > now }
 
-    private fun findLink(text: String): String? {
-        val urls = urlRe.findAll(text).map { it.value.trimEnd('.', ',', ';') }.toList()
-        return urls.firstOrNull { u -> callHosts.any { u.contains(it) } } ?: urls.firstOrNull()
-    }
-
-    /** Timed (not all-day) events, current and upcoming. */
-    fun timed(now: Long) = events.filter { !it.allDay && it.end > now }
-
-    fun current(now: Long) = timed(now).firstOrNull { it.begin <= now }
-    fun next(now: Long) = timed(now).firstOrNull { it.begin > now }
+    fun current(now: Long) = meetings(now).firstOrNull { it.begin <= now }
+    fun next(now: Long) = meetings(now).firstOrNull { it.begin > now }
 
     /** Events overlapping the local day that starts at [dayStart] (all-day events use UTC dates). */
     fun on(dayStart: Long, dayEnd: Long, utcDayStart: Long): List<Event> = events.filter {
@@ -119,4 +126,11 @@ object Calendar {
         CalendarContract.CONTENT_URI.buildUpon().appendPath("time").appendPath(millis.toString()).build()))
 
     fun join(e: Event) = e.link?.let { Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse(it))) } ?: false
+
+    /** Google Maps (or any map app) searching for the event's place; the Maps website if none handles geo:. */
+    fun directions(e: Event): Boolean {
+        val q = Uri.encode(e.place ?: return false)
+        return Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=$q")), quiet = true) ||
+            Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")))
+    }
 }

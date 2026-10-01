@@ -8,6 +8,22 @@ import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -270,7 +286,7 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
             SectionLabel(if (picked == today) stringResource(R.string.calendar_today) else Dates.format("EEEEdMMMM", picked))
             val list = eventsOn(picked)
             if (list.isEmpty()) Text(stringResource(R.string.calendar_no_events), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            list.take(6).forEach { e -> EventRow(e) { host.close(); Calendar.open(e) } }
+            list.take(6).forEach { e -> EventRow(e, host::close) }
         }
         MenuEntry(Sym.OPEN_IN_NEW, stringResource(R.string.calendar_open)) {
             host.close(); Calendar.openDay(picked.atTime(9, 0).atZone(zone).toInstant().toEpochMilli())
@@ -279,22 +295,27 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
 }
 
 @Composable
-private fun SmallIconButton(sym: String, label: String, onClick: () -> Unit) {
+private fun SmallIconButton(sym: String, label: String, color: Color = LocalContentColor.current, onClick: () -> Unit) {
     // Looks 28 dp, but takes clicks and focus over the 48 dp minimum.
     Box(Modifier.minimumInteractiveComponentSize().clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand),
         contentAlignment = Alignment.Center) {
-        Box(Modifier.size(28.dp).clip(CircleShape), contentAlignment = Alignment.Center) { SymIcon(sym, size = 18.sp, contentDescription = label) }
+        Box(Modifier.size(28.dp).clip(CircleShape), contentAlignment = Alignment.Center) {
+            SymIcon(sym, size = 18.sp, contentDescription = label, color = color)
+        }
     }
 }
 
 /** A wall time as the system shows it: its 12/24-hour setting, the locale's layout. */
 private fun shortTime(millis: Long): String = Dates.format(Dates.timeSkeleton(DateFormat.is24HourFormat(Env.app)), millis)
 
+/**
+ * One event in a list. Clicking it opens the event in the calendar app; a meeting also gets a Join
+ * button (video-call link) and a Directions button (a place to go). [close] closes the menu first.
+ */
 @Composable
-fun EventRow(e: Calendar.Event, onClick: () -> Unit) {
-    val zone = ZoneId.systemDefault()
+fun EventRow(e: Calendar.Event, close: () -> Unit) {
     val range = if (e.allDay) stringResource(R.string.calendar_all_day) else shortTime(e.begin) + " – " + shortTime(e.end)
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand)
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { close(); Calendar.open(e) }.pointerHoverIcon(PointerIcon.Hand)
         .padding(vertical = 6.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(width = 4.dp, height = 30.dp).clip(RoundedCornerShape(2.dp)).background(Color(e.color or 0xFF000000.toInt())))
         Spacer(Modifier.width(10.dp))
@@ -304,12 +325,15 @@ fun EventRow(e: Calendar.Event, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
                 overflow = TextOverflow.Ellipsis)
         }
-        if (e.link != null) SymIcon(Sym.VIDEOCAM, size = 18.sp, color = MaterialTheme.colorScheme.primary)
+        if (e.place != null) SmallIconButton(Sym.DIRECTIONS, stringResource(R.string.event_directions)) { close(); Calendar.directions(e) }
+        if (e.link != null) SmallIconButton(Sym.VIDEOCAM, stringResource(R.string.common_join), MaterialTheme.colorScheme.primary) { close(); Calendar.join(e) }
     }
 }
 
 object EventItem : ItemType("event", R.string.item_event_title, Sym.EVENT_UPCOMING, R.string.item_event_desc) {
     override val refreshMs = 5_000L
+    // Room for Join, Directions and Open on one line.
+    override val menuWidthDp = 320
     override val canBeActive = true
     override val permissions = listOf(Manifest.permission.READ_CALENDAR)
 
@@ -353,15 +377,19 @@ object EventItem : ItemType("event", R.string.item_event_title, Sym.EVENT_UPCOMI
                     next != null -> stringResource(R.string.event_starts_in, Fmt.duration(next.begin - now))
                     else -> null
                 }) {
-                if (focus != null) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (focus.link != null) FilledTonalButton(onClick = { host.close(); Calendar.join(focus) }) {
-                        SymIcon(Sym.VIDEOCAM, size = 18.sp); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.common_join))
+                if (focus != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    val pad = PaddingValues(horizontal = 12.dp)
+                    if (focus.link != null) FilledTonalButton(onClick = { host.close(); Calendar.join(focus) }, contentPadding = pad) {
+                        SymIcon(Sym.VIDEOCAM, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.common_join), maxLines = 1)
                     }
-                    OutlinedButton(onClick = { host.close(); Calendar.open(focus) }) { Text(stringResource(R.string.common_open)) }
+                    if (focus.place != null) OutlinedButton(onClick = { host.close(); Calendar.directions(focus) }, contentPadding = pad) {
+                        SymIcon(Sym.DIRECTIONS, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.event_directions), maxLines = 1)
+                    }
+                    OutlinedButton(onClick = { host.close(); Calendar.open(focus) }, contentPadding = pad) { Text(stringResource(R.string.common_open), maxLines = 1) }
                 }
                 MenuDivider()
                 SectionLabel(stringResource(R.string.event_coming_up))
-                val upcoming = Calendar.timed(now).filter { it != focus }.take(6)
+                val upcoming = Calendar.meetings(now).filter { it != focus }.take(6)
                 if (upcoming.isEmpty()) Text(stringResource(R.string.event_nothing_else), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 var lastDay: LocalDate? = null
@@ -372,7 +400,7 @@ object EventItem : ItemType("event", R.string.item_event_title, Sym.EVENT_UPCOMI
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                     }
                     lastDay = d
-                    EventRow(e) { host.close(); Calendar.open(e) }
+                    EventRow(e, host::close)
                 }
             }
         }
@@ -389,6 +417,11 @@ object EventItem : ItemType("event", R.string.item_event_title, Sym.EVENT_UPCOMI
 
 object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.string.item_timer_desc) {
     override val canBeActive = true
+    // Room for the four presets and Custom on one line.
+    override val menuWidthDp = 380
+
+    /** The presets, in minutes. */
+    private val presets = listOf(5, 10, 25, 60)
 
     override fun state(item: ItemConfig): ItemState {
         val s = Timers.state.value
@@ -423,17 +456,15 @@ object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.str
         rememberTick()
         val s = Timers.state.collectAsStateValue()
         if (s == null) {
-            var custom by remember { mutableStateOf("") }
+            var showCustom by remember { mutableStateOf(false) }
             MenuCard(Sym.TIMER, stringResource(R.string.item_timer_title), stringResource(R.string.timer_menu_hint)) {
-                SectionLabel(stringResource(R.string.timer_countdown))
-                val presets = listOf(1, 3, 5, 10, 15, 25, 45, 60)
-                ChipRow(presets.map { if (it < 60) pluralStringResource(R.plurals.common_minutes_short, it, it) else pluralStringResource(R.plurals.common_hours, 1, 1) }) { i -> Timers.startTimer(presets[i] * 60_000L, item.opt("label", "")) }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) { TextRow(stringResource(R.string.timer_minutes), custom, numeric = true) { custom = it.filter(Char::isDigit).take(4) } }
-                    Spacer(Modifier.width(8.dp))
-                    FilledTonalButton(onClick = { custom.toIntOrNull()?.takeIf { it > 0 }?.let { Timers.startTimer(it * 60_000L, item.opt("label", "")) } },
-                        enabled = (custom.toIntOrNull() ?: 0) > 0) { Text(stringResource(R.string.timer_start)) }
+                val labels = presets.map {
+                    if (it < 60) pluralStringResource(R.plurals.common_minutes_short, it, it) else pluralStringResource(R.plurals.common_hours, it / 60, it / 60)
+                } + stringResource(R.string.timer_custom)
+                ChipRow(labels) { i ->
+                    if (i < presets.size) Timers.startTimer(presets[i] * 60_000L, item.opt("label", "")) else showCustom = !showCustom
                 }
+                if (showCustom) CustomMinutes { Timers.startTimer(it * 60_000L, item.opt("label", "")) }
                 MenuDivider()
                 MenuEntry(Sym.AVG_PACE, stringResource(R.string.timer_stopwatch)) { Timers.startStopwatch() }
                 MenuEntry(Sym.COFFEE, stringResource(R.string.timer_pomodoro), stringResource(R.string.timer_pomodoro_detail)) { Timers.startPomodoro() }
@@ -480,6 +511,36 @@ object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.str
             help = stringResource(R.string.timer_name_help)) {
             set(item.with("label", it.take(30).ifBlank { null }))
         }
+    }
+}
+
+/**
+ * The minutes field behind the timer's Custom chip: focused when it appears, with a Start button
+ * that's enabled once the field holds a number of minutes. Enter starts too.
+ */
+@Composable
+private fun CustomMinutes(onStart: (Int) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    val minutes = text.toIntOrNull()?.takeIf { it > 0 }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    fun start() { minutes?.let(onStart) }
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = { v -> text = v.filter(Char::isDigit).take(4) },
+            label = { Text(stringResource(R.string.timer_minutes)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { start() }, onDone = { start() }),
+            modifier = Modifier.weight(1f).focusRequester(focus).onPreviewKeyEvent { e ->
+                // A hardware keyboard's Enter, which doesn't always arrive as an IME action. Both key
+                // down and up are consumed, so the IME action can't start the timer a second time.
+                if (e.key == Key.Enter || e.key == Key.NumPadEnter) { if (e.type == KeyEventType.KeyDown) start(); true } else false
+            },
+        )
+        FilledTonalButton(onClick = { start() }, enabled = minutes != null) { Text(stringResource(R.string.timer_start)) }
     }
 }
 

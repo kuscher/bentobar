@@ -14,8 +14,9 @@ import io.github.kuscher.bentobar.items.Ticker
 import io.github.kuscher.bentobar.items.Timers
 
 /**
- * Test hooks for development over adb. The receiver requires android.permission.DUMP, which only
- * the shell (adb) and the system hold, so apps on the device can't use it.
+ * Test hooks for development over adb, in debug builds only (src/debug: release builds don't
+ * include them). The receiver requires android.permission.DUMP, which only the shell (adb) and the
+ * system hold, so apps on the device can't use it.
  *
  *   adb shell am broadcast -a io.github.kuscher.bentobar.DEBUG -p io.github.kuscher.bentobar --es c 'dump'
  */
@@ -111,8 +112,11 @@ class DebugReceiver : BroadcastReceiver() {
      */
     private fun winshot(title: String) {
         val svc = Env.service ?: run { resultData = "service not running"; return }
-        val w = (if (title == "app") svc.windows.firstOrNull { // the settings window (its own surface, without the caption)
-            it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.root?.packageName == svc.packageName
+        // The settings window (its own surface, without the caption), found by its title: no other
+        // app's window content is read to find it.
+        val label = svc.applicationInfo.loadLabel(svc.packageManager).toString()
+        val w = (if (title == "app") svc.windows.firstOrNull {
+            it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_APPLICATION && it.title?.toString() == label
         } else svc.windows.firstOrNull {
             it.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY && it.title?.toString() == title
         }) ?: run { resultData = "no BentoBar window titled $title"; return }

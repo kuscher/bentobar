@@ -140,10 +140,8 @@ class BarController(private val service: AccessibilityService) {
     private var menuKey: String? = null
     private var menuClosedKey: String? = null
     private var menuClosedAt = 0L
-    private var awake: Overlay? = null
     private var snap: BarSnapshot? = null
     private var sampled: BarColors? = null
-    private var sampledAt = 0L
     private var overlayIds = emptySet<Int>()
     private var hovering = false
     private var pinned = false
@@ -190,11 +188,12 @@ class BarController(private val service: AccessibilityService) {
     private val screen = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             if (i.action == Intent.ACTION_SCREEN_OFF) closeMenu()
+            updateAwake()
             main.post(scanNow)
             if (i.action == Intent.ACTION_SCREEN_ON) { main.removeCallbacks(poll); main.postDelayed(poll, 2_000) }
         }
     }
-    private val wallpaper = WallpaperManager.OnColorsChangedListener { _, _ -> main.postDelayed(sample, 300) }
+    private val wallpaper = WallpaperManager.OnColorsChangedListener { _, _ -> requestSample(300) }
 
     fun start() {
         started = true
@@ -228,7 +227,7 @@ class BarController(private val service: AccessibilityService) {
         hideTip()
         main.removeCallbacksAndMessages(null) // after closeMenu, which posts a collapse
         strip.destroy()
-        awake?.destroy(); awake = null
+        if (screenLock.isHeld) screenLock.release()
         Ticker.stop("bar")
         scope.cancel()
         io.shutdown()
@@ -253,11 +252,15 @@ class BarController(private val service: AccessibilityService) {
     /** Rotation, density or resolution: a menu or tooltip placed for the old display would be off, so close them. */
     fun onConfigChanged() {
         closeMenu(); hideTip()
-        main.postDelayed(scanNow, 200); main.postDelayed(sample, 500)
+        main.postDelayed(scanNow, 200); requestSample(500)
     }
+
+    private var lastColor: ColorMode? = null
 
     private fun onConfig() {
         if (!started) return
+        // Colour back to "Match the status bar": read the bar again (nothing else would until it changes).
+        Store.config.value.color.let { if (it != lastColor) { if (it == ColorMode.AUTO && lastColor != null) requestSample(100); lastColor = it } }
         // Switched to Show everything (or presenting) with hidden items out: nothing can fold them back.
         Store.config.value.let { if ((it.hiddenMode == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) { expanded.value = false; pinned = false } }
         applyLook()
@@ -293,8 +296,8 @@ class BarController(private val service: AccessibilityService) {
                 service.clearCache()
                 runCatching { StatusBarScan.scan(barWindow) }.onFailure { Log.w(tag, "scan failed", it) }.getOrNull()
                     // No node tree (SystemUI mid-change): the whole bar would cover its icons. Keep the last
-                    // reading of this same bar; with none, the whole bar is still better than nothing.
-                    ?.let { if (it.summary != StatusBarScan.NO_TREE) it else prev?.takeIf { p -> p.windowId == it.windowId && p.bar == it.bar } ?: it }
+                    // reading of this same bar; with none, stay hidden until a scan can read it.
+                    ?.let { if (it.summary != StatusBarScan.NO_TREE) it else prev?.takeIf { p -> p.windowId == it.windowId && p.bar == it.bar } }
             }
         }
         val newWindow = s?.windowId != snap?.windowId
@@ -321,17 +324,15 @@ class BarController(private val service: AccessibilityService) {
         }
         if (show) {
             place(s!!, screenW)
-            val now = SystemClock.uptimeMillis()
-            // Re-sample every 30 s too: a bar can turn opaque or change colour without a new window.
-            if (newWindow || now - sampledAt > 30_000) {
-                sampledAt = now; main.removeCallbacks(sample); main.postDelayed(sample, 250)
-            }
+            // A new status bar window can look different (see requestSample for the other triggers).
+            if (newWindow) requestSample(250)
         } else {
             if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { "${it.title} " + Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
                 "enabled=${cfg.enabled} interactive=${pm.isInteractive} locked=${km.isKeyguardLocked})")
             closeMenu()
             hideTip()
             strip.hide()
+            updateAwake()
             Ticker.stop("bar")
         }
     }
@@ -361,7 +362,12 @@ class BarController(private val service: AccessibilityService) {
         if (where != lastPlace) { trace("place $where"); lastPlace = where }
         BarStatus.current.value = if (maxWidth.intValue == 0) BarStatus.NO_ROOM else BarStatus.SHOWN
         if (!strip.shown) {
+            stripEmpty = false // a new window starts visible; its first measure says whether it has content
             strip.show { StripHost() }
+            updateAwake()
+            // Back on screen (after a full-screen app, the lock screen, a covering panel): the bar may
+            // look different now, and a reading owed while hidden is taken here.
+            requestSample(250)
             Ticker.start("bar")
             Log.i(tag, "bar shown: bar=${s.bar.toShortString()} free=${s.free.toShortString()} [${s.summary}]")
         } else strip.relayout()
@@ -374,18 +380,40 @@ class BarController(private val service: AccessibilityService) {
      * own surface, no app content), read at the clock. On some devices that surface is glyphs on
      * transparent (the HP); on others it's opaque, e.g. white glyphs on a black bar (the Acer).
      */
+    /**
+     * Asks for one colour reading. It's taken only while the strip is on screen; asked for while it's
+     * hidden, it waits until the strip shows ([place] asks again then). The triggers are the moments
+     * the bar can change: a new status bar window, the strip coming back on screen, a theme, display
+     * or wallpaper change, and switching back to "Match the status bar". Never on a timer: an
+     * accessibility service taking screenshots every 30 s looks like screen capture to Android's
+     * threat detection. A bar that changes colour with none of these isn't followed (none seen so far).
+     */
+    private fun requestSample(delayMs: Long) {
+        if (!started || !strip.shown) return
+        main.removeCallbacks(sample)
+        main.postDelayed(sample, delayMs)
+    }
+
+    private var sampleFailures = 0
+
     private fun sampleColor() {
+        if (!started || !strip.shown || !pm.isInteractive) return
         val s = snap ?: return applyLook()
         if (Store.config.value.color != ColorMode.AUTO) return applyLook()
         service.takeScreenshotOfWindow(s.windowId, callbacks, object : AccessibilityService.TakeScreenshotCallback {
             override fun onSuccess(r: AccessibilityService.ScreenshotResult) {
                 val c = runCatching { barColors(r, s) }.getOrNull()
                 // A result can arrive after stop(): it mustn't paint a strip that's gone.
-                main.post { if (started) { sampled = c; applyLook() } }
+                main.post { if (started) { sampled = c; sampleFailures = 0; applyLook() } }
             }
             override fun onFailure(code: Int) {
-                Log.i(tag, "status bar colour sample failed ($code), using wallpaper hints")
-                main.post { if (started) applyLook() }
+                main.post {
+                    if (!started) return@post
+                    // One-off readings now: try twice more, then use the theme and wallpaper hints rather
+                    // than a reading of how the bar looked before.
+                    if (++sampleFailures <= 2) { Log.i(tag, "status bar colour sample failed ($code), retrying"); requestSample(2_000) }
+                    else { Log.i(tag, "status bar colour sample failed ($code), using wallpaper hints"); sampled = null; sampleFailures = 0; applyLook() }
+                }
             }
         })
     }
@@ -487,7 +515,7 @@ class BarController(private val service: AccessibilityService) {
         // Without the ‹ button there's no way to fold hidden items back, so they stay folded.
         val open = expanded.value && cfg.hiddenMode != HiddenMode.SHOW_ALL && !cfg.presenting
         MeasuredStrip(bias = when (cfg.position) { Position.RIGHT -> 1f; Position.CENTER -> 0f; Position.LEFT -> -1f },
-            onWidth = { w -> if (w != strip.params.width) main.post { applyWidth(w) } }) {
+            onWidth = { w -> if (w != strip.params.width || (w <= 0) != stripEmpty) main.post { applyWidth(w) } }) {
             Strip(
                 visible = entries(visible),
                 revealed = if (open) entries(hidden) else emptyList(),
@@ -507,7 +535,17 @@ class BarController(private val service: AccessibilityService) {
     }
 
     /** Sizes the strip window to its content (an exact width, never WRAP_CONTENT). */
+    /**
+     * Nothing to draw (every item off, or only rule items that don't apply now): the strip's window
+     * is made invisible rather than left up empty and a pixel wide, which is what Android's threat
+     * detection looks for ("imperceptible content" from an accessibility service). Its content keeps
+     * being measured, so it shows again as soon as there's something to draw.
+     */
+    private var stripEmpty = false
+
     private fun applyWidth(w: Int) {
+        val empty = w <= 0
+        if (empty != stripEmpty) { stripEmpty = empty; strip.setContentVisible(!empty); trace("strip ${if (empty) "empty" else "has content"}"); updateAwake() }
         val width = w.coerceAtLeast(1)
         if (strip.params.width == width) return
         trace("width ${strip.params.width} -> $width")
@@ -738,20 +776,35 @@ class BarController(private val service: AccessibilityService) {
 
     // ---- keep awake --------------------------------------------------------------------------
 
+    /**
+     * Keep awake holds the screen on through the strip's own window (FLAG_KEEP_SCREEN_ON on a
+     * window that's visible), not a window of its own. It used to be a separate 1×1 see-through
+     * overlay: Play Protect's live threat detection flags an accessibility service that keeps
+     * "imperceptible content" on screen ("App displays over other apps"). The catch: while the strip
+     * is hidden (a full-screen app, the screen locked), keep awake waits; full-screen video players
+     * keep the screen on themselves.
+     */
     private fun updateAwake() {
         val on = Caffeine.active()
-        if (on && awake == null) {
-            awake = Overlay(service, "BentoBar keep awake", touchable = false).apply {
-                params.width = 1; params.height = 1
-                params.flags = params.flags or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                show { }
-            }
-            Log.i(tag, "keep awake on")
-        } else if (!on && awake != null) {
-            awake?.destroy(); awake = null
-            Log.i(tag, "keep awake off")
+        val f = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        val flags = if (on) strip.params.flags or f else strip.params.flags and f.inv()
+        if (flags != strip.params.flags) {
+            strip.params.flags = flags
+            strip.relayout()
+            Log.i(tag, if (on) "keep awake on" else "keep awake off")
         }
+        // While the strip is hidden (a full-screen app, BentoBar hidden from its tile) or has nothing
+        // to draw, no visible window of ours carries the flag: a screen wake lock holds it instead,
+        // with no window. Released when the strip is back, keep awake ends, the screen goes off (the
+        // power key or the lid) or the lock screen is up.
+        val lock = on && (!strip.shown || stripEmpty) && pm.isInteractive && !km.isKeyguardLocked
+        if (lock && !screenLock.isHeld) { screenLock.acquire(); Log.i(tag, "keep awake: wake lock while the bar is hidden") }
+        else if (!lock && screenLock.isHeld) screenLock.release()
     }
+
+    /** See [updateAwake]. Deprecated in favor of FLAG_KEEP_SCREEN_ON, which needs a visible window. */
+    @Suppress("DEPRECATION")
+    private val screenLock = pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "BentoBar:keepAwake").apply { setReferenceCounted(false) }
 
     // ---- tests (adb only) --------------------------------------------------------------------
 

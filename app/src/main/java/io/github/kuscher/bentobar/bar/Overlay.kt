@@ -81,6 +81,13 @@ class Overlay(
         wm.addView(frame, params)
     }
 
+    /**
+     * Shows or hides the window's content without removing the window: invisible, Android doesn't
+     * show the window at all, while its content is still laid out (so it can report when it has
+     * something to draw again).
+     */
+    fun setContentVisible(visible: Boolean) { root?.visibility = if (visible) android.view.View.VISIBLE else android.view.View.INVISIBLE }
+
     /** Applies changed [params] (position, size, flags). */
     fun relayout() { root?.let { runCatching { wm.updateViewLayout(it, params) } } }
 

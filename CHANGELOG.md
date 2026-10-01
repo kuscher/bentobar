@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Fewer things that look like abuse.** Play Protect's live threat detection warned "App displays
+  over other apps" about BentoBar. Its rules aren't public; these changes remove what matches
+  Google's own description (an accessibility service keeping imperceptible content on screen) and
+  cut screen captures. Keep awake no longer keeps an invisible one-pixel window up: it keeps the
+  screen on through BentoBar's visible bar, and while the bar is hidden (a full-screen app, BentoBar
+  hidden from its tile) through a screen wake lock, never on the lock screen. A bar with nothing to
+  draw makes its window invisible instead of leaving it up a pixel wide. The status bar's color is
+  read when something changes (and retried if a reading fails) instead of every 30 seconds, never
+  while the bar is hidden. A status bar BentoBar can't read yet no longer counts as all free space.
+  Release builds leave out the adb test hooks.
 - **A keyboard shortcut for the bar.** A second launcher entry, **BentoBar menu**, opens BentoBar's
   menu with every item listed and the first one focused: arrows and Enter open any item's menu,
   Escape closes it. Give it a shortcut once in the system's keyboard shortcuts (Action + / ›

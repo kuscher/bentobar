@@ -18,6 +18,19 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## Unreleased (2026-10-01): Google Play offers BentoBar to PC-type devices only
+- The manifest requires `android.hardware.type.pc` (Googlebooks report it). The user asked for Play to
+  target Googlebooks, or at least desktop Android devices; Play had 5,744 supported device models for
+  0.5, mostly phones. With Summa and StudioSnap (minSdk 34 like BentoBar) this left only the five
+  Googlebooks. Android doesn't enforce the feature at install time.
+- **Production on Play waits for the next release.** The user wants BentoBar in production, but 0.5 on
+  Play has the unbind crash and no device filter, so it was not promoted. The next version (everything
+  under "Unreleased") should go to closed testing and production together. Before that: try the crash
+  fix on the HP, bump the version, write `docs/release-notes/<version>.md` and the Play text, and
+  update the Play forms for the new optional Usage access (`PACKAGE_USAGE_STATS`): data safety, the
+  privacy page (googlebook.studio/privacy/bentobar), and the Accessibility video if Setup looks
+  different now.
+
 ## Unreleased (2026-10-01): crash on unbind fixed
 - 0.5 crashed on the HP (twice, 2026-10-01) when the accessibility service was unbound, e.g. by
   `uiautomator dump` (UiAutomation suspends accessibility services): "BentoBar keeps stopping", and

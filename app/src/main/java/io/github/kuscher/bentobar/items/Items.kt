@@ -5,9 +5,11 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import io.github.kuscher.bentobar.R
+import io.github.kuscher.bentobar.data.BarConfig
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
+import io.github.kuscher.bentobar.data.couldShow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -44,14 +46,14 @@ object Ticker {
     @Volatile var focusItem: String? = null
 
     /**
-     * Items worth sampling now: what's visible or could pop out (shown, revealed, "when active",
-     * an open menu), or everything while the settings preview is open. A folded-away battery or
-     * memory item costs nothing.
+     * Items worth sampling now: what the strip could draw ([couldShow], the same rule it draws by),
+     * revealed hidden items, an open menu, or everything while the settings preview is open. A
+     * folded-away battery or memory item costs nothing.
      */
-    private fun needed(items: List<ItemConfig>): List<ItemConfig> {
+    private fun needed(cfg: BarConfig): List<ItemConfig> {
         val all = "settings" in users
-        return items.filter {
-            it.section != Section.OFF && (all || it.section == Section.SHOWN || it.whenActive || revealHidden || it.id == focusItem)
+        return cfg.items.filter {
+            it.section != Section.OFF && (all || cfg.couldShow(it) || revealHidden || it.id == focusItem)
         }
     }
 
@@ -83,7 +85,7 @@ object Ticker {
     private fun runOnce() {
         val now = SystemClock.elapsedRealtime()
         val cfg = Store.config.value
-        val live = needed(cfg.items)
+        val live = needed(cfg)
         try {
             Env.tick(now, live.mapTo(HashSet()) { it.type })
             Timers.check()

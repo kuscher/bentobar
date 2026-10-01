@@ -31,8 +31,18 @@ object Contrast {
         return (maxOf(la, lb) + 0.05f) / (minOf(la, lb) + 0.05f)
     }
 
-    /** White or near-black, whichever reads better on [bg]. */
-    fun readableOn(bg: Color) = if (ratio(Color.White, bg) >= ratio(DARK_TEXT, bg)) Color.White else DARK_TEXT
+    /**
+     * White or near-black, whichever reads better on [bg]. On a mid grey (about #777 to #858585)
+     * neither reaches 4.5:1, and pure black does: one of white and black always reaches 4.58:1.
+     */
+    fun readableOn(bg: Color): Color {
+        val best = if (ratio(Color.White, bg) >= ratio(DARK_TEXT, bg)) Color.White else DARK_TEXT
+        return when {
+            ratio(best, bg) >= MIN -> best
+            ratio(Color.Black, bg) >= ratio(Color.White, bg) -> Color.Black
+            else -> Color.White
+        }
+    }
 
     /** [candidate] if it reads on [bg] at [min], else [fallback]. */
     fun orElse(candidate: Color, bg: Color, fallback: Color, min: Float = MIN) =

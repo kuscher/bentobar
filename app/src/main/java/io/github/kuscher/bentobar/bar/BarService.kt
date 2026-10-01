@@ -27,7 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import io.github.kuscher.bentobar.data.ColorMode
 import io.github.kuscher.bentobar.data.ItemConfig
@@ -115,7 +115,7 @@ class BarController(private val service: AccessibilityService) {
     private var menuClosedAt = 0L
     private var awake: Overlay? = null
     private var snap: BarSnapshot? = null
-    private var sampled: Color? = null
+    private var sampled: BarColors? = null
     private var sampledAt = 0L
     private var overlayIds = emptySet<Int>()
     private var hovering = false
@@ -185,6 +185,7 @@ class BarController(private val service: AccessibilityService) {
 
     fun stop() {
         started = false
+        BarLook.current.value = null
         main.removeCallbacksAndMessages(null)
         runCatching { service.unregisterReceiver(screen) }
         runCatching { WallpaperManager.getInstance(service).removeOnColorsChangedListener(wallpaper) }
@@ -265,7 +266,8 @@ class BarController(private val service: AccessibilityService) {
         if (show) {
             place(s!!, screenW)
             val now = SystemClock.uptimeMillis()
-            if (newWindow || (sampled == null && now - sampledAt > 30_000)) {
+            // Re-sample every 30 s too: a bar can turn opaque or change colour without a new window.
+            if (newWindow || now - sampledAt > 30_000) {
                 sampledAt = now; main.removeCallbacks(sample); main.postDelayed(sample, 250)
             }
         } else {
@@ -301,15 +303,16 @@ class BarController(private val service: AccessibilityService) {
     // ---- colour ------------------------------------------------------------------------------
 
     /**
-     * Copies the status bar's text colour: a screenshot of SystemUI's status bar WINDOW only
-     * (its own surface: glyphs on transparent, no wallpaper or app content), read at the clock.
+     * Copies the status bar's text colour: a screenshot of SystemUI's status bar WINDOW only (its
+     * own surface, no app content), read at the clock. On some devices that surface is glyphs on
+     * transparent (the HP); on others it's opaque, e.g. white glyphs on a black bar (the Acer).
      */
     private fun sampleColor() {
         val s = snap ?: return applyLook()
         if (Store.config.value.color != ColorMode.AUTO) return applyLook()
         service.takeScreenshotOfWindow(s.windowId, io, object : AccessibilityService.TakeScreenshotCallback {
             override fun onSuccess(r: AccessibilityService.ScreenshotResult) {
-                val c = runCatching { textColor(r, s) }.getOrNull()
+                val c = runCatching { barColors(r, s) }.getOrNull()
                 main.post { sampled = c; applyLook() }
             }
             override fun onFailure(code: Int) {
@@ -319,37 +322,72 @@ class BarController(private val service: AccessibilityService) {
         })
     }
 
-    private fun textColor(r: AccessibilityService.ScreenshotResult, s: BarSnapshot): Color? {
+    /**
+     * The clock's text colour and, when the bar is opaque there, the bar's own colour. Averaging
+     * every opaque pixel (as before) only works on a transparent bar: on an opaque one it blends
+     * glyphs and background into a grey (#474747 on the Acer's black bar, 2.3:1).
+     */
+    private fun barColors(r: AccessibilityService.ScreenshotResult, s: BarSnapshot): BarColors? {
         val hb = r.hardwareBuffer
         val bmp = Bitmap.wrapHardwareBuffer(hb, r.colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
         hb.close()
         bmp ?: return null
         val area = Rect(s.clock ?: s.bar).apply { offset(-s.bar.left, -s.bar.top) }
         area.intersect(0, 0, bmp.width, bmp.height)
-        var rr = 0L; var gg = 0L; var bb = 0L; var n = 0
+        val opaque = ArrayList<Int>()
+        var total = 0
         for (y in area.top until area.bottom) for (x in area.left until area.right) {
             val px = bmp.getPixel(x, y)
-            if ((px ushr 24) >= 230) { rr += (px shr 16) and 0xFF; gg += (px shr 8) and 0xFF; bb += px and 0xFF; n++ }
+            total++
+            if ((px ushr 24) >= 230) opaque.add(px)
         }
         bmp.recycle()
-        if (n < 12) return null
-        return Color((rr / n).toInt(), (gg / n).toInt(), (bb / n).toInt())
+        if (opaque.size < 12) return null
+        // Transparent bar: only the glyphs are opaque, so they are the text colour.
+        if (opaque.size < total * 0.8) return BarColors(average(opaque), null)
+        // Opaque bar: the commonest colour is the background; the text is what stands out most from it.
+        val bg = opaque.groupingBy { it and 0xFFFFFF }.eachCount().maxBy { it.value }.key
+        val dist = opaque.map { distance(it, bg) }
+        val far = dist.max()
+        val background = Color(0xFF000000.toInt() or bg)
+        if (far < 60) return BarColors(null, background) // nothing readable in the box
+        return BarColors(average(opaque.filterIndexed { i, _ -> dist[i] >= far * 0.6 }), background)
     }
 
-    private fun wallpaperGuess(): Color {
+    private fun average(px: List<Int>): Color {
+        var rr = 0L; var gg = 0L; var bb = 0L
+        for (p in px) { rr += (p shr 16) and 0xFF; gg += (p shr 8) and 0xFF; bb += p and 0xFF }
+        return Color((rr / px.size).toInt(), (gg / px.size).toInt(), (bb / px.size).toInt())
+    }
+
+    private fun distance(a: Int, b: Int): Int =
+        kotlin.math.abs(((a shr 16) and 0xFF) - ((b shr 16) and 0xFF)) +
+            kotlin.math.abs(((a shr 8) and 0xFF) - ((b shr 8) and 0xFF)) + kotlin.math.abs((a and 0xFF) - (b and 0xFF))
+
+    /** No sample: a dark system theme means a dark bar on Googlebooks; otherwise the wallpaper decides. */
+    private fun fallbackText(): Color {
+        val night = (service.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        if (night) return Color.White
         val hints = runCatching { WallpaperManager.getInstance(service).getWallpaperColors(WallpaperManager.FLAG_SYSTEM)?.colorHints }.getOrNull() ?: 0
-        return if (hints and android.app.WallpaperColors.HINT_SUPPORTS_DARK_TEXT != 0) Color(0xFF1F1F1F) else Color.White
+        return if (hints and android.app.WallpaperColors.HINT_SUPPORTS_DARK_TEXT != 0) Contrast.DARK_TEXT else Color.White
     }
 
     private fun applyLook() {
         val cfg = Store.config.value
-        val fg = when (cfg.color) {
+        val bg = if (cfg.color == ColorMode.AUTO) sampled?.background else null
+        val text = when (cfg.color) {
             ColorMode.LIGHT -> Color.White
-            ColorMode.DARK -> Color(0xFF1F1F1F)
-            ColorMode.AUTO -> sampled ?: wallpaperGuess()
+            ColorMode.DARK -> Contrast.DARK_TEXT
+            ColorMode.AUTO -> sampled?.text ?: bg?.let { Contrast.readableOn(it) } ?: fallbackText()
         }
-        look.value = StripLook(fg, fg.luminance() > 0.5f, cfg.textSize, cfg.spacing.dp, cfg.pill)
+        val live = Contrast.resolve(text, bg)
+        BarLook.current.value = live
+        look.value = StripLook(live.fg, live.barDark, cfg.textSize, cfg.spacing.dp, cfg.pill, live.background)
+        Log.i(tag, "look fg=${hex(live.fg)} bg=${bg?.let { hex(it) } ?: "transparent"} dark=${live.barDark} " +
+            "contrast=${"%.1f".format(java.util.Locale.ROOT, Contrast.ratio(live.fg, live.background))}")
     }
+
+    private fun hex(c: Color) = "#%06X".format(java.util.Locale.ROOT, c.toArgb() and 0xFFFFFF)
 
     // ---- the strip ---------------------------------------------------------------------------
 

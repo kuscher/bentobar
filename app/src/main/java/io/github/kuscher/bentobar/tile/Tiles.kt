@@ -79,7 +79,7 @@ class TimerTile : TileService() {
         t.state = if (s?.running == true) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         t.subtitle = when {
             s == null -> resources.getQuantityString(R.plurals.common_minutes_short, 25, 25)
-            s.mode == Timers.Mode.STOPWATCH -> Fmt.clock(Timers.elapsed(s)).let { if (s.running) it else getString(R.string.tile_paused, it) }
+            s.mode == Timers.Mode.STOPWATCH -> Fmt.clock(Timers.elapsed(s), elapsed = true).let { if (s.running) it else getString(R.string.tile_paused, it) }
             else -> Fmt.clock(Timers.remaining(s)).let { getString(if (s.running) R.string.tile_left else R.string.tile_paused, it) }
         }
         t.updateTile()

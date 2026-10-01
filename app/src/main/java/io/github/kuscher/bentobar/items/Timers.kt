@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import io.github.kuscher.bentobar.R
+import io.github.kuscher.bentobar.util.ClockAnchor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
@@ -18,7 +19,8 @@ import kotlinx.serialization.json.Json
 /**
  * The one shared timer: countdown, stopwatch or Pomodoro. State is persisted (wall-clock times)
  * so a timer survives BentoBar's process being restarted, and the end is also scheduled with
- * AlarmManager so it fires even when the bar isn't running.
+ * AlarmManager so it fires even when the bar isn't running. Setting the clock doesn't change a
+ * timer: [State.anchor] tells a clock change from time passing, and the alarm counts real time.
  */
 object Timers {
     enum class Mode { TIMER, STOPWATCH, POMODORO }
@@ -38,7 +40,13 @@ object Timers {
         /** Completed work rounds (POMODORO). */
         val round: Int = 0,
         val label: String = "",
-    )
+        /** When [at] was last set, in real time too ([ClockAnchor]); absent in state saved before. */
+        val anchorWall: Long = 0,
+        val anchorElapsed: Long = 0,
+        val anchorBoot: Int = -1,
+    ) {
+        val anchor get() = ClockAnchor(anchorWall, anchorElapsed, anchorBoot)
+    }
 
     const val POMO_WORK = 25 * 60_000L
     const val POMO_BREAK = 5 * 60_000L
@@ -61,7 +69,13 @@ object Timers {
         _state.value = prefs.getString("state", null)?.let { runCatching { json.decodeFromString(State.serializer(), it) }.getOrNull() }
         finishedAt = prefs.getLong("finishedAt", 0)
         check()
+        // Alarms don't survive a reboot (and a process restart loses the in-process check): arm
+        // again for a timer that's still running.
+        _state.value?.let { if (it.running) schedule(it) }
     }
+
+    /** Re-arms the alarm, e.g. after exact alarms were switched on or off in Setup. */
+    fun reschedule() { if (::app.isInitialized) _state.value?.let { if (it.running) schedule(it) } }
 
     fun now() = System.currentTimeMillis()
 
@@ -115,7 +129,13 @@ object Timers {
 
     /** Called every tick and by the alarm: finishes a countdown whose time is up. */
     fun check() {
-        val s = _state.value ?: return
+        var s = _state.value ?: return
+        if (s.running) {
+            // The clock was set since [at] was: move [at] with it, so the time left (or, for the
+            // stopwatch, the time taken) stays what it really is.
+            val jump = s.anchor.jump(ClockAnchor.now(app))
+            if (jump != 0L) { Log.i(TAG, "clock moved ${jump / 1000} s: timer follows"); s = s.copy(at = s.at + jump); set(s) }
+        }
         if (s.mode == Mode.STOPWATCH || !s.running || now() < s.at) return
         finish(s)
     }
@@ -143,7 +163,8 @@ object Timers {
         }
     }
 
-    private fun set(s: State?) {
+    private fun set(state: State?) {
+        val s = state?.let { val a = ClockAnchor.now(app); it.copy(anchorWall = a.wall, anchorElapsed = a.elapsed, anchorBoot = a.boot) }
         _state.value = s
         prefs.edit().putString("state", s?.let { json.encodeToString(State.serializer(), it) }).apply()
         schedule(s)
@@ -159,10 +180,12 @@ object Timers {
         if (s == null || !s.running || s.mode == Mode.STOPWATCH) return
         // Exact when the user allowed it (Alarms & reminders); otherwise Android may run it a bit late
         // while the device sleeps. The in-process handler covers the awake case to the second.
+        // Real time since boot (not the wall clock), so setting the clock doesn't move it.
+        val at = android.os.SystemClock.elapsedRealtime() + (s.at - now()).coerceAtLeast(0)
         try {
             if (am.canScheduleExactAlarms() && io.github.kuscher.bentobar.data.Uses.on(io.github.kuscher.bentobar.data.Uses.EXACT_ALARMS))
-                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, s.at, pi)
-            else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, s.at, pi)
+                am.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, pi)
+            else am.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, at, pi)
         } catch (e: SecurityException) {
             Log.w(TAG, "alarm not allowed", e)
         }

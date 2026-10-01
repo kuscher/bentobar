@@ -324,6 +324,8 @@ private fun setRuntimeUse(activity: Activity, key: String, permission: String, r
         if (!granted) activity.requestPermissions(arrayOf(permission), request)
     } else {
         Store.update { it.copy(turnedOff = it.turnedOff + key) }
+        // Off means off now: drop events already read (the chip used them), not just new reads.
+        if (key == Uses.CALENDAR) io.github.kuscher.bentobar.items.Calendar.forget()
         if (granted) activity.revokeSelfPermissionOnKill(permission)
         Notice.post(activity.getString(R.string.setup_use_off_runtime))
     }

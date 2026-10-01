@@ -38,6 +38,7 @@ object Store {
             state.value = c.copy(version = 2, autoCollapseSec = if (c.autoCollapseSec == 8) 0 else c.autoCollapseSec)
             save(state.value)
         }
+        if (state.value.version < 3) { state.value = state.value.migrateToV3(); save(state.value) }
         if (raw == null) save(state.value)
     }
 
@@ -63,24 +64,17 @@ object Store {
     fun remove(id: String) = update { c -> c.copy(items = c.items.filterNot { it.id == id }) }
 
     /** Moves [id] into [section] at [index] within that section (end if out of range). */
-    fun move(id: String, section: Section, index: Int) = update { c ->
-        val item = c.items.firstOrNull { it.id == id } ?: return@update c
-        val rest = c.items.filterNot { it.id == id }
-        val inSection = rest.withIndex().filter { it.value.section == section }
-        val at = when {
-            inSection.isEmpty() -> rest.size
-            index >= inSection.size -> inSection.last().index + 1
-            else -> inSection[index.coerceAtLeast(0)].index
-        }
-        c.copy(items = rest.toMutableList().apply { add(at, item.copy(section = section)) })
-    }
+    fun move(id: String, section: Section, index: Int) = update { c -> c.copy(items = c.items.moved(id, section, index)) }
 
     fun newId(): String = UUID.randomUUID().toString().substring(0, 8)
 
     fun export(): String = json.encodeToString(BarConfig.serializer(), state.value)
 
     fun import(text: String): Boolean = runCatching {
-        val c = json.decodeFromString(BarConfig.serializer(), text)
+        // An older layout (Copy settings from an earlier version) comes through the same migrations.
+        val c = json.decodeFromString(BarConfig.serializer(), text).let {
+            if (it.version < 2) it.copy(version = 2, autoCollapseSec = if (it.autoCollapseSec == 8) 0 else it.autoCollapseSec) else it
+        }.migrateToV3()
         update { c }
     }.isSuccess
 
@@ -91,16 +85,17 @@ object Store {
 
 /** What a fresh install shows: a useful bar that still leaves room. */
 object Defaults {
+    /**
+     * A calm first bar, after the most-used Mac menu bar tools: the calendar (Fantastical,
+     * Itsycal), a timer, and keep awake (Amphetamine), plus the next meeting (MeetingBar), which
+     * shows only when one is near. Everything else is one click away in Add.
+     */
     fun config() = BarConfig(
         items = listOf(
-            ItemConfig(Store.newId(), "timer", Section.HIDDEN, whenActive = true),
             ItemConfig(Store.newId(), "event", Section.HIDDEN, whenActive = true),
-            ItemConfig(Store.newId(), "network", Section.SHOWN, display = Display.TEXT),
-            ItemConfig(Store.newId(), "battery", Section.HIDDEN),
-            ItemConfig(Store.newId(), "memory", Section.HIDDEN),
-            ItemConfig(Store.newId(), "caffeine", Section.SHOWN, display = Display.ICON),
             ItemConfig(Store.newId(), "calendar", Section.SHOWN, display = Display.ICON),
-            ItemConfig(Store.newId(), "tools", Section.SHOWN, display = Display.ICON),
+            ItemConfig(Store.newId(), "timer", Section.SHOWN, display = Display.ICON),
+            ItemConfig(Store.newId(), "caffeine", Section.SHOWN, display = Display.ICON),
         ),
     )
 }

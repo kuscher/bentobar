@@ -46,16 +46,34 @@ data class ItemConfig(
         copy(options = if (value == null) options - key else options + (key to value))
 }
 
+/**
+ * These items with [id] moved into [section] at [index] among that section's other items (the end
+ * if out of range). Unchanged if [id] isn't there. [Store.move] and the drag preview both use it.
+ */
+fun List<ItemConfig>.moved(id: String, section: Section, index: Int): List<ItemConfig> {
+    val item = firstOrNull { it.id == id } ?: return this
+    val rest = filterNot { it.id == id }
+    val inSection = rest.withIndex().filter { it.value.section == section }
+    val at = when {
+        inSection.isEmpty() -> rest.size
+        index >= inSection.size -> inSection.last().index + 1
+        else -> inSection[index.coerceAtLeast(0)].index
+    }
+    return rest.toMutableList().apply { add(at, item.copy(section = section)) }
+}
+
 @Serializable
 data class BarConfig(
-    val version: Int = 2,
+    val version: Int = 3,
     /** Master switch (the Quick Settings tile flips it, e.g. for presenting). */
     val enabled: Boolean = true,
     val items: List<ItemConfig> = emptyList(),
     val position: Position = Position.RIGHT,
-    /** Show the ‹ button that reveals hidden items. */
+    /** How the Hidden section works (version 3). */
+    val hiddenMode: HiddenMode = HiddenMode.SHOW_ALL,
+    /** Before version 3: show the ‹ button. Read only by [migrateToV3]. */
     val chevron: Boolean = true,
-    /** Reveal hidden items while the pointer rests on BentoBar's strip (off by default: it can surprise). */
+    /** Before version 3: reveal hidden items on hover. Read only by [migrateToV3]. */
     val revealOnHover: Boolean = false,
     /** Hide revealed items again after this many seconds; 0 (default) keeps them until ‹ is clicked. */
     val autoCollapseSec: Int = 0,
@@ -88,4 +106,30 @@ object Uses {
     const val EXACT_ALARMS = "exactAlarms"
 
     fun on(key: String) = key !in Store.config.value.turnedOff
+}
+
+/**
+ * How hidden items work. SHOW_ALL (the default): no ‹; an item in Hidden with a "Show when" rule
+ * appears only while it applies, the others always show. CLICK and HOVER: hidden items wait behind
+ * ‹ and come out on a click, or on hover too.
+ */
+@Serializable
+enum class HiddenMode { SHOW_ALL, CLICK, HOVER }
+
+/**
+ * Version 3 replaced the ‹ switch and "reveal on hover" with [HiddenMode]. With ‹ off, a hidden
+ * item without a rule never showed; under SHOW_ALL it would, so those move to Off and the bar looks
+ * the same as before.
+ */
+fun BarConfig.migrateToV3(): BarConfig = if (version >= 3) this else copy(
+    version = 3,
+    hiddenMode = when { !chevron -> HiddenMode.SHOW_ALL; revealOnHover -> HiddenMode.HOVER; else -> HiddenMode.CLICK },
+    items = if (chevron) items else items.map { if (it.section == Section.HIDDEN && !it.whenActive) it.copy(section = Section.OFF) else it },
+)
+
+/** Whether an item in the bar config is drawn right now (outside presenting), for the strip and the preview. */
+fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.section) {
+    Section.SHOWN -> true
+    Section.HIDDEN -> if (hiddenMode == HiddenMode.SHOW_ALL) !item.whenActive || active else item.whenActive && active
+    Section.OFF -> false
 }

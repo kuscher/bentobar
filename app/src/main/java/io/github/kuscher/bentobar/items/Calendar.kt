@@ -13,9 +13,11 @@ import android.os.Looper
 import android.provider.CalendarContract
 import android.util.Log
 import io.github.kuscher.bentobar.R
+import java.time.ZoneId
+import java.util.Locale
 import java.util.concurrent.Executors
 
-/** Upcoming calendar events from the Calendar provider (needs READ_CALENDAR). */
+/** Upcoming calendar events from the Calendar provider (needs READ_CALENDAR). Tasks synced in by task apps are left out. */
 object Calendar {
     data class Event(
         val eventId: Long,
@@ -25,16 +27,18 @@ object Calendar {
         val allDay: Boolean,
         val color: Int,
         val location: String,
+        /** On a calendar the user can edit (contributor access or more): not holidays, birthdays or subscriptions. */
+        val editable: Boolean,
         /**
-         * A meeting: timed (not all-day), on a calendar the user can edit (contributor access or
-         * more). Not: Todoist feeds, holidays, birthdays and other subscribed calendars.
+         * A real meeting (see [Meetings.isMeeting]): timed, on an [editable] calendar, and with a video-call
+         * [link] or at least one attendee besides the user. A flight Gmail added on its own is not one.
          */
         val meeting: Boolean,
-        /** A video-call link found in the location or description; meetings only. */
+        /** A video-call link found in the location or description. */
         val link: String?,
     ) {
-        /** A place to get directions to: a meeting's location, unless that is itself a link. */
-        val place: String? get() = location.trim().takeIf { meeting && it.isNotEmpty() && !CallLinks.hasUrl(it) }
+        /** A place to get directions to: a timed event's location on an editable calendar, unless that is itself a link. */
+        val place: String? get() = location.trim().takeIf { editable && !allDay && it.isNotEmpty() && !CallLinks.hasUrl(it) }
     }
 
     private const val TAG = "BentoBar"
@@ -78,36 +82,87 @@ object Calendar {
             CalendarContract.Instances.ALL_DAY, CalendarContract.Instances.DISPLAY_COLOR,
             CalendarContract.Instances.EVENT_LOCATION, CalendarContract.Instances.DESCRIPTION,
             CalendarContract.Instances.SELF_ATTENDEE_STATUS, CalendarContract.Instances.VISIBLE,
-            CalendarContract.Instances.CALENDAR_ACCESS_LEVEL,
+            CalendarContract.Instances.CALENDAR_ACCESS_LEVEL, CalendarContract.Instances.OWNER_ACCOUNT,
         )
         val out = ArrayList<Event>()
+        // The calendar owner of each event, for telling the user apart from other attendees.
+        val owners = HashMap<Long, String>()
         CalendarContract.Instances.query(app.contentResolver, projection, begin, end)?.use { c ->
             while (c.moveToNext()) {
                 if (c.getInt(9) == 0) continue // calendar hidden by the user
                 if (c.getInt(8) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
                 val location = c.getString(6).orEmpty()
+                val text = location + "\n" + c.getString(7).orEmpty()
+                // Tasks synced in from a task app (Todoist links each one, open or done) aren't events:
+                // they show nowhere, not in the agenda, the month view, Next meeting or the chip.
+                if (CallLinks.isTask(text)) continue
                 val allDay = c.getInt(4) != 0
-                // Tasks synced in from a task app (Todoist links each one) aren't meetings either, and
-                // a completed one (Todoist puts "✓" before its title) isn't shown at all.
-                val task = CallLinks.isTask(location + "\n" + c.getString(7).orEmpty())
-                if (task && c.getString(1).orEmpty().trimStart().startsWith("✓")) continue
-                val meeting = !allDay && c.getInt(10) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR && !task
+                val id = c.getLong(0)
+                c.getString(11)?.let { owners[id] = it }
                 out += Event(
-                    eventId = c.getLong(0), title = c.getString(1).orEmpty().ifBlank { app.getString(R.string.calendar_no_title) },
+                    eventId = id, title = c.getString(1).orEmpty().ifBlank { app.getString(R.string.calendar_no_title) },
                     begin = c.getLong(2), end = c.getLong(3), allDay = allDay,
-                    color = c.getInt(5), location = location, meeting = meeting,
-                    link = if (meeting) CallLinks.find(location + "\n" + c.getString(7).orEmpty()) else null,
+                    color = c.getInt(5), location = location,
+                    editable = c.getInt(10) >= CalendarContract.Calendars.CAL_ACCESS_CONTRIBUTOR,
+                    meeting = false, link = CallLinks.find(text),
                 )
             }
         }
-        out.sortedBy { it.begin }
+        // Without a call link, a meeting needs someone else invited. Attendees are read only for the
+        // candidates before the meeting horizon, once per load (not per tick). The horizon is taken a
+        // few minutes ahead: it moves at midnight, and the next load can be up to a minute away.
+        val zone = ZoneId.systemDefault()
+        val horizon = Meetings.horizon(now + 5 * 60_000L, zone)
+        val candidates = out.filter { it.link == null && !it.allDay && it.editable && Meetings.inHorizon(it.begin, it.end, now, horizon) }
+            .mapTo(HashSet()) { it.eventId }
+        val withOthers = runCatching { withOthers(candidates, owners) }
+            .onFailure { Log.w(TAG, "attendee query failed", it) }.getOrDefault(emptySet())
+        out.map { e ->
+            val meeting = Meetings.isMeeting(e.allDay, e.editable, e.link != null, e.eventId in withOthers)
+            if (meeting) e.copy(meeting = true) else e
+        }.sortedBy { it.begin }
     } catch (e: Exception) {
         Log.w(TAG, "calendar query failed", e)
         emptyList()
     }
 
-    /** Meetings (see [Event.meeting]), current and upcoming. Next meeting and the chip use only these. */
-    fun meetings(now: Long) = events.filter { it.meeting && it.end > now }
+    /**
+     * Of [ids], the events with at least one attendee who isn't the user. The user is an attendee
+     * whose email is the event's calendar owner ([owners]), or the organizer when that's one of the
+     * user's own accounts (the owners of calendars they own).
+     */
+    private fun withOthers(ids: Set<Long>, owners: Map<Long, String>): Set<Long> {
+        if (ids.isEmpty()) return emptySet()
+        val mine = HashSet<String>()
+        app.contentResolver.query(CalendarContract.Calendars.CONTENT_URI, arrayOf(CalendarContract.Calendars.OWNER_ACCOUNT),
+            "${CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL} >= ${CalendarContract.Calendars.CAL_ACCESS_OWNER}", null, null)?.use { c ->
+            while (c.moveToNext()) c.getString(0)?.let { mine += it.lowercase(Locale.ROOT) }
+        }
+        val found = HashSet<Long>()
+        app.contentResolver.query(CalendarContract.Attendees.CONTENT_URI,
+            arrayOf(CalendarContract.Attendees.EVENT_ID, CalendarContract.Attendees.ATTENDEE_EMAIL, CalendarContract.Attendees.ATTENDEE_RELATIONSHIP),
+            "${CalendarContract.Attendees.EVENT_ID} IN (${ids.joinToString(",")})", null, null)?.use { c ->
+            while (c.moveToNext()) {
+                val id = c.getLong(0)
+                if (id in found) continue
+                val email = c.getString(1).orEmpty().trim().lowercase(Locale.ROOT)
+                if (email.isEmpty()) continue // no one to tell apart (and no one to meet)
+                val isUser = email == owners[id]?.lowercase(Locale.ROOT) ||
+                    (c.getInt(2) == CalendarContract.Attendees.RELATIONSHIP_ORGANIZER && email in mine)
+                if (!isUser) found += id
+            }
+        }
+        return found
+    }
+
+    /**
+     * Meetings (see [Event.meeting]) on now or starting before the horizon ([Meetings.horizon]: 03:00
+     * tomorrow). The Next meeting item and the chip use only these.
+     */
+    fun meetings(now: Long): List<Event> {
+        val horizon = Meetings.horizon(now, ZoneId.systemDefault())
+        return events.filter { it.meeting && Meetings.inHorizon(it.begin, it.end, now, horizon) }
+    }
 
     fun current(now: Long) = meetings(now).firstOrNull { it.begin <= now }
     fun next(now: Long) = meetings(now).firstOrNull { it.begin > now }

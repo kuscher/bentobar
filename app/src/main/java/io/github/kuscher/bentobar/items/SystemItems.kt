@@ -23,7 +23,6 @@ import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
 import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.ui.Meter
-import io.github.kuscher.bentobar.ui.SliderRow
 import io.github.kuscher.bentobar.ui.Sparkline
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Fmt
@@ -32,6 +31,8 @@ import java.util.Locale
 
 object NetworkItem : ItemType("network", R.string.item_network_title, Sym.SWAP_VERT, R.string.item_network_desc) {
     override val canBeActive = true
+    private val above = Threshold("activeKBs", 500, 50..5000, step = 50) { Fmt.bytes(it * 1000.0) + "/s" }
+    override val trigger = Trigger(R.string.trigger_network, R.string.trigger_network_short, above)
 
     override fun state(item: ItemConfig): ItemState {
         val n = Env.net
@@ -43,7 +44,7 @@ object NetworkItem : ItemType("network", R.string.item_network_title, Sym.SWAP_V
             "total" -> Fmt.rate(n.down + n.up) + "/s"
             else -> "$down $up"
         }
-        val threshold = item.optInt("activeKBs", 500) * 1000.0
+        val threshold = above.of(item) * 1000.0
         return ItemState(icon = Sym.SWAP_VERT, text = text, active = maxOf(n.down, n.up) >= threshold, widthKey = "net",
             desc = Env.str(R.string.network_state_desc, Fmt.bytes(n.down), Fmt.bytes(n.up)))
     }
@@ -69,18 +70,18 @@ object NetworkItem : ItemType("network", R.string.item_network_title, Sym.SWAP_V
         ChoiceRow(stringResource(R.string.option_show), listOf("both" to stringResource(R.string.network_show_both), "down" to stringResource(R.string.network_download),
             "up" to stringResource(R.string.network_upload), "total" to stringResource(R.string.network_show_total)),
             item.opt("show", "both")) { set(item.with("show", it)) }
-        SliderRow(stringResource(R.string.option_active_above), item.optInt("activeKBs", 500), 50..5000,
-            { "$it KB/s" }) { set(item.with("activeKBs", it.toString())) }
     }
 }
 
 object CpuItem : ItemType("cpu", R.string.item_cpu_title, Sym.MEMORY, R.string.item_cpu_desc) {
     override val canBeActive = true
+    private val above = Threshold("activePct", 80, 30..99) { "$it%" }
+    override val trigger = Trigger(R.string.trigger_cpu, R.string.trigger_cpu_short, above)
 
     override fun state(item: ItemConfig): ItemState {
         val c = Env.cpu
         if (!c.available) return ItemState(icon = Sym.MEMORY, text = "–", desc = Env.str(R.string.cpu_unavailable_desc))
-        val limit = item.optInt("activePct", 80) / 100.0
+        val limit = above.of(item) / 100.0
         return ItemState(icon = Sym.MEMORY, text = Fmt.percent(c.total), active = c.total >= limit,
             tone = if (c.total >= 0.9) Tone.WARN else Tone.NORMAL, widthKey = "cpu",
             desc = Env.str(if (c.total >= 0.9) R.string.cpu_state_desc_high else R.string.cpu_state_desc, Fmt.percent(c.total)))
@@ -122,18 +123,16 @@ object CpuItem : ItemType("cpu", R.string.item_cpu_title, Sym.MEMORY, R.string.i
             }
         }
     }
-
-    override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SliderRow(stringResource(R.string.option_active_above), item.optInt("activePct", 80), 30..99, { "$it%" }) { set(item.with("activePct", it.toString())) }
-    }
 }
 
 object MemoryItem : ItemType("memory", R.string.item_memory_title, Sym.MEMORY_ALT, R.string.item_memory_desc) {
     override val canBeActive = true
+    private val above = Threshold("activePct", 85, 50..99) { "$it%" }
+    override val trigger = Trigger(R.string.trigger_memory, R.string.trigger_memory_short, above)
 
     override fun state(item: ItemConfig): ItemState {
         val m = Env.mem
-        val limit = item.optInt("activePct", 85) / 100.0
+        val limit = above.of(item) / 100.0
         return ItemState(icon = Sym.MEMORY_ALT, text = Fmt.percent(m.used), active = m.used >= limit || m.low, widthKey = "mem",
             tone = if (m.low) Tone.WARN else Tone.NORMAL, desc = Env.str(R.string.memory_state_desc, Fmt.percent(m.used)))
     }
@@ -158,19 +157,20 @@ object MemoryItem : ItemType("memory", R.string.item_memory_title, Sym.MEMORY_AL
             MenuEntry(Sym.APPS, stringResource(R.string.common_apps)) { host.close(); Env.launch(Intent(Settings.ACTION_APPLICATION_SETTINGS)) }
         }
     }
-
-    override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SliderRow(stringResource(R.string.option_active_above), item.optInt("activePct", 85), 50..99, { "$it%" }) { set(item.with("activePct", it.toString())) }
-    }
 }
 
 object BatteryItem : ItemType("battery", R.string.item_battery_title, Sym.BOLT, R.string.item_battery_desc) {
     override val canBeActive = true
+    /** A newer key: 20 was the fixed cutoff before it, so configs without it behave as they did. */
+    private val below = Threshold("lowPct", 20, 5..50, step = 5) { "$it%" }
+    override val trigger = Trigger(R.string.trigger_battery, R.string.trigger_battery_short, below)
 
     override fun state(item: ItemConfig): ItemState {
         val b = Env.battery
         val hot = b.tempC >= 42 || b.thermal >= PowerManager.THERMAL_STATUS_MODERATE
         val low = !b.charging && b.level < 0.2
+        // The trigger has its own cutoff; the colors keep the fixed 20% and 10% warnings.
+        val belowLimit = !b.charging && b.level < below.of(item) / 100.0
         val text = when (item.opt("show", "watts")) {
             "percent" -> Fmt.percent(b.level)
             "temp" -> String.format(Locale.ROOT, "%.0f°", b.tempC)
@@ -179,7 +179,7 @@ object BatteryItem : ItemType("battery", R.string.item_battery_title, Sym.BOLT, 
         }
         return ItemState(
             icon = if (b.charging) Sym.BOLT else if (b.level < 0.1) Sym.BATTERY_0_BAR else Sym.BATTERY_FULL,
-            filled = b.charging, text = text, active = low || hot, widthKey = "bat",
+            filled = b.charging, text = text, active = belowLimit || hot, widthKey = "bat",
             tone = when { !b.charging && b.level < 0.1 -> Tone.ALERT; low || hot -> Tone.WARN; else -> Tone.NORMAL },
             desc = Env.str(R.string.battery_state_desc, Fmt.percent(b.level), b.statusText(), Fmt.oneDecimal(kotlin.math.abs(b.watts))),
         )
@@ -218,12 +218,15 @@ object BatteryItem : ItemType("battery", R.string.item_battery_title, Sym.BOLT, 
 object StorageItem : ItemType("storage", R.string.item_storage_title, Sym.HARD_DRIVE, R.string.item_storage_desc) {
     override val refreshMs = 30_000L
     override val canBeActive = true
+    /** A newer key: 10 was the fixed cutoff before it. */
+    private val below = Threshold("freePct", 10, 1..50) { "$it%" }
+    override val trigger = Trigger(R.string.trigger_storage, R.string.trigger_storage_short, below)
 
     override fun state(item: ItemConfig): ItemState {
         val s = Env.storage
         val freeFrac = if (s.total == 0L) 1.0 else s.free.toDouble() / s.total
         return ItemState(icon = Sym.HARD_DRIVE, text = Fmt.bytes(s.free.toDouble()).replace(" ", ""),
-            active = freeFrac < 0.1, tone = if (freeFrac < 0.05) Tone.ALERT else if (freeFrac < 0.1) Tone.WARN else Tone.NORMAL,
+            active = freeFrac < below.of(item) / 100.0, tone = if (freeFrac < 0.05) Tone.ALERT else if (freeFrac < 0.1) Tone.WARN else Tone.NORMAL,
             desc = Env.str(R.string.storage_state_desc, Fmt.bytes(s.free.toDouble())))
     }
 

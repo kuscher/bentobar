@@ -60,7 +60,6 @@
     <string name="option_show">Show</string>
     <string name="network_show_both">Down and up</string>
     <string name="network_show_total">Total</string>
-    <string name="option_active_above">Counts as active above</string>
     <string name="item_cpu_title">CPU load</string>
     <string name="item_cpu_desc">How busy the processor is, per core, with clock speeds</string>
     <string name="cpu_unavailable_desc">This device doesn\'t share CPU load with apps</string>
@@ -156,7 +155,7 @@
     <string name="clock_zone_none">No zone matches</string>
     <string name="clock_zone_use_device">Use this device\'s time zone</string>
     <string name="item_calendar_title">Date and calendar</string>
-    <string name="item_calendar_desc">Today\'s date; click for a month view with your events</string>
+    <string name="item_calendar_desc">Today\'s date; click for the month and each day\'s events</string>
     <string name="calendar_date_in_bar">Date in the bar</string>
     <string name="calendar_week_number">Week number</string>
     <string name="calendar_own_pattern">Or your own pattern</string>
@@ -172,27 +171,20 @@
     <string name="calendar_open">Open Calendar</string>
     <string name="calendar_all_day">All day</string>
     <string name="item_event_title">Next meeting</string>
-    <string name="item_event_desc">Your next calendar event and a countdown, with a Join button</string>
-    <string name="event_allow">Allow calendar</string>
+    <string name="item_event_desc">Your next meeting today and a countdown, with a Join button</string>
     <string name="event_access_needed">Calendar access needed</string>
+    <string name="event_needs_calendar">BentoBar needs to read your calendar for this</string>
+    <string name="event_today">Meetings today</string>
+    <string name="event_no_more">No more meetings today</string>
+    <string name="event_longest_title">Longest title</string>
     <string name="event_now_text">%1$s · %2$s left</string>
     <string name="event_now_desc">Now: %1$s, ends in %2$s</string>
-    <string name="event_no_more">No more events</string>
-    <string name="event_none_upcoming">No upcoming events</string>
     <string name="event_in">in %1$s</string>
     <string name="event_next_text">%1$s %2$s</string>
     <string name="event_next_desc">Next: %1$s %2$s</string>
-    <string name="event_needs_calendar">BentoBar needs to read your calendar for this</string>
-    <string name="event_nothing_coming">Nothing coming up</string>
-    <string name="event_now_ends_in">Now · ends in %1$s</string>
-    <string name="event_starts_in">Starts in %1$s</string>
     <string name="common_join">Join</string>
     <string name="event_directions">Directions</string>
     <string name="common_open">Open</string>
-    <string name="event_coming_up">Coming up</string>
-    <string name="event_nothing_else">Nothing else in the next weeks</string>
-    <string name="event_active_from">Counts as active from</string>
-    <string name="event_longest_title">Longest title</string>
     <string name="item_timer_title">Timer</string>
     <string name="item_timer_desc">Countdown, stopwatch and Pomodoro; scroll to add minutes</string>
     <string name="common_done">Done</string>
@@ -413,8 +405,6 @@
     <string name="section_shown_help">Left to right, as they appear</string>
     <string name="section_hidden_reveal_both">Revealed by the ‹ button or by hovering over BentoBar.</string>
     <string name="section_hidden_reveal_chevron">Revealed by the ‹ button.</string>
-    <string name="section_hidden_reveal_hover">Revealed by hovering over BentoBar.</string>
-    <string name="section_hidden_reveal_none">Not revealed: the ‹ button is off (Look).</string>
     <string name="section_hidden_help">%1$s Items set to show when active pop out on their own.</string>
     <string name="section_off_help">Kept with their settings, not shown</string>
     <string name="section_empty">Nothing here</string>
@@ -422,16 +412,36 @@
     <string name="row_when_active">shows when active</string>
     <string name="row_icon_only">icon only</string>
     <string name="row_text_only">text only</string>
-    <string name="row_move_up">Move %1$s up</string>
-    <string name="row_move_down">Move %1$s down</string>
+    <string name="row_move_up">Move up</string>
+    <string name="row_move_down">Move down</string>
+    <string name="row_move_to_hidden">Move to Hidden</string>
     <string name="row_more">More for %1$s</string>
     <string name="row_show_in_bar">Show in the bar</string>
     <string name="common_delete">Delete</string>
     <string name="detail_needs_calendar">This item needs access to your calendar. It stays on this device.</string>
     <string name="common_allow">Allow</string>
     <string name="detail_where">Where</string>
-    <string name="detail_when_active">Show itself when active</string>
-    <string name="detail_when_active_help">Stays hidden until it has something to say, like a running timer or a meeting about to start</string>
+    <string name="detail_trigger_help">Waits behind ‹ and pops into the bar while this is true</string>
+    <string name="detail_trigger_help_not_hidden">Only items behind ‹ pop into the bar. This one is not hidden now.</string>
+    <string name="detail_trigger_help_move">Turning this on moves it behind ‹. It pops into the bar while this is true.</string>
+    <string name="trigger_network">Show when downloading or uploading faster than %1$s</string>
+    <string name="trigger_network_short">shows above %1$s</string>
+    <string name="trigger_cpu">Show when CPU load is above %1$s</string>
+    <string name="trigger_cpu_short">shows above %1$s CPU</string>
+    <string name="trigger_memory">Show when memory use is above %1$s, or memory runs low</string>
+    <string name="trigger_memory_short">shows above %1$s memory</string>
+    <string name="trigger_battery">Show when the battery is below %1$s and not charging, or running hot</string>
+    <string name="trigger_battery_short">shows below %1$s battery</string>
+    <string name="trigger_storage">Show when less than %1$s of storage is free</string>
+    <string name="trigger_storage_short">shows below %1$s free</string>
+    <string name="trigger_event">Show %1$s before a meeting, and during it</string>
+    <string name="trigger_event_short">shows %1$s before a meeting</string>
+    <string name="trigger_timer">Show while a timer or stopwatch is going, and for a minute after it ends</string>
+    <string name="trigger_timer_short">shows while a timer runs</string>
+    <string name="trigger_countdown">Show in the last 24 hours before the date</string>
+    <string name="trigger_countdown_short">shows in the last 24 hours</string>
+    <string name="trigger_caffeine">Show while keep awake is on</string>
+    <string name="trigger_caffeine_short">shows while on</string>
     <string name="detail_options">Options</string>
     <string name="detail_duplicate">Duplicate</string>
 
@@ -460,11 +470,8 @@
     <string name="look_pill_none">None, like the system</string>
     <string name="look_pill_subtle">Soft pill</string>
     <string name="look_pill_solid">Solid pill</string>
-    <string name="look_chevron">Show the ‹ button</string>
-    <string name="look_chevron_help">Click it to show or hide your hidden items. Without it, hidden items only appear while active.</string>
     <string name="look_collapse">After revealing, hide them again</string>
     <string name="look_collapse_never">Only when I click ‹</string>
-    <string name="look_reveal_hover">Reveal them when the pointer rests on BentoBar</string>
     <string name="look_chip">Timer or meeting chip</string>
     <string name="look_chip_fallback">When BentoBar is off</string>
     <string name="look_chip_always">Always</string>
@@ -529,10 +536,6 @@
     </plurals>
 
     <!-- plurals: time -->
-    <plurals name="event_minutes_before">
-        <item quantity="one">%1$d min before</item>
-        <item quantity="other">%1$d min before</item>
-    </plurals>
     <plurals name="event_characters">
         <item quantity="one">%1$d character</item>
         <item quantity="other">%1$d characters</item>
@@ -589,4 +592,11 @@
     <string name="barmenu_presenting_stop">Stop presenting</string>
     <string name="look_presenting">Presenting mode</string>
     <string name="look_presenting_help">For screen sharing: shows only a running timer or a meeting about to start. Turn it off here or from the ‹ menu.</string>
+    <string name="look_hidden_mode">Hidden items</string>
+    <string name="look_hidden_show_all">Show everything</string>
+    <string name="look_hidden_click">Behind ‹, on click</string>
+    <string name="look_hidden_hover">Behind ‹, on hover</string>
+    <string name="look_hidden_mode_help">Show everything puts every item in the bar while it fits. Items with a Show when rule appear only while it applies.</string>
+    <string name="section_when_active">When active</string>
+    <string name="section_hidden_reveal_show_all">Shown while their Show when rule applies. Items here without a rule always show.</string>
 </resources>

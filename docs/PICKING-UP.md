@@ -71,7 +71,7 @@ Verified on the HP Googlebook 14 (Android 17, SDK 37.1):
 ## Ideas for next versions
 - Now playing (needs notification-listener access, another restricted setting).
 - Weather (needs internet: would break the "no internet permission" promise; maybe a separate flavour).
-- Drag to reorder in the bar itself (e.g. with a modifier key) and in settings.
+- Drag to reorder in the bar itself (e.g. with a modifier key); settings has it now.
 - Profiles (e.g. "Presenting"), triggers beyond "when active".
 - External displays: one strip per display's status bar.
 - Draw the strip with plain Views to cut CPU further.

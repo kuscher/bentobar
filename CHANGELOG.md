@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- **Calendar and Next meeting: two items with clear rules.** **Date and calendar** shows the date;
+  its menu is the month and the picked day's events, timed and all-day (meetings, flights, holidays,
+  birthdays), with Join for video calls and Directions for places. **Next meeting** shows only real
+  meetings: timed, on a calendar you can edit, with a video call or someone else invited, so a
+  flight or a solo appointment never counts. It looks no further than 3 a.m. tomorrow, shows the
+  title and a countdown (accented from 15 minutes before, set it under "Show when", until it ends),
+  and just its icon when there are no more meetings today. Its menu lists today's meetings with
+  Join and Directions. Tasks that apps like Todoist sync into your calendar are left out of both,
+  and of the chip.
+- **Drag to reorder in settings.** Drag a row (anywhere with a mouse, by its handle with a finger)
+  within its card or onto another one; the other rows slide aside. The up and down arrows are gone:
+  the ≡ menu, Alt+Up/Down and screen reader actions on each row do the same moves.
+- **"Show when…" in words.** An item's settings say when it pops out of hiding ("Show when CPU load
+  is above 80%"), with a slider for the number, and the list says it in short ("shows above 80%
+  CPU"). Battery and storage get their own thresholds (20% and 10% by default, as before).
 - **Readable on any status bar.** On a status bar with its own solid color (black on the Acer
   Googlebook 14), BentoBar's items came out dark gray on black. It now tells the bar's color from
   the clock's, and its text, accent and warning colors always reach 4.5:1 contrast. The preview in

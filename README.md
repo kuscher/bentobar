@@ -44,7 +44,9 @@ compartment, and the whole thing neat.
 </p>
 
 - **Show when active:** a hidden item can pop out on its own while it has something to say, such
-  as a running timer, a meeting about to start or a busy CPU, and disappear again after.
+  as a running timer, a meeting about to start or a busy CPU, and disappear again after. Its
+  settings say the rule in words ("Show when CPU load is above 80%") and let you set the number.
+- **Drag to reorder** in settings, within a section or into another one.
 - **Click any item** for its menu: charts, details and actions.
 - **Right-click an item** to hide it, move it or change how it looks.
 - **Scroll** over the sound item to change the volume, or over the timer to add minutes.
@@ -65,8 +67,8 @@ hides when an app goes full screen or the screen locks.
 | **Memory** | RAM in use | used, available, chart |
 | **Battery details** | watts, %, temperature or time to full | power in or out, voltage, current, health, cycles, thermal state |
 | **Storage** | free space | used and free, shortcuts to clean up |
-| **Date and calendar** | the date, in your format | a month view with your events |
-| **Next meeting** | title and countdown | today's agenda, **Join** for video calls |
+| **Date and calendar** | the date, in your format | a month view, and the day's events (all-day ones too) with **Join** and **Directions**; tasks that apps like Todoist sync to your calendar are left out, here and in Next meeting |
+| **Next meeting** | title and countdown, until 3 a.m. tomorrow; just the icon when there are no more meetings | today's meetings with **Join** and **Directions** |
 | **Clock** | a second clock: seconds, 24-hour or another city | world clocks |
 | **Timer** | countdown, stopwatch or Pomodoro | start, pause, +1 min, stop |
 | **Countdown** | days and hours to a date | exact time left |
@@ -113,7 +115,7 @@ status bar may work, but haven't been tested.
       settings**, and confirm with your PIN.
    3. Return to Accessibility › **BentoBar** and turn it on.
 5. Optional: in **Setup**, allow notifications (timer alerts, the Live Update chip) and calendar
-   access (next meeting, events in the month view).
+   access (Next meeting, events in the month view).
 
 About a day later, Android shows *"Review app with full device access"*. That's a standard check
 for every app that uses an accessibility service. Keep BentoBar if you're happy with what it does

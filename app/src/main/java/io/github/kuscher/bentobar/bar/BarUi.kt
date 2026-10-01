@@ -28,8 +28,10 @@ import androidx.compose.ui.composed
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
@@ -40,6 +42,9 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import kotlinx.coroutines.launch
+import io.github.kuscher.bentobar.ui.animatePlacement
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -105,6 +110,8 @@ interface StripEvents {
     fun placed(id: String, at: Rect)
     /** The pointer is over [item] (or has left it), for its tooltip. */
     fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {}
+    /** [item] dragged sideways by [dx] px; [done] on release, where it should land. */
+    fun drag(item: ItemConfig, dx: Float, done: Boolean) {}
 }
 
 /**
@@ -238,6 +245,19 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     var bounds by remember { mutableStateOf(Rect()) }
     val itemMenuLabel = androidx.compose.ui.res.stringResource(io.github.kuscher.bentobar.R.string.strip_item_menu)
     LaunchedEffect(hovered) { events.itemHover(entry.item, bounds, hovered) }
+    // Dragging sideways: the item lifts and follows the pointer while the others slide aside
+    // (animatePlacement, as the controller previews the new order), then it settles into its slot.
+    // Positions are measured against the item's untransformed slot: pointer positions relative to
+    // the moving item itself would feed its own movement back in and make it flicker.
+    var slotX by remember { mutableStateOf(0f) }
+    var grab by remember { mutableStateOf<Float?>(null) } // where in the item it was picked up
+    var startSlot by remember { mutableStateOf(0f) }
+    var dragOffset by remember { mutableStateOf(0f) }
+    val settle = remember { androidx.compose.animation.core.Animatable(0f) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val lifted = grab != null
+    val liftScale by androidx.compose.animation.core.animateFloatAsState(if (lifted) 1.08f else 1f,
+        androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMedium), label = "lift")
     // Live numbers (speeds, percentages, clocks) sit in a fixed slot sized for their widest
     // reading (Fmt.widthTemplate), right-aligned, so nothing next to them moves as they change.
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -260,16 +280,42 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val showText = display != Display.ICON && !s.text.isNullOrEmpty()
     Row(
         Modifier.fillMaxHeight()
-            .graphicsLayer { alpha = appear.value; translationX = (1f - appear.value) * 6.dp.toPx() }
-            .onGloballyPositioned { bounds = it.boundsInWindow().toRect(); events.placed(entry.item.id, bounds) }
+            .onGloballyPositioned { slotX = it.positionInWindow().x; bounds = it.boundsInWindow().toRect(); events.placed(entry.item.id, bounds) }
+            .clicks({ events.click(entry.item, bounds) }, { events.context(entry.item, bounds) }, { events.scroll(entry.item, it) },
+                onDrag = { localX, downX, done ->
+                    if (grab == null) { grab = downX; startSlot = slotX; scope.launch { settle.snapTo(0f) } }
+                    val left = slotX + localX - (grab ?: downX) // where the item's left edge follows the pointer
+                    dragOffset = left - slotX
+                    events.drag(entry.item, left - startSlot, done)
+                    if (done) {
+                        // The previewed order is now the real one; spring from where it was let go into its slot.
+                        val from = dragOffset
+                        grab = null
+                        dragOffset = 0f
+                        scope.launch {
+                            settle.snapTo(from)
+                            settle.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow))
+                        }
+                    }
+                })
+            // Neighbors slide to their new places like magnets; the lifted item follows the pointer instead.
+            .then(if (lifted || settle.isRunning) Modifier else Modifier.animatePlacement())
+            .zIndex(if (lifted || settle.isRunning) 1f else 0f)
+            .graphicsLayer {
+                alpha = appear.value
+                translationX = (1f - appear.value) * 6.dp.toPx() + dragOffset + settle.value
+                scaleX = liftScale; scaleY = liftScale
+            }
             .clip(RoundedCornerShape(10.dp))
             .background(when {
                 alert -> look.alertBg
+                // Lifted, it's a solid tile in the bar's own colour, so text it passes over doesn't show through.
+                lifted -> look.fg.copy(alpha = 0.18f).compositeOver(look.background)
                 hovered -> look.fg.copy(alpha = 0.14f)
                 else -> Color.Transparent
             })
             .hoverable(source)
-            .clicks({ events.click(entry.item, bounds) }, { events.context(entry.item, bounds) }, { events.scroll(entry.item, it) })
             .semantics(mergeDescendants = true) {
                 contentDescription = s.desc.ifEmpty { s.text.orEmpty() }; role = Role.Button
                 // The clicks come from raw pointer input, so tell assistive tech how to press it.
@@ -302,17 +348,26 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     }
 }
 
-/** Primary click, secondary click (right button or touch long-press) and mouse-wheel steps. */
-private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll: ((Int) -> Unit)?): Modifier = composed {
+/**
+ * Primary click, secondary click (right button or touch long-press), mouse-wheel steps and, with
+ * [onDrag], a sideways drag: a primary press that moves past the touch slop (mouse, touchpad press
+ * or touch) becomes a drag instead of a click.
+ */
+private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll: ((Int) -> Unit)?,
+                            onDrag: ((localX: Float, downX: Float, done: Boolean) -> Unit)? = null): Modifier = composed {
     // Keep the gesture coroutine running across recompositions; call the latest callbacks.
     val click by rememberUpdatedState(onClick)
     val context by rememberUpdatedState(onContext)
     val scroll by rememberUpdatedState(onScroll)
+    val drag by rememberUpdatedState(onDrag)
     pointerInput(Unit) {
         awaitPointerEventScope {
             var down = 0L
             var secondary = false
             var armed = false
+            var downX = 0f
+            var dx = 0f
+            var dragging = false
             while (true) {
                 val e = awaitPointerEvent()
                 when (e.type) {
@@ -320,9 +375,26 @@ private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll
                         armed = true
                         secondary = e.buttons.isSecondaryPressed
                         down = e.changes.firstOrNull()?.uptimeMillis ?: 0L
+                        downX = e.changes.firstOrNull()?.position?.x ?: 0f
+                        dx = 0f
+                        dragging = false
                         e.changes.forEach { it.consume() }
                     }
-                    PointerEventType.Release -> if (armed) {
+                    PointerEventType.Move -> if (armed && !secondary && drag != null) {
+                        val c = e.changes.firstOrNull()
+                        if (c != null && c.pressed) {
+                            dx = c.position.x - downX
+                            if (!dragging && kotlin.math.abs(dx) > viewConfiguration.touchSlop) dragging = true
+                            if (dragging) { drag?.invoke(c.position.x, downX, false); c.consume() }
+                        }
+                    }
+                    PointerEventType.Release -> if (armed && dragging) {
+                        armed = false
+                        dragging = false
+                        // Where it was let go: the pointer can travel past the last move event.
+                        drag?.invoke(e.changes.firstOrNull()?.position?.x ?: (downX + dx), downX, true)
+                        e.changes.forEach { it.consume() }
+                    } else if (armed) {
                         armed = false
                         val c = e.changes.firstOrNull()
                         val inside = c != null && c.position.x >= 0 && c.position.y >= 0 &&

@@ -54,6 +54,24 @@
             </intent-filter>
         </activity>
 
+        <!-- "BentoBar menu": opens the bar's menu with every item, for the keyboard. A launcher entry so
+             it can be given a shortcut in the system's keyboard shortcut settings (Action + / › Customize);
+             BentoBar itself never reads keys. -->
+        <activity
+            android:name=".ui.BarMenuActivity"
+            android:exported="true"
+            android:label="@string/barmenu_shortcut_label"
+            android:icon="@mipmap/ic_launcher"
+            android:theme="@style/Theme.BentoBar.NoDisplay"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".bar.BarService"
             android:exported="true"

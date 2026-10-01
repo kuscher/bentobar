@@ -77,8 +77,9 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
 - **The status bar window can be opaque.** On the HP it's glyphs on transparent; on the Acer
   Googlebook 14 it's white glyphs on its own black. The colour sampler tells background and text
   apart (`barColors`), decides dark/light from the background, and `bar/Contrast.kt` holds every
-  strip colour to 4.5:1 (unit-tested in `ContrastTest`). Re-check on any new device: `look fg=…
-  bg=… contrast=…` in the log.
+  strip colour to 4.5:1, with pure black as the last fallback for mid grays where neither white nor
+  near-black reaches it (`ContrastTest.everyOpaqueBarReaches45` sweeps every gray and a color grid).
+  Re-check on any new device: `look fg=… bg=… contrast=…` in the log.
 - **Settings state is observed, not read while drawing** (`ui/SetupState.kt`, `bar/BarStatus.kt`).
   In desktop windowing, Settings opens in its own window and BentoBar's stays resumed, so onResume
   alone misses changes; and with strong skipping (Kotlin 2.x) a composable reading Android state
@@ -119,6 +120,23 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   only verified, so JIT dominates at first). The big costs were full node-tree scans on every
   window event (title changes included) and sampling folded items; now ~0.5% of one core with CPU
   and network ticking. The manifest is `profileable` by the shell for simpleperf.
+- **What the strip draws and what the ticker samples are one rule** (`BarConfig.couldShow`, built on
+  `shows`). Two separate predicates drifted when Show everything became the default: hidden items were
+  drawn but never sampled, so a clock froze (`HiddenModeTest.everythingDrawnIsSampled`).
+- **Time:** timers and keep awake store wall-clock times (they survive a restart) plus a `ClockAnchor`
+  (elapsed realtime and the boot count), so a clock change moves the deadline with it instead of
+  ending it early; the timer alarm is `ELAPSED_REALTIME_WAKEUP`, armed again in `Timers.init` (alarms
+  don't survive a reboot). Live Update calls (`setRequestPromotedOngoing`, `setShortCriticalText`) are
+  API 36.1: behind `Notify.liveUpdates`, since minSdk is 34.
+- **Notification actions launch activities directly** (`PendingIntent.getActivity` for the chip's Join
+  and Open). A broadcast receiver that then starts an activity is a notification trampoline, blocked
+  for targetSdk 31+, and the chip shows exactly when the accessibility service (whose binding allows
+  background starts) may be off.
+- **Keyboard:** the "BentoBar menu" launcher entry (`ui/BarMenuActivity`, no window) opens the ‹ menu
+  listing every item, focused. A focusable accessibility overlay does take key focus after the
+  activity finishes (checked on the Acer). Users bind it in the Shortcut Helper; on the Acer, Action
+  with B, C, E, F, P and U launch apps and can't be reassigned, and A, G, H, I, L, N, Q, S, V and W
+  are system shortcuts; D, J, K, M, O, R, T, X, Y and Z are free.
 - StudioSnap's helper (`~/studiosnap/ss enable`) used to overwrite the whole
   `enabled_accessibility_services` list and switch BentoBar off; fixed there on 2026-09-28. Both
   helpers now add or remove only their own entry (short or full component form).

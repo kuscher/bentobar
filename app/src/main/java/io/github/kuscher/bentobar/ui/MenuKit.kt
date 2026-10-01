@@ -143,12 +143,12 @@ fun Sparkline(
 
 /** A full-width row button, like a desktop menu entry. */
 @Composable
-fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Boolean = true, onClick: () -> Unit) {
+fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Boolean = true, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     val focused by source.collectIsFocusedAsState()
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 40.dp).focusRing(focused, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
+        modifier.fillMaxWidth().heightIn(min = 40.dp).focusRing(focused, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
             .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
             .hoverable(source)
             .clickable(enabled = enabled, interactionSource = source, indication = null, onClick = onClick)

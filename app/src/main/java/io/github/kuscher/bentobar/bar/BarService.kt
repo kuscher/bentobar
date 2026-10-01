@@ -560,15 +560,7 @@ class BarController(private val service: AccessibilityService) {
             if (next && secs > 0) main.postDelayed(collapse, secs * 1000L)
         }
 
-        override fun chevronContext(at: Rect) = toggleMenu("bentobar", at, 290) { host ->
-            BentoBarMenu(host, openItem = { item ->
-                val type = Items.of(item.type)
-                val menuUi = type?.menu
-                closeMenu(); menuClosedKey = null
-                if (type != null && type.onClick(item)) Ticker.refresh()
-                else if (menuUi != null) toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> menuUi(item, h) }
-            }, hideBar = { Store.update { it.copy(enabled = false) } })
-        }
+        override fun chevronContext(at: Rect) = barMenu(at, everything = false)
 
         /**
          * A drag in the bar. While it moves, the strip previews the new order ([dragPreview]), so
@@ -627,6 +619,33 @@ class BarController(private val service: AccessibilityService) {
                 if (secs > 0) main.postDelayed(collapse, secs * 1000L)
             }
         }
+    }
+
+    private fun barMenu(at: Rect, everything: Boolean) = toggleMenu("bentobar", at, 290) { host ->
+        BentoBarMenu(host, openItem = { item ->
+            val type = Items.of(item.type)
+            val menuUi = type?.menu
+            closeMenu(); menuClosedKey = null
+            // From the list of every item, an item's menu opens under the item itself.
+            val anchor = placed[item.id]?.takeIf { everything } ?: at
+            if (type != null && type.onClick(item)) Ticker.refresh()
+            else if (menuUi != null) toggleMenu("item:${item.id}", anchor, type.menuWidthDp) { h -> menuUi(item, h) }
+        }, hideBar = { Store.update { it.copy(enabled = false) } }, everything = everything)
+    }
+
+    /**
+     * The "BentoBar menu" entry (a keyboard shortcut the user binds in the system's shortcut
+     * settings): BentoBar's menu listing every item, focused for arrows and Enter. Again closes it.
+     * False when the strip isn't showing.
+     */
+    fun openBarMenu(): Boolean {
+        if (!started || !strip.shown) return false
+        // Under the strip's end next to the system icons (its start when the strip is on the left).
+        val w = strip.params.width
+        val h = strip.params.height
+        val at = if (Store.config.value.position == Position.LEFT) Rect(0, 0, 1, h) else Rect(w - 1, 0, w, h)
+        barMenu(at, everything = true)
+        return true
     }
 
     // ---- menus -------------------------------------------------------------------------------

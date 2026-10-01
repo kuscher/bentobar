@@ -58,10 +58,18 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
   the settings window. Menu crops include the menu's shadow margin, which can show other windows
   behind it, so don't publish them.
-- Release: `./gradlew :app:assembleRelease`, signed with `~/.config/bentobar/keystore.jks` and
-  `keystore.pass` (not in git; alias `bentobar`, cert SHA-256 17:1F:D5:44:…:29:E5:F9:0C; a new key since 2026-09-30, the one Google Play uses too, so GitHub
-  installs of 0.5 and earlier must be uninstalled once). The keystore and its password are backed up in the user's
-  Drive folder "Googlebook app signing keys (new keys, 2026-09-30)" (https://drive.google.com/drive/folders/1pZslZAb2fVsigLt6MApNU2A-plq-gXeI), file bentobar-keystore.jks, with a README. A debug and a release install
+- Release (`docs/RELEASING.md`): bump `versionCode` and `versionName`, add `docs/release-notes/<version>.md`
+  and Play's "What's new" (`store-submission/listing/en-US/release-notes.txt`, 500 characters at most),
+  commit, push, then `git tag v<version> && git push origin v<version>`. GitHub Actions
+  (`.github/workflows/release.yml`) builds, signs and publishes: `BentoBar.apk` + `SHA256SUMS` as the
+  GitHub release, the bundle as a draft on Google Play's closed-testing track. Someone still presses
+  "Send for review" in the Play Console. "Run workflow" on the Actions tab is a dry run.
+- The release key (alias `bentobar`, cert SHA-256 17:1F:D5:44:…:29:E5:F9:0C; a new key since 2026-09-30, the one Google Play uses too, so GitHub
+  installs of 0.5 and earlier must be uninstalled once) lives in the secrets of the GitHub environment
+  `release`; you never need the key file. The keystore and its password are backed up in the user's
+  Drive folder "Googlebook app signing keys (new keys, 2026-09-30)" (https://drive.google.com/drive/folders/1pZslZAb2fVsigLt6MApNU2A-plq-gXeI), file bentobar-keystore.jks, with a README.
+  On a machine that has `~/.config/bentobar/keystore.jks` and `keystore.pass`, `./gradlew :app:assembleRelease`
+  still signs with it; without them the release build is unsigned. A debug and a release install
   can't replace each other (different keys), so uninstall first.
 - adb uses VSCodeBook's Unix socket (`~/.config/vscodebook/android.env`), never tcp:5037.
 

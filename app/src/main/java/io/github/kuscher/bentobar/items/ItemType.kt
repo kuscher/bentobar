@@ -70,6 +70,8 @@ abstract class ItemType(
 
     /** Whether "show when active" means something for this type. */
     open val canBeActive: Boolean = false
+    /** Only ever an icon in the bar (no text to show), so settings don't offer "Show as". */
+    open val iconOnly: Boolean = false
 
     /** The "Show when…" rule in words, for types that [canBeActive]. */
     open val trigger: Trigger? = null

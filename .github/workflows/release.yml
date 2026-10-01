@@ -88,9 +88,14 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           cp app/build/outputs/apk/release/app-release.apk BentoBar.apk
           sha256sum BentoBar.apk > SHA256SUMS
-          gh release create "$GITHUB_REF_NAME" --verify-tag --title "BentoBar $VERSION" \
-            --notes-file "docs/release-notes/$VERSION.md" \
-            BentoBar.apk SHA256SUMS
+          # A re-run, or a release made by hand with the local script: leave what is published as it is.
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            echo "::notice::the release $GITHUB_REF_NAME exists already; not publishing again"
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "BentoBar $VERSION" \
+              --notes-file "docs/release-notes/$VERSION.md" \
+              BentoBar.apk SHA256SUMS
+          fi
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

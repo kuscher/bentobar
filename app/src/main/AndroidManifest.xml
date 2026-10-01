@@ -24,6 +24,11 @@
         </intent>
     </queries>
 
+    <!-- Google Play offers BentoBar only to devices that say they are a PC: Googlebooks and other
+         desktop-class Android devices (BentoBar adds items to the desktop's status bar). Android itself
+         doesn't check this, so the APK from GitHub still installs anywhere. -->
+    <uses-feature android:name="android.hardware.type.pc" android:required="true" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

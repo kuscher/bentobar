@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **On Google Play, BentoBar is for Googlebooks and other desktop-class Android devices only**
+  (devices that report themselves as a PC). The APK from GitHub still installs anywhere.
 - **Calendar and Next meeting: two items with clear rules.** **Date and calendar** shows the date;
   its menu is the month and the picked day's events, timed and all-day (meetings, flights, holidays,
   birthdays), with Join for video calls and Directions for places. **Next meeting** shows only real

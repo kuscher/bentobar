@@ -39,6 +39,7 @@ class Overlay(
 
     private val wm = context.getSystemService(WindowManager::class.java)
     private val lifecycleRegistry = LifecycleRegistry(this)
+    private val life = OverlayLifecycle(lifecycleRegistry)
     private val savedState = SavedStateRegistryController.create(this).apply { performRestore(null) }
     override val viewModelStore = ViewModelStore()
     override val lifecycle: Lifecycle get() = lifecycleRegistry
@@ -67,6 +68,7 @@ class Overlay(
     fun show(content: @Composable () -> Unit) {
         val existing = compose
         if (existing != null) { existing.setContent(content); return }
+        if (!life.shown()) return // destroyed: a window added now would never be removed
         val cv = ComposeView(context).apply { setContent(content) }
         val frame = Frame(context).apply {
             setViewTreeLifecycleOwner(this@Overlay)
@@ -76,7 +78,6 @@ class Overlay(
         }
         compose = cv
         root = frame
-        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
         wm.addView(frame, params)
     }
 
@@ -95,13 +96,14 @@ class Overlay(
         runCatching { wm.removeViewImmediate(r) }
         root = null
         compose = null
-        lifecycleRegistry.currentState = Lifecycle.State.CREATED
+        life.hidden()
     }
 
+    /** Takes the window down for good. Safe if it was never shown, and to call again. */
     fun destroy() {
         hide()
         viewModelStore.clear()
-        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+        life.destroy()
     }
 
     /** Screen position of the window's top-left corner. */
@@ -118,5 +120,34 @@ class Overlay(
             if (onKey?.invoke(event) == true) return true
             return super.dispatchKeyEvent(event)
         }
+    }
+}
+
+/**
+ * An [Overlay]'s lifecycle: RESUMED while its window is up, CREATED while it's hidden, DESTROYED
+ * once it's done with. Every call is safe in every state. LifecycleRegistry alone isn't: it throws
+ * on INITIALIZED -> DESTROYED (an overlay destroyed before it was ever shown: the strip, when the
+ * service is unbound while the status bar is hidden) and on anything after DESTROYED. Kept apart
+ * from the window so it can be unit-tested (`OverlayLifecycleTest`).
+ */
+internal class OverlayLifecycle(private val registry: LifecycleRegistry) {
+    val destroyed get() = registry.currentState == Lifecycle.State.DESTROYED
+
+    /** The window is going up. False once destroyed: there's no way back, so don't show it. */
+    fun shown(): Boolean {
+        if (destroyed) return false
+        registry.currentState = Lifecycle.State.RESUMED
+        return true
+    }
+
+    fun hidden() {
+        if (registry.currentState.isAtLeast(Lifecycle.State.CREATED)) registry.currentState = Lifecycle.State.CREATED
+    }
+
+    fun destroy() {
+        if (destroyed) return
+        // Never shown: through CREATED first, the only way LifecycleRegistry lets a lifecycle end.
+        if (registry.currentState == Lifecycle.State.INITIALIZED) registry.currentState = Lifecycle.State.CREATED
+        registry.currentState = Lifecycle.State.DESTROYED
     }
 }

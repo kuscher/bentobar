@@ -30,9 +30,13 @@ made with `scripts/play/graphics.mjs` in kuscher/googlebook-tech.
 1. **App signing (decide once, it can't be undone).** Recommended, as for Summa: *Use existing app signing key* and upload
    `~/.config/bentobar/keystore.jks` with Google's PEPK tool, so the Play build and the APKs on GitHub have the same signature and people can
    move between them without uninstalling. The same key is the upload key.
-2. **Build the bundle** (Play only takes .aab files): `./gradlew :app:bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`, signed with `~/.config/bentobar/keystore.jks` (the same key as the GitHub APK). Each upload needs a higher version code than the last
+2. **Build the bundle** (Play only takes .aab files): pushing a release tag does it (see [docs/RELEASING.md](../docs/RELEASING.md)); GitHub Actions
+   builds the bundle and signs it with the same key as the GitHub APK. By hand, on a machine that has the key:
+   `./gradlew :app:bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`. Each upload needs a higher version code than the last
    (`versionCode` in `app/build.gradle.kts` (6 for 0.5)).
 3. **Closed test first.** The developer account is a personal one: before production, a closed test with at least 12
    testers opted in for 14 days in a row.
 4. **Store listing, store settings and App content:** filled in from these files on 30 September 2026.
-5. **Release:** add the bundle to the closed testing track, paste `release-notes.txt`, send for review.
+5. **Release:** the release tag puts the bundle on the closed testing track as a draft, with `release-notes.txt` as "What's new"
+   (update that file before tagging; 500 characters at most). Then press "Send for review" in the Play Console: nothing is
+   sent for review automatically.

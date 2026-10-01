@@ -194,6 +194,9 @@ Needs JDK 21 and the Android SDK (platform 37).
 Googlebook connected over Wireless debugging. [CLAUDE.md](CLAUDE.md) explains how the code is
 organised, and [docs/research](docs/research) has the platform findings behind the design.
 
+Releases are built and signed by GitHub Actions when a `v<version>` tag is pushed, so nobody needs
+the release key on their machine: see [docs/RELEASING.md](docs/RELEASING.md).
+
 ## About this project
 
 BentoBar is my personal hobby project, made by me, [Alexander Kuscher](https://github.com/kuscher).

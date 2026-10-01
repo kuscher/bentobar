@@ -6,8 +6,15 @@ commit at every milestone.
 ## Where things live
 - Repo `~/bentobar`, GitHub github.com/kuscher/bentobar (public; was kuscher/discobar, which redirects).
   Releases carry `BentoBar.apk` (stable name for releases/latest/download/BentoBar.apk) + SHA256SUMS.
-- Release key `~/.config/bentobar/keystore.jks` + `keystore.pass` (not in git). New key since 2026-09-30
-  (also Google Play's), backed up with its password to a private folder, file bentobar-keystore.jks.
+- Releasing (since 2026-10-01, `docs/RELEASING.md`): push a tag `v<version>` and GitHub Actions builds,
+  signs and publishes the GitHub release and puts the bundle on Google Play's closed-testing track as a
+  draft ("Send for review" stays a button in the Play Console). No key needed on this machine. Release
+  texts are in `docs/release-notes/<version>.md`. The dry run ("Run workflow") passed on 2026-10-01; the
+  publishing steps run for the first time with the next tag, so watch that run. `main` is still 0.5
+  (version code 6, the build on Play) and the tag `v0.5` exists: the next release needs a new version.
+- Release key: in the secrets of the GitHub environment `release` (the Play key in `play`). New key since
+  2026-09-30 (also Google Play's), backed up with its password to a private folder, file bentobar-keystore.jks.
+  A machine with `~/.config/bentobar/keystore.jks` + `keystore.pass` (not in git) can still sign a local build.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 

@@ -26,7 +26,12 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   - `ui/`: `MainActivity` (nav rail), `BarPage` (preview, sections, item detail), `Pages`
     (Add, Look, Setup, About), `Theme`, `MenuKit` and `Controls` (shared UI pieces).
   - `tile/Tiles.kt`: the BentoBar, Keep awake and Timer tiles.
-  - `util/`: `Sym.kt` (generated), `Ui.kt` (fonts, `SymIcon`), `Fmt.kt`, `DebugReceiver.kt`.
+  - `util/`: `Sym.kt` (generated), `Ui.kt` (fonts, `SymIcon`), `Fmt.kt`, `Dates.kt` (locale-aware dates
+    and times from skeletons), `DebugReceiver.kt`.
+- Text: every user-facing string is a resource. `res/values/strings.xml` is US English (the default);
+  `res/values-en-rGB/strings.xml` holds only the strings whose British spelling differs. Item titles and
+  blurbs are `@StringRes` ids on `ItemType`; non-Compose code uses `Env.str`/`Env.plural`. Counts use
+  `<plurals>`, values use positional format args. `res/xml/locales_config.xml` lists the languages.
 - `tools/logo.py`: draws the icon (a bento box seen from above: a status bar compartment with a ‹
   and dots cut out, over three item compartments; rice, salmon, tamago and edamame on ink blue):
   launcher foreground/monochrome/background, `ic_bentobar` (24 dp, app header, ‹ menu) and

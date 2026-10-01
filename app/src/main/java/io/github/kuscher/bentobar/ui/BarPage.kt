@@ -53,6 +53,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.bar.Strip
 import io.github.kuscher.bentobar.bar.StripEntry
 import io.github.kuscher.bentobar.bar.StripEvents
@@ -67,12 +70,11 @@ import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.items.ItemState
 import io.github.kuscher.bentobar.items.Items
 import io.github.kuscher.bentobar.items.Ticker
+import io.github.kuscher.bentobar.util.Dates
 import io.github.kuscher.bentobar.util.Fonts
 import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.time.ZonedDateTime
 
 @Composable
 fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, onSetup: () -> Unit) {
@@ -81,10 +83,12 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
     val item = cfg.items.firstOrNull { it.id == selected }
     val snackbar = remember { SnackbarHostState() }
     val deleted by Undo.deleted.collectAsState()
+    val res = androidx.compose.ui.platform.LocalResources.current
     LaunchedEffect(deleted) {
         val d = deleted ?: return@LaunchedEffect
-        val name = Items.of(d.item.type)?.title ?: "item"
-        if (snackbar.showSnackbar("Deleted $name", "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) Undo.restore(d)
+        val name = Items.of(d.item.type)?.title ?: res.getString(R.string.bar_deleted_fallback)
+        if (snackbar.showSnackbar(res.getString(R.string.bar_deleted, name), res.getString(R.string.bar_undo),
+                duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) Undo.restore(d)
         Undo.deleted.value = null
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -108,7 +112,7 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
             } else {
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     if (item != null) {
-                        TextButton(onClick = { onSelect(null) }) { SymIcon(Sym.ARROW_BACK, size = 18.sp); Spacer(Modifier.width(6.dp)); Text("All items") }
+                        TextButton(onClick = { onSelect(null) }) { SymIcon(Sym.ARROW_BACK, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.bar_all_items)) }
                         ItemDetail(item, states[item.id], onSelect)
                     } else Sections(cfg.items, states, selected, onSelect)
                 }
@@ -125,12 +129,12 @@ private fun SetupBanner(onSetup: () -> Unit) {
             SymIcon(Sym.INFO, size = 24.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text("One step left: turn on BentoBar", style = MaterialTheme.typography.titleMedium,
+                Text(stringResource(R.string.bar_banner_title), style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer)
-                Text("Android only lets apps draw on the status bar through an accessibility service. Setup explains what that means.",
+                Text(stringResource(R.string.bar_banner_text),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
             }
-            FilledTonalButton(onClick = onSetup) { Text("Set up") }
+            FilledTonalButton(onClick = onSetup) { Text(stringResource(R.string.bar_banner_set_up)) }
         }
     }
 }
@@ -140,8 +144,8 @@ private fun Placeholder() {
     Column(Modifier.fillMaxWidth().padding(top = 40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         SymIcon(Sym.TOUCH_APP, size = 40.sp, color = MaterialTheme.colorScheme.outline)
         Spacer(Modifier.height(10.dp))
-        Text("Pick an item to change it", style = MaterialTheme.typography.titleMedium)
-        Text("Or right-click an item in the status bar.", style = MaterialTheme.typography.bodyMedium,
+        Text(stringResource(R.string.bar_placeholder_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.bar_placeholder_text), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -185,9 +189,11 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
             Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(18.dp))
                 .background(barBrush),
         ) {
-            val now = remember(tick) { LocalDateTime.now() }
+            val now = remember(tick) { ZonedDateTime.now() }
+            // The system's 12/24-hour setting and the locale's own short date, like the real status bar.
+            val h24 = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
             Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(now.format(DateTimeFormatter.ofPattern("H:mm   EEE, MMM d", Locale.getDefault())), color = look.fg,
+                Text(Dates.format(Dates.timeSkeleton(h24), now) + "   " + Dates.format("EEEMMMd", now), color = look.fg,
                     fontFamily = Fonts.bar, fontSize = 14.sp)
                 if (cfg.position == Position.LEFT) Spacer(Modifier.width(16.dp)) else Spacer(Modifier.weight(1f))
                 Strip(entries(visible), if (expanded) entries(hidden) else emptyList(), cfg.chevron && hidden.isNotEmpty(), expanded,
@@ -202,7 +208,7 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 }
             }
         }
-        Text("Preview. Click an item to edit it" + if (hidden.isNotEmpty()) ", and ‹ to show hidden items." else ".",
+        Text(stringResource(if (hidden.isNotEmpty()) R.string.bar_preview_hint_hidden else R.string.bar_preview_hint),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 6.dp, top = 6.dp))
     }
@@ -210,17 +216,17 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
 
 @Composable
 private fun Sections(items: List<ItemConfig>, states: Map<String, ItemState>, selected: String?, onSelect: (String?) -> Unit) {
-    SectionCard(Section.SHOWN, "In the bar", "Left to right, as they appear", items, states, selected, onSelect)
+    SectionCard(Section.SHOWN, stringResource(R.string.section_shown), stringResource(R.string.section_shown_help), items, states, selected, onSelect)
     val cfg by Store.config.collectAsState()
     // Says how hidden items come back with the current settings (hover reveal is off by default).
-    val reveal = when {
-        cfg.chevron && cfg.revealOnHover -> "Revealed by the ‹ button or by hovering over BentoBar."
-        cfg.chevron -> "Revealed by the ‹ button."
-        cfg.revealOnHover -> "Revealed by hovering over BentoBar."
-        else -> "Not revealed: the ‹ button is off (Look)."
-    }
-    SectionCard(Section.HIDDEN, "Hidden behind ‹", "$reveal Items set to show when active pop out on their own.", items, states, selected, onSelect)
-    SectionCard(Section.OFF, "Off", "Kept with their settings, not shown", items, states, selected, onSelect)
+    val reveal = stringResource(when {
+        cfg.chevron && cfg.revealOnHover -> R.string.section_hidden_reveal_both
+        cfg.chevron -> R.string.section_hidden_reveal_chevron
+        cfg.revealOnHover -> R.string.section_hidden_reveal_hover
+        else -> R.string.section_hidden_reveal_none
+    })
+    SectionCard(Section.HIDDEN, stringResource(R.string.section_hidden), stringResource(R.string.section_hidden_help, reveal), items, states, selected, onSelect)
+    SectionCard(Section.OFF, stringResource(R.string.common_off), stringResource(R.string.section_off_help), items, states, selected, onSelect)
 }
 
 @Composable
@@ -234,7 +240,7 @@ private fun SectionCard(section: Section, title: String, help: String, all: List
             Text(help, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp))
             Spacer(Modifier.height(6.dp))
-            if (items.isEmpty()) Text("Nothing here", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
+            if (items.isEmpty()) Text(stringResource(R.string.section_empty), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             items.forEachIndexed { i, item -> ItemRow(item, states[item.id], i, items.size, item.id == selected, onSelect) }
         }
@@ -258,25 +264,25 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
         Column(Modifier.weight(1f)) {
             Text(type.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val overflow by io.github.kuscher.bentobar.bar.BarOverflow.ids.collectAsState()
-            val detail = listOfNotNull(if (item.id in overflow) "doesn't fit in the bar right now (in the ‹ menu)" else null,
+            val detail = listOfNotNull(if (item.id in overflow) stringResource(R.string.row_overflow) else null,
                 state?.text?.takeIf { it.isNotBlank() },
-                if (item.whenActive && item.section == Section.HIDDEN) "shows when active" else null,
-                when (item.display) { Display.ICON -> "icon only"; Display.TEXT -> "text only"; else -> null }).joinToString(" · ")
+                if (item.whenActive && item.section == Section.HIDDEN) stringResource(R.string.row_when_active) else null,
+                when (item.display) { Display.ICON -> stringResource(R.string.row_icon_only); Display.TEXT -> stringResource(R.string.row_text_only); else -> null }).joinToString(" · ")
             if (detail.isNotEmpty()) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        IconButton(onClick = { Store.move(item.id, item.section, index - 1) }, enabled = index > 0) { SymIcon(Sym.ARROW_UPWARD, size = 18.sp, contentDescription = "Move ${type.title} up") }
-        IconButton(onClick = { Store.move(item.id, item.section, index + 1) }, enabled = index < count - 1) { SymIcon(Sym.ARROW_DOWNWARD, size = 18.sp, contentDescription = "Move ${type.title} down") }
+        IconButton(onClick = { Store.move(item.id, item.section, index - 1) }, enabled = index > 0) { SymIcon(Sym.ARROW_UPWARD, size = 18.sp, contentDescription = stringResource(R.string.row_move_up, type.title)) }
+        IconButton(onClick = { Store.move(item.id, item.section, index + 1) }, enabled = index < count - 1) { SymIcon(Sym.ARROW_DOWNWARD, size = 18.sp, contentDescription = stringResource(R.string.row_move_down, type.title)) }
         Box {
-            IconButton(onClick = { menu = true }) { SymIcon(Sym.MENU, size = 18.sp, contentDescription = "More for ${type.title}") }
+            IconButton(onClick = { menu = true }) { SymIcon(Sym.MENU, size = 18.sp, contentDescription = stringResource(R.string.row_more, type.title)) }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                if (item.section != Section.SHOWN) DropdownMenuItem(text = { Text("Show in the bar") }, onClick = { menu = false; Store.move(item.id, Section.SHOWN, 999) },
+                if (item.section != Section.SHOWN) DropdownMenuItem(text = { Text(stringResource(R.string.row_show_in_bar)) }, onClick = { menu = false; Store.move(item.id, Section.SHOWN, 999) },
                     leadingIcon = { SymIcon(Sym.VISIBILITY, size = 18.sp) })
-                if (item.section != Section.HIDDEN) DropdownMenuItem(text = { Text("Hide behind ‹") }, onClick = { menu = false; Store.move(item.id, Section.HIDDEN, 999) },
+                if (item.section != Section.HIDDEN) DropdownMenuItem(text = { Text(stringResource(R.string.section_hidden)) }, onClick = { menu = false; Store.move(item.id, Section.HIDDEN, 999) },
                     leadingIcon = { SymIcon(Sym.VISIBILITY_OFF, size = 18.sp) })
-                if (item.section != Section.OFF) DropdownMenuItem(text = { Text("Turn off") }, onClick = { menu = false; Store.move(item.id, Section.OFF, 999) },
+                if (item.section != Section.OFF) DropdownMenuItem(text = { Text(stringResource(R.string.common_turn_off)) }, onClick = { menu = false; Store.move(item.id, Section.OFF, 999) },
                     leadingIcon = { SymIcon(Sym.REMOVE, size = 18.sp) })
-                DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; if (selected) onSelect(null); Undo.delete(item) },
+                DropdownMenuItem(text = { Text(stringResource(R.string.common_delete)) }, onClick = { menu = false; if (selected) onSelect(null); Undo.delete(item) },
                     leadingIcon = { SymIcon(Sym.DELETE, size = 18.sp) })
             }
         }
@@ -308,32 +314,34 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
             if (missing.isNotEmpty()) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer), modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("This item needs access to your calendar. It stays on this device.", style = MaterialTheme.typography.bodyMedium,
+                        Text(stringResource(R.string.detail_needs_calendar), style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onTertiaryContainer)
-                        FilledTonalButton(onClick = { (context as? android.app.Activity)?.requestPermissions(missing.toTypedArray(), 2) }) { Text("Allow") }
+                        FilledTonalButton(onClick = { (context as? android.app.Activity)?.requestPermissions(missing.toTypedArray(), 2) }) { Text(stringResource(R.string.common_allow)) }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
             }
-            ChoiceRow("Where", listOf(Section.SHOWN to "In the bar", Section.HIDDEN to "Hidden behind ‹", Section.OFF to "Off"), item.section) { s ->
+            ChoiceRow(stringResource(R.string.detail_where), listOf(Section.SHOWN to stringResource(R.string.section_shown),
+                Section.HIDDEN to stringResource(R.string.section_hidden), Section.OFF to stringResource(R.string.common_off)), item.section) { s ->
                 Store.move(item.id, s, 999)
             }
-            if (type.canBeActive) SwitchRow("Show itself when active", item.whenActive,
-                help = "Stays hidden until it has something to say, like a running timer or a meeting about to start") { on ->
+            if (type.canBeActive) SwitchRow(stringResource(R.string.detail_when_active), item.whenActive,
+                help = stringResource(R.string.detail_when_active_help)) { on ->
                 Store.updateItem(item.id) { it.copy(whenActive = on, section = if (on && it.section == Section.SHOWN) Section.HIDDEN else it.section) }
             }
-            ChoiceRow("Show as", listOf(Display.ICON_AND_TEXT to "Icon and text", Display.TEXT to "Text", Display.ICON to "Icon"), item.display) { d ->
+            ChoiceRow(stringResource(R.string.display_show_as), listOf(Display.ICON_AND_TEXT to stringResource(R.string.display_icon_and_text),
+                Display.TEXT to stringResource(R.string.display_text), Display.ICON to stringResource(R.string.display_icon)), item.display) { d ->
                 Store.updateItem(item.id) { it.copy(display = d) }; Ticker.refresh()
             }
             type.options?.let { opts ->
                 Spacer(Modifier.height(4.dp))
-                SectionLabel("Options")
+                SectionLabel(stringResource(R.string.detail_options))
                 opts(item) { changed -> Store.updateItem(item.id) { changed }; Ticker.refresh() }
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = { onSelect(Store.add(item.type, item.section, item.options)) }) { Text("Duplicate") }
-                TextButton(onClick = { onSelect(null); Undo.delete(item) }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                OutlinedButton(onClick = { onSelect(Store.add(item.type, item.section, item.options)) }) { Text(stringResource(R.string.detail_duplicate)) }
+                TextButton(onClick = { onSelect(null); Undo.delete(item) }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             }
         }
     }

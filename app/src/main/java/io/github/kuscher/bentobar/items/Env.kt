@@ -17,6 +17,9 @@ import android.os.StatFs
 import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
+import androidx.annotation.PluralsRes
+import androidx.annotation.StringRes
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.Store
 
 /**
@@ -63,12 +66,20 @@ object Env {
         true
     } catch (e: ActivityNotFoundException) {
         Log.w(TAG, "no activity for $intent")
-        Toast.makeText(app, "Nothing on this device can open that", Toast.LENGTH_SHORT).show()
+        Toast.makeText(app, app.getString(R.string.toast_nothing_can_open), Toast.LENGTH_SHORT).show()
         false
     } catch (e: SecurityException) {
         Log.w(TAG, "not allowed: $intent", e)
         false
     }
+
+    /** A string in the app's language, for code outside Compose (item states, notifications, tiles). */
+    fun str(@StringRes id: Int): String = app.getString(id)
+    fun str(@StringRes id: Int, vararg args: Any): String = app.getString(id, *args)
+
+    /** A plural string; the count is also the first format argument unless [args] are given. */
+    fun plural(@PluralsRes id: Int, count: Int, vararg args: Any): String =
+        if (args.isEmpty()) app.resources.getQuantityString(id, count, count) else app.resources.getQuantityString(id, count, *args)
 
     fun global(action: Int): Boolean = service?.performGlobalAction(action) ?: false
 
@@ -134,22 +145,25 @@ class NetSampler {
     }
 
     /** "Wi-Fi", "Ethernet", … plus metered state, from the default network. */
-    fun describe(context: Context): String = runCatching { describeOrThrow(context) }.getOrDefault("Network")
+    fun describe(context: Context): String = runCatching { describeOrThrow(context) }.getOrDefault(context.getString(R.string.network_menu_title))
 
     private fun describeOrThrow(context: Context): String {
-        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return "Unknown"
-        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return "Offline"
+        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return context.getString(R.string.common_unknown)
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return context.getString(R.string.network_kind_offline)
         val kind = when {
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Mobile data"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> "Bluetooth tethering"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_USB) -> "USB tethering"
-            else -> "Connected"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> R.string.network_kind_wifi
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> R.string.network_kind_ethernet
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> R.string.network_kind_mobile
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> R.string.network_kind_bluetooth
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_USB) -> R.string.network_kind_usb
+            else -> R.string.network_kind_connected
         }
-        val vpn = if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) " · VPN" else ""
-        val metered = if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) " · metered" else ""
-        return kind + vpn + metered
+        // "Wi-Fi · VPN · metered": separate words joined with the typographic dot.
+        return listOfNotNull(
+            context.getString(kind),
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) context.getString(R.string.network_kind_vpn) else null,
+            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) context.getString(R.string.network_kind_metered) else null,
+        ).joinToString(" · ")
     }
 }
 
@@ -303,42 +317,42 @@ class BatterySampler {
         thermal = context.getSystemService(PowerManager::class.java)?.currentThermalStatus ?: thermal
     }
 
-    fun statusText(): String = when (status) {
-        BatteryManager.BATTERY_STATUS_CHARGING -> "Charging"
-        BatteryManager.BATTERY_STATUS_DISCHARGING -> "On battery"
-        BatteryManager.BATTERY_STATUS_FULL -> "Full"
-        BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "Plugged in, not charging"
-        else -> "Unknown"
-    }
+    fun statusText(): String = Env.str(when (status) {
+        BatteryManager.BATTERY_STATUS_CHARGING -> R.string.battery_status_charging
+        BatteryManager.BATTERY_STATUS_DISCHARGING -> R.string.battery_status_discharging
+        BatteryManager.BATTERY_STATUS_FULL -> R.string.battery_status_full
+        BatteryManager.BATTERY_STATUS_NOT_CHARGING -> R.string.battery_status_not_charging
+        else -> R.string.common_unknown
+    })
 
-    fun sourceText(): String = when (plugged) {
-        BatteryManager.BATTERY_PLUGGED_AC -> "Charger"
-        BatteryManager.BATTERY_PLUGGED_USB -> "USB"
-        BatteryManager.BATTERY_PLUGGED_WIRELESS -> "Wireless"
-        BatteryManager.BATTERY_PLUGGED_DOCK -> "Dock"
-        0 -> "Battery"
-        else -> "Power"
-    }
+    fun sourceText(): String = Env.str(when (plugged) {
+        BatteryManager.BATTERY_PLUGGED_AC -> R.string.battery_source_charger
+        BatteryManager.BATTERY_PLUGGED_USB -> R.string.battery_source_usb
+        BatteryManager.BATTERY_PLUGGED_WIRELESS -> R.string.battery_source_wireless
+        BatteryManager.BATTERY_PLUGGED_DOCK -> R.string.battery_source_dock
+        0 -> R.string.battery_source_battery
+        else -> R.string.battery_source_power
+    })
 
-    fun healthText(): String = when (health) {
-        BatteryManager.BATTERY_HEALTH_GOOD -> "Good"
-        BatteryManager.BATTERY_HEALTH_OVERHEAT -> "Overheating"
-        BatteryManager.BATTERY_HEALTH_DEAD -> "Dead"
-        BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "Over voltage"
-        BatteryManager.BATTERY_HEALTH_COLD -> "Cold"
-        BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "Failure"
-        else -> "Unknown"
-    }
+    fun healthText(): String = Env.str(when (health) {
+        BatteryManager.BATTERY_HEALTH_GOOD -> R.string.battery_health_good
+        BatteryManager.BATTERY_HEALTH_OVERHEAT -> R.string.battery_health_overheat
+        BatteryManager.BATTERY_HEALTH_DEAD -> R.string.battery_health_dead
+        BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> R.string.battery_health_over_voltage
+        BatteryManager.BATTERY_HEALTH_COLD -> R.string.battery_health_cold
+        BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> R.string.battery_health_failure
+        else -> R.string.common_unknown
+    })
 
-    fun thermalText(): String = when (thermal) {
-        PowerManager.THERMAL_STATUS_NONE -> "Normal"
-        PowerManager.THERMAL_STATUS_LIGHT -> "Warm"
-        PowerManager.THERMAL_STATUS_MODERATE -> "Hot, slowing a little"
-        PowerManager.THERMAL_STATUS_SEVERE -> "Hot, slowing down"
-        PowerManager.THERMAL_STATUS_CRITICAL -> "Critical"
-        PowerManager.THERMAL_STATUS_EMERGENCY, PowerManager.THERMAL_STATUS_SHUTDOWN -> "Shutting down soon"
-        else -> "Unknown"
-    }
+    fun thermalText(): String = Env.str(when (thermal) {
+        PowerManager.THERMAL_STATUS_NONE -> R.string.battery_thermal_normal
+        PowerManager.THERMAL_STATUS_LIGHT -> R.string.battery_thermal_warm
+        PowerManager.THERMAL_STATUS_MODERATE -> R.string.battery_thermal_moderate
+        PowerManager.THERMAL_STATUS_SEVERE -> R.string.battery_thermal_severe
+        PowerManager.THERMAL_STATUS_CRITICAL -> R.string.battery_thermal_critical
+        PowerManager.THERMAL_STATUS_EMERGENCY, PowerManager.THERMAL_STATUS_SHUTDOWN -> R.string.battery_thermal_shutdown
+        else -> R.string.common_unknown
+    })
 }
 
 class StorageSampler {

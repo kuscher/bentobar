@@ -22,6 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.Display
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Section
@@ -70,27 +73,28 @@ fun ItemContextMenu(itemId: String, host: MenuHost, openMenu: () -> Unit) {
     val item = cfg.items.firstOrNull { it.id == itemId } ?: return
     val type = Items.of(item.type) ?: return
     MenuCard(type.icon, type.title, when (item.section) {
-        Section.SHOWN -> "Shown in the bar"
-        Section.HIDDEN -> if (item.whenActive) "Hidden, shows when active" else "Hidden behind ‹"
-        Section.OFF -> "Off"
+        Section.SHOWN -> stringResource(R.string.context_shown)
+        Section.HIDDEN -> stringResource(if (item.whenActive) R.string.context_hidden_when_active else R.string.section_hidden)
+        Section.OFF -> stringResource(R.string.common_off)
     }) {
-        if (type.menu != null) MenuEntry(Sym.OPEN_IN_NEW, "Open") { openMenu() }
-        if (item.section != Section.SHOWN) MenuEntry(Sym.VISIBILITY, "Always show") { Store.updateItem(item.id) { it.copy(section = Section.SHOWN) } }
-        if (item.section != Section.HIDDEN) MenuEntry(Sym.VISIBILITY_OFF, "Hide behind ‹") { Store.updateItem(item.id) { it.copy(section = Section.HIDDEN) } }
-        if (type.canBeActive) MenuEntry(if (item.whenActive) Sym.CHECK_CIRCLE else Sym.UPDATE, "Show when active",
+        if (type.menu != null) MenuEntry(Sym.OPEN_IN_NEW, stringResource(R.string.common_open)) { openMenu() }
+        if (item.section != Section.SHOWN) MenuEntry(Sym.VISIBILITY, stringResource(R.string.context_always_show)) { Store.updateItem(item.id) { it.copy(section = Section.SHOWN) } }
+        if (item.section != Section.HIDDEN) MenuEntry(Sym.VISIBILITY_OFF, stringResource(R.string.section_hidden)) { Store.updateItem(item.id) { it.copy(section = Section.HIDDEN) } }
+        if (type.canBeActive) MenuEntry(if (item.whenActive) Sym.CHECK_CIRCLE else Sym.UPDATE, stringResource(R.string.context_show_when_active),
             detail = if (item.whenActive) "✓" else null) {
             Store.updateItem(item.id) { it.copy(whenActive = !it.whenActive, section = if (!it.whenActive && it.section == Section.SHOWN) Section.HIDDEN else it.section) }
         }
-        SectionLabel("Show as")
-        val displays = listOf(Display.ICON_AND_TEXT to "Icon and text", Display.TEXT to "Text", Display.ICON to "Icon")
+        SectionLabel(stringResource(R.string.display_show_as))
+        val displays = listOf(Display.ICON_AND_TEXT to stringResource(R.string.display_icon_and_text), Display.TEXT to stringResource(R.string.display_text),
+            Display.ICON to stringResource(R.string.display_icon))
         ChipRow(displays.map { (d, l) -> if (d == item.display) "✓ $l" else l }) { i ->
             Store.updateItem(item.id) { it.copy(display = displays[i].first) }
             Ticker.refresh()
         }
         MenuDivider()
-        MenuEntry(Sym.TUNE, "Item settings…") { host.openItemSettings(item.id) }
+        MenuEntry(Sym.TUNE, stringResource(R.string.context_item_settings)) { host.openItemSettings(item.id) }
         // It turns the item off (kept with its settings), so it says so; Delete is in settings, with an undo.
-        MenuEntry(Sym.VISIBILITY_OFF, "Turn off") { host.close(); Store.updateItem(item.id) { it.copy(section = Section.OFF) } }
+        MenuEntry(Sym.VISIBILITY_OFF, stringResource(R.string.common_turn_off)) { host.close(); Store.updateItem(item.id) { it.copy(section = Section.OFF) } }
     }
 }
 
@@ -104,10 +108,11 @@ fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> 
     val hidden = cfg.items.filter {
         (it.section == Section.HIDDEN && !(it.whenActive && states[it.id]?.active == true)) || it.id in overflow
     }
-    MenuCard(Sym.WYSIWYG, "BentoBar", if (hidden.isEmpty()) "No hidden items" else "${hidden.size} hidden",
+    MenuCard(Sym.WYSIWYG, stringResource(R.string.app_name),
+        if (hidden.isEmpty()) stringResource(R.string.barmenu_no_hidden) else pluralStringResource(R.plurals.barmenu_hidden_count, hidden.size, hidden.size),
         iconRes = io.github.kuscher.bentobar.R.drawable.ic_bentobar) {
         if (hidden.isNotEmpty()) {
-            SectionLabel("Hidden items")
+            SectionLabel(stringResource(R.string.barmenu_hidden_items))
             hidden.forEach { item ->
                 val type = Items.of(item.type) ?: return@forEach
                 val s = states[item.id]
@@ -115,9 +120,9 @@ fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> 
             }
             MenuDivider()
         }
-        MenuEntry(Sym.EDIT, "Edit the bar…") { host.openItemSettings("") }
-        MenuEntry(Sym.VISIBILITY_OFF, "Hide BentoBar", detail = "e.g. to present") { host.close(); hideBar() }
-        Text("Bring it back from BentoBar's app or its Quick Settings tile.", style = MaterialTheme.typography.bodySmall,
+        MenuEntry(Sym.EDIT, stringResource(R.string.barmenu_edit)) { host.openItemSettings("") }
+        MenuEntry(Sym.VISIBILITY_OFF, stringResource(R.string.barmenu_hide), detail = stringResource(R.string.barmenu_hide_detail)) { host.close(); hideBar() }
+        Text(stringResource(R.string.barmenu_bring_back), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 4.dp))
     }
 }

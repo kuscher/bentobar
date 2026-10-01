@@ -1,10 +1,557 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<!-- The default text: US English. British spellings live in values-en-rGB. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+
+    <!-- base -->
     <string name="app_name">BentoBar</string>
     <string name="a11y_label">BentoBar</string>
     <string name="a11y_summary">Draws your BentoBar items in the status bar</string>
-    <string name="a11y_description">BentoBar draws the items you add (network speed, timer, calendar, tools…) on top of the status bar. Android only allows that through an accessibility service.\n\nWhat BentoBar does with it: it reads the layout of the status bar, and nothing else, to find free space; it copies the colour of the status bar clock so your items match; and it runs system actions such as screenshot or lock when you pick them in its Tools menu.\n\nIt does not read other apps\' windows, does not watch your keyboard, mouse or touches, and has no internet access.</string>
+    <string name="a11y_description">BentoBar draws the items you add (network speed, timer, calendar, tools…) on top of the status bar. Android only allows that through an accessibility service.\n\nWhat BentoBar does with it: it reads the layout of the status bar, and nothing else, to find free space; it copies the color of the status bar clock so your items match; and it runs system actions such as screenshot or lock when you pick them in its Tools menu.\n\nIt does not read other apps\' windows, does not watch your keyboard, mouse or touches, and has no internet access.</string>
     <string name="tile_bar">BentoBar</string>
     <string name="tile_awake">Keep awake</string>
     <string name="tile_timer">Timer</string>
+
+    <!-- env -->
+    <string name="toast_nothing_can_open">Nothing on this device can open that</string>
+    <string name="common_unknown">Unknown</string>
+    <string name="network_kind_offline">Offline</string>
+    <string name="network_kind_wifi">Wi-Fi</string>
+    <string name="network_kind_ethernet">Ethernet</string>
+    <string name="network_kind_mobile">Mobile data</string>
+    <string name="network_kind_bluetooth">Bluetooth tethering</string>
+    <string name="network_kind_usb">USB tethering</string>
+    <string name="network_kind_connected">Connected</string>
+    <string name="network_kind_vpn">VPN</string>
+    <string name="network_kind_metered">metered</string>
+    <string name="battery_status_charging">Charging</string>
+    <string name="battery_status_discharging">On battery</string>
+    <string name="battery_status_full">Full</string>
+    <string name="battery_status_not_charging">Plugged in, not charging</string>
+    <string name="battery_source_charger">Charger</string>
+    <string name="battery_source_usb">USB</string>
+    <string name="battery_source_wireless">Wireless</string>
+    <string name="battery_source_dock">Dock</string>
+    <string name="battery_source_battery">Battery</string>
+    <string name="battery_source_power">Power</string>
+    <string name="battery_health_good">Good</string>
+    <string name="battery_health_overheat">Overheating</string>
+    <string name="battery_health_dead">Dead</string>
+    <string name="battery_health_over_voltage">Over voltage</string>
+    <string name="battery_health_cold">Cold</string>
+    <string name="battery_health_failure">Failure</string>
+    <string name="battery_thermal_normal">Normal</string>
+    <string name="battery_thermal_warm">Warm</string>
+    <string name="battery_thermal_moderate">Hot, slowing a little</string>
+    <string name="battery_thermal_severe">Hot, slowing down</string>
+    <string name="battery_thermal_critical">Critical</string>
+    <string name="battery_thermal_shutdown">Shutting down soon</string>
+
+    <!-- system -->
+    <string name="item_network_title">Network speed</string>
+    <string name="item_network_desc">Download and upload speed, with a chart</string>
+    <string name="network_state_desc">Network: %1$s/s down, %2$s/s up</string>
+    <string name="network_menu_title">Network</string>
+    <string name="network_download">Download</string>
+    <string name="network_upload">Upload</string>
+    <string name="network_received">Received since start-up</string>
+    <string name="network_sent">Sent since start-up</string>
+    <string name="network_internet_settings">Internet settings</string>
+    <string name="network_data_usage">Data usage</string>
+    <string name="option_show">Show</string>
+    <string name="network_show_both">Down and up</string>
+    <string name="network_show_total">Total</string>
+    <string name="option_active_above">Counts as active above</string>
+    <string name="item_cpu_title">CPU load</string>
+    <string name="item_cpu_desc">How busy the processor is, per core, with clock speeds</string>
+    <string name="cpu_unavailable_desc">This device doesn\'t share CPU load with apps</string>
+    <string name="cpu_state_desc">CPU %1$s busy</string>
+    <string name="cpu_state_desc_high">CPU %1$s busy, high</string>
+    <string name="cpu_menu_title">CPU</string>
+    <string name="cpu_menu_unavailable">Not available on this device</string>
+    <string name="cpu_cores">Cores</string>
+    <string name="cpu_cluster">Cores %1$s</string>
+    <string name="cpu_cluster_clock">%1$s of %2$s GHz</string>
+    <string name="cpu_gpu">Graphics (GPU)</string>
+    <string name="cpu_battery_usage">Battery usage by app</string>
+    <string name="item_memory_title">Memory</string>
+    <string name="item_memory_desc">How much RAM is in use</string>
+    <string name="memory_state_desc">Memory %1$s used</string>
+    <string name="memory_in_use">%1$s in use</string>
+    <string name="common_used">Used</string>
+    <string name="memory_available">Available</string>
+    <string name="memory_installed">Installed</string>
+    <string name="memory_state">State</string>
+    <string name="memory_low">Low memory</string>
+    <string name="common_apps">Apps</string>
+    <string name="item_battery_title">Battery details</string>
+    <string name="item_battery_desc">Power draw in watts, temperature, time to full</string>
+    <string name="battery_state_desc">Battery %1$s, %2$s, %3$s watts</string>
+    <string name="battery_menu_title">Battery</string>
+    <string name="battery_charging_at">Charging at</string>
+    <string name="battery_using">Using</string>
+    <string name="battery_power_source">Power source</string>
+    <string name="battery_voltage">Voltage</string>
+    <string name="battery_current">Current</string>
+    <string name="battery_temperature">Temperature</string>
+    <string name="battery_health">Health</string>
+    <string name="battery_cycles">Charge cycles</string>
+    <string name="battery_full_in">Full in</string>
+    <string name="battery_thermal_state">Thermal state</string>
+    <string name="battery_usage">Battery usage</string>
+    <string name="battery_saver">Battery saver</string>
+    <string name="battery_show_watts">Watts</string>
+    <string name="battery_show_percent">Percent</string>
+    <string name="battery_show_time">Time to full</string>
+    <string name="item_storage_title">Storage</string>
+    <string name="item_storage_desc">Free space on the device</string>
+    <string name="storage_state_desc">%1$s free</string>
+    <string name="storage_free_of">%1$s free of %2$s</string>
+    <string name="storage_free">Free</string>
+    <string name="storage_settings">Storage settings</string>
+    <string name="storage_free_up">Free up space</string>
+
+    <!-- time -->
+    <string name="item_clock_title">Clock</string>
+    <string name="item_clock_desc">A second clock: seconds, 24-hour or another time zone</string>
+    <string name="clock_world">World clock</string>
+    <string name="clock_tomorrow">Tomorrow</string>
+    <string name="clock_yesterday">Yesterday</string>
+    <string name="clock_local">Local</string>
+    <string name="clock_here">Here (%1$s)</string>
+    <string name="clock_alarms">Alarms and timers</string>
+    <string name="clock_date_settings">Date and time settings</string>
+    <string name="option_label">Label</string>
+    <string name="clock_label_help">Shown before the time, e.g. NYC</string>
+    <string name="option_none">None</string>
+    <string name="clock_hours">Hours</string>
+    <string name="option_like_system">Like the system</string>
+    <string name="clock_hours_24">24-hour</string>
+    <string name="clock_hours_12">12-hour</string>
+    <string name="clock_seconds">Seconds</string>
+    <string name="clock_zone_named">Time zone: %1$s (%2$s)</string>
+    <string name="clock_zone_device">Time zone: this device\'s</string>
+    <string name="clock_zone_find">Find a city or zone</string>
+    <string name="clock_zone_find_hint">e.g. Tokyo, London, New York</string>
+    <string name="clock_zone_none">No zone matches</string>
+    <string name="clock_zone_use_device">Use this device\'s time zone</string>
+    <string name="item_calendar_title">Date and calendar</string>
+    <string name="item_calendar_desc">Today\'s date; click for a month view with your events</string>
+    <string name="calendar_date_in_bar">Date in the bar</string>
+    <string name="calendar_week_number">Week number</string>
+    <string name="calendar_own_pattern">Or your own pattern</string>
+    <string name="calendar_own_pattern_help">Java date pattern, e.g. EEE d MMM yyyy</string>
+    <string name="calendar_week_numbers">Week numbers in the month view</string>
+    <string name="calendar_week">Week %1$d</string>
+    <string name="calendar_previous_month">Previous month</string>
+    <string name="calendar_today">Today</string>
+    <string name="calendar_next_month">Next month</string>
+    <string name="calendar_allow_hint">Allow calendar access to see your events here.</string>
+    <string name="calendar_allow">Allow calendar access</string>
+    <string name="calendar_no_events">No events</string>
+    <string name="calendar_open">Open Calendar</string>
+    <string name="calendar_all_day">All day</string>
+    <string name="item_event_title">Next meeting</string>
+    <string name="item_event_desc">Your next calendar event and a countdown, with a Join button</string>
+    <string name="event_allow">Allow calendar</string>
+    <string name="event_access_needed">Calendar access needed</string>
+    <string name="event_now_text">%1$s · %2$s left</string>
+    <string name="event_now_desc">Now: %1$s, ends in %2$s</string>
+    <string name="event_no_more">No more events</string>
+    <string name="event_none_upcoming">No upcoming events</string>
+    <string name="event_in">in %1$s</string>
+    <string name="event_next_text">%1$s %2$s</string>
+    <string name="event_next_desc">Next: %1$s %2$s</string>
+    <string name="event_needs_calendar">BentoBar needs to read your calendar for this</string>
+    <string name="event_nothing_coming">Nothing coming up</string>
+    <string name="event_now_ends_in">Now · ends in %1$s</string>
+    <string name="event_starts_in">Starts in %1$s</string>
+    <string name="common_join">Join</string>
+    <string name="common_open">Open</string>
+    <string name="event_coming_up">Coming up</string>
+    <string name="event_nothing_else">Nothing else in the next weeks</string>
+    <string name="event_active_from">Counts as active from</string>
+    <string name="event_longest_title">Longest title</string>
+    <string name="item_timer_title">Timer</string>
+    <string name="item_timer_desc">Countdown, stopwatch and Pomodoro; scroll to add minutes</string>
+    <string name="common_done">Done</string>
+    <string name="timer_finished_desc">Timer finished</string>
+    <string name="timer_stopwatch_desc">Stopwatch %1$s</string>
+    <string name="timer_break_left_desc">Break %1$s left</string>
+    <string name="timer_left_desc">Timer %1$s left</string>
+    <string name="timer_menu_hint">Scroll over the timer in the bar to add minutes</string>
+    <string name="timer_countdown">Countdown</string>
+    <string name="timer_minutes">Minutes</string>
+    <string name="timer_start">Start</string>
+    <string name="timer_stopwatch">Stopwatch</string>
+    <string name="timer_pomodoro">Pomodoro</string>
+    <string name="timer_pomodoro_detail">25 + 5 min</string>
+    <string name="timer_focus">Focus</string>
+    <string name="timer_break">Break</string>
+    <string name="timer_round">Round %1$d · long break every 4</string>
+    <string name="timer_running">Running</string>
+    <string name="common_paused">Paused</string>
+    <string name="common_ends_at">Ends at %1$s</string>
+    <string name="common_pause">Pause</string>
+    <string name="common_resume">Resume</string>
+    <string name="common_plus_one_min">+1 min</string>
+    <string name="timer_reset_stopwatch">Reset stopwatch</string>
+    <string name="timer_stop">Stop timer</string>
+    <string name="timer_name">Name for countdowns</string>
+    <string name="timer_name_help">Shown in the alert when it ends</string>
+    <string name="item_countdown_title">Countdown</string>
+    <string name="item_countdown_desc">Days and hours until a date you pick</string>
+    <string name="countdown_set_date">Set a date</string>
+    <string name="countdown_no_date">Countdown without a date</string>
+    <string name="countdown_now">Now</string>
+    <string name="countdown_desc">%1$s: %2$s left</string>
+    <string name="countdown_time_left">Time left</string>
+    <string name="countdown_days">Days</string>
+    <string name="countdown_change_date">Change date</string>
+    <string name="countdown_label_hint">e.g. Launch</string>
+    <string name="countdown_date_time">Date and time</string>
+    <string name="countdown_date_time_help">Year-month-day hour:minute</string>
+
+    <!-- tool -->
+    <string name="item_caffeine_title">Keep awake</string>
+    <string name="item_caffeine_desc">Stops the screen from turning off; click to switch</string>
+    <string name="common_on">On</string>
+    <string name="caffeine_on_desc">Keeping the screen on</string>
+    <string name="caffeine_off_desc">Keep awake is off</string>
+    <string name="caffeine_needs_service">Turn on BentoBar (accessibility) to use this</string>
+    <string name="caffeine_off_subtitle">The screen turns off as usual</string>
+    <string name="caffeine_until_off_subtitle">Screen stays on until you turn this off</string>
+    <string name="caffeine_for_subtitle">Screen stays on for %1$s</string>
+    <string name="caffeine_keep_on_for">Keep the screen on for</string>
+    <string name="caffeine_until_i_turn_off">Until I turn it off</string>
+    <string name="common_turn_off">Turn off</string>
+    <string name="caffeine_click_keeps_on">A click keeps the screen on</string>
+    <string name="caffeine_until_turned_off">Until turned off</string>
+    <string name="item_sound_title">Sound</string>
+    <string name="item_sound_desc">Volume and media controls; scroll to change the volume</string>
+    <string name="sound_muted">Muted</string>
+    <string name="sound_muted_desc">Sound muted</string>
+    <string name="sound_media_volume">Media volume</string>
+    <string name="sound_media_volume_pct">Media volume %1$d%%</string>
+    <string name="sound_unmute">Unmute</string>
+    <string name="sound_mute">Mute</string>
+    <string name="sound_media">Media</string>
+    <string name="sound_previous">Previous track</string>
+    <string name="sound_play">Play</string>
+    <string name="sound_next">Next track</string>
+    <string name="sound_all_volumes">All volumes</string>
+    <string name="sound_settings">Sound settings</string>
+    <string name="item_tools_title">Tools</string>
+    <string name="item_tools_desc">Screenshot, lock, overview, all apps and settings shortcuts</string>
+    <string name="tools_screenshot">Screenshot</string>
+    <string name="tools_lock">Lock</string>
+    <string name="tools_overview">Overview</string>
+    <string name="tools_all_apps">All apps</string>
+    <string name="tools_notifications">Notifications</string>
+    <string name="tools_quick_settings">Quick settings</string>
+    <string name="tools_power">Power</string>
+    <string name="tools_wifi">Wi-Fi</string>
+    <string name="tools_display">Display</string>
+    <string name="tools_sound">Sound</string>
+    <string name="tools_keyboard">Keyboard</string>
+    <string name="tools_battery">Battery</string>
+    <string name="tools_storage">Storage</string>
+    <string name="tools_apps">Apps</string>
+    <string name="tools_accessibility">Accessibility</string>
+    <string name="tools_developer">Developer</string>
+    <string name="tools_settings">Settings</string>
+    <string name="tools_section_system">System</string>
+    <string name="tools_system_actions">System actions</string>
+    <string name="tools_system_actions_help">Screenshot, lock, overview, all apps, power</string>
+    <string name="tools_settings_shortcuts">Settings shortcuts</string>
+    <string name="apps_find">Find an app</string>
+    <string name="apps_search">Search</string>
+    <string name="item_app_title">App shortcut</string>
+    <string name="item_app_desc">One app, one click away</string>
+    <string name="app_pick">Pick an app</string>
+    <string name="app_no_app_desc">App shortcut without an app</string>
+    <string name="app_open_desc">Open %1$s</string>
+    <string name="app_match_color">Match the bar\'s color</string>
+    <string name="app_match_color_help">Uses the app\'s themed icon when it has one</string>
+    <string name="item_folder_title">App folder</string>
+    <string name="item_folder_desc">A drop-down of your favorite apps</string>
+    <string name="folder_no_apps">No apps yet</string>
+    <string name="folder_choose_apps">Choose apps</string>
+    <string name="folder_name">Name</string>
+    <string name="item_text_title">Text or emoji</string>
+    <string name="item_text_desc">Your own label, optionally opening a link</string>
+    <string name="text_default">Hello</string>
+    <string name="text_icon_star">Star</string>
+    <string name="text_icon_heart">Heart</string>
+    <string name="text_icon_bookmark">Bookmark</string>
+    <string name="text_icon_label">Label</string>
+    <string name="text_icon_pin">Pin</string>
+    <string name="text_icon_rocket">Rocket</string>
+    <string name="text_icon_idea">Idea</string>
+    <string name="text_icon_link">Link</string>
+    <string name="text_text">Text</string>
+    <string name="text_text_help">Emoji work too</string>
+    <string name="text_icon">Icon</string>
+    <string name="text_opens">Opens (optional)</string>
+    <string name="text_opens_help">A web address to open on click</string>
+    <string name="item_spacer_title">Spacer or divider</string>
+    <string name="item_spacer_desc">Room between items, or a thin line to group them</string>
+    <string name="spacer_desc">Spacer</string>
+    <string name="spacer_width">Width</string>
+    <string name="spacer_line">Draw a divider line</string>
+
+    <!-- items -->
+    <string name="item_failed">%1$s failed</string>
+
+    <!-- calendar -->
+    <string name="calendar_no_title">(No title)</string>
+
+    <!-- timers -->
+    <string name="timer_alert_focus_done">Focus round done</string>
+    <string name="timer_alert_break_over">Break\'s over</string>
+    <string name="timer_alert_next_focus">Next: 25 minutes of focus</string>
+    <string name="timer_alert_done">Timer done</string>
+    <string name="timer_alert_finished">%1$s timer finished</string>
+
+    <!-- notify -->
+    <string name="channel_alerts">Timer alerts</string>
+    <string name="channel_alerts_desc">When a timer or Pomodoro round ends</string>
+    <string name="channel_live">Live Update chip</string>
+    <string name="channel_live_desc">The running timer or next meeting as a chip in the status bar</string>
+    <string name="chip_focus_round">Focus · round %1$d</string>
+    <string name="chip_started_at">Started at %1$s</string>
+    <string name="chip_starts_at">Starts at %1$s</string>
+    <string name="chip_stop">Stop</string>
+
+    <!-- tiles -->
+    <string name="tile_set_up">Set up</string>
+    <string name="tile_shown">Shown</string>
+    <string name="tile_hidden">Hidden</string>
+    <string name="tile_set_up_bentobar">Set up BentoBar</string>
+    <string name="common_off">Off</string>
+    <string name="tile_paused">%1$s · paused</string>
+    <string name="tile_left">%1$s left</string>
+
+    <!-- menus -->
+    <string name="context_shown">Shown in the bar</string>
+    <string name="context_hidden_when_active">Hidden, shows when active</string>
+    <string name="section_hidden">Hidden behind ‹</string>
+    <string name="context_always_show">Always show</string>
+    <string name="context_show_when_active">Show when active</string>
+    <string name="display_show_as">Show as</string>
+    <string name="display_icon_and_text">Icon and text</string>
+    <string name="display_text">Text</string>
+    <string name="display_icon">Icon</string>
+    <string name="context_item_settings">Item settings…</string>
+    <string name="barmenu_no_hidden">No hidden items</string>
+    <string name="barmenu_hidden_items">Hidden items</string>
+    <string name="barmenu_edit">Edit the bar…</string>
+    <string name="barmenu_hide">Hide BentoBar</string>
+    <string name="barmenu_hide_detail">e.g. to present</string>
+    <string name="barmenu_bring_back">Bring it back from BentoBar\'s app or its Quick Settings tile.</string>
+
+    <!-- barui -->
+    <string name="chevron_hide">Hide BentoBar\'s hidden items</string>
+    <string name="chevron_show">Show BentoBar\'s hidden items</string>
+    <string name="chevron_menu">BentoBar menu</string>
+    <string name="strip_item_menu">Item menu</string>
+
+    <!-- main -->
+    <string name="nav_bar">Bar</string>
+    <string name="nav_add">Add</string>
+    <string name="nav_look">Look</string>
+    <string name="nav_setup">Setup</string>
+    <string name="nav_about">About</string>
+    <string name="page_bar">Your bar</string>
+    <string name="page_add">Add items</string>
+    <string name="page_look">Look and behavior</string>
+    <string name="page_setup">Setup</string>
+    <string name="page_about">About BentoBar</string>
+    <string name="status_service_off">BentoBar\'s accessibility service is off. Turn it on in Setup.</string>
+    <string name="status_hidden">Hidden for now; switch it back on here or with the Quick Settings tile.</string>
+    <string name="status_starting">Starting…</string>
+    <string name="status_no_room">The status bar has no free space for BentoBar\'s items right now.</string>
+    <string name="status_no_bar">The status bar is hidden right now (a full-screen app), so BentoBar is too.</string>
+    <string name="status_covered">A system panel covers the status bar; BentoBar is back when it closes.</string>
+    <string name="status_live">Live in the status bar. Changes apply right away.</string>
+    <string name="show_in_status_bar">Show in status bar</string>
+
+    <!-- barpage -->
+    <string name="bar_deleted_fallback">item</string>
+    <string name="bar_deleted">Deleted %1$s</string>
+    <string name="bar_undo">Undo</string>
+    <string name="bar_all_items">All items</string>
+    <string name="bar_banner_title">One step left: turn on BentoBar</string>
+    <string name="bar_banner_text">Android only lets apps draw on the status bar through an accessibility service. Setup explains what that means.</string>
+    <string name="bar_banner_set_up">Set up</string>
+    <string name="bar_placeholder_title">Pick an item to change it</string>
+    <string name="bar_placeholder_text">Or right-click an item in the status bar.</string>
+    <string name="bar_preview_hint">Preview. Click an item to edit it.</string>
+    <string name="bar_preview_hint_hidden">Preview. Click an item to edit it, and ‹ to show hidden items.</string>
+    <string name="section_shown">In the bar</string>
+    <string name="section_shown_help">Left to right, as they appear</string>
+    <string name="section_hidden_reveal_both">Revealed by the ‹ button or by hovering over BentoBar.</string>
+    <string name="section_hidden_reveal_chevron">Revealed by the ‹ button.</string>
+    <string name="section_hidden_reveal_hover">Revealed by hovering over BentoBar.</string>
+    <string name="section_hidden_reveal_none">Not revealed: the ‹ button is off (Look).</string>
+    <string name="section_hidden_help">%1$s Items set to show when active pop out on their own.</string>
+    <string name="section_off_help">Kept with their settings, not shown</string>
+    <string name="section_empty">Nothing here</string>
+    <string name="row_overflow">doesn\'t fit in the bar right now (in the ‹ menu)</string>
+    <string name="row_when_active">shows when active</string>
+    <string name="row_icon_only">icon only</string>
+    <string name="row_text_only">text only</string>
+    <string name="row_move_up">Move %1$s up</string>
+    <string name="row_move_down">Move %1$s down</string>
+    <string name="row_more">More for %1$s</string>
+    <string name="row_show_in_bar">Show in the bar</string>
+    <string name="common_delete">Delete</string>
+    <string name="detail_needs_calendar">This item needs access to your calendar. It stays on this device.</string>
+    <string name="common_allow">Allow</string>
+    <string name="detail_where">Where</string>
+    <string name="detail_when_active">Show itself when active</string>
+    <string name="detail_when_active_help">Stays hidden until it has something to say, like a running timer or a meeting about to start</string>
+    <string name="detail_options">Options</string>
+    <string name="detail_duplicate">Duplicate</string>
+
+    <!-- pages -->
+    <string name="add_group_system">System</string>
+    <string name="add_group_time">Time</string>
+    <string name="add_group_tools">Tools</string>
+    <string name="add_add">Add</string>
+    <string name="add_add_hidden">Add hidden</string>
+    <string name="look_placement">Placement</string>
+    <string name="look_position">Where BentoBar sits</string>
+    <string name="look_position_right">Next to the system icons</string>
+    <string name="look_position_center">Center</string>
+    <string name="look_position_left">After the clock</string>
+    <string name="look_spacing">Space between items</string>
+    <string name="look_look">Look</string>
+    <string name="look_text_size">Text size</string>
+    <string name="look_text_small">Small</string>
+    <string name="look_text_large">Large</string>
+    <string name="look_color">Color</string>
+    <string name="look_color_auto">Match the status bar</string>
+    <string name="look_color_light">Light</string>
+    <string name="look_color_dark">Dark</string>
+    <string name="look_color_help">Matching reads the color of the status bar clock</string>
+    <string name="look_background">Background</string>
+    <string name="look_pill_none">None, like the system</string>
+    <string name="look_pill_subtle">Soft pill</string>
+    <string name="look_pill_solid">Solid pill</string>
+    <string name="look_chevron">Show the ‹ button</string>
+    <string name="look_chevron_help">Click it to show or hide your hidden items. Without it, hidden items only appear while active.</string>
+    <string name="look_collapse">After revealing, hide them again</string>
+    <string name="look_collapse_never">Only when I click ‹</string>
+    <string name="look_reveal_hover">Reveal them when the pointer rests on BentoBar</string>
+    <string name="look_chip">Timer or meeting chip</string>
+    <string name="look_chip_fallback">When BentoBar is off</string>
+    <string name="look_chip_always">Always</string>
+    <string name="look_chip_help">Android shows one chip per app next to the system icons, and hides it while that app\'s own window is open. BentoBar uses it for a running timer, or a meeting that starts within 15 minutes.</string>
+    <string name="look_backup">Backup</string>
+    <string name="look_clip_label">BentoBar settings</string>
+    <string name="look_copied">Settings copied</string>
+    <string name="look_copy">Copy settings</string>
+    <string name="look_restored">Settings restored</string>
+    <string name="look_not_settings">The clipboard doesn\'t hold BentoBar settings</string>
+    <string name="look_paste">Paste settings</string>
+    <string name="setup_optional">optional</string>
+    <string name="setup_done">done</string>
+    <string name="setup_aap_title">Advanced Protection is on</string>
+    <string name="setup_aap_text">It allows only assistive accessibility services, so BentoBar can\'t run. The Live Update chip and the Quick Settings tiles still work.</string>
+    <string name="setup_turn_on_title">Turn on BentoBar</string>
+    <string name="setup_turn_on_text">Android lets apps draw on the status bar only through an accessibility service, so turning BentoBar on happens in Accessibility settings. Android will say BentoBar can \"view and control your screen\"; here is what it actually does with that:</string>
+    <string name="setup_turn_on_reads">reads the layout of the status bar, and nothing else, to find free space for your items</string>
+    <string name="setup_turn_on_copies">copies the color of the status bar clock so your items match it</string>
+    <string name="setup_turn_on_runs">runs system actions (screenshot, lock, overview…) when you pick them in the Tools menu</string>
+    <string name="setup_turn_on_doesnt">It doesn\'t read other apps\' windows, doesn\'t watch your keyboard, mouse or touches, and has no internet access: nothing leaves your device.</string>
+    <string name="setup_accessibility_settings">Accessibility settings</string>
+    <string name="setup_turn_on">Turn on</string>
+    <string name="setup_app_info">App info</string>
+    <string name="setup_restricted_intro">Installed BentoBar from a download? Android guards this switch for such apps:</string>
+    <string name="setup_restricted_1">In Accessibility, open BentoBar and tap the switch. Android says \"Restricted setting\"; tap OK.</string>
+    <string name="setup_restricted_2">Tap App info above, then ⋮ (top right) › Allow restricted settings, and confirm with your PIN.</string>
+    <string name="setup_restricted_3">Come back to Accessibility › BentoBar and turn it on.</string>
+    <string name="setup_review_note">About a day later, Android asks you to review apps with full device access. That\'s a standard check for every app like this; keep BentoBar if you\'re happy with what it does.</string>
+    <string name="setup_notifications_title">Notifications</string>
+    <string name="setup_notifications_text">For timer alerts, and the Live Update chip that shows a running timer when BentoBar is off.</string>
+    <string name="setup_live_title">Live Updates</string>
+    <string name="setup_live_text">Lets Android show BentoBar\'s chip in the status bar. On by default; you can turn it off in Android\'s settings.</string>
+    <string name="setup_open_setting">Open setting</string>
+    <string name="setup_calendar_title">Calendar</string>
+    <string name="setup_calendar_text">For the Next meeting item and the events in the month view. Read on this device only.</string>
+    <string name="setup_alarms_title">Alarms and reminders</string>
+    <string name="setup_alarms_text">Lets timers ring on the second even while the Googlebook sleeps. Without it they may be a little late.</string>
+    <string name="about_version">BentoBar %1$s</string>
+    <string name="about_tagline">Add, hide and organize items in your Googlebook\'s status bar.</string>
+    <string name="about_formerly">Called DiscoBar until version 0.4.</string>
+    <string name="about_privacy">Privacy</string>
+    <string name="about_privacy_text">BentoBar has no internet permission. Your settings, calendar events and everything it measures stay on this device. Its accessibility service reads only the status bar (its layout, and the color of its clock), never other apps.</string>
+    <string name="about_how">How it works</string>
+    <string name="about_how_text">Android doesn\'t let apps change the system\'s own status bar icons. BentoBar draws its items in the empty part of the status bar, in windows of its own, and moves them out of the way when the system\'s icons change or an app goes full screen. Your running timer can also appear as an official Android Live Update chip.</string>
+    <string name="about_open_source">Open source</string>
+    <string name="about_open_source_text">BentoBar is free software under the MIT License.</string>
+    <string name="about_credit_symbols">Material Symbols, © Google, Apache License 2.0</string>
+    <string name="about_credit_compose">Jetpack Compose and AndroidX, © The Android Open Source Project, Apache License 2.0</string>
+    <string name="about_credit_kotlin">Kotlin and kotlinx.serialization, © JetBrains, Apache License 2.0</string>
+    <string name="about_who">Who made this</string>
+    <string name="about_who_text">BentoBar is a personal hobby project by Alexander Kuscher (github.com/kuscher), proudly developed entirely on a Googlebook.</string>
+    <string name="about_employer_text">It isn\'t affiliated with the author\'s employer: that employer didn\'t make, sponsor or endorse it, and BentoBar doesn\'t endorse that employer or its products either. The views and choices in it are the author\'s own.</string>
+    <string name="about_not_affiliated">Not affiliated</string>
+    <string name="about_not_affiliated_text">BentoBar is an independent project, not made by or affiliated with Google, or with Surtees Studios (Bartender) or Bjango (iStat Menus).</string>
+
+    <!-- plurals: system -->
+    <plurals name="cpu_menu_subtitle">
+        <item quantity="one">%1$s busy · %2$d core</item>
+        <item quantity="other">%1$s busy · %2$d cores</item>
+    </plurals>
+
+    <!-- plurals: time -->
+    <plurals name="event_minutes_before">
+        <item quantity="one">%1$d min before</item>
+        <item quantity="other">%1$d min before</item>
+    </plurals>
+    <plurals name="event_characters">
+        <item quantity="one">%1$d character</item>
+        <item quantity="other">%1$d characters</item>
+    </plurals>
+    <plurals name="common_minutes_short">
+        <item quantity="one">%1$d min</item>
+        <item quantity="other">%1$d min</item>
+    </plurals>
+    <plurals name="common_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+
+    <!-- plurals: tool -->
+    <plurals name="sound_volume_desc">
+        <item quantity="one">Volume %1$d percent</item>
+        <item quantity="other">Volume %1$d percent</item>
+    </plurals>
+    <plurals name="common_hours_short">
+        <item quantity="one">%1$d h</item>
+        <item quantity="other">%1$d h</item>
+    </plurals>
+
+    <!-- plurals: timers -->
+    <plurals name="timer_alert_next_break">
+        <item quantity="one">Next: a %1$d-minute break</item>
+        <item quantity="other">Next: a %1$d-minute break</item>
+    </plurals>
+
+    <!-- plurals: menus -->
+    <plurals name="barmenu_hidden_count">
+        <item quantity="one">%1$d hidden</item>
+        <item quantity="other">%1$d hidden</item>
+    </plurals>
+
+    <!-- plurals: pages -->
+    <plurals name="add_in_your_bar">
+        <item quantity="one">In your bar</item>
+        <item quantity="other">%1$d in your bar</item>
+    </plurals>
+    <plurals name="look_collapse_after">
+        <item quantity="one">After %1$d s</item>
+        <item quantity="other">After %1$d s</item>
+    </plurals>
 </resources>

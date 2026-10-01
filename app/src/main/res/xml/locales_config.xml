@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The languages Android's per-app language setting offers for BentoBar. The default resources
+  (values/) are US English; values-en-rGB holds the British spellings, copied for en-AU, en-NZ, en-IE, en-IN and en-ZA.
+-->
+<locale-config xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:defaultLocale="en-US"
+    tools:targetApi="35">
+    <locale android:name="en-US" />
+    <locale android:name="en-GB" />
+    <locale android:name="en-AU" />
+    <locale android:name="en-NZ" />
+    <locale android:name="en-IE" />
+    <locale android:name="en-IN" />
+    <locale android:name="en-ZA" />
+</locale-config>

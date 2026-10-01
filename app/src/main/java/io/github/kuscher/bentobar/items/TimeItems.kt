@@ -7,6 +7,10 @@ import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -214,6 +218,10 @@ object CalendarItem : ItemType("calendar", R.string.item_calendar_title, Sym.CAL
     }
 }
 
+
+/** The agenda shows this many events at most; the rest are a "+N more" row. */
+private const val AGENDA_MAX = 12
+
 @Composable
 private fun MonthMenu(item: ItemConfig, host: MenuHost) {
     rememberTick()
@@ -267,13 +275,17 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
                             val isToday = d == today
                             val isPicked = d == picked
                             val has = allowed && eventsOn(d).isNotEmpty()
+                            // TalkBack reads the whole date (and whether anything's on), not just "14".
+                            val full = Dates.format("EEEEdMMMM", d)
+                            val label = if (has) stringResource(R.string.calendar_day_has_events, full) else full
                             Column(
                                 Modifier.size(28.dp).clip(CircleShape)
                                     .background(when { isToday -> MaterialTheme.colorScheme.primary; isPicked -> MaterialTheme.colorScheme.secondaryContainer; else -> Color.Transparent })
-                                    .clickable { picked = d }.pointerHoverIcon(PointerIcon.Hand),
+                                    .selectable(selected = isPicked, onClick = { picked = d }).pointerHoverIcon(PointerIcon.Hand)
+                                    .semantics { contentDescription = label },
                                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
                             ) {
-                                Text("${i + 1}", style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                                Text("${i + 1}", modifier = Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
                                     color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
                                     fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal)
                                 if (has) Box(Modifier.size(4.dp).clip(CircleShape).background(if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary))
@@ -294,13 +306,22 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
             if (week.isEmpty()) Text(stringResource(R.string.calendar_no_events_week), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             var shown = 0
             for ((d, list) in week) {
-                if (shown >= 12) break
+                if (shown >= AGENDA_MAX) break
                 SectionLabel(when (d) {
                     today -> stringResource(R.string.calendar_today)
                     today.plusDays(1) -> stringResource(R.string.calendar_tomorrow)
                     else -> Dates.format("EEEEdMMMM", d)
                 })
-                list.take(12 - shown).forEach { e -> EventRow(e, host::close); shown++ }
+                list.take(AGENDA_MAX - shown).forEach { e -> EventRow(e, host::close); shown++ }
+            }
+            // What didn't fit isn't dropped silently: "+3 more" opens Calendar on the first day left out.
+            val more = week.sumOf { it.second.size } - shown
+            if (more > 0) {
+                var skip = shown
+                val firstLeft = week.first { (_, list) -> (skip < list.size).also { skip -= list.size } }.first
+                MenuEntry(Sym.EVENT, pluralStringResource(R.plurals.calendar_more, more, more)) {
+                    host.close(); Calendar.openDay(firstLeft.atTime(9, 0).atZone(zone).toInstant().toEpochMilli())
+                }
             }
         }
         MenuEntry(Sym.OPEN_IN_NEW, stringResource(R.string.calendar_open)) {

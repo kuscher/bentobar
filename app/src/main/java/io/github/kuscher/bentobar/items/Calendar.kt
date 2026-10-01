@@ -48,20 +48,45 @@ object Calendar {
     @Volatile var events: List<Event> = emptyList(); private set
     @Volatile private var loadedAt = 0L
     private var observing = false
+    /** A load is running; [again]: the provider changed meanwhile, so one more follows it. Main thread only. */
+    private var loading = false
+    private var again = false
+    /** Bumped by [forget]: a load started before then must not publish. */
+    private var generation = 0
 
     fun init(context: Context) { app = context.applicationContext }
 
-    fun allowed() = app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
+    fun allowed() = ::app.isInitialized && app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
         Uses.on(Uses.CALENDAR)
 
-    /** Reloads at most once a minute, or right away after the provider changes. */
+    /**
+     * Reloads at most once a minute, or right away after the provider changes. One load at a time:
+     * a sync that changes hundreds of events queues one more load, not hundreds. Main thread.
+     */
     fun refresh(force: Boolean = false) {
         val now = System.currentTimeMillis()
         if (!force && now - loadedAt < 60_000) return
         loadedAt = now
-        if (!allowed()) { events = emptyList(); return }
+        if (!allowed()) { forget(); return }
         observe()
-        io.execute { events = load(now) }
+        if (loading) { again = true; return }
+        loading = true
+        val gen = generation
+        io.execute {
+            val loaded = load(now)
+            main.post {
+                loading = false
+                if (gen == generation && allowed()) { events = loaded; Chips.update(app) }
+                if (again) { again = false; refresh(force = true) }
+            }
+        }
+    }
+
+    /** Calendar switched off in Setup: drop what was read, and whatever a running load returns. */
+    fun forget() {
+        generation++
+        again = false
+        if (events.isNotEmpty()) { events = emptyList(); if (::app.isInitialized) Chips.update(app) }
     }
 
     private fun observe() {
@@ -157,6 +182,7 @@ object Calendar {
      * tomorrow). The Next meeting item and the chip use only these.
      */
     fun meetings(now: Long): List<Event> {
+        if (!allowed()) return emptyList()
         val horizon = Meetings.horizon(now, ZoneId.systemDefault())
         return events.filter { it.meeting && Meetings.inHorizon(it.begin, it.end, now, horizon) }
     }
@@ -165,19 +191,24 @@ object Calendar {
     fun next(now: Long) = meetings(now).firstOrNull { it.begin > now }
 
     /** Events overlapping the local day that starts at [dayStart] (all-day events use UTC dates). */
-    fun on(dayStart: Long, dayEnd: Long, utcDayStart: Long): List<Event> = events.filter {
+    fun on(dayStart: Long, dayEnd: Long, utcDayStart: Long): List<Event> = if (!allowed()) emptyList() else events.filter {
         if (it.allDay) it.begin <= utcDayStart && it.end > utcDayStart else it.begin < dayEnd && it.end > dayStart
     }
 
-    fun open(e: Event) = Env.launch(Intent(Intent.ACTION_VIEW,
+    fun open(e: Event) = Env.launch(openIntent(e))
+
+    /** The calendar app showing this occurrence of [e]. */
+    fun openIntent(e: Event): Intent = Intent(Intent.ACTION_VIEW,
         ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, e.eventId))
         .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, e.begin)
-        .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, e.end))
+        .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, e.end)
 
     fun openDay(millis: Long) = Env.launch(Intent(Intent.ACTION_VIEW,
         CalendarContract.CONTENT_URI.buildUpon().appendPath("time").appendPath(millis.toString()).build()))
 
-    fun join(e: Event) = e.link?.let { Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse(it))) } ?: false
+    fun join(e: Event) = joinIntent(e)?.let { Env.launch(it) } ?: false
+
+    fun joinIntent(e: Event): Intent? = e.link?.let { Intent(Intent.ACTION_VIEW, Uri.parse(it)) }
 
     /** Google Maps (or any map app) searching for the event's place; the Maps website if none handles geo:. */
     fun directions(e: Event): Boolean {

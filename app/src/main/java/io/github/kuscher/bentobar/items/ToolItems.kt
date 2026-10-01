@@ -60,20 +60,27 @@ import io.github.kuscher.bentobar.ui.SwitchRow
 import io.github.kuscher.bentobar.ui.TextRow
 import io.github.kuscher.bentobar.ui.TileGrid
 import io.github.kuscher.bentobar.ui.rememberTick
+import io.github.kuscher.bentobar.util.ClockAnchor
 import io.github.kuscher.bentobar.util.Fmt
 import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Locale
 
-/** Keep-awake: while on, BarService keeps a tiny window with FLAG_KEEP_SCREEN_ON on screen. */
+/**
+ * Keep-awake: while on, BarService keeps a tiny window with FLAG_KEEP_SCREEN_ON on screen. [until]
+ * is wall time (it survives a restart); [anchor] keeps setting the clock from changing how long it lasts.
+ */
 object Caffeine {
     const val FOREVER = Long.MAX_VALUE
     val until = MutableStateFlow(0L)
+    private var anchor = ClockAnchor(0, 0, -1)
 
     fun init(context: Context) {
         val p = context.getSharedPreferences("caffeine", Context.MODE_PRIVATE)
-        until.value = p.getLong("until", 0).takeIf { it > System.currentTimeMillis() } ?: 0L
+        anchor = ClockAnchor(p.getLong("anchorWall", 0), p.getLong("anchorElapsed", 0), p.getInt("anchorBoot", -1))
+        until.value = p.getLong("until", 0)
+        check()
     }
 
     fun on(minutes: Int?) = set(if (minutes == null) FOREVER else System.currentTimeMillis() + minutes * 60_000L)
@@ -81,12 +88,20 @@ object Caffeine {
     fun toggle(minutes: Int?) = if (active()) off() else on(minutes)
     fun active(now: Long = System.currentTimeMillis()) = until.value > now
 
-    /** Turns itself off when the time is up; called every tick. */
-    fun check() { if (until.value != 0L && !active()) off() }
+    /** Follows a clock change, and turns itself off when the time is up; called every tick. */
+    fun check() {
+        val v = until.value
+        if (v == 0L || v == FOREVER) return
+        val jump = anchor.jump(ClockAnchor.now(Env.app))
+        if (jump != 0L) set(v + jump)
+        if (!active()) off()
+    }
 
     private fun set(v: Long) {
         until.value = v
-        Env.app.getSharedPreferences("caffeine", Context.MODE_PRIVATE).edit().putLong("until", v).apply()
+        anchor = ClockAnchor.now(Env.app)
+        Env.app.getSharedPreferences("caffeine", Context.MODE_PRIVATE).edit().putLong("until", v)
+            .putLong("anchorWall", anchor.wall).putLong("anchorElapsed", anchor.elapsed).putInt("anchorBoot", anchor.boot).apply()
     }
 }
 

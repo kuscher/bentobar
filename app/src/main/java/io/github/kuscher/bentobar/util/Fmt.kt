@@ -43,9 +43,12 @@ object Fmt {
         }
     }
 
-    /** Timer faces: "4:05", "12:30", "1:02:03". */
-    fun clock(ms: Long): String {
-        val s = (ms + 999) / 1000
+    /**
+     * Timer faces: "4:05", "12:30", "1:02:03". Time left rounds up (it reads 0:00 only when it's
+     * over); time taken, [elapsed] (the stopwatch), rounds down, so it reads 0:01 after a second.
+     */
+    fun clock(ms: Long, elapsed: Boolean = false): String {
+        val s = if (elapsed) ms / 1000 else (ms + 999) / 1000
         val h = s / 3600
         val m = (s % 3600) / 60
         val sec = s % 60

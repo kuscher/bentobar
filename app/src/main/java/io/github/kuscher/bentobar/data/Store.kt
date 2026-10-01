@@ -83,13 +83,24 @@ object Store {
 
     fun export(): String = json.encodeToString(BarConfig.serializer(), state.value)
 
-    fun import(text: String): Boolean = runCatching {
-        // An older layout (Copy settings from an earlier version) comes through the same migrations.
-        val c = json.decodeFromString(BarConfig.serializer(), text).let {
-            if (it.version < 2) it.copy(version = 2, autoCollapseSec = if (it.autoCollapseSec == 8) 0 else it.autoCollapseSec) else it
-        }.migrateToV3()
+    fun import(text: String): Boolean {
+        val c = parseLayout(text) ?: return false
         update { c }
-    }.isSuccess
+        return true
+    }
+
+    /**
+     * A layout from Copy settings, or null if [text] isn't one: it must be a JSON object with an
+     * items list, or any JSON at all (`{}`, another app's settings) would replace the bar with an
+     * empty one. An older layout comes through the same migrations; a repeated item id keeps its first.
+     */
+    fun parseLayout(text: String): BarConfig? = runCatching {
+        val root = json.parseToJsonElement(text)
+        if ((root as? kotlinx.serialization.json.JsonObject)?.get("items") !is kotlinx.serialization.json.JsonArray) return null
+        json.decodeFromJsonElement(BarConfig.serializer(), root).let {
+            if (it.version < 2) it.copy(version = 2, autoCollapseSec = if (it.autoCollapseSec == 8) 0 else it.autoCollapseSec) else it
+        }.migrateToV3().let { it.copy(items = it.items.distinctBy { item -> item.id }) }
+    }.getOrNull()
 
     private fun save(c: BarConfig) {
         prefs.edit().putString(KEY, json.encodeToString(BarConfig.serializer(), c)).apply()

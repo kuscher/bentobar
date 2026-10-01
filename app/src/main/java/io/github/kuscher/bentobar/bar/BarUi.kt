@@ -119,6 +119,8 @@ fun Strip(
     maxWidthPx: Int,
     heightDp: Dp,
     events: StripEvents,
+    /** Ids of the items that didn't fit, each time that changes. */
+    onOverflow: (Set<String>) -> Unit = {},
 ) {
     val pillBg = when (look.pill) {
         Pill.NONE -> Color.Transparent
@@ -149,7 +151,7 @@ fun Strip(
         }
         val items = if (chevronOnLeft) revealed + visible else visible + revealed
         if (chevronOnLeft) chevron()
-        FitRow(maxWidthPx = maxWidthPx, keepEnd = chevronOnLeft, spacing = look.spacing) {
+        FitRow(ids = items.map { it.item.id }, maxWidthPx = maxWidthPx, keepEnd = chevronOnLeft, spacing = look.spacing, onDropped = onOverflow) {
             // key(): remembered state (hover, held width) belongs to the item, not to its position,
             // or an item popping in would inherit its neighbour's width.
             items.forEach { androidx.compose.runtime.key(it.item.id) { ItemView(it, look, events) } }
@@ -158,9 +160,14 @@ fun Strip(
     }
 }
 
-/** A row that drops children which don't fit, from the start (or the end when !keepEnd). */
+/**
+ * A row that drops children which don't fit, from the start (or the end when !keepEnd), and
+ * reports the dropped [ids] so they can be offered elsewhere instead of silently vanishing.
+ */
 @Composable
-private fun FitRow(maxWidthPx: Int, keepEnd: Boolean, spacing: Dp, content: @Composable () -> Unit) {
+private fun FitRow(ids: List<String>, maxWidthPx: Int, keepEnd: Boolean, spacing: Dp, onDropped: (Set<String>) -> Unit,
+                   content: @Composable () -> Unit) {
+    val last = remember { arrayOf<Set<String>?>(null) }
     Layout(content) { measurables, constraints ->
         val gap = spacing.roundToPx()
         val placeables = measurables.map { it.measure(Constraints(maxHeight = constraints.maxHeight)) }
@@ -174,6 +181,8 @@ private fun FitRow(maxWidthPx: Int, keepEnd: Boolean, spacing: Dp, content: @Com
             keep[i] = true
             used += w
         }
+        val dropped = ids.filterIndexed { i, _ -> i < keep.size && !keep[i] }.toSet()
+        if (dropped != last[0]) { last[0] = dropped; onDropped(dropped) }
         val height = placeables.maxOfOrNull { it.height } ?: 0
         layout(used, height) {
             var x = 0

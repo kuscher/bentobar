@@ -100,7 +100,10 @@ fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> 
     val states by Ticker.states.collectAsState()
     // Worked out here, not when the menu opened, so an item popping out (or in) updates the list.
     val cfg by Store.config.collectAsState()
-    val hidden = cfg.items.filter { it.section == Section.HIDDEN && !(it.whenActive && states[it.id]?.active == true) }
+    val overflow by io.github.kuscher.bentobar.bar.BarOverflow.ids.collectAsState()
+    val hidden = cfg.items.filter {
+        (it.section == Section.HIDDEN && !(it.whenActive && states[it.id]?.active == true)) || it.id in overflow
+    }
     MenuCard(Sym.WYSIWYG, "BentoBar", if (hidden.isEmpty()) "No hidden items" else "${hidden.size} hidden",
         iconRes = io.github.kuscher.bentobar.R.drawable.ic_bentobar) {
         if (hidden.isNotEmpty()) {

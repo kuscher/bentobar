@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- **Readable on any status bar.** On a status bar with its own solid color (black on the Acer
+  Googlebook 14), BentoBar's items came out dark gray on black. It now tells the bar's color from
+  the clock's, and its text, accent and warning colors always reach 4.5:1 contrast. The preview in
+  settings shows the real colors.
+- **Setup tells the truth.** Steps, the Turn on and Allow buttons, and the header update as soon as
+  something changes, including in Settings' own window. The header says when there's no room in
+  the status bar or a full-screen app hides it, instead of always "Live".
+- **Nothing disappears silently.** Items that don't fit move into the ‹ menu and are marked in
+  settings. The gap after the network speed now closes again 5 seconds after a big reading.
+- **Accessibility.** Icon-only buttons have names, switches and sliders are named by their labels,
+  screen readers can press status bar items, menus show keyboard focus, and hovering an item shows
+  its name.
+- Delete has an undo; the right-click menu's "Remove from the bar" is now "Turn off", which is what
+  it did.
+- The install guide covers Play Protect's "App blocked" screen.
+
 ## 0.5 (2026-09-29): DiscoBar is now BentoBar
 
 - **New name: BentoBar.** Like a bento box, it keeps your status bar items neatly in their

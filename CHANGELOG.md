@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The CPU menu says "Core 0" for a core listed on its own (each one, on some Intel chips), not
+  "Cores 0". The README's screenshots show the current app.
 - **Fewer things that look like abuse.** Play Protect's live threat detection warned "App displays
   over other apps" about BentoBar. Its rules aren't public; these changes remove what matches
   Google's own description (an accessibility service keeping imperceptible content on screen) and

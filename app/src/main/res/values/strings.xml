@@ -69,6 +69,7 @@
     <string name="cpu_menu_unavailable">Not available on this device</string>
     <string name="cpu_cores">Cores</string>
     <string name="cpu_cluster">Cores %1$s</string>
+    <string name="cpu_core_one">Core %1$s</string>
     <string name="cpu_cluster_clock">%1$s of %2$s GHz</string>
     <string name="cpu_gpu">Graphics (GPU)</string>
     <string name="cpu_battery_usage">Battery usage by app</string>

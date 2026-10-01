@@ -35,6 +35,10 @@ A() { adb -s "$(connect)" "$@"; }
 dbg() { A shell "am broadcast --user current -a $PKG.DEBUG -p $PKG --es c '$*'" >/dev/null; sleep 0.4
   A shell "logcat -d -s BentoBar:I" | grep "debug $1" | tail -1 | sed 's/.*-> //'; }
 
+winshot() { # BentoBar's own window as a PNG: winshot TITLE|app FILE (debug builds; written to the app's cache)
+  local r; r=$(A shell "am broadcast --user current -a $PKG.DEBUG -p $PKG --es c 'winshot $1'" | sed -n 's/.*data="\([^"]*\)".*/\1/p')
+  case $r in file:*) A exec-out "run-as $PKG cat cache/winshot.png" > "$2"; echo "$2 (${r##* })" ;; *) echo "winshot: $r" >&2; return 1 ;; esac; }
+
 build() { if [ "${1:-}" = release ]; then ./gradlew :app:assembleRelease --console=plain -q; else ./gradlew :app:assembleDebug --console=plain -q; fi; }
 
 install() {
@@ -110,5 +114,6 @@ case "${1:-}" in
   shot) shift; shot "$@" ;;
   menushot) shift; menushot "$@" ;;
   appshot) shift; appshot "$@" ;;
+  winshot) shift; winshot "$@" ;;
   *) sed -n '3,15p' "$0"; exit 1 ;;
 esac

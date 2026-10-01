@@ -124,21 +124,23 @@ class DebugReceiver : BroadcastReceiver() {
         svc.takeScreenshotOfWindow(w.id, java.util.concurrent.Executors.newSingleThreadExecutor(),
             object : android.accessibilityservice.AccessibilityService.TakeScreenshotCallback {
                 override fun onSuccess(r: android.accessibilityservice.AccessibilityService.ScreenshotResult) {
+                    // Full size into the app's cache, and its path as the result: a broadcast result
+                    // over about 1 MB fails (TransactionTooLarge) and the broadcast never finishes.
+                    // Pull it with `adb exec-out run-as <package> cat cache/winshot.png`.
                     val hb = r.hardwareBuffer
-                    var bmp = android.graphics.Bitmap.wrapHardwareBuffer(hb, r.colorSpace)!!.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                    hb.close()
-                    // A broadcast result over about 1 MB fails (TransactionTooLarge), the broadcast
-                    // never finishes and Android reports BentoBar as not responding: halve big
-                    // windows (the settings window) until the PNG fits.
-                    var out = java.io.ByteArrayOutputStream()
-                    bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
-                    while (out.size() > 600_000 && bmp.width > 200) {
-                        bmp = android.graphics.Bitmap.createScaledBitmap(bmp, bmp.width / 2, bmp.height / 2, true)
-                        out = java.io.ByteArrayOutputStream()
-                        bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    try {
+                        val bmp = android.graphics.Bitmap.wrapHardwareBuffer(hb, r.colorSpace)?.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                        val file = java.io.File(svc.cacheDir, "winshot.png")
+                        pending.resultData = if (bmp == null) "failed: no bitmap" else {
+                            file.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                            "file:cache/winshot.png ${bmp.width}x${bmp.height}"
+                        }
+                    } catch (e: Exception) {
+                        pending.resultData = "failed: $e"
+                    } finally {
+                        hb.close()
+                        pending.finish()
                     }
-                    pending.resultData = android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
-                    pending.finish()
                 }
                 override fun onFailure(code: Int) { pending.resultData = "failed $code"; pending.finish() }
             })

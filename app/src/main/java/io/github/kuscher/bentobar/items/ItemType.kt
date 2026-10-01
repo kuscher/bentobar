@@ -1,6 +1,7 @@
 package io.github.kuscher.bentobar.items
 
 import android.graphics.Bitmap
+import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import io.github.kuscher.bentobar.data.ItemConfig
 
@@ -48,11 +49,15 @@ interface MenuHost {
  */
 abstract class ItemType(
     val type: String,
-    val title: String,
+    @StringRes val titleRes: Int,
     val icon: String,
     /** One line for the catalog. */
-    val blurb: String,
+    @StringRes val blurbRes: Int,
 ) {
+    /** The name in the app's language, read when asked (never cached, so it follows a locale change). */
+    val title: String get() = Env.app.getString(titleRes)
+    val blurb: String get() = Env.app.getString(blurbRes)
+
     /** How often [state] is recomputed while the bar shows. */
     open val refreshMs: Long = 1000
 

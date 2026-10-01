@@ -17,12 +17,13 @@ import android.graphics.Typeface
 import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ChipMode
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.ui.MainActivity
 import io.github.kuscher.bentobar.util.Fmt
 import io.github.kuscher.bentobar.util.Sym
-import java.text.DateFormat
+import android.text.format.DateFormat
 import java.util.Date
 
 /** Notification channels and the timer-finished alert. */
@@ -34,14 +35,14 @@ object Notify {
 
     fun channels(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
-        nm.createNotificationChannel(NotificationChannel(ALERTS, "Timer alerts", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "When a timer or Pomodoro round ends"
+        nm.createNotificationChannel(NotificationChannel(ALERTS, context.getString(R.string.channel_alerts), NotificationManager.IMPORTANCE_HIGH).apply {
+            description = context.getString(R.string.channel_alerts_desc)
             setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
         })
-        nm.createNotificationChannel(NotificationChannel(LIVE, "Live Update chip", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = "The running timer or next meeting as a chip in the status bar"
+        nm.createNotificationChannel(NotificationChannel(LIVE, context.getString(R.string.channel_live), NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = context.getString(R.string.channel_live_desc)
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
@@ -156,15 +157,17 @@ object Chips {
     private fun timer(context: Context, t: Timers.State): Notification {
         val now = Timers.now()
         val title = when (t.mode) {
-            Timers.Mode.STOPWATCH -> "Stopwatch"
-            Timers.Mode.POMODORO -> if (t.phase == Timers.Phase.WORK) "Focus · round ${t.round + 1}" else "Break"
-            Timers.Mode.TIMER -> t.label.ifBlank { "Timer" }
+            Timers.Mode.STOPWATCH -> context.getString(R.string.timer_stopwatch)
+            Timers.Mode.POMODORO -> if (t.phase == Timers.Phase.WORK) context.getString(R.string.chip_focus_round, t.round + 1) else context.getString(R.string.timer_break)
+            Timers.Mode.TIMER -> t.label.ifBlank { context.getString(R.string.item_timer_title) }
         }
+        // The system's time format: 12/24-hour as set in Android, not just the locale's default.
+        val time = DateFormat.getTimeFormat(context)
         val b = base(context, if (t.mode == Timers.Mode.STOPWATCH) Sym.AVG_PACE else Sym.TIMER, title,
             when {
-                !t.running -> "Paused"
-                t.mode == Timers.Mode.STOPWATCH -> "Started at ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(t.at))}"
-                else -> "Ends at ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(t.at))}"
+                !t.running -> context.getString(R.string.common_paused)
+                t.mode == Timers.Mode.STOPWATCH -> context.getString(R.string.chip_started_at, time.format(Date(t.at)))
+                else -> context.getString(R.string.common_ends_at, time.format(Date(t.at)))
             })
         if (t.running) {
             b.setWhen(t.at).setShowWhen(true).setUsesChronometer(true)
@@ -172,20 +175,22 @@ object Chips {
         } else {
             b.setShortCriticalText(Fmt.clock(if (t.mode == Timers.Mode.STOPWATCH) t.pausedMs else t.pausedMs))
         }
-        b.addAction(action(context, if (t.running) Sym.PAUSE else Sym.PLAY_ARROW, if (t.running) "Pause" else "Resume", ChipAction.TOGGLE))
-        if (t.mode != Timers.Mode.STOPWATCH) b.addAction(action(context, Sym.ADD, "+1 min", ChipAction.PLUS))
-        b.addAction(action(context, Sym.STOP, "Stop", ChipAction.STOP))
+        b.addAction(action(context, if (t.running) Sym.PAUSE else Sym.PLAY_ARROW,
+            context.getString(if (t.running) R.string.common_pause else R.string.common_resume), ChipAction.TOGGLE))
+        if (t.mode != Timers.Mode.STOPWATCH) b.addAction(action(context, Sym.ADD, context.getString(R.string.common_plus_one_min), ChipAction.PLUS))
+        b.addAction(action(context, Sym.STOP, context.getString(R.string.chip_stop), ChipAction.STOP))
         return b.build()
     }
 
     private fun event(context: Context, e: Calendar.Event, now: Long): Notification {
         val on = e.begin <= now
+        val time = DateFormat.getTimeFormat(context)
         val b = base(context, Sym.EVENT, e.title,
-            if (on) "Ends at ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(e.end))}"
-            else "Starts at ${DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(e.begin))}")
+            if (on) context.getString(R.string.common_ends_at, time.format(Date(e.end)))
+            else context.getString(R.string.chip_starts_at, time.format(Date(e.begin))))
             .setWhen(if (on) e.end else e.begin).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
-        if (e.link != null) b.addAction(action(context, Sym.VIDEOCAM, "Join", ChipAction.JOIN))
-        b.addAction(action(context, Sym.OPEN_IN_NEW, "Open", ChipAction.OPEN_EVENT))
+        if (e.link != null) b.addAction(action(context, Sym.VIDEOCAM, context.getString(R.string.common_join), ChipAction.JOIN))
+        b.addAction(action(context, Sym.OPEN_IN_NEW, context.getString(R.string.common_open), ChipAction.OPEN_EVENT))
         return b.build()
     }
 }

@@ -42,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.bar.BarService
 import io.github.kuscher.bentobar.bar.BarStatus
 import io.github.kuscher.bentobar.data.Store
@@ -143,38 +145,39 @@ class MainActivity : ComponentActivity() {
         Row(Modifier.fillMaxSize().safeDrawingPadding()) {
             NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxHeight()) {
                 Spacer(Modifier.height(12.dp))
-                androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(io.github.kuscher.bentobar.R.drawable.ic_bentobar), contentDescription = "BentoBar",
+                androidx.compose.material3.Icon(androidx.compose.ui.res.painterResource(io.github.kuscher.bentobar.R.drawable.ic_bentobar), contentDescription = stringResource(R.string.app_name),
                     tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(30.dp))
                 Spacer(Modifier.height(20.dp))
-                val pages = listOf(Sym.WYSIWYG to "Bar", Sym.ADD to "Add", Sym.PALETTE to "Look", Sym.TUNE to "Setup", Sym.INFO to "About")
+                val pages = listOf(Sym.WYSIWYG to R.string.nav_bar, Sym.ADD to R.string.nav_add, Sym.PALETTE to R.string.nav_look,
+                    Sym.TUNE to R.string.nav_setup, Sym.INFO to R.string.nav_about)
                 pages.forEachIndexed { i, (icon, label) ->
                     NavigationRailItem(selected = page == i, onClick = { page = i },
-                        icon = { SymIcon(icon, size = 22.sp, filled = page == i) }, label = { Text(label) })
+                        icon = { SymIcon(icon, size = 22.sp, filled = page == i) }, label = { Text(stringResource(label)) })
                 }
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 Row(Modifier.fillMaxWidth().padding(start = 28.dp, end = 20.dp, top = 18.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(listOf("Your bar", "Add items", "Look and behaviour", "Setup", "About BentoBar")[page],
+                        Text(stringResource(listOf(R.string.page_bar, R.string.page_add, R.string.page_look, R.string.page_setup, R.string.page_about)[page]),
                             style = MaterialTheme.typography.headlineSmall)
                         // Says what the strip is actually doing, not just whether the service is on.
-                        Text(when {
-                            !running -> "BentoBar's accessibility service is off. Turn it on in Setup."
-                            !cfg.enabled -> "Hidden for now; switch it back on here or with the Quick Settings tile."
+                        Text(stringResource(when {
+                            !running -> R.string.status_service_off
+                            !cfg.enabled -> R.string.status_hidden
                             else -> when (status) {
-                                BarStatus.STOPPED -> "Starting…"
-                                BarStatus.NO_ROOM -> "The status bar has no free space for BentoBar's items right now."
-                                BarStatus.NO_BAR -> "The status bar is hidden right now (a full-screen app), so BentoBar is too."
-                                BarStatus.COVERED -> "A system panel covers the status bar; BentoBar is back when it closes."
-                                else -> "Live in the status bar. Changes apply right away."
+                                BarStatus.STOPPED -> R.string.status_starting
+                                BarStatus.NO_ROOM -> R.string.status_no_room
+                                BarStatus.NO_BAR -> R.string.status_no_bar
+                                BarStatus.COVERED -> R.string.status_covered
+                                else -> R.string.status_live
                             }
-                        }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     // Only meaningful once the service runs; before that, Setup is the way in.
                     if (running) {
                         Row(Modifier.toggleable(cfg.enabled, role = androidx.compose.ui.semantics.Role.Switch) { on -> Store.update { it.copy(enabled = on) } },
                             verticalAlignment = Alignment.CenterVertically) {
-                            Text("Show in status bar", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 10.dp))
+                            Text(stringResource(R.string.show_in_status_bar), style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 10.dp))
                             Switch(checked = cfg.enabled, onCheckedChange = null)
                         }
                     }

@@ -6,6 +6,9 @@ import android.os.storage.StorageManager
 import android.provider.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ItemConfig
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -26,7 +29,7 @@ import io.github.kuscher.bentobar.util.Fmt
 import io.github.kuscher.bentobar.util.Sym
 import java.util.Locale
 
-object NetworkItem : ItemType("network", "Network speed", Sym.SWAP_VERT, "Download and upload speed, with a chart") {
+object NetworkItem : ItemType("network", R.string.item_network_title, Sym.SWAP_VERT, R.string.item_network_desc) {
     override val canBeActive = true
 
     override fun state(item: ItemConfig): ItemState {
@@ -41,105 +44,109 @@ object NetworkItem : ItemType("network", "Network speed", Sym.SWAP_VERT, "Downlo
         }
         val threshold = item.optInt("activeKBs", 500) * 1000.0
         return ItemState(icon = Sym.SWAP_VERT, text = text, active = maxOf(n.down, n.up) >= threshold, widthKey = "net",
-            desc = "Network: ${Fmt.bytes(n.down)}/s down, ${Fmt.bytes(n.up)}/s up")
+            desc = Env.str(R.string.network_state_desc, Fmt.bytes(n.down), Fmt.bytes(n.up)))
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
         rememberTick()
         val n = Env.net
-        MenuCard(Sym.SWAP_VERT, "Network", Env.net.describe(Env.app)) {
-            InfoRow("Download", "${Fmt.bytes(n.down)}/s", MaterialTheme.colorScheme.primary)
-            InfoRow("Upload", "${Fmt.bytes(n.up)}/s", MaterialTheme.colorScheme.tertiary)
+        MenuCard(Sym.SWAP_VERT, stringResource(R.string.network_menu_title), Env.net.describe(Env.app)) {
+            InfoRow(stringResource(R.string.network_download), "${Fmt.bytes(n.down)}/s", MaterialTheme.colorScheme.primary)
+            InfoRow(stringResource(R.string.network_upload), "${Fmt.bytes(n.up)}/s", MaterialTheme.colorScheme.tertiary)
             Sparkline(n.downHistory.toList(), second = n.upHistory.toList())
-            InfoRow("Received since start-up", Fmt.bytes(n.rxTotal.toDouble()))
-            InfoRow("Sent since start-up", Fmt.bytes(n.txTotal.toDouble()))
+            InfoRow(stringResource(R.string.network_received), Fmt.bytes(n.rxTotal.toDouble()))
+            InfoRow(stringResource(R.string.network_sent), Fmt.bytes(n.txTotal.toDouble()))
             MenuDivider()
-            MenuEntry(Sym.WIFI, "Internet settings") { host.close(); Env.launch(Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)) }
-            MenuEntry(Sym.DATA_USAGE, "Data usage") { host.close(); Env.launch(Intent(Settings.ACTION_DATA_USAGE_SETTINGS)) }
+            MenuEntry(Sym.WIFI, stringResource(R.string.network_internet_settings)) { host.close(); Env.launch(Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)) }
+            MenuEntry(Sym.DATA_USAGE, stringResource(R.string.network_data_usage)) { host.close(); Env.launch(Intent(Settings.ACTION_DATA_USAGE_SETTINGS)) }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        ChoiceRow("Show", listOf("both" to "Down and up", "down" to "Download", "up" to "Upload", "total" to "Total"),
+        ChoiceRow(stringResource(R.string.option_show), listOf("both" to stringResource(R.string.network_show_both), "down" to stringResource(R.string.network_download),
+            "up" to stringResource(R.string.network_upload), "total" to stringResource(R.string.network_show_total)),
             item.opt("show", "both")) { set(item.with("show", it)) }
-        SliderRow("Counts as active above", item.optInt("activeKBs", 500), 50..5000,
+        SliderRow(stringResource(R.string.option_active_above), item.optInt("activeKBs", 500), 50..5000,
             { "$it KB/s" }) { set(item.with("activeKBs", it.toString())) }
     }
 }
 
-object CpuItem : ItemType("cpu", "CPU load", Sym.MEMORY, "How busy the processor is, per core, with clock speeds") {
+object CpuItem : ItemType("cpu", R.string.item_cpu_title, Sym.MEMORY, R.string.item_cpu_desc) {
     override val canBeActive = true
 
     override fun state(item: ItemConfig): ItemState {
         val c = Env.cpu
-        if (!c.available) return ItemState(icon = Sym.MEMORY, text = "–", desc = "This device doesn't share CPU load with apps")
+        if (!c.available) return ItemState(icon = Sym.MEMORY, text = "–", desc = Env.str(R.string.cpu_unavailable_desc))
         val limit = item.optInt("activePct", 80) / 100.0
         return ItemState(icon = Sym.MEMORY, text = Fmt.percent(c.total), active = c.total >= limit,
             tone = if (c.total >= 0.9) Tone.WARN else Tone.NORMAL, widthKey = "cpu",
-            desc = "CPU ${Fmt.percent(c.total)} busy" + if (c.total >= 0.9) ", high" else "")
+            desc = Env.str(if (c.total >= 0.9) R.string.cpu_state_desc_high else R.string.cpu_state_desc, Fmt.percent(c.total)))
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
         rememberTick()
         val c = Env.cpu
         androidx.compose.runtime.DisposableEffect(Unit) { c.detail++; onDispose { c.detail-- } }
-        MenuCard(Sym.MEMORY, "CPU", if (c.available) "${Fmt.percent(c.total)} busy · ${c.perCore.size} cores" else "Not available on this device") {
+        MenuCard(Sym.MEMORY, stringResource(R.string.cpu_menu_title),
+            if (c.available) pluralStringResource(R.plurals.cpu_menu_subtitle, c.perCore.size, Fmt.percent(c.total), c.perCore.size)
+            else stringResource(R.string.cpu_menu_unavailable)) {
             if (c.available) {
                 Sparkline(c.history.toList(), max = 1.0)
                 Spacer(Modifier.height(8.dp))
-                SectionLabel("Cores")
+                SectionLabel(stringResource(R.string.cpu_cores))
                 CoreBars(c.perCore)
                 Spacer(Modifier.height(6.dp))
                 c.clusters.forEach { cl ->
-                    InfoRow("Cores ${cl.cores}", String.format(Locale.ROOT, "%.2f of %.2f GHz", cl.curKhz / 1e6, cl.maxKhz / 1e6))
+                    InfoRow(stringResource(R.string.cpu_cluster, cl.cores), stringResource(R.string.cpu_cluster_clock,
+                        String.format(Locale.ROOT, "%.2f", cl.curKhz / 1e6), String.format(Locale.ROOT, "%.2f", cl.maxKhz / 1e6)))
                 }
                 c.gpu?.let { g ->
                     MenuDivider()
-                    InfoRow("Graphics (GPU)", Fmt.percent(g), MaterialTheme.colorScheme.tertiary)
+                    InfoRow(stringResource(R.string.cpu_gpu), Fmt.percent(g), MaterialTheme.colorScheme.tertiary)
                     Sparkline(c.gpuHistory.toList(), color = MaterialTheme.colorScheme.tertiary, max = 1.0)
                 }
             }
             MenuDivider()
-            MenuEntry(Sym.BOLT, "Battery usage by app") { host.close(); Env.launch(Intent(Intent.ACTION_POWER_USAGE_SUMMARY)) }
+            MenuEntry(Sym.BOLT, stringResource(R.string.cpu_battery_usage)) { host.close(); Env.launch(Intent(Intent.ACTION_POWER_USAGE_SUMMARY)) }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SliderRow("Counts as active above", item.optInt("activePct", 80), 30..99, { "$it%" }) { set(item.with("activePct", it.toString())) }
+        SliderRow(stringResource(R.string.option_active_above), item.optInt("activePct", 80), 30..99, { "$it%" }) { set(item.with("activePct", it.toString())) }
     }
 }
 
-object MemoryItem : ItemType("memory", "Memory", Sym.MEMORY_ALT, "How much RAM is in use") {
+object MemoryItem : ItemType("memory", R.string.item_memory_title, Sym.MEMORY_ALT, R.string.item_memory_desc) {
     override val canBeActive = true
 
     override fun state(item: ItemConfig): ItemState {
         val m = Env.mem
         val limit = item.optInt("activePct", 85) / 100.0
         return ItemState(icon = Sym.MEMORY_ALT, text = Fmt.percent(m.used), active = m.used >= limit || m.low, widthKey = "mem",
-            tone = if (m.low) Tone.WARN else Tone.NORMAL, desc = "Memory ${Fmt.percent(m.used)} used")
+            tone = if (m.low) Tone.WARN else Tone.NORMAL, desc = Env.str(R.string.memory_state_desc, Fmt.percent(m.used)))
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
         rememberTick()
         val m = Env.mem
-        MenuCard(Sym.MEMORY_ALT, "Memory", "${Fmt.percent(m.used)} in use") {
+        MenuCard(Sym.MEMORY_ALT, stringResource(R.string.item_memory_title), stringResource(R.string.memory_in_use, Fmt.percent(m.used))) {
             Meter(m.used.toFloat(), if (m.low) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-            InfoRow("Used", Fmt.bytes((m.total - m.avail).toDouble()))
-            InfoRow("Available", Fmt.bytes(m.avail.toDouble()))
-            InfoRow("Installed", Fmt.bytes(m.total.toDouble()))
-            if (m.low) InfoRow("State", "Low memory", MaterialTheme.colorScheme.error)
+            InfoRow(stringResource(R.string.common_used), Fmt.bytes((m.total - m.avail).toDouble()))
+            InfoRow(stringResource(R.string.memory_available), Fmt.bytes(m.avail.toDouble()))
+            InfoRow(stringResource(R.string.memory_installed), Fmt.bytes(m.total.toDouble()))
+            if (m.low) InfoRow(stringResource(R.string.memory_state), stringResource(R.string.memory_low), MaterialTheme.colorScheme.error)
             Sparkline(m.usedHistory.toList(), max = 1.0)
             MenuDivider()
-            MenuEntry(Sym.APPS, "Apps") { host.close(); Env.launch(Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)) }
+            MenuEntry(Sym.APPS, stringResource(R.string.common_apps)) { host.close(); Env.launch(Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)) }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SliderRow("Counts as active above", item.optInt("activePct", 85), 50..99, { "$it%" }) { set(item.with("activePct", it.toString())) }
+        SliderRow(stringResource(R.string.option_active_above), item.optInt("activePct", 85), 50..99, { "$it%" }) { set(item.with("activePct", it.toString())) }
     }
 }
 
-object BatteryItem : ItemType("battery", "Battery details", Sym.BOLT, "Power draw in watts, temperature, time to full") {
+object BatteryItem : ItemType("battery", R.string.item_battery_title, Sym.BOLT, R.string.item_battery_desc) {
     override val canBeActive = true
 
     override fun state(item: ItemConfig): ItemState {
@@ -156,39 +163,41 @@ object BatteryItem : ItemType("battery", "Battery details", Sym.BOLT, "Power dra
             icon = if (b.charging) Sym.BOLT else if (b.level < 0.1) Sym.BATTERY_0_BAR else Sym.BATTERY_FULL,
             filled = b.charging, text = text, active = low || hot, widthKey = "bat",
             tone = when { !b.charging && b.level < 0.1 -> Tone.ALERT; low || hot -> Tone.WARN; else -> Tone.NORMAL },
-            desc = "Battery ${Fmt.percent(b.level)}, ${b.statusText()}, ${Fmt.oneDecimal(kotlin.math.abs(b.watts))} watts",
+            desc = Env.str(R.string.battery_state_desc, Fmt.percent(b.level), b.statusText(), Fmt.oneDecimal(kotlin.math.abs(b.watts))),
         )
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
         rememberTick()
         val b = Env.battery
-        MenuCard(if (b.charging) Sym.BOLT else Sym.BATTERY_FULL, "Battery", "${Fmt.percent(b.level)} · ${b.statusText()}") {
+        MenuCard(if (b.charging) Sym.BOLT else Sym.BATTERY_FULL, stringResource(R.string.battery_menu_title), "${Fmt.percent(b.level)} · ${b.statusText()}") {
             Meter(b.level.toFloat(), if (!b.charging && b.level < 0.2) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
-            InfoRow(if (b.watts >= 0) "Charging at" else "Using", String.format(Locale.ROOT, "%.1f W", kotlin.math.abs(b.watts)))
+            InfoRow(stringResource(if (b.watts >= 0) R.string.battery_charging_at else R.string.battery_using), String.format(Locale.ROOT, "%.1f W", kotlin.math.abs(b.watts)))
             Sparkline(b.wattHistory.toList())
-            InfoRow("Power source", b.sourceText())
-            InfoRow("Voltage", String.format(Locale.ROOT, "%.2f V", b.voltageMv / 1000.0))
-            InfoRow("Current", String.format(Locale.ROOT, "%d mA", kotlin.math.abs(b.currentUa) / 1000))
-            InfoRow("Temperature", String.format(Locale.ROOT, "%.1f °C", b.tempC),
+            InfoRow(stringResource(R.string.battery_power_source), b.sourceText())
+            InfoRow(stringResource(R.string.battery_voltage), String.format(Locale.ROOT, "%.2f V", b.voltageMv / 1000.0))
+            InfoRow(stringResource(R.string.battery_current), String.format(Locale.ROOT, "%d mA", kotlin.math.abs(b.currentUa) / 1000))
+            InfoRow(stringResource(R.string.battery_temperature), String.format(Locale.ROOT, "%.1f °C", b.tempC),
                 if (b.tempC >= 42) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
-            InfoRow("Health", b.healthText())
-            if (b.cycles >= 0) InfoRow("Charge cycles", b.cycles.toString())
-            if (b.chargeTimeMs > 0) InfoRow("Full in", Fmt.duration(b.chargeTimeMs))
-            InfoRow("Thermal state", b.thermalText())
+            InfoRow(stringResource(R.string.battery_health), b.healthText())
+            if (b.cycles >= 0) InfoRow(stringResource(R.string.battery_cycles), b.cycles.toString())
+            if (b.chargeTimeMs > 0) InfoRow(stringResource(R.string.battery_full_in), Fmt.duration(b.chargeTimeMs))
+            InfoRow(stringResource(R.string.battery_thermal_state), b.thermalText())
             MenuDivider()
-            MenuEntry(Sym.BOLT, "Battery usage") { host.close(); Env.launch(Intent(Intent.ACTION_POWER_USAGE_SUMMARY)) }
-            MenuEntry(Sym.SETTINGS, "Battery saver") { host.close(); Env.launch(Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)) }
+            MenuEntry(Sym.BOLT, stringResource(R.string.battery_usage)) { host.close(); Env.launch(Intent(Intent.ACTION_POWER_USAGE_SUMMARY)) }
+            MenuEntry(Sym.SETTINGS, stringResource(R.string.battery_saver)) { host.close(); Env.launch(Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS)) }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        ChoiceRow("Show", listOf("watts" to "Watts", "percent" to "Percent", "temp" to "Temperature", "time" to "Time to full"),
+        ChoiceRow(stringResource(R.string.option_show), listOf("watts" to stringResource(R.string.battery_show_watts),
+            "percent" to stringResource(R.string.battery_show_percent), "temp" to stringResource(R.string.battery_temperature),
+            "time" to stringResource(R.string.battery_show_time)),
             item.opt("show", "watts")) { set(item.with("show", it)) }
     }
 }
 
-object StorageItem : ItemType("storage", "Storage", Sym.HARD_DRIVE, "Free space on the device") {
+object StorageItem : ItemType("storage", R.string.item_storage_title, Sym.HARD_DRIVE, R.string.item_storage_desc) {
     override val refreshMs = 30_000L
     override val canBeActive = true
 
@@ -197,19 +206,19 @@ object StorageItem : ItemType("storage", "Storage", Sym.HARD_DRIVE, "Free space 
         val freeFrac = if (s.total == 0L) 1.0 else s.free.toDouble() / s.total
         return ItemState(icon = Sym.HARD_DRIVE, text = Fmt.bytes(s.free.toDouble()).replace(" ", ""),
             active = freeFrac < 0.1, tone = if (freeFrac < 0.05) Tone.ALERT else if (freeFrac < 0.1) Tone.WARN else Tone.NORMAL,
-            desc = "${Fmt.bytes(s.free.toDouble())} free")
+            desc = Env.str(R.string.storage_state_desc, Fmt.bytes(s.free.toDouble())))
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
         val s = Env.storage
         val used = if (s.total == 0L) 0.0 else (s.total - s.free).toDouble() / s.total
-        MenuCard(Sym.HARD_DRIVE, "Storage", "${Fmt.bytes(s.free.toDouble())} free of ${Fmt.bytes(s.total.toDouble())}") {
+        MenuCard(Sym.HARD_DRIVE, stringResource(R.string.item_storage_title), stringResource(R.string.storage_free_of, Fmt.bytes(s.free.toDouble()), Fmt.bytes(s.total.toDouble()))) {
             Meter(used.toFloat())
-            InfoRow("Used", Fmt.bytes((s.total - s.free).toDouble()))
-            InfoRow("Free", Fmt.bytes(s.free.toDouble()))
+            InfoRow(stringResource(R.string.common_used), Fmt.bytes((s.total - s.free).toDouble()))
+            InfoRow(stringResource(R.string.storage_free), Fmt.bytes(s.free.toDouble()))
             MenuDivider()
-            MenuEntry(Sym.HARD_DRIVE, "Storage settings") { host.close(); Env.launch(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) }
-            MenuEntry(Sym.DELETE, "Free up space") { host.close(); Env.launch(Intent(StorageManager.ACTION_MANAGE_STORAGE)) }
+            MenuEntry(Sym.HARD_DRIVE, stringResource(R.string.storage_settings)) { host.close(); Env.launch(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) }
+            MenuEntry(Sym.DELETE, stringResource(R.string.storage_free_up)) { host.close(); Env.launch(Intent(StorageManager.ACTION_MANAGE_STORAGE)) }
         }
     }
 }

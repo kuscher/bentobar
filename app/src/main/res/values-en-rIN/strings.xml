@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- en-IN: the same British spellings as values-en-rGB (Android doesn't fall back from
+     en-IN to en-GB). Keep in sync; LocaleCopiesTest checks it. -->
+<!-- British English: only the strings whose spelling differs from the US default; the rest fall back to values/. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+
+    <!-- base -->
+    <string name="a11y_description">BentoBar draws the items you add (network speed, timer, calendar, tools…) on top of the status bar. Android only allows that through an accessibility service.\n\nWhat BentoBar does with it: it reads the layout of the status bar, and nothing else, to find free space; it copies the colour of the status bar clock so your items match; and it runs system actions such as screenshot or lock when you pick them in its Tools menu.\n\nIt does not read other apps\' windows, does not watch your keyboard, mouse or touches, and has no internet access.</string>
+
+    <!-- tool -->
+    <string name="app_match_color">Match the bar\'s colour</string>
+    <string name="item_folder_desc">A drop-down of your favourite apps</string>
+
+    <!-- main -->
+    <string name="page_look">Look and behaviour</string>
+
+    <!-- pages -->
+    <string name="look_position_center">Centre</string>
+    <string name="look_color">Colour</string>
+    <string name="look_color_help">Matching reads the colour of the status bar clock</string>
+    <string name="setup_turn_on_copies">copies the colour of the status bar clock so your items match it</string>
+    <string name="about_tagline">Add, hide and organise items in your Googlebook\'s status bar.</string>
+    <string name="about_privacy_text">BentoBar has no internet permission. Your settings, calendar events and everything it measures stay on this device. Its accessibility service reads only the status bar (its layout, and the colour of its clock), never other apps.</string>
+</resources>

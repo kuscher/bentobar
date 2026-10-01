@@ -43,6 +43,10 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.ui.ActionTile
 import io.github.kuscher.bentobar.ui.ChoiceRow
@@ -86,20 +90,21 @@ object Caffeine {
     }
 }
 
-object CaffeineItem : ItemType("caffeine", "Keep awake", Sym.COFFEE, "Stops the screen from turning off; click to switch") {
+object CaffeineItem : ItemType("caffeine", R.string.item_caffeine_title, Sym.COFFEE, R.string.item_caffeine_desc) {
     override val canBeActive = true
     private val durations = listOf(15, 30, 60, 120, 240)
 
     override fun state(item: ItemConfig): ItemState {
         val on = Caffeine.active()
         val left = Caffeine.until.value - System.currentTimeMillis()
+        val forever = Caffeine.until.value == Caffeine.FOREVER
         val text = when {
             !on -> null
-            Caffeine.until.value == Caffeine.FOREVER -> "On"
+            forever -> Env.str(R.string.common_on)
             else -> Fmt.duration(left)
         }
-        return ItemState(icon = Sym.COFFEE, filled = on, text = text, active = on, widthKey = if (text != null && text != "On") "left" else null,
-            desc = if (on) "Keeping the screen on" else "Keep awake is off")
+        return ItemState(icon = Sym.COFFEE, filled = on, text = text, active = on, widthKey = if (on && !forever) "left" else null,
+            desc = Env.str(if (on) R.string.caffeine_on_desc else R.string.caffeine_off_desc))
     }
 
     override fun onClick(item: ItemConfig): Boolean {
@@ -111,30 +116,35 @@ object CaffeineItem : ItemType("caffeine", "Keep awake", Sym.COFFEE, "Stops the 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, _ ->
         rememberTick()
         val on = Caffeine.active()
-        MenuCard(Sym.COFFEE, "Keep awake", when {
-            Env.service == null -> "Turn on BentoBar (accessibility) to use this"
-            !on -> "The screen turns off as usual"
-            Caffeine.until.value == Caffeine.FOREVER -> "Screen stays on until you turn this off"
-            else -> "Screen stays on for ${Fmt.duration(Caffeine.until.value - System.currentTimeMillis())}"
+        MenuCard(Sym.COFFEE, stringResource(R.string.item_caffeine_title), when {
+            Env.service == null -> stringResource(R.string.caffeine_needs_service)
+            !on -> stringResource(R.string.caffeine_off_subtitle)
+            Caffeine.until.value == Caffeine.FOREVER -> stringResource(R.string.caffeine_until_off_subtitle)
+            else -> stringResource(R.string.caffeine_for_subtitle, Fmt.duration(Caffeine.until.value - System.currentTimeMillis()))
         }) {
-            SectionLabel("Keep the screen on for")
-            ChipRow(durations.map { if (it < 60) "$it min" else "${it / 60} h" } + "Until I turn it off") { i ->
+            SectionLabel(stringResource(R.string.caffeine_keep_on_for))
+            ChipRow(durations.map {
+                if (it < 60) pluralStringResource(R.plurals.common_minutes_short, it, it)
+                else pluralStringResource(R.plurals.common_hours_short, it / 60, it / 60)
+            } + stringResource(R.string.caffeine_until_i_turn_off)) { i ->
                 Caffeine.on(durations.getOrNull(i))
             }
             if (on) {
                 MenuDivider()
-                MenuEntry(Sym.CLOSE, "Turn off") { Caffeine.off() }
+                MenuEntry(Sym.CLOSE, stringResource(R.string.common_turn_off)) { Caffeine.off() }
             }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        ChoiceRow("A click keeps the screen on", listOf("" to "Until turned off", "30" to "30 min", "60" to "1 hour", "120" to "2 hours"),
+        ChoiceRow(stringResource(R.string.caffeine_click_keeps_on), listOf("" to stringResource(R.string.caffeine_until_turned_off),
+            "30" to pluralStringResource(R.plurals.common_minutes_short, 30, 30), "60" to pluralStringResource(R.plurals.common_hours, 1, 1),
+            "120" to pluralStringResource(R.plurals.common_hours, 2, 2)),
             item.opt("minutes", "")) { set(item.with("minutes", it.ifBlank { null })) }
     }
 }
 
-object SoundItem : ItemType("sound", "Sound", Sym.VOLUME_UP, "Volume and media controls; scroll to change the volume") {
+object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R.string.item_sound_desc) {
     private fun am() = Env.app.getSystemService(AudioManager::class.java)
 
     override fun state(item: ItemConfig): ItemState {
@@ -144,8 +154,8 @@ object SoundItem : ItemType("sound", "Sound", Sym.VOLUME_UP, "Volume and media c
         val muted = am.isStreamMute(AudioManager.STREAM_MUSIC) || v == 0
         val pct = v * 100 / max
         return ItemState(icon = when { muted -> Sym.VOLUME_OFF; pct < 34 -> Sym.VOLUME_MUTE; pct < 67 -> Sym.VOLUME_DOWN; else -> Sym.VOLUME_UP },
-            text = if (muted) "Muted" else "$pct%", widthKey = if (muted) null else "pct",
-            desc = if (muted) "Sound muted" else "Volume $pct percent")
+            text = if (muted) Env.str(R.string.sound_muted) else "$pct%", widthKey = if (muted) null else "pct",
+            desc = if (muted) Env.str(R.string.sound_muted_desc) else Env.plural(R.plurals.sound_volume_desc, pct))
     }
 
     override fun onScroll(item: ItemConfig, steps: Int) {
@@ -169,84 +179,86 @@ object SoundItem : ItemType("sound", "Sound", Sym.VOLUME_UP, "Volume and media c
             var v by remember { mutableFloatStateOf(actual) }
             LaunchedEffect(actual) { if (!dragging) v = actual }
             val muted = am.isStreamMute(AudioManager.STREAM_MUSIC)
-            MenuCard(Sym.VOLUME_UP, "Sound", if (muted) "Muted" else "Media volume ${(v * 100 / max).toInt()}%") {
+            val volumeLabel = stringResource(R.string.sound_media_volume)
+            MenuCard(Sym.VOLUME_UP, stringResource(R.string.item_sound_title),
+                if (muted) stringResource(R.string.sound_muted) else stringResource(R.string.sound_media_volume_pct, (v * 100 / max).toInt())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FilledTonalIconButton(onClick = {
                         am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, 0)
-                    }) { SymIcon(if (muted) Sym.VOLUME_OFF else Sym.VOLUME_UP, size = 20.sp, contentDescription = if (muted) "Unmute" else "Mute") }
+                    }) { SymIcon(if (muted) Sym.VOLUME_OFF else Sym.VOLUME_UP, size = 20.sp, contentDescription = stringResource(if (muted) R.string.sound_unmute else R.string.sound_mute)) }
                     Spacer(Modifier.width(8.dp))
                     Slider(value = v, onValueChange = {
                         dragging = true
                         v = it
                         am.setStreamVolume(AudioManager.STREAM_MUSIC, it.toInt(), 0)
                     }, onValueChangeFinished = { dragging = false }, valueRange = 0f..max.toFloat(), steps = (max - 1).coerceAtLeast(0),
-                        modifier = Modifier.weight(1f).semantics { contentDescription = "Media volume" })
+                        modifier = Modifier.weight(1f).semantics { contentDescription = volumeLabel })
                 }
-                SectionLabel("Media")
+                SectionLabel(stringResource(R.string.sound_media))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS) }) { SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = "Previous track") }
+                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS) }) { SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = stringResource(R.string.sound_previous)) }
                     FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }) {
-                        SymIcon(if (am.isMusicActive) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp, contentDescription = if (am.isMusicActive) "Pause" else "Play")
+                        SymIcon(if (am.isMusicActive) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp, contentDescription = stringResource(if (am.isMusicActive) R.string.common_pause else R.string.sound_play))
                     }
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT) }) { SymIcon(Sym.SKIP_NEXT, size = 22.sp, contentDescription = "Next track") }
+                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT) }) { SymIcon(Sym.SKIP_NEXT, size = 22.sp, contentDescription = stringResource(R.string.sound_next)) }
                 }
                 MenuDivider()
-                MenuEntry(Sym.TUNE, "All volumes") { host.close(); Env.launch(Intent(Settings.Panel.ACTION_VOLUME)) }
-                MenuEntry(Sym.SETTINGS, "Sound settings") { host.close(); Env.launch(Intent(Settings.ACTION_SOUND_SETTINGS)) }
+                MenuEntry(Sym.TUNE, stringResource(R.string.sound_all_volumes)) { host.close(); Env.launch(Intent(Settings.Panel.ACTION_VOLUME)) }
+                MenuEntry(Sym.SETTINGS, stringResource(R.string.sound_settings)) { host.close(); Env.launch(Intent(Settings.ACTION_SOUND_SETTINGS)) }
             }
         }
     }
 }
 
-object ToolsItem : ItemType("tools", "Tools", Sym.HANDYMAN, "Screenshot, lock, overview, all apps and settings shortcuts") {
+object ToolsItem : ItemType("tools", R.string.item_tools_title, Sym.HANDYMAN, R.string.item_tools_desc) {
     override val menuWidthDp = 392
-    private data class Tool(val icon: String, val label: String, val run: () -> Unit)
+    private data class Tool(val icon: String, @StringRes val label: Int, val run: () -> Unit)
 
     private fun global(action: Int) = { Env.global(action); Unit }
     private fun settings(action: String) = { Env.launch(Intent(action)); Unit }
 
     private val system = listOf(
-        Tool(Sym.SCREENSHOT_MONITOR, "Screenshot", global(AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT)),
-        Tool(Sym.LOCK, "Lock", global(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)),
-        Tool(Sym.DESKTOP_WINDOWS, "Overview", global(AccessibilityService.GLOBAL_ACTION_RECENTS)),
-        Tool(Sym.APPS, "All apps", global(AccessibilityService.GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS)),
-        Tool(Sym.NOTIFICATIONS, "Notifications", global(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)),
-        Tool(Sym.TOGGLE_ON, "Quick settings", global(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)),
-        Tool(Sym.POWER_SETTINGS_NEW, "Power", global(AccessibilityService.GLOBAL_ACTION_POWER_DIALOG)),
+        Tool(Sym.SCREENSHOT_MONITOR, R.string.tools_screenshot, global(AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT)),
+        Tool(Sym.LOCK, R.string.tools_lock, global(AccessibilityService.GLOBAL_ACTION_LOCK_SCREEN)),
+        Tool(Sym.DESKTOP_WINDOWS, R.string.tools_overview, global(AccessibilityService.GLOBAL_ACTION_RECENTS)),
+        Tool(Sym.APPS, R.string.tools_all_apps, global(AccessibilityService.GLOBAL_ACTION_ACCESSIBILITY_ALL_APPS)),
+        Tool(Sym.NOTIFICATIONS, R.string.tools_notifications, global(AccessibilityService.GLOBAL_ACTION_NOTIFICATIONS)),
+        Tool(Sym.TOGGLE_ON, R.string.tools_quick_settings, global(AccessibilityService.GLOBAL_ACTION_QUICK_SETTINGS)),
+        Tool(Sym.POWER_SETTINGS_NEW, R.string.tools_power, global(AccessibilityService.GLOBAL_ACTION_POWER_DIALOG)),
     )
     private val shortcuts = listOf(
-        Tool(Sym.WIFI, "Wi-Fi", settings(Settings.ACTION_WIFI_SETTINGS)),
-        Tool(Sym.DESKTOP_WINDOWS, "Display", settings(Settings.ACTION_DISPLAY_SETTINGS)),
-        Tool(Sym.VOLUME_UP, "Sound", settings(Settings.ACTION_SOUND_SETTINGS)),
-        Tool(Sym.KEYBOARD, "Keyboard", settings(Settings.ACTION_HARD_KEYBOARD_SETTINGS)),
-        Tool(Sym.BOLT, "Battery", settings(Intent.ACTION_POWER_USAGE_SUMMARY)),
-        Tool(Sym.HARD_DRIVE, "Storage", settings(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)),
-        Tool(Sym.APPS, "Apps", settings(Settings.ACTION_APPLICATION_SETTINGS)),
-        Tool(Sym.TOUCH_APP, "Accessibility", settings(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
-        Tool(Sym.BUILD, "Developer", settings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)),
-        Tool(Sym.SETTINGS, "Settings", settings(Settings.ACTION_SETTINGS)),
+        Tool(Sym.WIFI, R.string.tools_wifi, settings(Settings.ACTION_WIFI_SETTINGS)),
+        Tool(Sym.DESKTOP_WINDOWS, R.string.tools_display, settings(Settings.ACTION_DISPLAY_SETTINGS)),
+        Tool(Sym.VOLUME_UP, R.string.tools_sound, settings(Settings.ACTION_SOUND_SETTINGS)),
+        Tool(Sym.KEYBOARD, R.string.tools_keyboard, settings(Settings.ACTION_HARD_KEYBOARD_SETTINGS)),
+        Tool(Sym.BOLT, R.string.tools_battery, settings(Intent.ACTION_POWER_USAGE_SUMMARY)),
+        Tool(Sym.HARD_DRIVE, R.string.tools_storage, settings(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)),
+        Tool(Sym.APPS, R.string.tools_apps, settings(Settings.ACTION_APPLICATION_SETTINGS)),
+        Tool(Sym.TOUCH_APP, R.string.tools_accessibility, settings(Settings.ACTION_ACCESSIBILITY_SETTINGS)),
+        Tool(Sym.BUILD, R.string.tools_developer, settings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)),
+        Tool(Sym.SETTINGS, R.string.tools_settings, settings(Settings.ACTION_SETTINGS)),
     )
 
-    override fun state(item: ItemConfig) = ItemState(icon = Sym.HANDYMAN, text = "Tools", desc = "Tools")
+    override fun state(item: ItemConfig) = ItemState(icon = Sym.HANDYMAN, text = Env.str(R.string.item_tools_title), desc = Env.str(R.string.item_tools_title))
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host ->
-        MenuCard(Sym.HANDYMAN, "Tools") {
+        MenuCard(Sym.HANDYMAN, stringResource(R.string.item_tools_title)) {
             if (item.optBool("system", true)) {
-                SectionLabel("System")
-                TileGrid { system.forEach { t -> ActionTile(t.icon, t.label) { host.afterClose(t.run) } } }
+                SectionLabel(stringResource(R.string.tools_section_system))
+                TileGrid { system.forEach { t -> ActionTile(t.icon, stringResource(t.label)) { host.afterClose(t.run) } } }
             }
             if (item.optBool("settings", true)) {
-                SectionLabel("Settings")
-                TileGrid { shortcuts.forEach { t -> ActionTile(t.icon, t.label) { host.close(); t.run() } } }
+                SectionLabel(stringResource(R.string.tools_settings))
+                TileGrid { shortcuts.forEach { t -> ActionTile(t.icon, stringResource(t.label)) { host.close(); t.run() } } }
             }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SwitchRow("System actions", item.optBool("system", true), help = "Screenshot, lock, overview, all apps, power") {
+        SwitchRow(stringResource(R.string.tools_system_actions), item.optBool("system", true), help = stringResource(R.string.tools_system_actions_help)) {
             set(item.with("system", it.toString()))
         }
-        SwitchRow("Settings shortcuts", item.optBool("settings", true)) { set(item.with("settings", it.toString())) }
+        SwitchRow(stringResource(R.string.tools_settings_shortcuts), item.optBool("settings", true)) { set(item.with("settings", it.toString())) }
     }
 }
 
@@ -298,7 +310,7 @@ object Apps {
 fun AppPicker(selected: List<ComponentName>, multi: Boolean, onChange: (List<ComponentName>) -> Unit) {
     var query by remember { mutableStateOf("") }
     val all = remember { Apps.list(Env.app) }
-    TextRow("Find an app", query, placeholder = "Search") { query = it }
+    TextRow(stringResource(R.string.apps_find), query, placeholder = stringResource(R.string.apps_search)) { query = it }
     val shown = all.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }.take(40)
     Column {
         shown.forEach { app ->
@@ -317,15 +329,15 @@ fun AppPicker(selected: List<ComponentName>, multi: Boolean, onChange: (List<Com
     }
 }
 
-object AppItem : ItemType("app", "App shortcut", Sym.ROCKET_LAUNCH, "One app, one click away") {
+object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.string.item_app_desc) {
     override val refreshMs = 60_000L
 
     private fun cn(item: ItemConfig) = item.options["app"]?.let { ComponentName.unflattenFromString(it) }
 
     override fun state(item: ItemConfig): ItemState {
-        val cn = cn(item) ?: return ItemState(icon = Sym.ROCKET_LAUNCH, text = "Pick an app", desc = "App shortcut without an app")
+        val cn = cn(item) ?: return ItemState(icon = Sym.ROCKET_LAUNCH, text = Env.str(R.string.app_pick), desc = Env.str(R.string.app_no_app_desc))
         val label = Apps.label(Env.app, cn)
-        return ItemState(image = Apps.icon(Env.app, cn, 64, item.optBool("mono", true)), text = label, desc = "Open $label")
+        return ItemState(image = Apps.icon(Env.app, cn, 64, item.optBool("mono", true)), text = label, desc = Env.str(R.string.app_open_desc, label))
     }
 
     override fun onClick(item: ItemConfig): Boolean {
@@ -335,21 +347,21 @@ object AppItem : ItemType("app", "App shortcut", Sym.ROCKET_LAUNCH, "One app, on
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SwitchRow("Match the bar's colour", item.optBool("mono", true), help = "Uses the app's themed icon when it has one") {
+        SwitchRow(stringResource(R.string.app_match_color), item.optBool("mono", true), help = stringResource(R.string.app_match_color_help)) {
             set(item.with("mono", it.toString()))
         }
         AppPicker(listOfNotNull(cn(item)), multi = false) { set(item.with("app", it.firstOrNull()?.flattenToString())) }
     }
 }
 
-object FolderItem : ItemType("folder", "App folder", Sym.GRID_VIEW, "A drop-down of your favourite apps") {
+object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW, R.string.item_folder_desc) {
     override val menuWidthDp = 340
-    override fun state(item: ItemConfig) = ItemState(icon = Sym.GRID_VIEW, text = item.opt("label", "Apps"), desc = "App folder")
+    override fun state(item: ItemConfig) = ItemState(icon = Sym.GRID_VIEW, text = item.opt("label", Env.str(R.string.common_apps)), desc = Env.str(R.string.item_folder_title))
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host ->
         val apps = Apps.parse(item.opt("apps", ""))
-        MenuCard(Sym.GRID_VIEW, item.opt("label", "Apps")) {
-            if (apps.isEmpty()) Text("No apps yet", style = MaterialTheme.typography.bodyMedium)
+        MenuCard(Sym.GRID_VIEW, item.opt("label", stringResource(R.string.common_apps))) {
+            if (apps.isEmpty()) Text(stringResource(R.string.folder_no_apps), style = MaterialTheme.typography.bodyMedium)
             TileGrid {
                 apps.forEach { cn ->
                     Column(Modifier.width(76.dp).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -362,26 +374,31 @@ object FolderItem : ItemType("folder", "App folder", Sym.GRID_VIEW, "A drop-down
                 }
             }
             MenuDivider()
-            MenuEntry(Sym.EDIT, "Choose apps") { host.openItemSettings(item.id) }
+            MenuEntry(Sym.EDIT, stringResource(R.string.folder_choose_apps)) { host.openItemSettings(item.id) }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow("Name", item.opt("label", "Apps")) { set(item.with("label", it.take(16).ifBlank { null })) }
+        TextRow(stringResource(R.string.folder_name), item.opt("label", stringResource(R.string.common_apps))) { set(item.with("label", it.take(16).ifBlank { null })) }
         AppPicker(Apps.parse(item.opt("apps", "")), multi = true) { list ->
             set(item.with("apps", list.joinToString(",") { it.flattenToString() }.ifBlank { null }))
         }
     }
 }
 
-object TextItem : ItemType("text", "Text or emoji", Sym.TEXT_FIELDS, "Your own label, optionally opening a link") {
+object TextItem : ItemType("text", R.string.item_text_title, Sym.TEXT_FIELDS, R.string.item_text_desc) {
     override fun state(item: ItemConfig) = ItemState(
         icon = item.options["icon"]?.let { iconChoices.toMap()[it] },
-        text = item.opt("text", "Hello"), desc = item.opt("text", "Hello"),
+        text = item.opt("text", Env.str(R.string.text_default)), desc = item.opt("text", Env.str(R.string.text_default)),
     )
 
     val iconChoices = listOf("none" to "", "star" to Sym.STAR, "heart" to Sym.FAVORITE, "bookmark" to Sym.BOOKMARK,
         "label" to Sym.LABEL, "pin" to Sym.PUSH_PIN, "rocket" to Sym.ROCKET_LAUNCH, "idea" to Sym.EMOJI_OBJECTS, "link" to Sym.LINK)
+
+    /** The icon choices' names (keys above are stored, these are shown). */
+    private val iconNames = mapOf("none" to R.string.option_none, "star" to R.string.text_icon_star, "heart" to R.string.text_icon_heart,
+        "bookmark" to R.string.text_icon_bookmark, "label" to R.string.text_icon_label, "pin" to R.string.text_icon_pin,
+        "rocket" to R.string.text_icon_rocket, "idea" to R.string.text_icon_idea, "link" to R.string.text_icon_link)
 
     override fun onClick(item: ItemConfig): Boolean {
         val link = item.options["link"]?.takeIf { it.isNotBlank() } ?: return true
@@ -390,27 +407,29 @@ object TextItem : ItemType("text", "Text or emoji", Sym.TEXT_FIELDS, "Your own l
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow("Text", item.opt("text", "Hello"), help = "Emoji work too") { set(item.with("text", it.take(40))) }
-        ChoiceRow("Icon", iconChoices.map { it.first to (if (it.first == "none") "None" else it.first.replaceFirstChar(Char::titlecase)) },
+        TextRow(stringResource(R.string.text_text), item.opt("text", stringResource(R.string.text_default)), help = stringResource(R.string.text_text_help)) {
+            set(item.with("text", it.take(40)))
+        }
+        ChoiceRow(stringResource(R.string.text_icon), iconChoices.map { it.first to stringResource(iconNames.getValue(it.first)) },
             item.opt("icon", "none")) { set(item.with("icon", if (it == "none") null else it)) }
-        TextRow("Opens (optional)", item.opt("link", ""), placeholder = "https://…", help = "A web address to open on click") {
+        TextRow(stringResource(R.string.text_opens), item.opt("link", ""), placeholder = "https://…", help = stringResource(R.string.text_opens_help)) {
             set(item.with("link", it.trim().ifBlank { null }))
         }
     }
 
-    override fun defaultOptions() = mapOf("text" to "Hello")
+    override fun defaultOptions() = mapOf("text" to Env.str(R.string.text_default))
 }
 
-object SpacerItem : ItemType("spacer", "Spacer or divider", Sym.SPACE_BAR, "Room between items, or a thin line to group them") {
+object SpacerItem : ItemType("spacer", R.string.item_spacer_title, Sym.SPACE_BAR, R.string.item_spacer_desc) {
     override val refreshMs = 60_000L
 
-    override fun state(item: ItemConfig) = ItemState(gapDp = item.optInt("width", 12), divider = item.optBool("line", false), desc = "Spacer")
+    override fun state(item: ItemConfig) = ItemState(gapDp = item.optInt("width", 12), divider = item.optBool("line", false), desc = Env.str(R.string.spacer_desc))
 
     override fun onClick(item: ItemConfig) = true
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SliderRow("Width", item.optInt("width", 12), 4..64, { "$it dp" }) { set(item.with("width", it.toString())) }
-        SwitchRow("Draw a divider line", item.optBool("line", false)) { set(item.with("line", it.toString())) }
+        SliderRow(stringResource(R.string.spacer_width), item.optInt("width", 12), 4..64, { "$it dp" }) { set(item.with("width", it.toString())) }
+        SwitchRow(stringResource(R.string.spacer_line), item.optBool("line", false)) { set(item.with("line", it.toString())) }
     }
 }
 

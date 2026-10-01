@@ -73,6 +73,9 @@
     <string name="cpu_cluster_clock">%1$s of %2$s GHz</string>
     <string name="cpu_gpu">Graphics (GPU)</string>
     <string name="cpu_battery_usage">Battery usage by app</string>
+    <string name="cpu_overall">Overall</string>
+    <string name="cpu_per_app_note">Android doesn\'t tell apps how much CPU other apps use. Battery usage by app is the closest view.</string>
+    <string name="cpu_developer_options">Developer options</string>
     <string name="item_memory_title">Memory</string>
     <string name="item_memory_desc">How much RAM is in use</string>
     <string name="memory_state_desc">Memory %1$s used</string>
@@ -82,6 +85,10 @@
     <string name="memory_installed">Installed</string>
     <string name="memory_state">State</string>
     <string name="memory_low">Low memory</string>
+    <string name="memory_normal">Normal</string>
+    <string name="memory_total">Total</string>
+    <string name="memory_low_below">Low below</string>
+    <string name="memory_per_app_note">Android doesn\'t tell apps how much memory other apps use.</string>
     <string name="common_apps">Apps</string>
     <string name="item_battery_title">Battery details</string>
     <string name="item_battery_desc">Power draw in watts, temperature, time to full</string>
@@ -109,6 +116,20 @@
     <string name="storage_free">Free</string>
     <string name="storage_settings">Storage settings</string>
     <string name="storage_free_up">Free up space</string>
+    <string name="usage_optin_data">See which apps use the most data</string>
+    <string name="usage_optin_storage">See which apps use the most storage</string>
+    <string name="usage_explain">Usage access lets BentoBar read how much data and storage each app uses. Android\'s switch also covers which apps you use and when; BentoBar doesn\'t read that, and nothing leaves your device.</string>
+    <string name="usage_turn_on">Turn on Usage access</string>
+    <string name="usage_top_data">Most data today</string>
+    <string name="usage_top_storage">Largest apps</string>
+    <string name="usage_loading">Loading…</string>
+    <string name="usage_none_data">No data used yet today</string>
+    <string name="usage_none_storage">No app sizes available</string>
+    <string name="usage_no_ethernet">Ethernet isn\'t included: Android doesn\'t report it per app.</string>
+    <string name="usage_android_system">Android system</string>
+    <string name="usage_other_apps">Other apps</string>
+    <string name="usage_tethering">Hotspot and tethering</string>
+    <string name="usage_removed_apps">Removed apps</string>
 
     <!-- time -->
     <string name="item_clock_title">Clock</string>
@@ -166,6 +187,7 @@
     <string name="event_now_ends_in">Now · ends in %1$s</string>
     <string name="event_starts_in">Starts in %1$s</string>
     <string name="common_join">Join</string>
+    <string name="event_directions">Directions</string>
     <string name="common_open">Open</string>
     <string name="event_coming_up">Coming up</string>
     <string name="event_nothing_else">Nothing else in the next weeks</string>
@@ -179,7 +201,7 @@
     <string name="timer_break_left_desc">Break %1$s left</string>
     <string name="timer_left_desc">Timer %1$s left</string>
     <string name="timer_menu_hint">Scroll over the timer in the bar to add minutes</string>
-    <string name="timer_countdown">Countdown</string>
+    <string name="timer_custom">Custom</string>
     <string name="timer_minutes">Minutes</string>
     <string name="timer_start">Start</string>
     <string name="timer_stopwatch">Stopwatch</string>
@@ -481,11 +503,12 @@
     <string name="setup_calendar_text">For the Next meeting item and the events in the month view. Read on this device only.</string>
     <string name="setup_alarms_title">Alarms and reminders</string>
     <string name="setup_alarms_text">Lets timers ring on the second even while the Googlebook sleeps. Without it they may be a little late.</string>
+    <string name="setup_usage_title">Usage access</string>
     <string name="about_version">BentoBar %1$s</string>
     <string name="about_tagline">Add, hide and organize items in your Googlebook\'s status bar.</string>
     <string name="about_formerly">Called DiscoBar until version 0.4.</string>
     <string name="about_privacy">Privacy</string>
-    <string name="about_privacy_text">BentoBar has no internet permission. Your settings, calendar events and everything it measures stay on this device. Its accessibility service reads only the status bar (its layout, and the color of its clock), never other apps.</string>
+    <string name="about_privacy_text">BentoBar has no internet permission. Your settings, calendar events and everything it measures stay on this device. Its accessibility service reads only the status bar (its layout, and the color of its clock), never other apps. If you turn on Usage access, BentoBar also reads how much data and storage each app uses, for the Network and Storage menus, and nothing else with that access.</string>
     <string name="about_how">How it works</string>
     <string name="about_how_text">Android doesn\'t let apps change the system\'s own status bar icons. BentoBar draws its items in the empty part of the status bar, in windows of its own, and moves them out of the way when the system\'s icons change or an app goes full screen. Your running timer can also appear as an official Android Live Update chip.</string>
     <string name="about_open_source">Open source</string>

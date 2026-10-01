@@ -145,9 +145,17 @@ with that access:
 - It runs **system actions** (screenshot, lock, overview, all apps, power) when you pick them in
   the Tools menu.
 
-BentoBar doesn't read other apps, doesn't watch your keyboard, mouse or touches, and has **no
-internet permission**: your layout, your calendar and everything it measures stay on your
+BentoBar doesn't read other apps' windows, doesn't watch your keyboard, mouse or touches, and has
+**no internet permission**: your layout, your calendar and everything it measures stay on your
 Googlebook.
+
+**Usage access is optional and off by default.** If you turn it on (Setup, or the Network and
+Storage menus), BentoBar reads how much data and storage each app uses, to list the top five in
+those menus, and nothing else. Android's switch also covers which apps you use and when; BentoBar
+doesn't read that. Turn it off any time in Android's Usage access settings (Setup › Usage access ›
+Open setting takes you there).
+Android doesn't share other apps' CPU or memory use with apps at all, so the CPU and Memory menus
+show the whole system instead.
 
 | Permission | Used for |
 |---|---|
@@ -155,6 +163,7 @@ Googlebook.
 | Notifications *(optional)* | timer alerts, and the Live Update chip |
 | Calendar *(optional)* | Next meeting, and events in the month view |
 | Alarms and reminders *(optional)* | timers that ring on the second while the Googlebook sleeps |
+| Usage access *(optional)* | the apps using the most data today and the largest apps, in the Network and Storage menus |
 | Network state, launcher apps | the network menu, and picking apps for shortcuts |
 
 ## Good to know

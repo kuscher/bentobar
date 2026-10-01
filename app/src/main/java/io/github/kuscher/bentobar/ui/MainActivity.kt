@@ -31,6 +31,9 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,6 +52,7 @@ import io.github.kuscher.bentobar.bar.BarStatus
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.items.Chips
 import io.github.kuscher.bentobar.items.Env
+import io.github.kuscher.bentobar.items.Items
 import io.github.kuscher.bentobar.items.Notify
 import io.github.kuscher.bentobar.items.Ticker
 import io.github.kuscher.bentobar.util.Sym
@@ -86,6 +90,8 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_ITEM)?.let { selected = it; page = 0 }
         if (intent.getBooleanExtra(EXTRA_EDIT, false)) page = 0
         intent.getStringExtra(EXTRA_REQUEST)?.let { perm ->
+            // Asked for from a menu ("Allow calendar"): that's switching it back on, too.
+            if (perm == android.Manifest.permission.READ_CALENDAR) Store.update { it.copy(turnedOff = it.turnedOff - io.github.kuscher.bentobar.data.Uses.CALENDAR) }
             if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(perm), 1)
         }
         if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") page = 2
@@ -120,6 +126,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        // Refused, and Android won't show its dialog again: say where it can still be allowed.
+        permissions.forEachIndexed { i, p ->
+            if (grantResults.getOrNull(i) == PackageManager.PERMISSION_DENIED && !shouldShowRequestPermissionRationale(p))
+                Notice.post(getString(R.string.setup_denied_settings), getString(R.string.common_open_settings)) { openAppInfo(this) }
+        }
         Setup.refresh(this)
         Ticker.refresh()
     }
@@ -185,11 +196,22 @@ class MainActivity : ComponentActivity() {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (page) {
                         0 -> BarPage(running, selected, onSelect = { selected = it }, onSetup = { page = 3 })
-                        1 -> AddPage { id -> selected = id; page = 0 }
+                        // Adding keeps you on Add: a message confirms it, with Undo, instead of jumping pages.
+                        1 -> AddPage { id ->
+                            val title = Store.config.value.items.firstOrNull { it.id == id }?.let { Items.of(it.type)?.title }.orEmpty()
+                            Notice.post(getString(R.string.add_added, title), getString(R.string.bar_undo)) { Store.remove(id) }
+                        }
                         2 -> LookPage()
                         3 -> SetupPage(this@MainActivity, setup)
                         else -> AboutPage()
                     }
+                    val snackbar = androidx.compose.runtime.remember { SnackbarHostState() }
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        Notice.messages.collect { m ->
+                            if (snackbar.showSnackbar(m.text, m.action, withDismissAction = m.action == null) == SnackbarResult.ActionPerformed) m.onAction?.invoke()
+                        }
+                    }
+                    SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
                 }
             }
         }

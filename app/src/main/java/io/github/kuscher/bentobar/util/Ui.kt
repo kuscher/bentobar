@@ -30,7 +30,12 @@ object Fonts {
         val am = context.applicationContext.assets
         symbols = FontFamily(ComposeTypeface(Typeface.createFromAsset(am, "fonts/MaterialSymbolsRounded.ttf")))
         symbolsFilled = FontFamily(ComposeTypeface(Typeface.createFromAsset(am, "fonts/MaterialSymbolsRounded_Fill.ttf")))
-        barTypeface = systemFamily("google-sans-text-medium") ?: systemFamily("google-sans-medium")
+        // Googlebooks name their UI font "google-sans-flex" (variable; the status bar uses it); older
+        // builds had "google-sans-text-medium". Without either, BentoBar fell back to the generic
+        // sans-serif, which looked technical next to the system's clock.
+        barTypeface = systemFamily("google-sans-flex")?.let { Typeface.create(it, 500, false) }
+            ?: systemFamily("google-sans-text-medium") ?: systemFamily("google-sans-medium")
+            ?: systemFamily("google-sans")?.let { Typeface.create(it, 500, false) }
             ?: Typeface.create("sans-serif-medium", Typeface.NORMAL)
         bar = FontFamily(ComposeTypeface(barTypeface))
     }

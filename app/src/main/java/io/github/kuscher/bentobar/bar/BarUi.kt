@@ -202,6 +202,8 @@ private fun Chevron(expanded: Boolean, onLeft: Boolean, look: StripLook, events:
     var bounds by remember { mutableStateOf(Rect()) }
     // Hidden items sit on the chevron's far side; the arrow points where they'll appear.
     val sym = if (onLeft != expanded) Sym.CHEVRON_LEFT else Sym.CHEVRON_RIGHT
+    val label = androidx.compose.ui.res.stringResource(if (expanded) io.github.kuscher.bentobar.R.string.chevron_hide else io.github.kuscher.bentobar.R.string.chevron_show)
+    val menuLabel = androidx.compose.ui.res.stringResource(io.github.kuscher.bentobar.R.string.chevron_menu)
     Box(
         Modifier.fillMaxHeight()
             .onGloballyPositioned { bounds = it.boundsInWindow().toRect(); events.placed("chevron", bounds) }
@@ -210,9 +212,9 @@ private fun Chevron(expanded: Boolean, onLeft: Boolean, look: StripLook, events:
             .hoverable(source)
             .clicks({ events.chevron(bounds) }, { events.chevronContext(bounds) }, null)
             .semantics {
-                contentDescription = if (expanded) "Hide BentoBar's hidden items" else "Show BentoBar's hidden items"; role = Role.Button
+                contentDescription = label; role = Role.Button
                 onClick { events.chevron(bounds); true }
-                onLongClick("BentoBar menu") { events.chevronContext(bounds); true }
+                onLongClick(menuLabel) { events.chevronContext(bounds); true }
             }
             .padding(horizontal = 3.dp),
         contentAlignment = Alignment.Center,
@@ -231,6 +233,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     var bounds by remember { mutableStateOf(Rect()) }
+    val itemMenuLabel = androidx.compose.ui.res.stringResource(io.github.kuscher.bentobar.R.string.strip_item_menu)
     LaunchedEffect(hovered) { events.itemHover(entry.item, bounds, hovered) }
     // Numbers change width every second; hold the widest size for a while so neighbours don't jump
     // (and the window doesn't resize every tick), then ease back to the natural width.
@@ -271,7 +274,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
                 contentDescription = s.desc.ifEmpty { s.text.orEmpty() }; role = Role.Button
                 // The clicks come from raw pointer input, so tell assistive tech how to press it.
                 onClick { events.click(entry.item, bounds); true }
-                onLongClick("Item menu") { events.context(entry.item, bounds); true }
+                onLongClick(itemMenuLabel) { events.context(entry.item, bounds); true }
             }
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

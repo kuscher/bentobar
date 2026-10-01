@@ -24,6 +24,8 @@ data class ItemState(
     val image: Bitmap? = null,
     /** Spacers: a fixed gap in dp (text and icon unused). */
     val gapDp: Int = 0,
+    /** Calendar: today's day number, drawn as a small date badge instead of [icon] in the bar. */
+    val dayNumber: Int? = null,
     /** Spacers: draw a thin divider line. */
     val divider: Boolean = false,
     /**
@@ -80,6 +82,8 @@ abstract class ItemType(
 
     /** Mouse wheel over the item; [steps] > 0 is up/away. */
     open fun onScroll(item: ItemConfig, steps: Int) {}
+    /** Uses the mouse wheel itself ([onScroll]); over other items the wheel reveals or folds hidden items. */
+    open val usesWheel: Boolean get() = false
 
     /** The drop-down menu. Null means the type has none (clicks go to [onClick]). */
     open val menu: (@Composable (item: ItemConfig, host: MenuHost) -> Unit)? = null

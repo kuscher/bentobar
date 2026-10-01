@@ -110,13 +110,24 @@ class BarController(private val service: AccessibilityService) {
         private val state = mutableStateOf(false)
         var value: Boolean
             get() = state.value
-            set(v) { state.value = v; Ticker.revealHidden = v || menuKey == "bentobar"; if (v) Ticker.refresh() }
+            set(v) {
+                state.value = v; Ticker.revealHidden = v || menuKey == "bentobar"; if (v) Ticker.refresh()
+                // Out: a click anywhere else folds them away again (see [outsideClick]).
+                strip.watchOutside(v)
+            }
     }
     private val look = mutableStateOf(StripLook(Color.White, true, TextSize.DEFAULT, 10.dp, Pill.NONE))
     private val maxWidth = mutableIntStateOf(0)
     private val heightDp = mutableStateOf(36.dp)
 
-    private val strip = Overlay(service, "BentoBar").apply { params.width = 1 }
+    private val strip = Overlay(service, "BentoBar", onOutside = { outsideClick() }).apply { params.width = 1; watchOutside(false) }
+
+    /** A click outside the strip while hidden items are out folds them away, unless a menu is open (it closes itself). */
+    private fun outsideClick() {
+        if (menuKey != null || !expanded.value) return
+        expanded.value = false; pinned = false
+        if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
+    }
     private var menu: Overlay? = null
     private var menuKey: String? = null
     private var menuClosedKey: String? = null
@@ -274,10 +285,13 @@ class BarController(private val service: AccessibilityService) {
         // On tablets the shade and Quick Settings slide over the status bar; our overlay would sit
         // on top of them. Only a big system window counts: on the desktop bar the panels open as
         // popups below the bar, and small system UI near the top shouldn't blink BentoBar away.
+        // The screenshot UI is a big, mostly see-through system window too ("Screenshot preview",
+        // full screen while it animates), but it doesn't cover the bar: hiding for it made the strip
+        // vanish for the seconds the preview shows.
         val cover = if (s == null) null else windows.firstOrNull { w ->
             val r = Rect().also { w.getBoundsInScreen(it) }
             w.type == AccessibilityWindowInfo.TYPE_SYSTEM && w.id != s.windowId && Rect.intersects(r, s.free) &&
-                r.height() >= s.bar.height() * 4
+                r.height() >= s.bar.height() * 4 && w.title?.contains("Screenshot", ignoreCase = true) != true
         }
         val covered = cover != null
         val show = s != null && !covered && cfg.enabled && pm.isInteractive && !km.isKeyguardLocked
@@ -441,8 +455,10 @@ class BarController(private val service: AccessibilityService) {
         // Presenting (screen sharing): only what matters on stage, whatever its section.
         // While dragging, the bar shows the order the item would land in.
         val items = dragPreview.value?.let { (id, at) -> cfg.items.moved(id, Section.SHOWN, at) } ?: cfg.items
-        val visible = if (cfg.presenting) items.filter { it.section != Section.OFF && it.type in PRESENTING_TYPES && states[it.id]?.active == true }
-        else items.filter { cfg.shows(it, states[it.id]?.active == true) }
+        val visible = (if (cfg.presenting) items.filter { it.section != Section.OFF && it.type in PRESENTING_TYPES && states[it.id]?.active == true }
+        else items.filter { cfg.shows(it, states[it.id]?.active == true) })
+            // Next meeting stays at the far left: its text changes width most, and there it moves nothing else.
+            .sortedBy { if (it.type == Store.PINNED_LEFT) 0 else 1 }
         // Behind ‹ (click or hover modes): hidden items not out on their own. Show everything: none.
         val hidden = if (cfg.presenting || cfg.hiddenMode == HiddenMode.SHOW_ALL) emptyList()
         else cfg.items.filter { it.section == Section.HIDDEN && !isActive(it, states) }
@@ -563,6 +579,12 @@ class BarController(private val service: AccessibilityService) {
             if (index != null) Store.move(item.id, Section.SHOWN, index)
             dragPreview.value = null
             dragFrom = null
+        }
+
+        override fun wheel(up: Boolean) {
+            val cfg = Store.config.value
+            if (cfg.presenting || cfg.hiddenMode == HiddenMode.SHOW_ALL || hiddenItems().isEmpty()) return
+            if (up != expanded.value) { expanded.value = up; pinned = false }
         }
 
         override fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {

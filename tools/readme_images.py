@@ -98,8 +98,8 @@ def main():
     menu = load("win_cpu.png")
     h = frame[1] + menu.height + 36
     if (RAW / "wallpaper.png").exists():
-        # An opaque status bar (the Acer's is black) says nothing about the wallpaper under it: use
-        # the wallpaper itself (screen-sized, as the screen shows it) below the bar.
+        # The wallpaper itself (screen-sized, as the screen shows it) below the bar, rather than the
+        # bar's colours continued: needed under an opaque bar (the Acer's, while an app is maximized).
         hero = load("wallpaper.png").crop((x0, 0, 1920, h))
     else:
         hero = wallpaper(bar, h).convert("RGBA")

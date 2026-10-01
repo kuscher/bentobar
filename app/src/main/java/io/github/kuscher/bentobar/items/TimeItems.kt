@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -195,9 +196,9 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(month.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + month.year,
                 style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            SmallIconButton(Sym.CHEVRON_LEFT) { offset-- }
+            SmallIconButton(Sym.CHEVRON_LEFT, "Previous month") { offset-- }
             if (offset != 0) TextButton(onClick = { offset = 0; picked = today }) { Text("Today") }
-            SmallIconButton(Sym.CHEVRON_RIGHT) { offset++ }
+            SmallIconButton(Sym.CHEVRON_RIGHT, "Next month") { offset++ }
         }
         val weeks = item.optBool("weeks", true)
         Row(Modifier.fillMaxWidth()) {
@@ -258,9 +259,12 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
 }
 
 @Composable
-private fun SmallIconButton(sym: String, onClick: () -> Unit) {
-    Box(Modifier.size(28.dp).clip(CircleShape).clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand),
-        contentAlignment = Alignment.Center) { SymIcon(sym, size = 18.sp) }
+private fun SmallIconButton(sym: String, label: String, onClick: () -> Unit) {
+    // Looks 28 dp, but takes clicks and focus over the 48 dp minimum.
+    Box(Modifier.minimumInteractiveComponentSize().clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand),
+        contentAlignment = Alignment.Center) {
+        Box(Modifier.size(28.dp).clip(CircleShape), contentAlignment = Alignment.Center) { SymIcon(sym, size = 18.sp, contentDescription = label) }
+    }
 }
 
 private val shortTime get() = DateTimeFormatter.ofPattern(if (DateFormat.is24HourFormat(Env.app)) "HH:mm" else "h:mm a", Locale.getDefault())
@@ -439,7 +443,8 @@ object TimerItem : ItemType("timer", "Timer", Sym.TIMER, "Countdown, stopwatch a
                     if (s.mode != Timers.Mode.STOPWATCH) OutlinedButton(onClick = { Timers.add(60_000) },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) { Text("+1 min", maxLines = 1) }
                     androidx.compose.material3.OutlinedIconButton(onClick = { Timers.stop() }) {
-                        SymIcon(if (s.mode == Timers.Mode.STOPWATCH) Sym.RESTART_ALT else Sym.STOP, size = 20.sp)
+                        SymIcon(if (s.mode == Timers.Mode.STOPWATCH) Sym.RESTART_ALT else Sym.STOP, size = 20.sp,
+                            contentDescription = if (s.mode == Timers.Mode.STOPWATCH) "Reset stopwatch" else "Stop timer")
                     }
                 }
             }

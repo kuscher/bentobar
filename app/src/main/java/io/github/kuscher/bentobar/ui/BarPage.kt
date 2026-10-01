@@ -263,10 +263,10 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
             if (detail.isNotEmpty()) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        IconButton(onClick = { Store.move(item.id, item.section, index - 1) }, enabled = index > 0) { SymIcon(Sym.ARROW_UPWARD, size = 18.sp) }
-        IconButton(onClick = { Store.move(item.id, item.section, index + 1) }, enabled = index < count - 1) { SymIcon(Sym.ARROW_DOWNWARD, size = 18.sp) }
+        IconButton(onClick = { Store.move(item.id, item.section, index - 1) }, enabled = index > 0) { SymIcon(Sym.ARROW_UPWARD, size = 18.sp, contentDescription = "Move ${type.title} up") }
+        IconButton(onClick = { Store.move(item.id, item.section, index + 1) }, enabled = index < count - 1) { SymIcon(Sym.ARROW_DOWNWARD, size = 18.sp, contentDescription = "Move ${type.title} down") }
         Box {
-            IconButton(onClick = { menu = true }) { SymIcon(Sym.MENU, size = 18.sp) }
+            IconButton(onClick = { menu = true }) { SymIcon(Sym.MENU, size = 18.sp, contentDescription = "More for ${type.title}") }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 if (item.section != Section.SHOWN) DropdownMenuItem(text = { Text("Show in the bar") }, onClick = { menu = false; Store.move(item.id, Section.SHOWN, 999) },
                     leadingIcon = { SymIcon(Sym.VISIBILITY, size = 18.sp) })

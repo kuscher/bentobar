@@ -36,6 +36,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -171,21 +173,22 @@ object SoundItem : ItemType("sound", "Sound", Sym.VOLUME_UP, "Volume and media c
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FilledTonalIconButton(onClick = {
                         am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, 0)
-                    }) { SymIcon(if (muted) Sym.VOLUME_OFF else Sym.VOLUME_UP, size = 20.sp) }
+                    }) { SymIcon(if (muted) Sym.VOLUME_OFF else Sym.VOLUME_UP, size = 20.sp, contentDescription = if (muted) "Unmute" else "Mute") }
                     Spacer(Modifier.width(8.dp))
                     Slider(value = v, onValueChange = {
                         dragging = true
                         v = it
                         am.setStreamVolume(AudioManager.STREAM_MUSIC, it.toInt(), 0)
-                    }, onValueChangeFinished = { dragging = false }, valueRange = 0f..max.toFloat(), steps = (max - 1).coerceAtLeast(0), modifier = Modifier.weight(1f))
+                    }, onValueChangeFinished = { dragging = false }, valueRange = 0f..max.toFloat(), steps = (max - 1).coerceAtLeast(0),
+                        modifier = Modifier.weight(1f).semantics { contentDescription = "Media volume" })
                 }
                 SectionLabel("Media")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS) }) { SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp) }
+                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS) }) { SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = "Previous track") }
                     FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }) {
-                        SymIcon(if (am.isMusicActive) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp)
+                        SymIcon(if (am.isMusicActive) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp, contentDescription = if (am.isMusicActive) "Pause" else "Play")
                     }
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT) }) { SymIcon(Sym.SKIP_NEXT, size = 22.sp) }
+                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT) }) { SymIcon(Sym.SKIP_NEXT, size = 22.sp, contentDescription = "Next track") }
                 }
                 MenuDivider()
                 MenuEntry(Sym.TUNE, "All volumes") { host.close(); Env.launch(Intent(Settings.Panel.ACTION_VOLUME)) }

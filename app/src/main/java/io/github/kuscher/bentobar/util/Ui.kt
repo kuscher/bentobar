@@ -6,6 +6,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -40,7 +42,11 @@ object Fonts {
     }
 }
 
-/** One Material Symbol. [size] is the glyph's em size; symbols fill their em box. */
+/**
+ * One Material Symbol. [size] is the glyph's em size; symbols fill their em box. The glyph is a
+ * private-use character, so a screen reader would read nonsense: give [contentDescription] when
+ * the icon carries meaning on its own (an icon-only button); without it the icon is silent.
+ */
 @Composable
 fun SymIcon(
     sym: String,
@@ -48,10 +54,11 @@ fun SymIcon(
     size: TextUnit = 20.sp,
     filled: Boolean = false,
     color: Color = LocalContentColor.current,
+    contentDescription: String? = null,
 ) {
     Text(
         text = sym,
-        modifier = modifier,
+        modifier = modifier.clearAndSetSemantics { if (contentDescription != null) this.contentDescription = contentDescription },
         color = color,
         style = TextStyle(
             fontFamily = if (filled) Fonts.symbolsFilled else Fonts.symbols,

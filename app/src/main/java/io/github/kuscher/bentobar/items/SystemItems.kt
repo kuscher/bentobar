@@ -21,6 +21,7 @@ import io.github.kuscher.bentobar.ui.InfoRow
 import io.github.kuscher.bentobar.ui.MenuCard
 import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
+import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.ui.Meter
 import io.github.kuscher.bentobar.ui.SliderRow
 import io.github.kuscher.bentobar.ui.Sparkline
@@ -56,6 +57,8 @@ object NetworkItem : ItemType("network", R.string.item_network_title, Sym.SWAP_V
             Sparkline(n.downHistory.toList(), second = n.upHistory.toList())
             InfoRow(stringResource(R.string.network_received), Fmt.bytes(n.rxTotal.toDouble()))
             InfoRow(stringResource(R.string.network_sent), Fmt.bytes(n.txTotal.toDouble()))
+            TopAppsSection(Usage.data, 10_000, stringResource(R.string.usage_top_data), stringResource(R.string.usage_optin_data),
+                stringResource(R.string.usage_none_data), host)
             MenuDivider()
             MenuEntry(Sym.WIFI, stringResource(R.string.network_internet_settings)) { host.close(); Env.launch(Intent(Settings.Panel.ACTION_INTERNET_CONNECTIVITY)) }
             MenuEntry(Sym.DATA_USAGE, stringResource(R.string.network_data_usage)) { host.close(); Env.launch(Intent(Settings.ACTION_DATA_USAGE_SETTINGS)) }
@@ -91,6 +94,7 @@ object CpuItem : ItemType("cpu", R.string.item_cpu_title, Sym.MEMORY, R.string.i
             if (c.available) pluralStringResource(R.plurals.cpu_menu_subtitle, c.perCore.size, Fmt.percent(c.total), c.perCore.size)
             else stringResource(R.string.cpu_menu_unavailable)) {
             if (c.available) {
+                InfoRow(stringResource(R.string.cpu_overall), Fmt.percent(c.total), MaterialTheme.colorScheme.primary)
                 Sparkline(c.history.toList(), max = 1.0)
                 Spacer(Modifier.height(8.dp))
                 SectionLabel(stringResource(R.string.cpu_cores))
@@ -106,8 +110,16 @@ object CpuItem : ItemType("cpu", R.string.item_cpu_title, Sym.MEMORY, R.string.i
                     Sparkline(c.gpuHistory.toList(), color = MaterialTheme.colorScheme.tertiary, max = 1.0)
                 }
             }
+            Spacer(Modifier.height(6.dp))
+            MenuNote(stringResource(R.string.cpu_per_app_note))
             MenuDivider()
             MenuEntry(Sym.BOLT, stringResource(R.string.cpu_battery_usage)) { host.close(); Env.launch(Intent(Intent.ACTION_POWER_USAGE_SUMMARY)) }
+            MenuEntry(Sym.APPS, stringResource(R.string.common_apps)) { host.close(); Env.launch(Intent(Settings.ACTION_APPLICATION_SETTINGS)) }
+            // Developer options only when the user has turned them on.
+            val dev = androidx.compose.runtime.remember { developerOptionsOn() }
+            if (dev) MenuEntry(Sym.BUILD, stringResource(R.string.cpu_developer_options)) {
+                host.close(); Env.launch(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+            }
         }
     }
 
@@ -133,11 +145,17 @@ object MemoryItem : ItemType("memory", R.string.item_memory_title, Sym.MEMORY_AL
             Meter(m.used.toFloat(), if (m.low) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)
             InfoRow(stringResource(R.string.common_used), Fmt.bytes((m.total - m.avail).toDouble()))
             InfoRow(stringResource(R.string.memory_available), Fmt.bytes(m.avail.toDouble()))
-            InfoRow(stringResource(R.string.memory_installed), Fmt.bytes(m.total.toDouble()))
-            if (m.low) InfoRow(stringResource(R.string.memory_state), stringResource(R.string.memory_low), MaterialTheme.colorScheme.error)
+            InfoRow(stringResource(R.string.memory_total), Fmt.bytes(m.total.toDouble()))
+            // The sold-with size, when it differs from what Android can use.
+            if (m.advertised > m.total) InfoRow(stringResource(R.string.memory_installed), Fmt.bytes(m.advertised.toDouble()))
+            InfoRow(stringResource(R.string.memory_state), stringResource(if (m.low) R.string.memory_low else R.string.memory_normal),
+                if (m.low) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+            if (m.threshold > 0) InfoRow(stringResource(R.string.memory_low_below), Fmt.bytes(m.threshold.toDouble()))
             Sparkline(m.usedHistory.toList(), max = 1.0)
+            Spacer(Modifier.height(6.dp))
+            MenuNote(stringResource(R.string.memory_per_app_note))
             MenuDivider()
-            MenuEntry(Sym.APPS, stringResource(R.string.common_apps)) { host.close(); Env.launch(Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)) }
+            MenuEntry(Sym.APPS, stringResource(R.string.common_apps)) { host.close(); Env.launch(Intent(Settings.ACTION_APPLICATION_SETTINGS)) }
         }
     }
 
@@ -216,9 +234,16 @@ object StorageItem : ItemType("storage", R.string.item_storage_title, Sym.HARD_D
             Meter(used.toFloat())
             InfoRow(stringResource(R.string.common_used), Fmt.bytes((s.total - s.free).toDouble()))
             InfoRow(stringResource(R.string.storage_free), Fmt.bytes(s.free.toDouble()))
+            TopAppsSection(Usage.storage, 60_000, stringResource(R.string.usage_top_storage), stringResource(R.string.usage_optin_storage),
+                stringResource(R.string.usage_none_storage), host)
             MenuDivider()
             MenuEntry(Sym.HARD_DRIVE, stringResource(R.string.storage_settings)) { host.close(); Env.launch(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)) }
             MenuEntry(Sym.DELETE, stringResource(R.string.storage_free_up)) { host.close(); Env.launch(Intent(StorageManager.ACTION_MANAGE_STORAGE)) }
         }
     }
 }
+
+/** Whether the user has turned on Developer options (a global setting any app may read). */
+private fun developerOptionsOn(): Boolean = runCatching {
+    Settings.Global.getInt(Env.app.contentResolver, Settings.Global.DEVELOPMENT_SETTINGS_ENABLED, 0) == 1
+}.getOrDefault(false)

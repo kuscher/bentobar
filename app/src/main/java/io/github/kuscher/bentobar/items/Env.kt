@@ -60,13 +60,13 @@ object Env {
         if ("storage" in types) storage.sample(now)
     }
 
-    /** Starts an activity from a non-activity context. */
-    fun launch(intent: Intent): Boolean = try {
+    /** Starts an activity from a non-activity context. [quiet]: no toast when nothing can open it (the caller has a fallback). */
+    fun launch(intent: Intent, quiet: Boolean = false): Boolean = try {
         app.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         true
     } catch (e: ActivityNotFoundException) {
         Log.w(TAG, "no activity for $intent")
-        Toast.makeText(app, app.getString(R.string.toast_nothing_can_open), Toast.LENGTH_SHORT).show()
+        if (!quiet) Toast.makeText(app, app.getString(R.string.toast_nothing_can_open), Toast.LENGTH_SHORT).show()
         false
     } catch (e: SecurityException) {
         Log.w(TAG, "not allowed: $intent", e)
@@ -266,6 +266,10 @@ class MemSampler {
     var total = 0L; private set
     var avail = 0L; private set
     var low = false; private set
+    /** Available memory below which Android counts as low on memory and starts closing apps. */
+    var threshold = 0L; private set
+    /** The RAM the device is sold with (more than [total], which excludes memory the kernel and hardware keep). */
+    var advertised = 0L; private set
     val usedHistory = History()
     val used get() = if (total == 0L) 0.0 else (total - avail).toDouble() / total
     private val info = ActivityManager.MemoryInfo()
@@ -274,6 +278,7 @@ class MemSampler {
         val am = context.getSystemService(ActivityManager::class.java) ?: return
         am.getMemoryInfo(info)
         total = info.totalMem; avail = info.availMem; low = info.lowMemory
+        threshold = info.threshold; advertised = info.advertisedMem
         usedHistory.add(used)
     }
 }

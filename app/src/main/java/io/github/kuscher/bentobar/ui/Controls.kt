@@ -25,6 +25,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.kuscher.bentobar.util.SymIcon
@@ -47,14 +51,16 @@ fun <T> ChoiceRow(label: String, choices: List<Pair<T, String>>, selected: T, he
 
 @Composable
 fun SwitchRow(label: String, checked: Boolean, help: String? = null, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+    // The whole row is the switch: clicking the label toggles it, and a screen reader hears its name.
+    Row(Modifier.fillMaxWidth().toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onChange)
+        .padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyLarge,
                 color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
             if (help != null) Text(help, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(16.dp))
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
     }
 }
 
@@ -87,6 +93,7 @@ fun SliderRow(label: String, value: Int, range: IntRange, format: (Int) -> Strin
             Text(format(v.toInt()), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         }
         Slider(value = v, onValueChange = { v = it }, onValueChangeFinished = { onChange(v.toInt()) },
-            valueRange = range.first.toFloat()..range.last.toFloat(), steps = (range.last - range.first - 1).coerceIn(0, 40))
+            valueRange = range.first.toFloat()..range.last.toFloat(), steps = (range.last - range.first - 1).coerceIn(0, 40),
+            modifier = Modifier.semantics { contentDescription = label })
     }
 }

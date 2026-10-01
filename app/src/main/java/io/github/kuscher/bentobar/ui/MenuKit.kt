@@ -2,10 +2,12 @@ package io.github.kuscher.bentobar.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -138,9 +141,10 @@ fun Sparkline(
 fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Boolean = true, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
+    val focused by source.collectIsFocusedAsState()
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(if (hovered && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
+        Modifier.fillMaxWidth().heightIn(min = 40.dp).focusRing(focused, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
+            .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
             .hoverable(source)
             .clickable(enabled = enabled, interactionSource = source, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand)
@@ -162,13 +166,14 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
 fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
+    val focused by source.collectIsFocusedAsState()
     val bg = when {
         selected -> MaterialTheme.colorScheme.primaryContainer
-        hovered -> MaterialTheme.colorScheme.surfaceContainerHighest
+        hovered || focused -> MaterialTheme.colorScheme.surfaceContainerHighest
         else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
     Column(
-        Modifier.width(84.dp).clip(RoundedCornerShape(14.dp)).background(bg)
+        Modifier.width(84.dp).focusRing(focused, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp)).background(bg)
             .hoverable(source)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand)
@@ -197,9 +202,10 @@ fun ChipRow(labels: List<String>, onClick: (Int) -> Unit) {
         labels.forEachIndexed { i, l ->
             val source = remember { MutableInteractionSource() }
             val hovered by source.collectIsHoveredAsState()
+            val focused by source.collectIsFocusedAsState()
             Text(l, style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.clip(RoundedCornerShape(50))
+                modifier = Modifier.heightIn(min = 32.dp).focusRing(focused, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
                     .background(if (hovered) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
                         else MaterialTheme.colorScheme.secondaryContainer)
                     .hoverable(source)
@@ -243,3 +249,8 @@ fun CoreBars(values: DoubleArray, color: Color = MaterialTheme.colorScheme.prima
         }
     }
 }
+
+/** Menus draw their own hover; this adds a ring when the keyboard focuses an entry (Tab, arrows). */
+@Composable
+private fun Modifier.focusRing(focused: Boolean, shape: androidx.compose.ui.graphics.Shape): Modifier =
+    if (focused) this.border(2.dp, MaterialTheme.colorScheme.primary, shape) else this

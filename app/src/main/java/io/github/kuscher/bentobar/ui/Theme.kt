@@ -32,8 +32,9 @@ private fun family(vararg names: String): FontFamily? {
 
 private fun typography(): Typography {
     val base = Typography()
-    val text = family("google-sans-text") ?: return base
-    val display = family("google-sans") ?: text
+    // Google Sans Flex is the Googlebook's UI font; older builds have google-sans-text.
+    val text = family("google-sans-flex") ?: family("google-sans-text") ?: family("google-sans") ?: return base
+    val display = family("google-sans-flex") ?: family("google-sans") ?: text
     fun TextStyle.t() = copy(fontFamily = text)
     fun TextStyle.d() = copy(fontFamily = display)
     return base.copy(

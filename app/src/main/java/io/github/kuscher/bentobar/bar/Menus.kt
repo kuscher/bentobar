@@ -120,6 +120,11 @@ fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> 
             }
             MenuDivider()
         }
+        if (cfg.presenting) MenuEntry(Sym.DESKTOP_WINDOWS, stringResource(R.string.barmenu_presenting_stop)) {
+            host.close(); Store.update { it.copy(presenting = false) }
+        } else MenuEntry(Sym.DESKTOP_WINDOWS, stringResource(R.string.barmenu_presenting), detail = stringResource(R.string.barmenu_presenting_detail)) {
+            host.close(); Store.update { it.copy(presenting = true) }
+        }
         MenuEntry(Sym.EDIT, stringResource(R.string.barmenu_edit)) { host.openItemSettings("") }
         MenuEntry(Sym.VISIBILITY_OFF, stringResource(R.string.barmenu_hide), detail = stringResource(R.string.barmenu_hide_detail)) { host.close(); hideBar() }
         Text(stringResource(R.string.barmenu_bring_back), style = MaterialTheme.typography.bodySmall,

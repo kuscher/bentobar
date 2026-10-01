@@ -554,4 +554,16 @@
         <item quantity="one">After %1$d s</item>
         <item quantity="other">After %1$d s</item>
     </plurals>
+    <string name="add_added">Added %1$s</string>
+    <string name="setup_use_name_notifications">notifications</string>
+    <string name="setup_use_name_calendar">your calendar</string>
+    <string name="setup_use_off_runtime">BentoBar stopped using %1$s. Android takes the permission back the next time BentoBar restarts.</string>
+    <string name="setup_use_off_exact">BentoBar stopped using exact alarms. Android keeps the access until you remove it under Alarms and reminders.</string>
+    <string name="setup_denied_settings">Android won\'t ask again. You can still allow it in BentoBar\'s app info.</string>
+    <string name="common_open_settings">Open settings</string>
+    <string name="barmenu_presenting">Presenting mode</string>
+    <string name="barmenu_presenting_detail">For screen sharing</string>
+    <string name="barmenu_presenting_stop">Stop presenting</string>
+    <string name="look_presenting">Presenting mode</string>
+    <string name="look_presenting_help">For screen sharing: shows only a running timer or a meeting about to start. Turn it off here or from the ‹ menu.</string>
 </resources>

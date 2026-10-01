@@ -26,11 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.composed
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -47,6 +47,9 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import io.github.kuscher.bentobar.util.Fmt
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -235,20 +238,16 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     var bounds by remember { mutableStateOf(Rect()) }
     val itemMenuLabel = androidx.compose.ui.res.stringResource(io.github.kuscher.bentobar.R.string.strip_item_menu)
     LaunchedEffect(hovered) { events.itemHover(entry.item, bounds, hovered) }
-    // Numbers change width every second; hold the widest size for a while so neighbours don't jump
-    // (and the window doesn't resize every tick), then ease back to the natural width.
+    // Live numbers (speeds, percentages, clocks) sit in a fixed slot sized for their widest
+    // reading (Fmt.widthTemplate), right-aligned, so nothing next to them moves as they change.
     val density = androidx.compose.ui.platform.LocalDensity.current
-    var natural by remember(s.widthKey) { mutableStateOf(0) }
-    var widest by remember(s.widthKey) { mutableStateOf(0) }
-    // Keyed on the item, not on the widths: while the held width is wider than the text, wait 5 s,
-    // then let it shrink; a wider reading in the meantime cancels the wait. (Keyed on widest, as
-    // before, it never shrank: widest and natural are set together when the text grows, so the
-    // effect started with them equal and ended, and nothing restarted it when the text shrank.)
-    LaunchedEffect(s.widthKey) {
-        androidx.compose.runtime.snapshotFlow { widest > natural }.collectLatest { held ->
-            if (held) { kotlinx.coroutines.delay(5_000); widest = natural }
-        }
-    }
+    val measurer = rememberTextMeasurer()
+    val textStyle = TextStyle(fontFamily = Fonts.bar, fontSize = look.textSp, fontFeatureSettings = "tnum", lineHeight = look.textSp)
+    // Appearing (the strip starting, an item popping out, ‹ revealing hidden items) fades and slides
+    // in instead of popping. Drawn in the graphics layer only: no relayout, so the window doesn't
+    // resize per frame.
+    val appear = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, androidx.compose.animation.core.tween(220)) }
     val alert = s.tone == Tone.ALERT
     val color = when (s.tone) {
         Tone.ALERT -> look.alertFg
@@ -261,6 +260,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val showText = display != Display.ICON && !s.text.isNullOrEmpty()
     Row(
         Modifier.fillMaxHeight()
+            .graphicsLayer { alpha = appear.value; translationX = (1f - appear.value) * 6.dp.toPx() }
             .onGloballyPositioned { bounds = it.boundsInWindow().toRect(); events.placed(entry.item.id, bounds) }
             .clip(RoundedCornerShape(10.dp))
             .background(when {
@@ -291,15 +291,13 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
         }
         if (showIcon && showText && (s.image != null || !s.icon.isNullOrEmpty())) Spacer(Modifier.width(5.dp))
         if (showText) {
-            Text(s.text!!, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = if (s.widthKey != null) Modifier.widthIn(min = with(density) { widest.toDp() }) else Modifier,
-                onTextLayout = { r ->
-                    if (s.widthKey == null) return@Text
-                    val w = kotlin.math.ceil(r.getLineRight(0) - r.getLineLeft(0)).toInt()
-                    natural = w
-                    if (w > widest) widest = w
-                },
-                style = TextStyle(fontFamily = Fonts.bar, fontSize = look.textSp, fontFeatureSettings = "tnum", lineHeight = look.textSp))
+            val template = if (s.widthKey != null) Fmt.widthTemplate(s.text!!) else null
+            val slot = template?.let { tpl -> remember(tpl, textStyle) { measurer.measure(tpl, textStyle, maxLines = 1).size.width } }
+            // With an icon, the number stays next to it and the spare room trails; text alone sits at the end.
+            val iconShown = showIcon && (s.image != null || !s.icon.isNullOrEmpty())
+            Text(s.text!!, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = if (iconShown) TextAlign.Start else TextAlign.End,
+                modifier = if (slot != null) Modifier.widthIn(min = with(density) { slot.toDp() }) else Modifier,
+                style = textStyle)
         }
     }
 }

@@ -160,7 +160,8 @@ object Timers {
         // Exact when the user allowed it (Alarms & reminders); otherwise Android may run it a bit late
         // while the device sleeps. The in-process handler covers the awake case to the second.
         try {
-            if (am.canScheduleExactAlarms()) am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, s.at, pi)
+            if (am.canScheduleExactAlarms() && io.github.kuscher.bentobar.data.Uses.on(io.github.kuscher.bentobar.data.Uses.EXACT_ALARMS))
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, s.at, pi)
             else am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, s.at, pi)
         } catch (e: SecurityException) {
             Log.w(TAG, "alarm not allowed", e)

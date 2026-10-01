@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kuscher.bentobar.bar.BarService
+import io.github.kuscher.bentobar.bar.BarStatus
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.items.Chips
 import io.github.kuscher.bentobar.items.Env
@@ -51,8 +52,8 @@ import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
 
 class MainActivity : ComponentActivity() {
-    /** Bumped on resume so permission and service rows re-read their state. */
-    private val resumes = mutableIntStateOf(0)
+    // Accessibility services turned on or off (in Settings' own window, on a Googlebook).
+    private val services = AccessibilityManager.AccessibilityServicesStateChangeListener { Setup.refresh(this) }
     private var page by mutableIntStateOf(0)
     private var selected by mutableStateOf<String?>(null)
 
@@ -66,7 +67,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             BentoBarTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-                    App(resumes.intValue)
+                    App()
                 }
             }
         }
@@ -92,9 +93,19 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
     }
 
+    override fun onStart() {
+        super.onStart()
+        getSystemService(AccessibilityManager::class.java)?.addAccessibilityServicesStateChangeListener(mainExecutor, services)
+    }
+
+    override fun onStop() {
+        getSystemService(AccessibilityManager::class.java)?.removeAccessibilityServicesStateChangeListener(services)
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
-        resumes.intValue++
+        Setup.refresh(this)
         Ticker.start("settings")
         Chips.update(this)
     }
@@ -106,14 +117,28 @@ class MainActivity : ComponentActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        resumes.intValue++
+        Setup.refresh(this)
         Ticker.refresh()
     }
 
+    // In desktop windowing, Settings opens in its own window and this one stays resumed, so coming
+    // back is a focus change, not a resume.
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        if (isTopResumedActivity) Setup.refresh(this)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) Setup.refresh(this)
+    }
+
     @Composable
-    private fun App(@Suppress("UNUSED_PARAMETER") resumeCount: Int) {
+    private fun App() {
         val cfg by Store.config.collectAsState()
-        val running = serviceOn(this)
+        val setup by Setup.state.collectAsState()
+        val status by BarStatus.current.collectAsState()
+        val running = setup.serviceOn
         Row(Modifier.fillMaxSize().safeDrawingPadding()) {
             NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.fillMaxHeight()) {
                 Spacer(Modifier.height(12.dp))
@@ -131,21 +156,31 @@ class MainActivity : ComponentActivity() {
                     Column(Modifier.weight(1f)) {
                         Text(listOf("Your bar", "Add items", "Look and behaviour", "Setup", "About BentoBar")[page],
                             style = MaterialTheme.typography.headlineSmall)
+                        // Says what the strip is actually doing, not just whether the service is on.
                         Text(when {
-                            !running -> "BentoBar is off. Turn it on in Setup."
+                            !running -> "BentoBar's accessibility service is off. Turn it on in Setup."
                             !cfg.enabled -> "Hidden for now; switch it back on here or with the Quick Settings tile."
-                            else -> "Live in the status bar. Changes apply right away."
+                            else -> when (status) {
+                                BarStatus.STOPPED -> "Starting…"
+                                BarStatus.NO_ROOM -> "The status bar has no free space for BentoBar's items right now."
+                                BarStatus.NO_BAR -> "The status bar is hidden right now (a full-screen app), so BentoBar is too."
+                                BarStatus.COVERED -> "A system panel covers the status bar; BentoBar is back when it closes."
+                                else -> "Live in the status bar. Changes apply right away."
+                            }
                         }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text("Show in status bar", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 10.dp))
-                    Switch(checked = cfg.enabled, onCheckedChange = { on -> Store.update { it.copy(enabled = on) } })
+                    // Only meaningful once the service runs; before that, Setup is the way in.
+                    if (running) {
+                        Text("Show in status bar", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 10.dp))
+                        Switch(checked = cfg.enabled, onCheckedChange = { on -> Store.update { it.copy(enabled = on) } })
+                    }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     when (page) {
                         0 -> BarPage(running, selected, onSelect = { selected = it }, onSetup = { page = 3 })
                         1 -> AddPage { id -> selected = id; page = 0 }
                         2 -> LookPage()
-                        3 -> SetupPage(this@MainActivity, running)
+                        3 -> SetupPage(this@MainActivity, setup)
                         else -> AboutPage()
                     }
                 }

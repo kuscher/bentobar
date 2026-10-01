@@ -159,6 +159,7 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
             desc = if (muted) Env.str(R.string.sound_muted_desc) else Env.plural(R.plurals.sound_volume_desc, pct))
     }
 
+    override val usesWheel = true
     override fun onScroll(item: ItemConfig, steps: Int) {
         am()?.adjustStreamVolume(AudioManager.STREAM_MUSIC, if (steps > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER, 0)
     }

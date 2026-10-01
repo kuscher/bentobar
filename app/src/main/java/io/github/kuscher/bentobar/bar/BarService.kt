@@ -193,6 +193,7 @@ class BarController(private val service: AccessibilityService) {
         runCatching { service.unregisterReceiver(screen) }
         runCatching { WallpaperManager.getInstance(service).removeOnColorsChangedListener(wallpaper) }
         closeMenu()
+        hideTip()
         strip.destroy()
         awake?.destroy(); awake = null
         Ticker.stop("bar")
@@ -283,6 +284,7 @@ class BarController(private val service: AccessibilityService) {
             if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { "${it.title} " + Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
                 "enabled=${cfg.enabled} interactive=${pm.isInteractive} locked=${km.isKeyguardLocked})")
             closeMenu()
+            hideTip()
             strip.hide()
             Ticker.stop("bar")
         }
@@ -488,6 +490,11 @@ class BarController(private val service: AccessibilityService) {
             }, hideBar = { Store.update { it.copy(enabled = false) } })
         }
 
+        override fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {
+            main.removeCallbacks(showTip)
+            if (inside && menu == null) { tipFor = item to Rect(at); main.postDelayed(showTip, 600) } else hideTip()
+        }
+
         override fun hover(inside: Boolean) {
             hovering = inside
             main.removeCallbacks(expandOnHover); main.removeCallbacks(collapse)
@@ -512,6 +519,7 @@ class BarController(private val service: AccessibilityService) {
     /** Opens the menu [key] below [anchor] (strip window coordinates), or closes it if it's open. */
     fun toggleMenu(key: String, anchor: Rect, widthDp: Int, content: @Composable (MenuHost) -> Unit) {
         val now = SystemClock.uptimeMillis()
+        hideTip()
         if (menuKey == key) { closeMenu(); return }
         Ticker.focusItem = key.removePrefix("item:").takeIf { key.startsWith("item:") }
         Ticker.revealHidden = expanded.value || key == "bentobar"
@@ -538,6 +546,41 @@ class BarController(private val service: AccessibilityService) {
         menuKey = key
         Ticker.start("menu")
         o.show { MenuSurface(widthDp.dp, maxH.dp) { content(host) } }
+    }
+
+    // ---- tooltips ----------------------------------------------------------------------------
+
+    private var tip: Overlay? = null
+    private var tipFor: Pair<ItemConfig, Rect>? = null
+    private val showTip = Runnable { tipFor?.let { (item, at) -> showTooltip(item, at) } }
+
+    /**
+     * The item's name below it, after a short hover: icon-only items otherwise give a mouse user
+     * nothing to go on. A no-touch window, so it never takes a click.
+     */
+    private fun showTooltip(item: ItemConfig, anchor: Rect) {
+        hideTip()
+        val s = snap ?: return
+        if (menu != null || !strip.shown) return
+        val label = Items.of(item.type)?.title ?: return
+        val loc = strip.locationOnScreen()
+        val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
+        val paint = android.text.TextPaint().apply { textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 13f, service.resources.displayMetrics) }
+        val w = (paint.measureText(label) + 2 * 10 * density).toInt() + 2
+        val bounds = wm.currentWindowMetrics.bounds
+        val o = Overlay(service, "BentoBar tooltip", touchable = false)
+        o.params.gravity = Gravity.TOP or Gravity.LEFT
+        o.params.width = w // exact, as for menus
+        o.params.height = (28 * density).toInt()
+        o.params.x = (a.centerX() - w / 2).coerceIn(0, (bounds.width() - w).coerceAtLeast(0))
+        o.params.y = s.bar.bottom + (4 * density).toInt()
+        tip = o
+        o.show { Tooltip(label) }
+    }
+
+    private fun hideTip() {
+        main.removeCallbacks(showTip)
+        tip?.destroy(); tip = null
     }
 
     fun closeMenu() {

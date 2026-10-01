@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -160,7 +161,11 @@ object SoundItem : ItemType("sound", "Sound", Sym.VOLUME_UP, "Volume and media c
         val am = am()
         if (am != null) {
             val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-            var v by remember { mutableFloatStateOf(am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()) }
+            // Follows the volume keys and the scroll wheel while the menu is open, except mid-drag.
+            val actual = am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
+            var dragging by remember { mutableStateOf(false) }
+            var v by remember { mutableFloatStateOf(actual) }
+            LaunchedEffect(actual) { if (!dragging) v = actual }
             val muted = am.isStreamMute(AudioManager.STREAM_MUSIC)
             MenuCard(Sym.VOLUME_UP, "Sound", if (muted) "Muted" else "Media volume ${(v * 100 / max).toInt()}%") {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -169,9 +174,10 @@ object SoundItem : ItemType("sound", "Sound", Sym.VOLUME_UP, "Volume and media c
                     }) { SymIcon(if (muted) Sym.VOLUME_OFF else Sym.VOLUME_UP, size = 20.sp) }
                     Spacer(Modifier.width(8.dp))
                     Slider(value = v, onValueChange = {
+                        dragging = true
                         v = it
                         am.setStreamVolume(AudioManager.STREAM_MUSIC, it.toInt(), 0)
-                    }, valueRange = 0f..max.toFloat(), steps = (max - 1).coerceAtLeast(0), modifier = Modifier.weight(1f))
+                    }, onValueChangeFinished = { dragging = false }, valueRange = 0f..max.toFloat(), steps = (max - 1).coerceAtLeast(0), modifier = Modifier.weight(1f))
                 }
                 SectionLabel("Media")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -61,6 +61,7 @@ class BarService : AccessibilityService() {
         Env.service = this
         bar = BarController(this).also { it.start() }
         Chips.update(this)
+        io.github.kuscher.bentobar.ui.Setup.refresh(this)
         Log.i(TAG, "service connected")
     }
 
@@ -80,6 +81,7 @@ class BarService : AccessibilityService() {
         bar = null
         if (Env.service === this) Env.service = null
         Chips.update(this)
+        io.github.kuscher.bentobar.ui.Setup.refresh(this)
     }
 
     fun controller(): BarController? = bar
@@ -186,6 +188,7 @@ class BarController(private val service: AccessibilityService) {
     fun stop() {
         started = false
         BarLook.current.value = null
+        BarStatus.current.value = BarStatus.STOPPED
         main.removeCallbacksAndMessages(null)
         runCatching { service.unregisterReceiver(screen) }
         runCatching { WallpaperManager.getInstance(service).removeOnColorsChangedListener(wallpaper) }
@@ -263,6 +266,12 @@ class BarController(private val service: AccessibilityService) {
         }
         val covered = cover != null
         val show = s != null && !covered && cfg.enabled && pm.isInteractive && !km.isKeyguardLocked
+        if (!show) BarStatus.current.value = when {
+            !pm.isInteractive || km.isKeyguardLocked -> BarStatus.ASLEEP
+            !cfg.enabled -> BarStatus.HIDDEN_BY_USER
+            s == null -> BarStatus.NO_BAR
+            else -> BarStatus.COVERED
+        }
         if (show) {
             place(s!!, screenW)
             val now = SystemClock.uptimeMillis()
@@ -293,6 +302,7 @@ class BarController(private val service: AccessibilityService) {
         // Keep room for the chevron (~26 dp) inside the free area.
         maxWidth.intValue = (s.free.width() - 2 * gap - (30 * density).toInt()).coerceAtLeast(0)
         heightDp.value = (s.bar.height() / density).dp
+        BarStatus.current.value = if (maxWidth.intValue == 0) BarStatus.NO_ROOM else BarStatus.SHOWN
         if (!strip.shown) {
             strip.show { StripHost() }
             Ticker.start("bar")
@@ -469,7 +479,7 @@ class BarController(private val service: AccessibilityService) {
         }
 
         override fun chevronContext(at: Rect) = toggleMenu("bentobar", at, 290) { host ->
-            BentoBarMenu(host, hiddenItems(), openItem = { item ->
+            BentoBarMenu(host, openItem = { item ->
                 val type = Items.of(item.type)
                 val menuUi = type?.menu
                 closeMenu(); menuClosedKey = null

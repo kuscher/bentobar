@@ -2,12 +2,9 @@ package io.github.kuscher.bentobar.ui
 
 import android.Manifest
 import android.app.Activity
-import android.app.AlarmManager
-import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
@@ -204,12 +201,16 @@ private fun Bullet(text: String) = Row(Modifier.padding(start = 4.dp, top = 2.dp
     Text(text, style = MaterialTheme.typography.bodyMedium)
 }
 
+/**
+ * Setup's steps, from [setup] (observed, so they flip to done the moment something changes). One
+ * rule for buttons: a step that isn't done has a filled action button; a done step only offers a
+ * plain link to manage it.
+ */
 @Composable
-fun SetupPage(activity: Activity, running: Boolean) {
-    val granted = { p: String -> activity.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED }
-    if (running && !Store.config.value.onboarded) Store.update { it.copy(onboarded = true) }
+fun SetupPage(activity: Activity, setup: SetupState) {
+    val running = setup.serviceOn
     Page {
-        if (Env.advancedProtection()) {
+        if (setup.advancedProtection) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
                 Column(Modifier.padding(18.dp)) {
@@ -230,7 +231,8 @@ fun SetupPage(activity: Activity, running: Boolean) {
             Body("It doesn't read other apps' windows, doesn't watch your keyboard, mouse or touches, and has no internet access: nothing leaves your device.")
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                FilledTonalButton(onClick = { MainActivity.openAccessibility(activity) }) { Text(if (running) "Accessibility settings" else "Turn on") }
+                if (running) TextButton(onClick = { MainActivity.openAccessibility(activity) }) { Text("Accessibility settings") }
+                else FilledTonalButton(onClick = { MainActivity.openAccessibility(activity) }, enabled = !setup.advancedProtection) { Text("Turn on") }
                 TextButton(onClick = { MainActivity.openAppInfo(activity) }) { Text("App info") }
             }
             if (!running) {
@@ -245,35 +247,40 @@ fun SetupPage(activity: Activity, running: Boolean) {
                 "like this; keep BentoBar if you're happy with what it does.", style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Step(2, "Notifications", Notify.allowed(activity)) {
+        Step(2, "Notifications", setup.notifications) {
             Body("For timer alerts, and the Live Update chip that shows a running timer when BentoBar is off.")
-            if (!Notify.allowed(activity)) FilledTonalButton(onClick = { activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 3) },
-                modifier = Modifier.padding(top = 8.dp)) { Text("Allow") }
+            if (!setup.notifications) StepAction("Allow") { activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 3) }
         }
-        val nm = activity.getSystemService(NotificationManager::class.java)
-        val promoted = runCatching { nm?.canPostPromotedNotifications() == true }.getOrDefault(false)
-        Step(3, "Live Updates", promoted, optional = true) {
+        Step(3, "Live Updates", setup.liveUpdates, optional = true) {
             Body("Lets Android show BentoBar's chip in the status bar. On by default; you can turn it off in Android's settings.")
-            TextButton(onClick = {
+            val open = {
                 if (!Env.launch(Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName)))
                     Env.launch(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName))
-            }) { Text("Open setting") }
+            }
+            if (setup.liveUpdates) StepLink("Open setting") { open() } else StepAction("Turn on") { open() }
         }
-        Step(4, "Calendar", granted(Manifest.permission.READ_CALENDAR), optional = true) {
+        Step(4, "Calendar", setup.calendar, optional = true) {
             Body("For the Next meeting item and the events in the month view. Read on this device only.")
-            if (!granted(Manifest.permission.READ_CALENDAR)) FilledTonalButton(onClick = { activity.requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 4) },
-                modifier = Modifier.padding(top = 8.dp)) { Text("Allow") }
+            if (!setup.calendar) StepAction("Allow") { activity.requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 4) }
         }
-        val am = activity.getSystemService(AlarmManager::class.java)
-        val exact = am?.canScheduleExactAlarms() == true
-        Step(5, "Alarms and reminders", exact, optional = true) {
+        Step(5, "Alarms and reminders", setup.exactAlarms, optional = true) {
             Body("Lets timers ring on the second even while the Googlebook sleeps. Without it they may be a little late.")
-            if (!exact) TextButton(onClick = {
+            if (!setup.exactAlarms) StepAction("Allow") {
                 Env.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + activity.packageName)))
-            }) { Text("Allow") }
+            }
         }
     }
 }
+
+/** A step's main action, while it isn't done. */
+@Composable
+private fun StepAction(label: String, onClick: () -> Unit) =
+    FilledTonalButton(onClick = onClick, modifier = Modifier.padding(top = 8.dp)) { Text(label) }
+
+/** A done step's way to change it. */
+@Composable
+private fun StepLink(label: String, onClick: () -> Unit) =
+    TextButton(onClick = onClick, modifier = Modifier.padding(top = 4.dp)) { Text(label) }
 
 // ---- About ---------------------------------------------------------------------------------
 

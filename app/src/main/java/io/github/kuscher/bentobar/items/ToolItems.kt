@@ -36,6 +36,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.semantics.Role
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
@@ -297,6 +303,9 @@ object Apps {
         context.packageManager.getActivityInfo(cn, 0).loadLabel(context.packageManager).toString()
     }.getOrDefault(cn.packageName)
 
+    /** [icon] if it's been drawn already: cheap enough to call while composing. */
+    fun cachedIcon(cn: ComponentName, px: Int, mono: Boolean): Bitmap? = synchronized(icons) { icons["${cn.flattenToShortString()}/$px/$mono"] }
+
     /** The app's icon; [mono] uses the themed (monochrome) layer when the app has one. */
     fun icon(context: Context, cn: ComponentName, px: Int, mono: Boolean): Bitmap? = synchronized(icons) {
         val key = "${cn.flattenToShortString()}/$px/$mono"
@@ -326,21 +335,26 @@ object Apps {
 @Composable
 fun AppPicker(selected: List<ComponentName>, multi: Boolean, onChange: (List<ComponentName>) -> Unit) {
     var query by remember { mutableStateOf("") }
-    val all = remember { Apps.list(Env.app) }
+    // Every launchable app with its label, and their icons, are read off the main thread: on a
+    // Googlebook with many apps, doing it while composing stalled the settings window.
+    val all by produceState<List<Apps.App>?>(null) { value = withContext(Dispatchers.IO) { Apps.list(Env.app) } }
     TextRow(stringResource(R.string.apps_find), query, placeholder = stringResource(R.string.apps_search)) { query = it }
-    val shown = all.filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }.take(40)
+    val shown = all.orEmpty().filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }.take(40)
     Column {
+        if (all == null) CircularProgressIndicator(Modifier.padding(8.dp).size(20.dp), strokeWidth = 2.dp)
         shown.forEach { app ->
             val on = app.component in selected
-            Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Apps.icon(Env.app, app.component, 64, false)?.let {
-                    Image(it.asImageBitmap(), null, Modifier.size(28.dp))
+            val toggle = { onChange(if (multi) (if (on) selected - app.component else selected + app.component) else listOf(app.component)) }
+            // One control per app, named by it: TalkBack reads "Gmail, checkbox, checked", not a bare checkbox.
+            Row(Modifier.fillMaxWidth().toggleable(on, role = Role.Checkbox, onValueChange = { toggle() }).padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                val icon by produceState(Apps.cachedIcon(app.component, 64, false), app.component) {
+                    if (value == null) value = withContext(Dispatchers.IO) { Apps.icon(Env.app, app.component, 64, false) }
                 }
+                icon?.let { Image(it.asImageBitmap(), null, Modifier.size(28.dp)) } ?: Spacer(Modifier.size(28.dp))
                 Spacer(Modifier.width(12.dp))
                 Text(app.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                Checkbox(checked = on, onCheckedChange = {
-                    onChange(if (multi) (if (on) selected - app.component else selected + app.component) else listOf(app.component))
-                })
+                Checkbox(checked = on, onCheckedChange = null)
             }
         }
     }

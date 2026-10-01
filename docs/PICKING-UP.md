@@ -10,8 +10,9 @@ commit at every milestone.
   signs and publishes the GitHub release and puts the bundle on Google Play's closed-testing track as a
   draft ("Send for review" stays a button in the Play Console). No key needed on this machine. Release
   texts are in `docs/release-notes/<version>.md`. The dry run ("Run workflow") passed on 2026-10-01; the
-  publishing steps run for the first time with the next tag, so watch that run. `main` is still 0.5
-  (version code 6, the build on Play) and the tag `v0.5` exists: the next release needs a new version.
+  first tag released that way is `v0.6` (version code 7, 2026-10-01): the next release needs a new
+  version. 0.6 is the first build signed with the new key on GitHub, so a 0.5 installed from GitHub has to
+  be uninstalled once (Look › Copy settings first; docs/release-notes/0.6.md says how).
 - Release key: in the secrets of the GitHub environment `release` (the Play key in `play`). New key since
   2026-09-30 (also Google Play's), backed up with its password to Drive folder "Googlebook app signing keys (new keys, 2026-09-30)", file bentobar-keystore.jks.
   A machine with `~/.config/bentobar/keystore.jks` + `keystore.pass` (not in git) can still sign a local build.

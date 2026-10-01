@@ -15,6 +15,8 @@ data class ItemState(
     /** Filled glyphs match the system's status bar icons; outlined reads as "off". */
     val filled: Boolean = true,
     val text: String? = null,
+    /** In a menu's list of items, instead of [text] when that wouldn't fit: a meeting's title without its countdown. */
+    val label: String? = null,
     /** Spoken description and tooltip. */
     val desc: String = "",
     /** "Has something to say": hidden items with whenActive pop into the bar while this is true. */

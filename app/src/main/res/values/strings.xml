@@ -358,8 +358,10 @@
     <string name="context_item_settings">Item settings…</string>
     <string name="barmenu_no_hidden">No hidden items</string>
     <string name="barmenu_hidden_items">Hidden items</string>
-    <string name="barmenu_edit">Edit the bar…</string>
-    <string name="barmenu_hide">Hide BentoBar</string>
+    <string name="barmenu_all_items">Items</string>
+    <string name="barmenu_shortcut_label">BentoBar menu</string>
+    <string name="barmenu_edit">Edit</string>
+    <string name="barmenu_hide">Hide</string>
     <string name="barmenu_hide_detail">All items, until you show it again</string>
     <string name="barmenu_bring_back">Show it again from the BentoBar app or its Quick Settings tile.</string>
 

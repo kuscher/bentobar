@@ -172,6 +172,9 @@ show the whole system instead.
 
 - **System icons stay.** Android doesn't let an installed app hide or reorder the system's own
   icons (clock, Wi-Fi, battery, notifications), so BentoBar organises its own items next to them.
+- **Keyboard shortcut.** The launcher entry **BentoBar menu** opens BentoBar's menu with every item
+  in it: arrows and Enter open an item's menu, Escape closes it. Give it a shortcut in the system's
+  keyboard shortcuts (Action + / › Customize), e.g. Action + T. BentoBar itself doesn't read keys.
 - **One chip.** Android shows one Live Update chip per app, with about seven characters of text,
   and hides it while that app's own window is open.
 - **CPU load** comes from each core's idle time (Android doesn't let apps read overall CPU usage),

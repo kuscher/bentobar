@@ -66,7 +66,9 @@ fun SwitchRow(label: String, checked: Boolean, help: String? = null, enabled: Bo
 
 /** A text field that saves as you type (debounced by recomposition, cheap for small strings). */
 @Composable
-fun TextRow(label: String, value: String, help: String? = null, placeholder: String = "", numeric: Boolean = false, onChange: (String) -> Unit) {
+fun TextRow(label: String, value: String, help: String? = null, placeholder: String = "", numeric: Boolean = false,
+            /** Shown instead of [help], with the field marked, while the text can't be used. */
+            error: String? = null, onChange: (String) -> Unit) {
     var text by remember(value) { mutableStateOf(value) }
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         OutlinedTextField(
@@ -75,11 +77,15 @@ fun TextRow(label: String, value: String, help: String? = null, placeholder: Str
             label = { Text(label) },
             placeholder = { Text(placeholder) },
             singleLine = true,
+            isError = error != null,
             keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
             modifier = Modifier.fillMaxWidth(),
         )
-        if (help != null) Text(help, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = 4.dp, top = 2.dp))
+        (error ?: help)?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall,
+                color = if (error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 2.dp))
+        }
     }
 }
 

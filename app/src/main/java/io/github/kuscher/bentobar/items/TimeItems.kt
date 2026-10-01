@@ -104,7 +104,8 @@ private fun zoneOf(item: ItemConfig): ZoneId =
     item.options["zone"]?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
 
 /** "Tokyo" from "Asia/Tokyo". */
-private fun cityOf(zone: ZoneId) = zone.id.substringAfterLast('/').replace('_', ' ')
+private fun cityOf(zone: ZoneId) = cityOf(zone.id)
+private fun cityOf(zoneId: String) = zoneId.substringAfterLast('/').replace('_', ' ')
 
 object ClockItem : ItemType("clock", R.string.item_clock_title, Sym.SCHEDULE, R.string.item_clock_desc) {
     override fun state(item: ItemConfig): ItemState {
@@ -163,7 +164,7 @@ object ClockItem : ItemType("clock", R.string.item_clock_title, Sym.SCHEDULE, R.
 fun ZonePicker(current: String?, onPick: (String?) -> Unit) {
     var query by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text(current?.let { stringResource(R.string.clock_zone_named, cityOf(ZoneId.of(it)), it) } ?: stringResource(R.string.clock_zone_device),
+        Text(current?.let { stringResource(R.string.clock_zone_named, cityOf(it), it) } ?: stringResource(R.string.clock_zone_device),
             style = MaterialTheme.typography.labelLarge)
         TextRow(stringResource(R.string.clock_zone_find), query, placeholder = stringResource(R.string.clock_zone_find_hint)) { query = it }
         if (query.length >= 2) {
@@ -438,8 +439,8 @@ object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.str
         }
         return when (s.mode) {
             Timers.Mode.STOPWATCH -> ItemState(icon = if (s.running) Sym.AVG_PACE else Sym.PAUSE, filled = true,
-                text = Fmt.clock(Timers.elapsed(s, now)), active = true, widthKey = "stopwatch",
-                desc = Env.str(R.string.timer_stopwatch_desc, Fmt.clock(Timers.elapsed(s, now))))
+                text = Fmt.clock(Timers.elapsed(s, now), elapsed = true), active = true, widthKey = "stopwatch",
+                desc = Env.str(R.string.timer_stopwatch_desc, Fmt.clock(Timers.elapsed(s, now), elapsed = true)))
             else -> {
                 val left = Timers.remaining(s, now)
                 val onBreak = s.mode == Timers.Mode.POMODORO && s.phase != Timers.Phase.WORK
@@ -488,7 +489,7 @@ object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.str
             }
             MenuCard(if (s.mode == Timers.Mode.STOPWATCH) Sym.AVG_PACE else Sym.TIMER, title, sub) {
                 val face = if (s.mode == Timers.Mode.STOPWATCH) Timers.elapsed(s, now) else Timers.remaining(s, now)
-                Text(Fmt.clock(face), style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
+                Text(Fmt.clock(face, elapsed = s.mode == Timers.Mode.STOPWATCH), style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
                     modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
                 if (s.mode != Timers.Mode.STOPWATCH && s.lengthMs > 0) {
                     Meter(1f - Timers.remaining(s, now).toFloat() / s.lengthMs)
@@ -554,9 +555,12 @@ object CountdownItem : ItemType("countdown", R.string.item_countdown_title, Sym.
     override val canBeActive = true
     override val trigger = Trigger(R.string.trigger_countdown, R.string.trigger_countdown_short)
 
-    fun target(item: ItemConfig): LocalDateTime? = runCatching {
-        LocalDateTime.parse(item.opt("at", ""), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
-    }.getOrNull()
+    /** "2026-12-24 18:00". Strict: February 30 is an error, not March 2 or February 28. */
+    private val format = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm").withResolverStyle(java.time.format.ResolverStyle.STRICT)
+
+    fun parse(text: String): LocalDateTime? = runCatching { LocalDateTime.parse(text.trim(), format) }.getOrNull()
+
+    fun target(item: ItemConfig): LocalDateTime? = parse(item.opt("at", ""))
 
     override fun state(item: ItemConfig): ItemState {
         val t = target(item) ?: return ItemState(icon = Sym.HOURGLASS_TOP, text = Env.str(R.string.countdown_set_date), desc = Env.str(R.string.countdown_no_date))
@@ -587,14 +591,15 @@ object CountdownItem : ItemType("countdown", R.string.item_countdown_title, Sym.
         TextRow(stringResource(R.string.option_label), item.opt("label", ""), placeholder = stringResource(R.string.countdown_label_hint)) {
             set(item.with("label", it.take(16).ifBlank { null }))
         }
-        TextRow(stringResource(R.string.countdown_date_time), item.opt("at", ""), placeholder = "2026-12-24 18:00",
-            help = stringResource(R.string.countdown_date_time_help)) {
+        val at = item.opt("at", "")
+        TextRow(stringResource(R.string.countdown_date_time), at, placeholder = "2026-12-24 18:00",
+            help = stringResource(R.string.countdown_date_time_help),
+            error = if (at.isNotBlank() && parse(at) == null) stringResource(R.string.countdown_date_invalid) else null) {
             set(item.with("at", it.trim().ifBlank { null }))
         }
     }
 
-    override fun defaultOptions() = mapOf("at" to LocalDate.now().plusDays(30).atTime(9, 0)
-        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")))
+    override fun defaultOptions() = mapOf("at" to LocalDate.now().plusDays(30).atTime(9, 0).format(format))
 }
 
 @Composable

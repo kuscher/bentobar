@@ -70,7 +70,10 @@ class MainActivity : ComponentActivity() {
         Env.init(this)
         Notify.channels(this)
         enableEdgeToEdge()
-        handle(intent)
+        // Recreated (theme, language, text size or density changed): stay where the user was, and
+        // don't act on the launch intent again (it could ask for a permission twice).
+        if (savedInstanceState == null) handle(intent)
+        else { page = savedInstanceState.getInt(STATE_PAGE); selected = savedInstanceState.getString(STATE_SELECTED) }
         setContent {
             BentoBarTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
@@ -82,7 +85,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handle(intent)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(STATE_PAGE, page)
+        outState.putString(STATE_SELECTED, selected)
     }
 
     private fun handle(intent: Intent?) {
@@ -90,8 +100,6 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_ITEM)?.let { selected = it; page = 0 }
         if (intent.getBooleanExtra(EXTRA_EDIT, false)) page = 0
         intent.getStringExtra(EXTRA_REQUEST)?.let { perm ->
-            // Asked for from a menu ("Allow calendar"): that's switching it back on, too.
-            if (perm == android.Manifest.permission.READ_CALENDAR) Store.update { it.copy(turnedOff = it.turnedOff - io.github.kuscher.bentobar.data.Uses.CALENDAR) }
             if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(perm), 1)
         }
         if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") page = 2
@@ -223,6 +231,8 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_ITEM = "item"
         const val EXTRA_EDIT = "edit"
         const val EXTRA_REQUEST = "request"
+        private const val STATE_PAGE = "page"
+        private const val STATE_SELECTED = "selected"
 
         /** Opens BentoBar's settings, on [itemId] if given. */
         fun open(context: Context, itemId: String?) {
@@ -233,6 +243,10 @@ class MainActivity : ComponentActivity() {
 
         /** Runtime permissions need an activity; the bar's menus come through here. */
         fun requestPermission(context: Context, permission: String) {
+            // Asked for from a menu ("Allow calendar"): that's switching it back on in Setup, too. Done
+            // here, not from the intent: the activity is exported, and another app's intent mustn't undo it.
+            if (permission == android.Manifest.permission.READ_CALENDAR)
+                Store.update { it.copy(turnedOff = it.turnedOff - io.github.kuscher.bentobar.data.Uses.CALENDAR) }
             context.startActivity(Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra(EXTRA_REQUEST, permission))

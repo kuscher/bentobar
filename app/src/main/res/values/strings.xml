@@ -223,6 +223,7 @@
     <string name="countdown_label_hint">Launch</string>
     <string name="countdown_date_time">Date and time</string>
     <string name="countdown_date_time_help">Year-month-day hour:minute</string>
+    <string name="countdown_date_invalid">Not a date and time yet: year-month-day hour:minute, like 2026-12-24 18:00</string>
 
     <!-- tool -->
     <string name="item_caffeine_title">Keep awake</string>

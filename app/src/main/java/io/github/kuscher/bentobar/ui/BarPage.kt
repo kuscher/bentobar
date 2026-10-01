@@ -52,6 +52,8 @@ import io.github.kuscher.bentobar.bar.Strip
 import io.github.kuscher.bentobar.bar.StripEntry
 import io.github.kuscher.bentobar.bar.StripEvents
 import io.github.kuscher.bentobar.bar.StripLook
+import io.github.kuscher.bentobar.bar.Contrast
+import io.github.kuscher.bentobar.data.ColorMode
 import io.github.kuscher.bentobar.data.Display
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Position
@@ -140,7 +142,20 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
     val visible = cfg.items.filter { it.section == Section.SHOWN || (it.section == Section.HIDDEN && active(it)) }
     val hidden = cfg.items.filter { it.section == Section.HIDDEN && !active(it) }
     val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.stateOf(it)) } }
-    val look = StripLook(Color.White, true, cfg.textSize, cfg.spacing.dp, cfg.pill)
+    // The preview uses the strip's real colours: the sampled bar when BentoBar is running and the
+    // colour is automatic, else the forced Light or Dark choice.
+    val live by io.github.kuscher.bentobar.bar.BarLook.current.collectAsState()
+    val bar = when (cfg.color) {
+        ColorMode.LIGHT -> Contrast.resolve(Color.White, null)
+        ColorMode.DARK -> Contrast.resolve(Contrast.DARK_TEXT, null)
+        ColorMode.AUTO -> live ?: Contrast.resolve(Color.White, null)
+    }
+    val look = StripLook(bar.fg, bar.barDark, cfg.textSize, cfg.spacing.dp, cfg.pill, bar.background)
+    val barBrush = when {
+        bar.opaque -> androidx.compose.ui.graphics.SolidColor(bar.background)
+        bar.barDark -> Brush.horizontalGradient(listOf(Color(0xFF5B6F8A), Color(0xFF3F6F73), Color(0xFF4F7E78)))
+        else -> Brush.horizontalGradient(listOf(Color(0xFFDDE6F3), Color(0xFFD5E8E6), Color(0xFFE3EEE9)))
+    }
     val events = object : StripEvents {
         override fun click(item: ItemConfig, at: Rect) = onSelect(item.id)
         override fun context(item: ItemConfig, at: Rect) = onSelect(item.id)
@@ -154,11 +169,11 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
     Column {
         Box(
             Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(18.dp))
-                .background(Brush.horizontalGradient(listOf(Color(0xFF5B6F8A), Color(0xFF3F6F73), Color(0xFF4F7E78)))),
+                .background(barBrush),
         ) {
             val now = remember(tick) { LocalDateTime.now() }
             Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(now.format(DateTimeFormatter.ofPattern("H:mm   EEE, MMM d", Locale.getDefault())), color = Color.White,
+                Text(now.format(DateTimeFormatter.ofPattern("H:mm   EEE, MMM d", Locale.getDefault())), color = look.fg,
                     fontFamily = Fonts.bar, fontSize = 14.sp)
                 if (cfg.position == Position.LEFT) Spacer(Modifier.width(16.dp)) else Spacer(Modifier.weight(1f))
                 Strip(entries(visible), if (expanded) entries(hidden) else emptyList(), cfg.chevron && hidden.isNotEmpty(), expanded,
@@ -166,10 +181,10 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 if (cfg.position == Position.LEFT) Spacer(Modifier.weight(1f)) else if (cfg.position == Position.CENTER) Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("US", color = Color.White, fontFamily = Fonts.bar, fontSize = 13.sp)
-                    SymIcon(Sym.NOTIFICATIONS, size = 18.sp, color = Color.White)
-                    SymIcon(Sym.WIFI, size = 18.sp, color = Color.White)
-                    SymIcon(Sym.BATTERY_FULL, size = 18.sp, color = Color.White)
+                    Text("US", color = look.fg, fontFamily = Fonts.bar, fontSize = 13.sp)
+                    SymIcon(Sym.NOTIFICATIONS, size = 18.sp, color = look.fg)
+                    SymIcon(Sym.WIFI, size = 18.sp, color = look.fg)
+                    SymIcon(Sym.BATTERY_FULL, size = 18.sp, color = look.fg)
                 }
             }
         }

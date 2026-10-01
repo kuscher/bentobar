@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.composed
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,13 +70,17 @@ data class StripLook(
     val textSize: TextSize,
     val spacing: Dp,
     val pill: Pill,
+    /** What the strip is drawn on: the sampled bar colour, or black/white for a dark/light bar. */
+    val background: Color = if (lightText) Color.Black else Color.White,
 ) {
     val textSp: TextUnit get() = when (textSize) { TextSize.SMALL -> 12.5.sp; TextSize.DEFAULT -> 14.sp; TextSize.LARGE -> 15.5.sp }
     // Measured on the desktop bar: system glyphs are about 13 px wide and 14–16 px tall at 1.125x,
     // which a 15 sp Material Symbol matches.
     val iconSp: TextUnit get() = when (textSize) { TextSize.SMALL -> 13.5.sp; TextSize.DEFAULT -> 15.sp; TextSize.LARGE -> 17.sp }
-    val accent: Color get() = if (lightText) Color(0xFFA8C7FA) else Color(0xFF0B57D0)
-    val warn: Color get() = if (lightText) Color(0xFFFFD27A) else Color(0xFF8A5100)
+    // Accent and warning colours keep 4.5:1 on the bar too; on a bar where they wouldn't (a mid-tone
+    // colour), the text colour is used instead.
+    val accent: Color get() = Contrast.orElse(if (lightText) Color(0xFFA8C7FA) else Color(0xFF0B57D0), background, fg)
+    val warn: Color get() = Contrast.orElse(if (lightText) Color(0xFFFFD27A) else Color(0xFF8A5100), background, fg)
     val alertBg: Color get() = if (lightText) Color(0xFFFFB4AB) else Color(0xFFB3261E)
     val alertFg: Color get() = if (lightText) Color(0xFF690005) else Color.White
 }
@@ -214,8 +219,14 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     var natural by remember(s.widthKey) { mutableStateOf(0) }
     var widest by remember(s.widthKey) { mutableStateOf(0) }
-    LaunchedEffect(widest) {
-        if (widest > natural) { kotlinx.coroutines.delay(5_000); widest = natural }
+    // Keyed on the item, not on the widths: while the held width is wider than the text, wait 5 s,
+    // then let it shrink; a wider reading in the meantime cancels the wait. (Keyed on widest, as
+    // before, it never shrank: widest and natural are set together when the text grows, so the
+    // effect started with them equal and ended, and nothing restarted it when the text shrank.)
+    LaunchedEffect(s.widthKey) {
+        androidx.compose.runtime.snapshotFlow { widest > natural }.collectLatest { held ->
+            if (held) { kotlinx.coroutines.delay(5_000); widest = natural }
+        }
     }
     val alert = s.tone == Tone.ALERT
     val color = when (s.tone) {

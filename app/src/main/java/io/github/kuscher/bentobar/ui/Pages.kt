@@ -182,8 +182,8 @@ private fun Step(n: Int, title: String, done: Boolean, optional: Boolean = false
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(title, style = MaterialTheme.typography.titleMedium)
-                    if (optional) Text("  optional", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                    if (done) Text("  done", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    if (optional) { Spacer(Modifier.width(8.dp)); Text("optional", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline) }
+                    if (done) { Spacer(Modifier.width(8.dp)); Text("done", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
                 }
                 Spacer(Modifier.height(4.dp))
                 content()

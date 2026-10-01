@@ -23,3 +23,8 @@ enum class BarStatus {
         val current = MutableStateFlow(STOPPED)
     }
 }
+
+/** Items in the bar that don't fit in the free space right now (they're in the ‹ menu instead). */
+object BarOverflow {
+    val ids = MutableStateFlow<Set<String>>(emptySet())
+}

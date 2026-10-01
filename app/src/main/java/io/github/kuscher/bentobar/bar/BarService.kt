@@ -144,7 +144,10 @@ class BarController(private val service: AccessibilityService) {
     private fun lightCheck() {
         val s = snap ?: return scan()
         val node = s.spacerNode
-        if (node == null || SystemClock.uptimeMillis() - lastFullScan > 30_000 || !node.refresh()) return scan()
+        // A bar without the DesktopStatusBarSpacer node has nothing cheap to re-check: a full scan
+        // (with clearCache) every 2 s is costly, so between full scans only the window list is read.
+        if (node == null) return if (SystemClock.uptimeMillis() - lastFullScan > 10_000) scan() else check(full = false)
+        if (SystemClock.uptimeMillis() - lastFullScan > 30_000 || !node.refresh()) return scan()
         val r = Rect().also { node.getBoundsInScreen(it) }
         if (r != s.free) scan()
     }
@@ -189,6 +192,7 @@ class BarController(private val service: AccessibilityService) {
         started = false
         BarLook.current.value = null
         BarStatus.current.value = BarStatus.STOPPED
+        BarOverflow.ids.value = emptySet()
         main.removeCallbacksAndMessages(null)
         runCatching { service.unregisterReceiver(screen) }
         runCatching { WallpaperManager.getInstance(service).removeOnColorsChangedListener(wallpaper) }
@@ -301,8 +305,9 @@ class BarController(private val service: AccessibilityService) {
             Position.LEFT -> { p.gravity = Gravity.TOP or Gravity.LEFT; p.x = s.free.left + gap }
             Position.CENTER -> { p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; p.x = s.free.centerX() - screenW / 2 }
         }
-        // Keep room for the chevron (~26 dp) inside the free area.
-        maxWidth.intValue = (s.free.width() - 2 * gap - (30 * density).toInt()).coerceAtLeast(0)
+        // Keep room for the chevron (~26 dp) inside the free area, when it shows.
+        val chevron = cfg.chevron && (hiddenItems().isNotEmpty() || BarOverflow.ids.value.isNotEmpty())
+        maxWidth.intValue = (s.free.width() - 2 * gap - if (chevron) (30 * density).toInt() else 0).coerceAtLeast(0)
         heightDp.value = (s.bar.height() / density).dp
         BarStatus.current.value = if (maxWidth.intValue == 0) BarStatus.NO_ROOM else BarStatus.SHOWN
         if (!strip.shown) {
@@ -418,6 +423,7 @@ class BarController(private val service: AccessibilityService) {
         val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.stateOf(it)) } }
         val visible = cfg.items.filter { it.section == Section.SHOWN || (it.section == Section.HIDDEN && isActive(it, states)) }
         val hidden = cfg.items.filter { it.section == Section.HIDDEN && !isActive(it, states) }
+        val overflow by BarOverflow.ids.collectAsState()
         // Without the ‹ button there's no way to fold hidden items back, so they stay folded.
         val open = expanded.value && cfg.chevron
         MeasuredStrip(bias = when (cfg.position) { Position.RIGHT -> 1f; Position.CENTER -> 0f; Position.LEFT -> -1f },
@@ -425,13 +431,15 @@ class BarController(private val service: AccessibilityService) {
             Strip(
                 visible = entries(visible),
                 revealed = if (open) entries(hidden) else emptyList(),
-                showChevron = cfg.chevron && hidden.isNotEmpty(),
+                // Items that don't fit are offered in the ‹ menu, so ‹ shows for them too.
+                showChevron = cfg.chevron && (hidden.isNotEmpty() || overflow.isNotEmpty()),
                 expanded = open,
                 chevronOnLeft = cfg.position != Position.LEFT,
                 look = look.value,
                 maxWidthPx = maxWidth.intValue,
                 heightDp = heightDp.value,
                 events = events,
+                onOverflow = { ids -> main.post { if (BarOverflow.ids.value != ids) { BarOverflow.ids.value = ids; main.post(scanNow) } } },
             )
         }
     }

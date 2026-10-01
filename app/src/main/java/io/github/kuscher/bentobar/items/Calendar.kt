@@ -1,5 +1,6 @@
 package io.github.kuscher.bentobar.items
 
+import io.github.kuscher.bentobar.data.Uses
 import android.Manifest
 import android.content.ContentUris
 import android.content.Context
@@ -38,7 +39,8 @@ object Calendar {
 
     fun init(context: Context) { app = context.applicationContext }
 
-    fun allowed() = app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED
+    fun allowed() = app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
+        Uses.on(Uses.CALENDAR)
 
     /** Reloads at most once a minute, or right away after the provider changes. */
     fun refresh(force: Boolean = false) {

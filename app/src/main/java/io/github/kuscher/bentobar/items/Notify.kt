@@ -50,7 +50,8 @@ object Notify {
     }
 
     fun allowed(context: Context) =
-        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED &&
+            io.github.kuscher.bentobar.data.Uses.on(io.github.kuscher.bentobar.data.Uses.NOTIFICATIONS)
 
     fun timerDone(context: Context, title: String, text: String) {
         if (!allowed(context)) return

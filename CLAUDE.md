@@ -10,7 +10,7 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
 - `app/src/main/java/io/github/kuscher/bentobar/`
   - `bar/BarService.kt`: the AccessibilityService plus `BarController`. It scans the status bar,
     places the strip, hides it (fullscreen, keyguard, screen off, a shade covering the bar), runs
-    menus, the keep-awake window and colour sampling, and has adb `debug()` hooks.
+    menus, keep awake (a flag on the strip window) and colour sampling, and has adb `debug()` hooks.
   - `bar/StatusBarScan.kt`: finds the status bar window (TYPE_SYSTEM at y=0) and the free area
     (the `DesktopStatusBarSpacer` node on Googlebook OS, else the widest gap).
   - `bar/Overlay.kt`: a Compose host in a TYPE_ACCESSIBILITY_OVERLAY window (outside-touch and
@@ -54,7 +54,7 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
 ## Dev loop
 - `./bento app` builds the debug APK, installs it, enables the service and opens settings.
 - `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|set ID k=v|look KEY VALUE|windows`.
-  The receiver is guarded by DUMP, so only adb can call it.
+  The receiver (`src/debug`, debug builds only) is guarded by DUMP, so only adb can call it.
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
   the settings window. Menu crops include the menu's shadow margin, which can show other windows
   behind it, so don't publish them.
@@ -137,6 +137,13 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   activity finishes (checked on the Acer). Users bind it in the Shortcut Helper; on the Acer, Action
   with B, C, E, F, P and U launch apps and can't be reassigned, and A, G, H, I, L, N, Q, S, V and W
   are system shortcuts; D, J, K, M, O, R, T, X, Y and Z are free.
+- **Play Protect's live threat detection** (on-device, Android 17) flagged BentoBar on the Acer as
+  "App displays over other apps" (`dumpsys safety_center`, source `GoogleAppProtectionService`,
+  `SuspiciousAppIssueType`). It looks for accessibility services that keep imperceptible content on
+  screen, and for screen capture. So: no invisible or 1×1 overlays (keep awake is
+  FLAG_KEEP_SCREEN_ON on the visible strip, a screen wake lock only while the strip is hidden or
+  empty, never on the lock screen; an empty strip's window is made invisible), status bar
+  screenshots only on a change and only while the strip shows (never on a timer), every overlay visible and there because the user asked for it, and no adb hooks in release.
 - StudioSnap's helper (`~/studiosnap/ss enable`) used to overwrite the whole
   `enabled_accessibility_services` list and switch BentoBar off; fixed there on 2026-09-28. Both
   helpers now add or remove only their own entry (short or full component form).

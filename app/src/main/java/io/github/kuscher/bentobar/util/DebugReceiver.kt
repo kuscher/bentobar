@@ -80,8 +80,8 @@ class DebugReceiver : BroadcastReceiver() {
                             "color" -> c.copy(color = io.github.kuscher.bentobar.data.ColorMode.valueOf(args[2].uppercase()))
                             "size" -> c.copy(textSize = io.github.kuscher.bentobar.data.TextSize.valueOf(args[2].uppercase()))
                             "chips" -> c.copy(chipMode = io.github.kuscher.bentobar.data.ChipMode.valueOf(args[2].uppercase()))
-                            "chevron" -> c.copy(chevron = args[2] == "on")
-                            "hover" -> c.copy(revealOnHover = args[2] == "on")
+                            "chevron" -> c.copy(hiddenMode = if (args[2] == "on") io.github.kuscher.bentobar.data.HiddenMode.CLICK else io.github.kuscher.bentobar.data.HiddenMode.SHOW_ALL)
+                            "hover" -> c.copy(hiddenMode = if (args[2] == "on") io.github.kuscher.bentobar.data.HiddenMode.HOVER else io.github.kuscher.bentobar.data.HiddenMode.CLICK)
                             "collapse" -> c.copy(autoCollapseSec = args[2].toInt())
                             "spacing" -> c.copy(spacing = args[2].toInt())
                             else -> c

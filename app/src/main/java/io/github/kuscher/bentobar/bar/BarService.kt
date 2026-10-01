@@ -30,6 +30,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import io.github.kuscher.bentobar.data.ColorMode
+import io.github.kuscher.bentobar.data.HiddenMode
+import io.github.kuscher.bentobar.data.shows
+import io.github.kuscher.bentobar.data.moved
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Pill
 import io.github.kuscher.bentobar.data.Position
@@ -177,7 +180,7 @@ class BarController(private val service: AccessibilityService) {
     fun start() {
         started = true
         // Pinned open with ‹ before a restart: open again.
-        Store.config.value.let { if (it.pinnedOpen && it.chevron) { expanded.value = true; pinned = true } }
+        Store.config.value.let { if (it.pinnedOpen && it.hiddenMode != HiddenMode.SHOW_ALL) { expanded.value = true; pinned = true } }
         service.registerReceiver(screen, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
         })
@@ -318,7 +321,7 @@ class BarController(private val service: AccessibilityService) {
             Position.CENTER -> { p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; p.x = s.free.centerX() - screenW / 2 }
         }
         // Keep room for the chevron (~26 dp) inside the free area, when it shows.
-        val chevron = cfg.presenting || (cfg.chevron && (hiddenItems().isNotEmpty() || BarOverflow.ids.value.isNotEmpty()))
+        val chevron = cfg.presenting || BarOverflow.ids.value.isNotEmpty() || (cfg.hiddenMode != HiddenMode.SHOW_ALL && hiddenItems().isNotEmpty())
         maxWidth.intValue = (s.free.width() - 2 * gap - if (chevron) (30 * density).toInt() else 0).coerceAtLeast(0)
         heightDp.value = (s.bar.height() / density).dp
         val where = "free=${s.free.toShortString()} x=${p.x} maxW=${maxWidth.intValue} [${s.summary}]"
@@ -436,19 +439,23 @@ class BarController(private val service: AccessibilityService) {
         val states by Ticker.states.collectAsState()
         val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.stateOf(it)) } }
         // Presenting (screen sharing): only what matters on stage, whatever its section.
-        val visible = if (cfg.presenting) cfg.items.filter { it.section != Section.OFF && it.type in PRESENTING_TYPES && states[it.id]?.active == true }
-        else cfg.items.filter { it.section == Section.SHOWN || (it.section == Section.HIDDEN && isActive(it, states)) }
-        val hidden = if (cfg.presenting) emptyList() else cfg.items.filter { it.section == Section.HIDDEN && !isActive(it, states) }
+        // While dragging, the bar shows the order the item would land in.
+        val items = dragPreview.value?.let { (id, at) -> cfg.items.moved(id, Section.SHOWN, at) } ?: cfg.items
+        val visible = if (cfg.presenting) items.filter { it.section != Section.OFF && it.type in PRESENTING_TYPES && states[it.id]?.active == true }
+        else items.filter { cfg.shows(it, states[it.id]?.active == true) }
+        // Behind ‹ (click or hover modes): hidden items not out on their own. Show everything: none.
+        val hidden = if (cfg.presenting || cfg.hiddenMode == HiddenMode.SHOW_ALL) emptyList()
+        else cfg.items.filter { it.section == Section.HIDDEN && !isActive(it, states) }
         val overflow by BarOverflow.ids.collectAsState()
         // Without the ‹ button there's no way to fold hidden items back, so they stay folded.
-        val open = expanded.value && cfg.chevron && !cfg.presenting
+        val open = expanded.value && cfg.hiddenMode != HiddenMode.SHOW_ALL && !cfg.presenting
         MeasuredStrip(bias = when (cfg.position) { Position.RIGHT -> 1f; Position.CENTER -> 0f; Position.LEFT -> -1f },
             onWidth = { w -> if (w != strip.params.width) main.post { applyWidth(w) } }) {
             Strip(
                 visible = entries(visible),
                 revealed = if (open) entries(hidden) else emptyList(),
                 // Items that don't fit are offered in the ‹ menu, so ‹ shows for them too.
-                showChevron = cfg.presenting || (cfg.chevron && (hidden.isNotEmpty() || overflow.isNotEmpty())),
+                showChevron = cfg.presenting || overflow.isNotEmpty() || hidden.isNotEmpty(),
                 expanded = open,
                 chevronOnLeft = cfg.position != Position.LEFT,
                 look = look.value,
@@ -468,6 +475,11 @@ class BarController(private val service: AccessibilityService) {
         strip.params.width = width
         strip.relayout()
     }
+
+    private var dragFrom: Pair<String, Rect>? = null
+    private var dragCenters: Map<String, Float> = emptyMap()
+    /** While an item is dragged: its id and the index it would land at, for the strip's live order. */
+    private val dragPreview = mutableStateOf<Pair<String, Int>?>(null)
 
     private val events = object : StripEvents {
         override fun placed(id: String, at: Rect) { placed[id] = at }
@@ -497,8 +509,9 @@ class BarController(private val service: AccessibilityService) {
         }
 
         override fun chevron(at: Rect) {
-            // While presenting, ‹ is only the way back to the menu (and out of presenting).
-            if (Store.config.value.presenting) return chevronContext(at)
+            // While presenting, or with nothing behind it (show everything, ‹ only for items that
+            // don't fit), ‹ opens the menu.
+            Store.config.value.let { if (it.presenting || it.hiddenMode == HiddenMode.SHOW_ALL) return chevronContext(at) }
             val next = !expanded.value
             expanded.value = next
             pinned = next
@@ -518,6 +531,40 @@ class BarController(private val service: AccessibilityService) {
             }, hideBar = { Store.update { it.copy(enabled = false) } })
         }
 
+        /**
+         * A drag in the bar. While it moves, the strip previews the new order ([dragPreview]), so
+         * the other items slide aside; on release that order is saved. The landing place is judged
+         * against where the items were when the drag began (a snapshot), not their moving slots,
+         * so it can't flip back and forth at a boundary. Only items in the bar move this way;
+         * ones out on their own or revealed from ‹ keep their section.
+         */
+        override fun drag(item: ItemConfig, dx: Float, done: Boolean) {
+            hideTip()
+            if (dragFrom?.first != item.id) {
+                val r = placed[item.id]
+                dragFrom = r?.let { item.id to Rect(it) }
+                dragCenters = placed.filterKeys { it != item.id }.mapValues { it.value.exactCenterX() }
+            }
+            val from = dragFrom?.second
+            val cfg = Store.config.value
+            val index = if (item.section != Section.SHOWN || from == null) null else {
+                val center = from.exactCenterX() + dx
+                val overflow = BarOverflow.ids.value
+                val others = cfg.items.filter { it.section == Section.SHOWN && it.id != item.id }
+                val drawn = others.filter { it.id !in overflow && dragCenters.containsKey(it.id) }
+                val after = drawn.firstOrNull { dragCenters.getValue(it.id) > center }
+                if (after == null) others.size else others.indexOfFirst { it.id == after.id }
+            }
+            if (!done) {
+                if (index != null && dragPreview.value != (item.id to index)) dragPreview.value = item.id to index
+                return
+            }
+            trace("drag ${item.type} dx=${dx.toInt()} -> index $index")
+            if (index != null) Store.move(item.id, Section.SHOWN, index)
+            dragPreview.value = null
+            dragFrom = null
+        }
+
         override fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {
             main.removeCallbacks(showTip)
             if (inside && menu == null) { tipFor = item to Rect(at); main.postDelayed(showTip, 600) } else hideTip()
@@ -528,7 +575,7 @@ class BarController(private val service: AccessibilityService) {
             hovering = inside
             main.removeCallbacks(expandOnHover); main.removeCallbacks(collapse)
             if (inside) {
-                if (Store.config.value.revealOnHover && !expanded.value) main.postDelayed(expandOnHover, 350)
+                if (Store.config.value.hiddenMode == HiddenMode.HOVER && !expanded.value) main.postDelayed(expandOnHover, 350)
             } else if (!pinned) main.postDelayed(collapse, 900)
             else {
                 val secs = Store.config.value.autoCollapseSec

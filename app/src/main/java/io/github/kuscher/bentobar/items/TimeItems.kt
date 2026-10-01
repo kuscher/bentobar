@@ -8,8 +8,6 @@ import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LocalContentColor
@@ -178,8 +176,14 @@ fun ZonePicker(current: String?, onPick: (String?) -> Unit) {
     }
 }
 
+/**
+ * The date in the bar; the menu is the month, with the picked day's agenda: every calendar event,
+ * timed or all-day (meetings, flights, holidays, birthdays), with Join and Directions where they apply.
+ */
 object CalendarItem : ItemType("calendar", R.string.item_calendar_title, Sym.CALENDAR_MONTH, R.string.item_calendar_desc) {
     override val refreshMs = 10_000L
+    // Room for Join and Directions next to an event in the agenda.
+    override val menuWidthDp = 340
 
     override fun state(item: ItemConfig): ItemState {
         val today = LocalDate.now()
@@ -309,8 +313,9 @@ private fun SmallIconButton(sym: String, label: String, color: Color = LocalCont
 private fun shortTime(millis: Long): String = Dates.format(Dates.timeSkeleton(DateFormat.is24HourFormat(Env.app)), millis)
 
 /**
- * One event in a list. Clicking it opens the event in the calendar app; a meeting also gets a Join
- * button (video-call link) and a Directions button (a place to go). [close] closes the menu first.
+ * One event in a list. Clicking it opens the event in the calendar app; it also gets a Join button
+ * when it has a video-call link, and a Directions button when it has a place to go. [close] closes
+ * the menu first.
  */
 @Composable
 fun EventRow(e: Calendar.Event, close: () -> Unit) {
@@ -330,86 +335,73 @@ fun EventRow(e: Calendar.Event, close: () -> Unit) {
     }
 }
 
-object EventItem : ItemType("event", R.string.item_event_title, Sym.EVENT_UPCOMING, R.string.item_event_desc) {
+/**
+ * Next meeting: the next meeting before 03:00 tomorrow ([Meetings]) and a countdown ("Standup in 12m",
+ * "Standup · 24m left"), accented from "Show when" minutes before it until it ends. With no meeting
+ * left in that horizon, just the icon. The menu lists the horizon's meetings.
+ */
+object EventItem : ItemType("event", R.string.item_event_title, Sym.GROUPS, R.string.item_event_desc) {
     override val refreshMs = 5_000L
-    // Room for Join, Directions and Open on one line.
-    override val menuWidthDp = 320
+    // Room for Join and Directions next to a meeting.
+    override val menuWidthDp = 340
     override val canBeActive = true
     override val permissions = listOf(Manifest.permission.READ_CALENDAR)
+    /** How long before a meeting the item pops out (with "Show when") and turns the accent color. */
+    val before = Threshold("soonMin", 15, 1..60) { Env.plural(R.plurals.common_minutes_short, it, it) }
+    override val trigger = Trigger(R.string.trigger_event, R.string.trigger_event_short, before)
 
     override fun state(item: ItemConfig): ItemState {
-        if (!Calendar.allowed()) return ItemState(icon = Sym.EVENT_UPCOMING, text = Env.str(R.string.event_allow), desc = Env.str(R.string.event_access_needed))
+        if (!Calendar.allowed()) return ItemState(icon = Sym.GROUPS, desc = Env.str(R.string.event_access_needed))
         Calendar.refresh()
         val now = System.currentTimeMillis()
         val max = item.optInt("chars", 20)
         fun short(t: String) = if (t.length <= max) t else t.take(max - 1).trimEnd() + "…"
-        val soon = item.optInt("soonMin", 15) * 60_000L
         Calendar.current(now)?.let { e ->
-            return ItemState(icon = Sym.EVENT, filled = true, text = Env.str(R.string.event_now_text, short(e.title), Fmt.duration(e.end - now)),
-                active = true, tone = Tone.ACCENT, desc = Env.str(R.string.event_now_desc, e.title, Fmt.duration(e.end - now)))
+            val left = Fmt.duration(e.end - now)
+            return ItemState(icon = Sym.GROUPS, text = Env.str(R.string.event_now_text, short(e.title), left), active = true,
+                tone = Tone.ACCENT, desc = Env.str(R.string.event_now_desc, e.title, left))
         }
-        val next = Calendar.next(now) ?: return ItemState(icon = Sym.EVENT_UPCOMING, text = Env.str(R.string.event_no_more), desc = Env.str(R.string.event_none_upcoming))
+        val next = Calendar.next(now) ?: return ItemState(icon = Sym.GROUPS, desc = Env.str(R.string.event_no_more))
         val until = next.begin - now
-        val sameDay = LocalDate.now() == Instant.ofEpochMilli(next.begin).atZone(ZoneId.systemDefault()).toLocalDate()
-        val whenText = when {
-            until < 60 * 60_000L -> Env.str(R.string.event_in, Fmt.duration(until.coerceAtLeast(60_000)))
-            sameDay -> shortTime(next.begin)
-            else -> Instant.ofEpochMilli(next.begin).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("EEE", Locale.getDefault()))
-        }
-        return ItemState(icon = Sym.EVENT_UPCOMING, text = Env.str(R.string.event_next_text, short(next.title), whenText), active = until <= soon,
-            tone = if (until <= 5 * 60_000L) Tone.ACCENT else Tone.NORMAL, desc = Env.str(R.string.event_next_desc, next.title, whenText))
+        val near = until <= before.of(item) * 60_000L
+        val whenText = if (until < 60 * 60_000L) Env.str(R.string.event_in, Fmt.duration(until.coerceAtLeast(60_000))) else shortTime(next.begin)
+        return ItemState(icon = Sym.GROUPS, text = Env.str(R.string.event_next_text, short(next.title), whenText), active = near,
+            tone = if (near) Tone.ACCENT else Tone.NORMAL, desc = Env.str(R.string.event_next_desc, next.title, whenText))
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
         rememberTick()
-        val now = System.currentTimeMillis()
         if (!Calendar.allowed()) {
-            MenuCard(Sym.EVENT_UPCOMING, stringResource(R.string.item_event_title), stringResource(R.string.event_needs_calendar)) {
+            MenuCard(Sym.GROUPS, stringResource(R.string.event_today), stringResource(R.string.event_needs_calendar)) {
                 MenuEntry(Sym.EVENT, stringResource(R.string.calendar_allow)) { host.close(); MainActivity.requestPermission(Env.app, Manifest.permission.READ_CALENDAR) }
             }
         } else {
-            val cur = Calendar.current(now)
-            val next = Calendar.next(now)
-            val focus = cur ?: next
-            MenuCard(Sym.EVENT_UPCOMING, focus?.title ?: stringResource(R.string.event_nothing_coming),
-                when {
-                    cur != null -> stringResource(R.string.event_now_ends_in, Fmt.duration(cur.end - now))
-                    next != null -> stringResource(R.string.event_starts_in, Fmt.duration(next.begin - now))
-                    else -> null
-                }) {
-                if (focus != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    val pad = PaddingValues(horizontal = 12.dp)
-                    if (focus.link != null) FilledTonalButton(onClick = { host.close(); Calendar.join(focus) }, contentPadding = pad) {
-                        SymIcon(Sym.VIDEOCAM, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.common_join), maxLines = 1)
-                    }
-                    if (focus.place != null) OutlinedButton(onClick = { host.close(); Calendar.directions(focus) }, contentPadding = pad) {
-                        SymIcon(Sym.DIRECTIONS, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.event_directions), maxLines = 1)
-                    }
-                    OutlinedButton(onClick = { host.close(); Calendar.open(focus) }, contentPadding = pad) { Text(stringResource(R.string.common_open), maxLines = 1) }
-                }
-                MenuDivider()
-                SectionLabel(stringResource(R.string.event_coming_up))
-                val upcoming = Calendar.meetings(now).filter { it != focus }.take(6)
-                if (upcoming.isEmpty()) Text(stringResource(R.string.event_nothing_else), style = MaterialTheme.typography.bodyMedium,
+            Calendar.refresh()
+            val now = System.currentTimeMillis()
+            val today = LocalDate.now()
+            MenuCard(Sym.GROUPS, stringResource(R.string.event_today), Dates.format("EEEEdMMMM", today)) {
+                val list = Calendar.meetings(now)
+                if (list.isEmpty()) Text(stringResource(R.string.event_no_more), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                var lastDay: LocalDate? = null
-                upcoming.forEach { e ->
+                var lastDay = today
+                list.forEach { e ->
+                    // A meeting after midnight (the horizon runs to 03:00) gets its day above it.
                     val d = Instant.ofEpochMilli(e.begin).atZone(ZoneId.systemDefault()).toLocalDate()
-                    if (d != lastDay && d != LocalDate.now()) {
+                    if (d > lastDay) {
                         Text(Dates.format("EEEEdMMM", d), style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                        lastDay = d
                     }
-                    lastDay = d
                     EventRow(e, host::close)
                 }
+                MenuDivider()
+                MenuEntry(Sym.OPEN_IN_NEW, stringResource(R.string.calendar_open)) { host.close(); Calendar.openDay(now) }
             }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
         val res = androidx.compose.ui.platform.LocalResources.current
-        SliderRow(stringResource(R.string.event_active_from), item.optInt("soonMin", 15), 1..60,
-            { res.getQuantityString(R.plurals.event_minutes_before, it, it) }) { set(item.with("soonMin", it.toString())) }
         SliderRow(stringResource(R.string.event_longest_title), item.optInt("chars", 20), 8..40,
             { res.getQuantityString(R.plurals.event_characters, it, it) }) { set(item.with("chars", it.toString())) }
     }
@@ -422,6 +414,8 @@ object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.str
 
     /** The presets, in minutes. */
     private val presets = listOf(5, 10, 25, 60)
+
+    override val trigger = Trigger(R.string.trigger_timer, R.string.trigger_timer_short)
 
     override fun state(item: ItemConfig): ItemState {
         val s = Timers.state.value
@@ -547,6 +541,7 @@ private fun CustomMinutes(onStart: (Int) -> Unit) {
 object CountdownItem : ItemType("countdown", R.string.item_countdown_title, Sym.HOURGLASS_TOP, R.string.item_countdown_desc) {
     override val refreshMs = 10_000L
     override val canBeActive = true
+    override val trigger = Trigger(R.string.trigger_countdown, R.string.trigger_countdown_short)
 
     fun target(item: ItemConfig): LocalDateTime? = runCatching {
         LocalDateTime.parse(item.opt("at", ""), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))

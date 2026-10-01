@@ -23,8 +23,12 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
     `TimeItems.kt` and `ToolItems.kt`.
   - `data/`: `Model.kt` (`BarConfig`, `ItemConfig`, `Section`…) and `Store` (JSON in
     SharedPreferences, a process-wide StateFlow shared by the service and settings).
-  - `ui/`: `MainActivity` (nav rail), `BarPage` (preview, sections, item detail), `Pages`
-    (Add, Look, Setup, About), `Theme`, `MenuKit` and `Controls` (shared UI pieces).
+  - `ui/`: `MainActivity` (nav rail), `BarPage` (preview, sections, item detail), `Reorder` (drag
+    and drop across the section cards: the gesture sits on the container, a copy of the row floats
+    above the cards, the Store changes once on the drop), `Pages` (Add, Look, Setup, About), `Theme`,
+    `MenuKit` and `Controls` (shared UI pieces).
+  - "Show when…": a type's `trigger` (in `ItemType.kt`) words its pop-out rule, and its `Threshold`
+    is the one source of the option key and default for both `state()` and the settings slider.
   - `tile/Tiles.kt`: the BentoBar, Keep awake and Timer tiles.
   - `util/`: `Sym.kt` (generated), `Ui.kt` (fonts, `SymIcon`), `Fmt.kt`, `Dates.kt` (locale-aware dates
     and times from skeletons), `DebugReceiver.kt`.

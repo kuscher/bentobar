@@ -432,7 +432,8 @@ private fun RowScope.RowBody(item: ItemConfig, state: ItemState?) {
             state?.text?.takeIf { it.isNotBlank() },
             // The rule in short ("shows above 80% CPU"), so the list says when each hidden item pops out.
             if (item.whenActive && item.section == Section.HIDDEN) type.trigger?.short(item) ?: stringResource(R.string.row_when_active) else null,
-            when (item.display) { Display.ICON -> stringResource(R.string.row_icon_only); Display.TEXT -> stringResource(R.string.row_text_only); else -> null }).joinToString(" · ")
+            if (type.iconOnly) null
+            else when (item.display) { Display.ICON -> stringResource(R.string.row_icon_only); Display.TEXT -> stringResource(R.string.row_text_only); else -> null }).joinToString(" · ")
         if (detail.isNotEmpty()) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
@@ -476,7 +477,7 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
             }
             val trigger = type.trigger
             if (type.canBeActive && trigger != null) TriggerControl(item, trigger)
-            ChoiceRow(stringResource(R.string.display_show_as), listOf(Display.ICON_AND_TEXT to stringResource(R.string.display_icon_and_text),
+            if (!type.iconOnly) ChoiceRow(stringResource(R.string.display_show_as), listOf(Display.ICON_AND_TEXT to stringResource(R.string.display_icon_and_text),
                 Display.TEXT to stringResource(R.string.display_text), Display.ICON to stringResource(R.string.display_icon)), item.display) { d ->
                 Store.updateItem(item.id) { it.copy(display = d) }; Ticker.refresh()
             }

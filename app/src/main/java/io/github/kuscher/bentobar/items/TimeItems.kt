@@ -390,14 +390,14 @@ object EventItem : ItemType("event", R.string.item_event_title, Sym.GROUPS, R.st
         fun short(t: String) = if (t.length <= max) t else t.take(max - 1).trimEnd() + "…"
         Calendar.current(now)?.let { e ->
             val left = Fmt.duration(e.end - now)
-            return ItemState(icon = Sym.GROUPS, text = Env.str(R.string.event_now_text, short(e.title), left), active = true,
+            return ItemState(icon = Sym.GROUPS, text = Env.str(R.string.event_now_text, short(e.title), left), label = e.title, active = true,
                 tone = Tone.ACCENT, desc = Env.str(R.string.event_now_desc, e.title, left))
         }
         val next = Calendar.next(now) ?: return ItemState(icon = Sym.GROUPS, desc = Env.str(R.string.event_no_more))
         val until = next.begin - now
         val near = until <= before.of(item) * 60_000L
         val whenText = if (until < 60 * 60_000L) Env.str(R.string.event_in, Fmt.duration(until.coerceAtLeast(60_000))) else shortTime(next.begin)
-        return ItemState(icon = Sym.GROUPS, text = Env.str(R.string.event_next_text, short(next.title), whenText), active = near,
+        return ItemState(icon = Sym.GROUPS, text = Env.str(R.string.event_next_text, short(next.title), whenText), label = next.title, active = near,
             tone = if (near) Tone.ACCENT else Tone.NORMAL, desc = Env.str(R.string.event_next_desc, next.title, whenText))
     }
 

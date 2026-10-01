@@ -19,6 +19,27 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## Unreleased (2026-10-01): fixes after 0.6, and a keyboard shortcut
+Tested on the Acer Googlebook 14 as a side-by-side debug build. CHANGELOG "Unreleased" has the
+user-facing list. What changed, by area:
+- **Strip:** sampling follows the drawing rule (`couldShow`); contrast falls back to black on mid
+  grays; the width budget counts the pill padding, and whether ‹ needs room is decided per measure
+  pass (`fitStrip`, unit-tested), so overflow can't stick; ‹ with nothing hidden opens the menu; a
+  status bar read without a node tree keeps the last snapshot of the same window; menus close on a
+  display change; screenshot results after stop() are dropped.
+- **Time:** `ClockAnchor` (util) for timers and keep awake; elapsed-realtime alarms, re-armed at
+  start and when exact alarms change (`Setup.refresh`); stopwatch rounds down (`Fmt.clock(elapsed)`).
+- **Chip:** re-evaluated at each meeting's boundaries and after calendar loads; actions are direct
+  activity PendingIntents. Calendar loads are coalesced (one in flight, one pending) and
+  `Calendar.forget()` runs when Calendar is switched off.
+- **Settings:** `Store.parseLayout` gates Paste settings; strict countdown dates with an error;
+  `MainActivity` saves page and selection and doesn't replay its launch intent; Allow calendar's
+  opt-in moved into `requestPermission`; Undo snackbar drawn last; app picker loads off main.
+- **Keyboard:** `BarMenuActivity` ("BentoBar menu") + `BentoBarMenu(everything = true)`. Verified on
+  the Acer: Action + T bound in the Shortcut Helper opens it; arrows, Enter and Escape work.
+- Not yet done: calendar months beyond the loaded 40 days (the month view has no data there; to be
+  decided), external displays.
+
 ## Unreleased (2026-10-01): Google Play offers BentoBar to PC-type devices only
 - The manifest requires `android.hardware.type.pc` (Googlebooks report it). The user asked for Play to
   target Googlebooks, or at least desktop Android devices; Play had 5,744 supported device models for

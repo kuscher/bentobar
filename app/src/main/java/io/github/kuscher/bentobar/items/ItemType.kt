@@ -15,6 +15,8 @@ data class ItemState(
     /** Filled glyphs match the system's status bar icons; outlined reads as "off". */
     val filled: Boolean = true,
     val text: String? = null,
+    /** In a menu's list of items, instead of [text] when that wouldn't fit: a meeting's title without its countdown. */
+    val label: String? = null,
     /** Spoken description and tooltip. */
     val desc: String = "",
     /** "Has something to say": hidden items with whenActive pop into the bar while this is true. */
@@ -68,6 +70,8 @@ abstract class ItemType(
 
     /** Whether "show when active" means something for this type. */
     open val canBeActive: Boolean = false
+    /** Only ever an icon in the bar (no text to show), so settings don't offer "Show as". */
+    open val iconOnly: Boolean = false
 
     /** The "Show when…" rule in words, for types that [canBeActive]. */
     open val trigger: Trigger? = null

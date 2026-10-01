@@ -63,6 +63,7 @@ import io.github.kuscher.bentobar.data.TextSize
 import io.github.kuscher.bentobar.items.Env
 import io.github.kuscher.bentobar.items.Items
 import io.github.kuscher.bentobar.items.Notify
+import io.github.kuscher.bentobar.items.Usage
 import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
 
@@ -284,6 +285,11 @@ fun SetupPage(activity: Activity, setup: SetupState) {
             UseSwitch(stringResource(R.string.setup_alarms_text), stringResource(R.string.setup_alarms_title), setup.exactAlarms) { on ->
                 setExactAlarmsUse(activity, on)
             }
+        }
+        Step(6, stringResource(R.string.setup_usage_title), setup.usageAccess, optional = true) {
+            Body(stringResource(R.string.usage_explain))
+            if (setup.usageAccess) StepLink(stringResource(R.string.setup_open_setting)) { Usage.openSettings(activity) }
+            else StepAction(stringResource(R.string.setup_turn_on)) { Usage.openSettings(activity) }
         }
     }
 }

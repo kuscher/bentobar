@@ -94,6 +94,11 @@ fun InfoRow(label: String, value: String, valueColor: Color = MaterialTheme.colo
     }
 }
 
+/** A short line of small, quiet text in a menu (an explanation or a status). */
+@Composable
+fun MenuNote(text: String) = Text(text, style = MaterialTheme.typography.bodySmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 2.dp))
+
 @Composable
 fun MenuDivider() = HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
 

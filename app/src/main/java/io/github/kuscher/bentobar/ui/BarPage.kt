@@ -30,6 +30,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -74,7 +79,16 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
     val cfg by Store.config.collectAsState()
     val states by Ticker.states.collectAsState()
     val item = cfg.items.firstOrNull { it.id == selected }
+    val snackbar = remember { SnackbarHostState() }
+    val deleted by Undo.deleted.collectAsState()
+    LaunchedEffect(deleted) {
+        val d = deleted ?: return@LaunchedEffect
+        val name = Items.of(d.item.type)?.title ?: "item"
+        if (snackbar.showSnackbar("Deleted $name", "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) Undo.restore(d)
+        Undo.deleted.value = null
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
         val wide = maxWidth >= 900.dp
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 8.dp)) {
             if (!running) SetupBanner(onSetup)
@@ -197,7 +211,15 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
 @Composable
 private fun Sections(items: List<ItemConfig>, states: Map<String, ItemState>, selected: String?, onSelect: (String?) -> Unit) {
     SectionCard(Section.SHOWN, "In the bar", "Left to right, as they appear", items, states, selected, onSelect)
-    SectionCard(Section.HIDDEN, "Hidden behind ‹", "Revealed by the ‹ button or on hover. Items set to show when active pop out on their own.", items, states, selected, onSelect)
+    val cfg by Store.config.collectAsState()
+    // Says how hidden items come back with the current settings (hover reveal is off by default).
+    val reveal = when {
+        cfg.chevron && cfg.revealOnHover -> "Revealed by the ‹ button or by hovering over BentoBar."
+        cfg.chevron -> "Revealed by the ‹ button."
+        cfg.revealOnHover -> "Revealed by hovering over BentoBar."
+        else -> "Not revealed: the ‹ button is off (Look)."
+    }
+    SectionCard(Section.HIDDEN, "Hidden behind ‹", "$reveal Items set to show when active pop out on their own.", items, states, selected, onSelect)
     SectionCard(Section.OFF, "Off", "Kept with their settings, not shown", items, states, selected, onSelect)
 }
 
@@ -252,7 +274,7 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
                     leadingIcon = { SymIcon(Sym.VISIBILITY_OFF, size = 18.sp) })
                 if (item.section != Section.OFF) DropdownMenuItem(text = { Text("Turn off") }, onClick = { menu = false; Store.move(item.id, Section.OFF, 999) },
                     leadingIcon = { SymIcon(Sym.REMOVE, size = 18.sp) })
-                DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; if (selected) onSelect(null); Store.remove(item.id) },
+                DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; if (selected) onSelect(null); Undo.delete(item) },
                     leadingIcon = { SymIcon(Sym.DELETE, size = 18.sp) })
             }
         }
@@ -309,8 +331,24 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = { onSelect(Store.add(item.type, item.section, item.options)) }) { Text("Duplicate") }
-                TextButton(onClick = { onSelect(null); Store.remove(item.id) }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                TextButton(onClick = { onSelect(null); Undo.delete(item) }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             }
         }
+    }
+}
+
+/** Delete with an undo: the item and where it was, until the snackbar goes. */
+object Undo {
+    data class Deleted(val item: ItemConfig, val index: Int)
+    val deleted = kotlinx.coroutines.flow.MutableStateFlow<Deleted?>(null)
+
+    fun delete(item: ItemConfig) {
+        deleted.value = Deleted(item, Store.config.value.items.indexOfFirst { it.id == item.id })
+        Store.remove(item.id)
+    }
+
+    fun restore(d: Deleted) = Store.update { c ->
+        if (c.items.any { it.id == d.item.id }) c
+        else c.copy(items = c.items.toMutableList().apply { add(d.index.coerceIn(0, size), d.item) })
     }
 }

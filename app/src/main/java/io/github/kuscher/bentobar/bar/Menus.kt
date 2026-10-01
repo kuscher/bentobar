@@ -89,14 +89,18 @@ fun ItemContextMenu(itemId: String, host: MenuHost, openMenu: () -> Unit) {
         }
         MenuDivider()
         MenuEntry(Sym.TUNE, "Item settings…") { host.openItemSettings(item.id) }
-        MenuEntry(Sym.DELETE, "Remove from the bar") { host.close(); Store.updateItem(item.id) { it.copy(section = Section.OFF) } }
+        // It turns the item off (kept with its settings), so it says so; Delete is in settings, with an undo.
+        MenuEntry(Sym.VISIBILITY_OFF, "Turn off") { host.close(); Store.updateItem(item.id) { it.copy(section = Section.OFF) } }
     }
 }
 
 /** Right-click on ‹, or the list view of hidden items. */
 @Composable
-fun BentoBarMenu(host: MenuHost, hidden: List<ItemConfig>, openItem: (ItemConfig) -> Unit, hideBar: () -> Unit) {
+fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> Unit) {
     val states by Ticker.states.collectAsState()
+    // Worked out here, not when the menu opened, so an item popping out (or in) updates the list.
+    val cfg by Store.config.collectAsState()
+    val hidden = cfg.items.filter { it.section == Section.HIDDEN && !(it.whenActive && states[it.id]?.active == true) }
     MenuCard(Sym.WYSIWYG, "BentoBar", if (hidden.isEmpty()) "No hidden items" else "${hidden.size} hidden",
         iconRes = io.github.kuscher.bentobar.R.drawable.ic_bentobar) {
         if (hidden.isNotEmpty()) {

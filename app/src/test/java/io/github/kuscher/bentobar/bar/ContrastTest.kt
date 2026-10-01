@@ -53,4 +53,19 @@ class ContrastTest {
         assertTrue(Contrast.ratio(strip.accent, teal) >= Contrast.MIN)
         assertTrue(Contrast.ratio(strip.warn, teal) >= Contrast.MIN)
     }
+
+    @Test fun everyOpaqueBarReaches45() {
+        // Every grey, and a coarse sweep of colours, with an unreadable sample (the bar's own colour):
+        // the strip's text, accent and warning colours still reach 4.5:1. #808080 failed before.
+        val bars = (0..255).map { Color(0xFF000000.toInt() or (it * 0x010101)) } +
+            (0..255 step 51).flatMap { r -> (0..255 step 51).flatMap { g -> (0..255 step 51).map { b -> Color(r, g, b) } } }
+        for (bg in bars) {
+            val look = Contrast.resolve(bg, bg)
+            assertTrue("fg on $bg", Contrast.ratio(look.fg, bg) >= Contrast.MIN)
+            val strip = StripLook(look.fg, look.barDark, io.github.kuscher.bentobar.data.TextSize.DEFAULT,
+                androidx.compose.ui.unit.Dp(12f), io.github.kuscher.bentobar.data.Pill.NONE, look.background)
+            assertTrue("accent on $bg", Contrast.ratio(strip.accent, bg) >= Contrast.MIN)
+            assertTrue("warn on $bg", Contrast.ratio(strip.warn, bg) >= Contrast.MIN)
+        }
+    }
 }

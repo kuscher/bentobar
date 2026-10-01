@@ -133,3 +133,6 @@ fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.sec
     Section.HIDDEN -> if (hiddenMode == HiddenMode.SHOW_ALL) !item.whenActive || active else item.whenActive && active
     Section.OFF -> false
 }
+
+/** Whether [shows] can be true for [item] once its "Show when" rule applies: the items worth sampling. */
+fun BarConfig.couldShow(item: ItemConfig): Boolean = shows(item, active = true)

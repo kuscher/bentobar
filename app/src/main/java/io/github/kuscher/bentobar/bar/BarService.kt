@@ -109,6 +109,8 @@ class BarController(private val service: AccessibilityService) {
     private val pm = service.getSystemService(PowerManager::class.java)
     private val km = service.getSystemService(KeyguardManager::class.java)
     private val io = Executors.newSingleThreadExecutor()
+    /** [io] for screenshot results; one arriving after stop() shut it down is dropped, not thrown. */
+    private val callbacks = java.util.concurrent.Executor { r -> runCatching { io.execute(r) } }
     private val density get() = service.resources.displayMetrics.density
 
     // Read by the strip's composition.
@@ -248,10 +250,16 @@ class BarController(private val service: AccessibilityService) {
         }
     }
 
-    fun onConfigChanged() { main.postDelayed(scanNow, 200); main.postDelayed(sample, 500) }
+    /** Rotation, density or resolution: a menu or tooltip placed for the old display would be off, so close them. */
+    fun onConfigChanged() {
+        closeMenu(); hideTip()
+        main.postDelayed(scanNow, 200); main.postDelayed(sample, 500)
+    }
 
     private fun onConfig() {
         if (!started) return
+        // Switched to Show everything (or presenting) with hidden items out: nothing can fold them back.
+        Store.config.value.let { if ((it.hiddenMode == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) { expanded.value = false; pinned = false } }
         applyLook()
         scan()
         Chips.update(service)
@@ -284,6 +292,9 @@ class BarController(private val service: AccessibilityService) {
                 // Without content-change events the node cache can go stale: read the status bar fresh.
                 service.clearCache()
                 runCatching { StatusBarScan.scan(barWindow) }.onFailure { Log.w(tag, "scan failed", it) }.getOrNull()
+                    // No node tree (SystemUI mid-change): the whole bar would cover its icons. Keep the last
+                    // reading of this same bar; with none, the whole bar is still better than nothing.
+                    ?.let { if (it.summary != StatusBarScan.NO_TREE) it else prev?.takeIf { p -> p.windowId == it.windowId && p.bar == it.bar } ?: it }
             }
         }
         val newWindow = s?.windowId != snap?.windowId
@@ -341,9 +352,10 @@ class BarController(private val service: AccessibilityService) {
             Position.LEFT -> { p.gravity = Gravity.TOP or Gravity.LEFT; p.x = s.free.left + gap }
             Position.CENTER -> { p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; p.x = s.free.centerX() - screenW / 2 }
         }
-        // Keep room for the chevron (~26 dp) inside the free area, when it shows.
-        val chevron = cfg.presenting || BarOverflow.ids.value.isNotEmpty() || (cfg.hiddenMode != HiddenMode.SHOW_ALL && hiddenItems().isNotEmpty())
-        maxWidth.intValue = (s.free.width() - 2 * gap - if (chevron) (30 * density).toInt() else 0).coerceAtLeast(0)
+        // The whole strip fits the free area: items, the pill's own padding and (decided by the strip,
+        // from what fits) room for ‹.
+        val pillPad = if (cfg.pill == Pill.NONE) 0 else (2 * STRIP_PILL_PADDING.value * density).toInt()
+        maxWidth.intValue = (s.free.width() - 2 * gap - pillPad).coerceAtLeast(0)
         heightDp.value = (s.bar.height() / density).dp
         val where = "free=${s.free.toShortString()} x=${p.x} maxW=${maxWidth.intValue} [${s.summary}]"
         if (where != lastPlace) { trace("place $where"); lastPlace = where }
@@ -365,14 +377,15 @@ class BarController(private val service: AccessibilityService) {
     private fun sampleColor() {
         val s = snap ?: return applyLook()
         if (Store.config.value.color != ColorMode.AUTO) return applyLook()
-        service.takeScreenshotOfWindow(s.windowId, io, object : AccessibilityService.TakeScreenshotCallback {
+        service.takeScreenshotOfWindow(s.windowId, callbacks, object : AccessibilityService.TakeScreenshotCallback {
             override fun onSuccess(r: AccessibilityService.ScreenshotResult) {
                 val c = runCatching { barColors(r, s) }.getOrNull()
-                main.post { sampled = c; applyLook() }
+                // A result can arrive after stop(): it mustn't paint a strip that's gone.
+                main.post { if (started) { sampled = c; applyLook() } }
             }
             override fun onFailure(code: Int) {
                 Log.i(tag, "status bar colour sample failed ($code), using wallpaper hints")
-                main.post { applyLook() }
+                main.post { if (started) applyLook() }
             }
         })
     }
@@ -384,8 +397,9 @@ class BarController(private val service: AccessibilityService) {
      */
     private fun barColors(r: AccessibilityService.ScreenshotResult, s: BarSnapshot): BarColors? {
         val hb = r.hardwareBuffer
-        val bmp = Bitmap.wrapHardwareBuffer(hb, r.colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
-        hb.close()
+        val bmp = try {
+            Bitmap.wrapHardwareBuffer(hb, r.colorSpace)?.let { wrapped -> wrapped.copy(Bitmap.Config.ARGB_8888, false).also { wrapped.recycle() } }
+        } finally { hb.close() }
         bmp ?: return null
         val area = Rect(s.clock ?: s.bar).apply { offset(-s.bar.left, -s.bar.top) }
         area.intersect(0, 0, bmp.width, bmp.height)
@@ -479,6 +493,8 @@ class BarController(private val service: AccessibilityService) {
                 revealed = if (open) entries(hidden) else emptyList(),
                 // Items that don't fit are offered in the ‹ menu, so ‹ shows for them too.
                 showChevron = cfg.presenting || overflow.isNotEmpty() || hidden.isNotEmpty(),
+                chevronAlways = cfg.presenting || hidden.isNotEmpty(),
+                chevronReservePx = (30 * density).toInt(),
                 expanded = open,
                 chevronOnLeft = cfg.position != Position.LEFT,
                 look = look.value,
@@ -532,9 +548,9 @@ class BarController(private val service: AccessibilityService) {
         }
 
         override fun chevron(at: Rect) {
-            // While presenting, or with nothing behind it (show everything, ‹ only for items that
+            // While presenting, or with nothing behind it (show everything, or ‹ only for items that
             // don't fit), ‹ opens the menu.
-            Store.config.value.let { if (it.presenting || it.hiddenMode == HiddenMode.SHOW_ALL) return chevronContext(at) }
+            Store.config.value.let { if (it.presenting || it.hiddenMode == HiddenMode.SHOW_ALL || (!expanded.value && hiddenItems().isEmpty())) return chevronContext(at) }
             val next = !expanded.value
             expanded.value = next
             pinned = next
@@ -604,7 +620,7 @@ class BarController(private val service: AccessibilityService) {
             hovering = inside
             main.removeCallbacks(expandOnHover); main.removeCallbacks(collapse)
             if (inside) {
-                if (Store.config.value.hiddenMode == HiddenMode.HOVER && !expanded.value) main.postDelayed(expandOnHover, 350)
+                if (Store.config.value.hiddenMode == HiddenMode.HOVER && !expanded.value && hiddenItems().isNotEmpty()) main.postDelayed(expandOnHover, 350)
             } else if (!pinned) main.postDelayed(collapse, 900)
             else {
                 val secs = Store.config.value.autoCollapseSec
@@ -626,12 +642,12 @@ class BarController(private val service: AccessibilityService) {
         val now = SystemClock.uptimeMillis()
         hideTip()
         if (menuKey == key) { closeMenu(); return }
-        Ticker.focusItem = key.removePrefix("item:").takeIf { key.startsWith("item:") }
-        Ticker.revealHidden = expanded.value || key == "bentobar"
         // The press that closed this very menu (outside touch) shouldn't reopen it.
         if (menuClosedKey == key && now - menuClosedAt < 350) return
-        closeMenu()
+        closeMenu() // resets the sampling demand, so the new menu's is set after it
         val s = snap ?: return
+        Ticker.focusItem = key.removePrefix("item:").takeIf { key.startsWith("item:") }
+        Ticker.revealHidden = expanded.value || key == "bentobar"
         val loc = strip.locationOnScreen()
         val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
         val bounds = wm.currentWindowMetrics.bounds

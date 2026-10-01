@@ -76,7 +76,8 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
 
 ## Things learned the hard way (see docs/research/device-findings.md)
 - **The status bar window can be opaque.** On the HP it's glyphs on transparent; on the Acer
-  Googlebook 14 it's white glyphs on its own black. The colour sampler tells background and text
+  Googlebook 14 it's white glyphs on its own black while an app is maximized, and see-through over
+  the wallpaper (like the HP) otherwise. The colour sampler tells background and text
   apart (`barColors`), decides dark/light from the background, and `bar/Contrast.kt` holds every
   strip colour to 4.5:1, with pure black as the last fallback for mid grays where neither white nor
   near-black reaches it (`ContrastTest.everyOpaqueBarReaches45` sweeps every gray and a color grid).

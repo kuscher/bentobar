@@ -18,6 +18,19 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## Unreleased (2026-10-01): crash on unbind fixed
+- 0.5 crashed on the HP (twice, 2026-10-01) when the accessibility service was unbound, e.g. by
+  `uiautomator dump` (UiAutomation suspends accessibility services): "BentoBar keeps stopping", and
+  the service stayed in "Binding" until its entry was taken out of `enabled_accessibility_services`
+  and put back.
+- Cause: `Overlay.destroy()` moved a strip that had never been shown (lifecycle still INITIALIZED)
+  straight to DESTROYED, which LifecycleRegistry refuses. Now `OverlayLifecycle` (in `bar/Overlay.kt`,
+  tested by `OverlayLifecycleTest`) makes show, hide and destroy safe in every state, and
+  `BarService` stops a controller exactly once (unbind, destroy, or a second connect).
+- The fix is on `main`. **Not released** (still 0.5, version code 6) and **not tested on a device**:
+  only the unit tests and a debug build on the Mac. Worth checking on the HP before the next release:
+  `uiautomator dump` twice in a row, and switching the service off with "Show in status bar" off.
+
 ## Unreleased (2026-09-30): fixes and polish from a second device (Acer Googlebook 14)
 Found testing 0.5 on an Acer Googlebook 14, whose status bar is opaque black (the HP's is
 transparent), with a release installed from GitHub (Play Protect, restricted settings). Nine PRs,

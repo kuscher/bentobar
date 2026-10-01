@@ -62,6 +62,7 @@ class BarService : AccessibilityService() {
     override fun onServiceConnected() {
         Env.init(this)
         Env.service = this
+        bar?.stop() // connected again without an unbind: the old strip's windows mustn't stay up
         bar = BarController(this).also { it.start() }
         Chips.update(this)
         io.github.kuscher.bentobar.ui.Setup.refresh(this)
@@ -79,9 +80,14 @@ class BarService : AccessibilityService() {
     override fun onUnbind(intent: Intent?): Boolean { shutdown(); return super.onUnbind(intent) }
     override fun onDestroy() { shutdown(); super.onDestroy() }
 
+    /**
+     * Runs on unbind and again on destroy; a rebind makes a new controller in [onServiceConnected].
+     * (UiAutomation, e.g. `uiautomator dump`, unbinds every accessibility service while it runs.)
+     */
     private fun shutdown() {
-        bar?.stop()
-        bar = null
+        val stopping = bar
+        bar = null // first: whatever stop() does, it runs once per controller
+        stopping?.stop()
         if (Env.service === this) Env.service = null
         Chips.update(this)
         io.github.kuscher.bentobar.ui.Setup.refresh(this)
@@ -209,15 +215,16 @@ class BarController(private val service: AccessibilityService) {
     }
 
     fun stop() {
+        if (!started) return // stopped already: the status and the ticker may be a newer controller's by now
         started = false
         BarLook.current.value = null
         BarStatus.current.value = BarStatus.STOPPED
         BarOverflow.ids.value = emptySet()
-        main.removeCallbacksAndMessages(null)
         runCatching { service.unregisterReceiver(screen) }
         runCatching { WallpaperManager.getInstance(service).removeOnColorsChangedListener(wallpaper) }
         closeMenu()
         hideTip()
+        main.removeCallbacksAndMessages(null) // after closeMenu, which posts a collapse
         strip.destroy()
         awake?.destroy(); awake = null
         Ticker.stop("bar")

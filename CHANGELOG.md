@@ -32,6 +32,11 @@
 - Delete has an undo; the right-click menu's "Remove from the bar" is now "Turn off", which is what
   it did.
 - The install guide covers Play Protect's "App blocked" screen.
+- **Fixed a crash when the service is stopped.** 0.5 crashed ("BentoBar keeps stopping") if Android
+  stopped its accessibility service, or you switched it off, before BentoBar's items had appeared in
+  the status bar (hidden, a full-screen app, or just after starting). Testing tools that pause
+  accessibility services set it off, and BentoBar could then stay off until it was switched off and
+  on again.
 
 ## 0.5 (2026-09-29): DiscoBar is now BentoBar
 

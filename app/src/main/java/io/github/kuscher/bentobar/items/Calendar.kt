@@ -108,13 +108,10 @@ object Calendar {
                 )
             }
         }
-        // Without a call link, a meeting needs someone else invited. Attendees are read only for the
-        // candidates before the meeting horizon, once per load (not per tick). The horizon is taken a
-        // few minutes ahead: it moves at midnight, and the next load can be up to a minute away.
-        val zone = ZoneId.systemDefault()
-        val horizon = Meetings.horizon(now + 5 * 60_000L, zone)
-        val candidates = out.filter { it.link == null && !it.allDay && it.editable && Meetings.inHorizon(it.begin, it.end, now, horizon) }
-            .mapTo(HashSet()) { it.eventId }
+        // Without a call link, a meeting needs someone else invited. Attendees are read for every
+        // loaded candidate, once per load (not per tick): Next meeting needs today's, and the calendar
+        // leaves meetings out of its agenda on any day the month view can show.
+        val candidates = out.filter { it.link == null && !it.allDay && it.editable }.mapTo(HashSet()) { it.eventId }
         val withOthers = runCatching { withOthers(candidates, owners) }
             .onFailure { Log.w(TAG, "attendee query failed", it) }.getOrDefault(emptySet())
         out.map { e ->

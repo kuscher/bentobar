@@ -55,11 +55,24 @@ object Store {
     fun updateItem(id: String, change: (ItemConfig) -> ItemConfig) =
         update { c -> c.copy(items = c.items.map { if (it.id == id) change(it) else it }) }
 
+    /**
+     * A new item goes at the left of the bar, where a new item is easy to spot, but after the Next
+     * meeting item, which stays at the far left: its width changes most, and at the bar's outer
+     * edge that moves nothing else. Hidden and Off items go at the end of their section.
+     */
     fun add(type: String, section: Section = Section.SHOWN, options: Map<String, String> = emptyMap()): String {
         val id = newId()
-        update { c -> c.copy(items = c.items + ItemConfig(id, type, section, options = options)) }
+        update { c ->
+            val item = ItemConfig(id, type, section, options = options)
+            val at = if (section != Section.SHOWN) -1
+                else c.items.indexOfFirst { it.section == Section.SHOWN && it.type != PINNED_LEFT }
+            c.copy(items = if (at < 0) c.items + item else c.items.toMutableList().apply { add(at, item) })
+        }
         return id
     }
+
+    /** The item type kept at the bar's far left (see [add]). */
+    const val PINNED_LEFT = "event"
 
     fun remove(id: String) = update { c -> c.copy(items = c.items.filterNot { it.id == id }) }
 
@@ -86,9 +99,8 @@ object Store {
 /** What a fresh install shows: a useful bar that still leaves room. */
 object Defaults {
     /**
-     * A calm first bar, after the most-used Mac menu bar tools: the calendar (Fantastical,
-     * Itsycal), a timer, and keep awake (Amphetamine), plus the next meeting (MeetingBar), which
-     * shows only when one is near. Everything else is one click away in Add.
+     * A calm first bar, left to right: the next meeting (only when one is near), the calendar, a
+     * timer and keep awake. Everything else is one click away in Add.
      */
     fun config() = BarConfig(
         items = listOf(

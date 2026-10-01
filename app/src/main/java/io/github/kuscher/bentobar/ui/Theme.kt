@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.Typeface as ComposeTypeface
 
@@ -35,8 +36,10 @@ private fun typography(): Typography {
     // Google Sans Flex is the Googlebook's UI font; older builds have google-sans-text.
     val text = family("google-sans-flex") ?: family("google-sans-text") ?: family("google-sans") ?: return base
     val display = family("google-sans-flex") ?: family("google-sans") ?: text
-    fun TextStyle.t() = copy(fontFamily = text)
-    fun TextStyle.d() = copy(fontFamily = display)
+    // Google Sans is spaced for 0 tracking; Material's defaults (0.25 to 0.5 sp) are tuned for Roboto
+    // and made body text look loosely set.
+    fun TextStyle.t() = copy(fontFamily = text, letterSpacing = 0.sp)
+    fun TextStyle.d() = copy(fontFamily = display, letterSpacing = 0.sp)
     return base.copy(
         displayLarge = base.displayLarge.d(), displayMedium = base.displayMedium.d(), displaySmall = base.displaySmall.d(),
         headlineLarge = base.headlineLarge.d(), headlineMedium = base.headlineMedium.d(), headlineSmall = base.headlineSmall.d(),

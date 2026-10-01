@@ -42,6 +42,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onPlaced
 import kotlinx.coroutines.launch
 import io.github.kuscher.bentobar.ui.animatePlacement
 import androidx.compose.ui.layout.positionInWindow
@@ -110,6 +111,8 @@ interface StripEvents {
     fun placed(id: String, at: Rect)
     /** The pointer is over [item] (or has left it), for its tooltip. */
     fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {}
+    /** The wheel over the strip, where no item uses it: [up] reveals hidden items, down folds them. */
+    fun wheel(up: Boolean) {}
     /** [item] dragged sideways by [dx] px; [done] on release, where it should land. */
     fun drag(item: ItemConfig, dx: Float, done: Boolean) {}
 }
@@ -146,6 +149,9 @@ fun Strip(
                         when (e.type) {
                             PointerEventType.Enter -> events.hover(true)
                             PointerEventType.Exit -> events.hover(false)
+                            PointerEventType.Scroll -> e.changes.firstOrNull()?.takeIf { !it.isConsumed }?.let {
+                                if (it.scrollDelta.y != 0f) { events.wheel(it.scrollDelta.y < 0); it.consume() }
+                            }
                         }
                     }
                 }
@@ -252,7 +258,10 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     var slotX by remember { mutableStateOf(0f) }
     var grab by remember { mutableStateOf<Float?>(null) } // where in the item it was picked up
     var startSlot by remember { mutableStateOf(0f) }
-    var dragOffset by remember { mutableStateOf(0f) }
+    // Where the item's left edge follows the pointer, in window coordinates; null when not dragging.
+    // The draw offset is worked out from it and the item's current slot at draw time, so a slot that
+    // moves (the preview reordering) can't leave the item a slot's width off for a frame.
+    var dragLeft by remember { mutableStateOf<Float?>(null) }
     val settle = remember { androidx.compose.animation.core.Animatable(0f) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val lifted = grab != null
@@ -280,18 +289,23 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val showText = display != Display.ICON && !s.text.isNullOrEmpty()
     Row(
         Modifier.fillMaxHeight()
-            .onGloballyPositioned { slotX = it.positionInWindow().x; bounds = it.boundsInWindow().toRect(); events.placed(entry.item.id, bounds) }
-            .clicks({ events.click(entry.item, bounds) }, { events.context(entry.item, bounds) }, { events.scroll(entry.item, it) },
+            // The slot is read during placement (before this frame draws), the bounds after layout.
+            .onPlaced { slotX = it.positionInWindow().x }
+            .onGloballyPositioned { bounds = it.boundsInWindow().toRect(); events.placed(entry.item.id, bounds) }
+            .clicks({ events.click(entry.item, bounds) }, { events.context(entry.item, bounds) },
+                if (io.github.kuscher.bentobar.items.Items.of(entry.item.type)?.usesWheel == true) { steps -> events.scroll(entry.item, steps) } else null,
                 onDrag = { localX, downX, done ->
-                    if (grab == null) { grab = downX; startSlot = slotX; scope.launch { settle.snapTo(0f) } }
+                    // Grabbed where the pointer is when the drag begins (past the touch slop), not where it
+                    // was pressed: otherwise the item jumps the slop distance to catch up on the first frame.
+                    if (grab == null) { grab = localX; startSlot = slotX; scope.launch { settle.snapTo(0f) } }
                     val left = slotX + localX - (grab ?: downX) // where the item's left edge follows the pointer
-                    dragOffset = left - slotX
+                    dragLeft = left
                     events.drag(entry.item, left - startSlot, done)
                     if (done) {
                         // The previewed order is now the real one; spring from where it was let go into its slot.
-                        val from = dragOffset
+                        val from = left - slotX
                         grab = null
-                        dragOffset = 0f
+                        dragLeft = null
                         scope.launch {
                             settle.snapTo(from)
                             settle.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f,
@@ -304,7 +318,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
             .zIndex(if (lifted || settle.isRunning) 1f else 0f)
             .graphicsLayer {
                 alpha = appear.value
-                translationX = (1f - appear.value) * 6.dp.toPx() + dragOffset + settle.value
+                translationX = (1f - appear.value) * 6.dp.toPx() + (dragLeft?.let { it - slotX } ?: 0f) + settle.value
                 scaleX = liftScale; scaleY = liftScale
             }
             .clip(RoundedCornerShape(10.dp))
@@ -331,6 +345,8 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
             if (img != null) {
                 Image(img.asImageBitmap(), null, Modifier.size(look.iconSp.value.dp),
                     colorFilter = if (entry.item.optBool("mono", true) && entry.item.type == "app") ColorFilter.tint(color) else null)
+            } else if (s.dayNumber != null) {
+                DayBadge(s.dayNumber, look.iconSp, color, look.background)
             } else if (s.icon != null && s.icon.isNotEmpty()) {
                 SymIcon(s.icon, size = look.iconSp, filled = s.filled, color = color)
             }
@@ -438,5 +454,18 @@ fun Tooltip(label: String) {
     Box(Modifier.fillMaxHeight().clip(RoundedCornerShape(6.dp)).background(Color(0xF0303134)).padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center) {
         Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1)
+    }
+}
+
+/**
+ * Today's day number as a small filled date badge, the size of a status bar icon: the number is cut
+ * out in the bar's own color, so it reads at this size on any bar.
+ */
+@Composable
+private fun DayBadge(day: Int, size: TextUnit, fg: Color, bg: Color) {
+    Box(Modifier.size(size.value.dp + 1.dp).clip(RoundedCornerShape(4.dp)).background(fg), contentAlignment = Alignment.Center) {
+        Text("$day", color = bg.copy(alpha = 1f), maxLines = 1,
+            style = TextStyle(fontFamily = Fonts.bar, fontSize = (size.value * 0.68f).sp, lineHeight = (size.value * 0.68f).sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontFeatureSettings = "tnum"))
     }
 }

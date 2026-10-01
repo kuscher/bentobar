@@ -208,7 +208,7 @@ class MainActivity : ComponentActivity() {
                     val snackbar = androidx.compose.runtime.remember { SnackbarHostState() }
                     androidx.compose.runtime.LaunchedEffect(Unit) {
                         Notice.messages.collect { m ->
-                            if (snackbar.showSnackbar(m.text, m.action, withDismissAction = m.action == null) == SnackbarResult.ActionPerformed) m.onAction?.invoke()
+                            if (snackbar.showSnackbar(m.text, m.action, duration = androidx.compose.material3.SnackbarDuration.Long) == SnackbarResult.ActionPerformed) m.onAction?.invoke()
                         }
                     }
                     SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))

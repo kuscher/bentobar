@@ -191,7 +191,7 @@ object CalendarItem : ItemType("calendar", R.string.item_calendar_title, Sym.CAL
         val pattern = item.options["format"]?.takeIf { it.isNotBlank() }
         val text = if (pattern == null) Dates.format("EEEdMMM", today)
             else runCatching { today.format(DateTimeFormatter.ofPattern(pattern, Locale.getDefault())) }.getOrDefault(today.toString())
-        return ItemState(icon = Sym.CALENDAR_MONTH, text = text, desc = Dates.format("EEEEdMMMMyyyy", today))
+        return ItemState(icon = Sym.CALENDAR_MONTH, dayNumber = today.dayOfMonth, text = text, desc = Dates.format("EEEEdMMMMyyyy", today))
     }
 
     /** A Sunday, to show what each date pattern looks like. */
@@ -228,7 +228,8 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
     fun eventsOn(d: LocalDate): List<Calendar.Event> {
         val s = d.atStartOfDay(zone).toInstant().toEpochMilli()
         val e = d.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
-        return Calendar.on(s, e, d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        // Meetings have their own item (Next meeting); the calendar shows everything else.
+        return Calendar.on(s, e, d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()).filterNot { it.meeting }
     }
     val weekOf = WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear()
     MenuCard(Sym.CALENDAR_MONTH, Dates.format("EEEEdMMMM", today),
@@ -287,10 +288,19 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             MenuEntry(Sym.EVENT, stringResource(R.string.calendar_allow)) { host.close(); MainActivity.requestPermission(Env.app, Manifest.permission.READ_CALENDAR) }
         } else {
-            SectionLabel(if (picked == today) stringResource(R.string.calendar_today) else Dates.format("EEEEdMMMM", picked))
-            val list = eventsOn(picked)
-            if (list.isEmpty()) Text(stringResource(R.string.calendar_no_events), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            list.take(6).forEach { e -> EventRow(e, host::close) }
+            // A week from the picked day, grouped by day; days with nothing on are left out.
+            val week = (0L until 7L).map { picked.plusDays(it) }.map { it to eventsOn(it) }.filter { it.second.isNotEmpty() }
+            if (week.isEmpty()) Text(stringResource(R.string.calendar_no_events_week), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            var shown = 0
+            for ((d, list) in week) {
+                if (shown >= 12) break
+                SectionLabel(when (d) {
+                    today -> stringResource(R.string.calendar_today)
+                    today.plusDays(1) -> stringResource(R.string.calendar_tomorrow)
+                    else -> Dates.format("EEEEdMMMM", d)
+                })
+                list.take(12 - shown).forEach { e -> EventRow(e, host::close); shown++ }
+            }
         }
         MenuEntry(Sym.OPEN_IN_NEW, stringResource(R.string.calendar_open)) {
             host.close(); Calendar.openDay(picked.atTime(9, 0).atZone(zone).toInstant().toEpochMilli())
@@ -441,6 +451,7 @@ object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.str
         }
     }
 
+    override val usesWheel = true
     override fun onScroll(item: ItemConfig, steps: Int) {
         val s = Timers.state.value
         if (s == null) Timers.startTimer(steps.coerceAtLeast(1) * 60_000L) else Timers.add(steps * 60_000L)

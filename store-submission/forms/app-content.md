@@ -13,7 +13,7 @@
 | Financial features | My app doesn't provide any financial features |
 | Health apps | No health features |
 | Advertising ID | Not used (no ad or analytics SDKs; `AD_ID` isn't declared) |
-| Permissions | Accessibility service (declaration needed, below), notifications, calendar (read), alarms and reminders (`SCHEDULE_EXACT_ALARM`, user-granted; the restricted one is `USE_EXACT_ALARM`, which BentoBar doesn't use), Usage access (`PACKAGE_USAGE_STATS`, optional and off by default: per-app data use and storage for the Network and Storage menus, read on the device only), network state, launcher-app queries (`<queries>` for MAIN/LAUNCHER, not `QUERY_ALL_PACKAGES`), Advanced Protection status. |
+| Permissions | Accessibility service (declaration needed, below), notifications, calendar (read), alarms and reminders (`SCHEDULE_EXACT_ALARM`, user-granted; the restricted one is `USE_EXACT_ALARM`, which BentoBar doesn't use), Usage access (`PACKAGE_USAGE_STATS`, optional and off by default: per-app data use and storage for the Network and Storage menus, read on the device only), wake lock (`WAKE_LOCK`, since 0.7: Keep awake while the bar is hidden), network state, launcher-app queries (`<queries>` for MAIN/LAUNCHER, not `QUERY_ALL_PACKAGES`), Advanced Protection status. |
 
 ## Declarations that need more than a tick
 

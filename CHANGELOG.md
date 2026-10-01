@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7 (2026-10-01)
 
 - **Fewer things that look like abuse.** Play Protect's live threat detection warned "App displays
   over other apps" about BentoBar. Its rules aren't public; these changes remove what matches

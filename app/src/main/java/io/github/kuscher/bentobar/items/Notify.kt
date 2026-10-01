@@ -17,6 +17,9 @@ import android.graphics.Typeface
 import android.graphics.drawable.Icon
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ChipMode
 import io.github.kuscher.bentobar.data.Store
@@ -28,6 +31,13 @@ import java.util.Date
 
 /** Notification channels and the timer-finished alert. */
 object Notify {
+    /**
+     * Live Updates (promoted notifications) exist from Android 16 QPR2 (API 36.1); minSdk is 34, and
+     * calling them on an older Android would crash. Googlebooks run 17.
+     */
+    val liveUpdates: Boolean get() = Build.VERSION.SDK_INT > Build.VERSION_CODES.BAKLAVA ||
+        (Build.VERSION.SDK_INT == Build.VERSION_CODES.BAKLAVA && Build.VERSION.SDK_INT_FULL >= Build.VERSION_CODES_FULL.BAKLAVA_1)
+
     const val ALERTS = "alerts"
     const val LIVE = "live"
     const val ID_DONE = 10
@@ -115,8 +125,15 @@ object Glyphs {
  * uses it for the running timer, else a meeting that is on or about to start.
  */
 object Chips {
+    /** A meeting gets its chip this long before it starts. */
+    private const val LEAD_MS = 15 * 60_000L
+    private val main = Handler(Looper.getMainLooper())
+    private var app: Context? = null
+    /** The chip changes at a meeting's times (15 minutes before, the start, the end), not only on events. */
+    private val boundary = Runnable { app?.let { update(it) } }
+
     fun update(context: Context) {
-        val app = context.applicationContext
+        val app = context.applicationContext.also { this.app = it }
         val nm = app.getSystemService(NotificationManager::class.java) ?: return
         val cfg = Store.config.value
         val barUp = Env.service != null && cfg.enabled
@@ -125,17 +142,31 @@ object Chips {
             ChipMode.FALLBACK -> !barUp
             ChipMode.ALWAYS -> true
         }
+        main.removeCallbacks(boundary)
         val n = if (wanted && Notify.allowed(app)) build(app) else null
         if (n == null) nm.cancel(Notify.ID_CHIP) else { Notify.channels(app); nm.notify(Notify.ID_CHIP, n) }
+        if (wanted && Timers.state.value == null && meetingChips()) {
+            // Keep the calendar current while the strip (which otherwise asks for it) may be away; a
+            // load that finds changes calls update() again.
+            Calendar.refresh()
+            val now = System.currentTimeMillis()
+            nextChange(Calendar.meetings(now), now)?.let { main.postDelayed(boundary, it - now + 1_000) }
+        }
     }
+
+    private fun meetingChips() =
+        Store.config.value.items.any { it.type == EventItem.type && it.section != io.github.kuscher.bentobar.data.Section.OFF }
+
+    /** The next time the meeting chip would change: a meeting entering the 15-minute window, starting or ending. */
+    internal fun nextChange(meetings: List<Calendar.Event>, now: Long): Long? =
+        meetings.flatMap { listOf(it.begin - LEAD_MS, it.begin, it.end) }.filter { it > now }.minOrNull()
 
     private fun build(context: Context): Notification? {
         val t = Timers.state.value
         if (t != null) return timer(context, t)
-        val cfg = Store.config.value
-        if (cfg.items.none { it.type == EventItem.type && it.section != io.github.kuscher.bentobar.data.Section.OFF }) return null
+        if (!meetingChips()) return null
         val now = System.currentTimeMillis()
-        val e = Calendar.current(now) ?: Calendar.next(now)?.takeIf { it.begin - now <= 15 * 60_000 } ?: return null
+        val e = Calendar.current(now) ?: Calendar.next(now)?.takeIf { it.begin - now <= LEAD_MS } ?: return null
         return event(context, e, now)
     }
 
@@ -146,14 +177,18 @@ object Chips {
             .setContentText(text)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setRequestPromotedOngoing(true)
             .setCategory(Notification.CATEGORY_PROGRESS)
+            .apply { if (Notify.liveUpdates) setRequestPromotedOngoing(true) }
             .setContentIntent(PendingIntent.getActivity(context, 1, Intent(context, MainActivity::class.java),
                 PendingIntent.FLAG_IMMUTABLE))
 
     private fun action(context: Context, sym: String, label: String, cmd: String) =
         Notification.Action.Builder(Glyphs.icon(sym), label, PendingIntent.getBroadcast(context, cmd.hashCode(),
             Intent(context, ChipAction::class.java).setAction(cmd), PendingIntent.FLAG_IMMUTABLE)).build()
+
+    private fun launch(context: Context, sym: String, label: String, request: Int, intent: Intent) =
+        Notification.Action.Builder(Glyphs.icon(sym), label, PendingIntent.getActivity(context, request,
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)).build()
 
     private fun timer(context: Context, t: Timers.State): Notification {
         val now = Timers.now()
@@ -174,7 +209,7 @@ object Chips {
             b.setWhen(t.at).setShowWhen(true).setUsesChronometer(true)
                 .setChronometerCountDown(t.mode != Timers.Mode.STOPWATCH)
         } else {
-            b.setShortCriticalText(Fmt.clock(if (t.mode == Timers.Mode.STOPWATCH) t.pausedMs else t.pausedMs))
+            if (Notify.liveUpdates) b.setShortCriticalText(Fmt.clock(t.pausedMs, elapsed = t.mode == Timers.Mode.STOPWATCH))
         }
         b.addAction(action(context, if (t.running) Sym.PAUSE else Sym.PLAY_ARROW,
             context.getString(if (t.running) R.string.common_pause else R.string.common_resume), ChipAction.TOGGLE))
@@ -190,8 +225,10 @@ object Chips {
             if (on) context.getString(R.string.common_ends_at, time.format(Date(e.end)))
             else context.getString(R.string.chip_starts_at, time.format(Date(e.begin))))
             .setWhen(if (on) e.end else e.begin).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(true)
-        if (e.link != null) b.addAction(action(context, Sym.VIDEOCAM, context.getString(R.string.common_join), ChipAction.JOIN))
-        b.addAction(action(context, Sym.OPEN_IN_NEW, context.getString(R.string.common_open), ChipAction.OPEN_EVENT))
+        // These open the meeting the chip shows, straight from the notification: a broadcast that then
+        // started an activity would be a trampoline Android blocks, and could pick a different meeting.
+        Calendar.joinIntent(e)?.let { b.addAction(launch(context, Sym.VIDEOCAM, context.getString(R.string.common_join), 2, it)) }
+        b.addAction(launch(context, Sym.OPEN_IN_NEW, context.getString(R.string.common_open), 3, Calendar.openIntent(e)))
         return b.build()
     }
 }
@@ -202,20 +239,14 @@ class ChipAction : BroadcastReceiver() {
         const val TOGGLE = "io.github.kuscher.bentobar.chip.TOGGLE"
         const val PLUS = "io.github.kuscher.bentobar.chip.PLUS"
         const val STOP = "io.github.kuscher.bentobar.chip.STOP"
-        const val JOIN = "io.github.kuscher.bentobar.chip.JOIN"
-        const val OPEN_EVENT = "io.github.kuscher.bentobar.chip.OPEN_EVENT"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         Env.init(context)
-        val now = System.currentTimeMillis()
-        val e = Calendar.current(now) ?: Calendar.next(now)
         when (intent.action) {
             TOGGLE -> Timers.toggle()
             PLUS -> Timers.add(60_000)
             STOP -> Timers.stop()
-            JOIN -> e?.let { Calendar.join(it) }
-            OPEN_EVENT -> e?.let { Calendar.open(it) }
         }
     }
 }

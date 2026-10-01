@@ -45,10 +45,12 @@ object Env {
         if (::app.isInitialized) return
         app = context.applicationContext
         Store.init(app)
+        // Before Timers: a timer that finished while BentoBar wasn't running ends in init, and its
+        // chip update asks the calendar.
+        Calendar.init(app)
         io.github.kuscher.bentobar.util.Fonts.init(app)
         Timers.init(app)
         Caffeine.init(app)
-        Calendar.init(app)
     }
 
     /** Samples only what the configured items use ([types]); menus ask for theirs while open. */

@@ -39,15 +39,18 @@ object Setup {
     fun refresh(context: Context) {
         val app = context.applicationContext
         val nm = app.getSystemService(NotificationManager::class.java)
+        val before = state.value
         state.value = SetupState(
             serviceOn = MainActivity.serviceOn(app),
             notifications = Notify.allowed(app),
-            liveUpdates = runCatching { nm?.canPostPromotedNotifications() == true }.getOrDefault(false),
+            liveUpdates = Notify.liveUpdates && runCatching { nm?.canPostPromotedNotifications() == true }.getOrDefault(false),
             calendar = app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
                 Uses.on(Uses.CALENDAR),
             exactAlarms = app.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true && Uses.on(Uses.EXACT_ALARMS),
             advancedProtection = Env.advancedProtection(),
             usageAccess = Usage.granted(app),
         )
+        // A running timer's alarm is exact only while exact alarms are allowed and used: follow a change.
+        if (state.value.exactAlarms != before.exactAlarms) io.github.kuscher.bentobar.items.Timers.reschedule()
     }
 }

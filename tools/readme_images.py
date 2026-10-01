@@ -5,10 +5,12 @@
 Raw captures (in RAW, default ~/.cache/bentobar/shots), made with a demo layout so no personal data
 shows:
   bar_hero.png, bar_now.png, bar_open.png   full-width screenshots, top 41 px (./bento shot F 41)
-  win_*.png                                 BentoBar's own windows (./bento debug winshot ...), which
+  win_*.png                                 BentoBar's own windows (./bento winshot TITLE FILE), which
                                             carry their shadow margin and no mouse pointer
-  app_*.png                                 the settings window (./bento debug winshot app)
+  app_*.png                                 the settings window (./bento winshot app FILE)
   cpu_frame.txt                             "cpu menu frame: x1 y1 x2 y2" of the CPU menu window
+  wallpaper.png                             optional: the wallpaper at screen size, for the hero image
+                                            under an opaque status bar (else it's continued from the bar)
 
 Writes docs/images/hero.png, bar.png, menus.png, settings.png and settings-pages.png.
 
@@ -70,31 +72,55 @@ def wallpaper(bar, height):
     return bg.filter(ImageFilter.GaussianBlur(6))
 
 
+# Captures from any Googlebook are scaled to the HP's 1920 px wide screen (its density), so the
+# images keep one size whichever device they came from; SCALE is set from bar_hero.png in main().
+SCALE = 1.0
+
+
+def load(name):
+    im = Image.open(RAW / name).convert("RGBA")
+    if SCALE != 1.0:
+        im = im.resize((round(im.width * SCALE), round(im.height * SCALE)), Image.LANCZOS)
+    return im
+
+
 def main():
+    global SCALE
     OUT.mkdir(parents=True, exist_ok=True)
+    SCALE = 1920 / Image.open(RAW / "bar_hero.png").width
 
     # Hero: the right part of the status bar with the CPU menu open under its item.
-    x0 = 820
-    bar = Image.open(RAW / "bar_hero.png").convert("RGBA").crop((x0, 0, 1920, 41))
-    frame = [int(v) for v in (RAW / "cpu_frame.txt").read_text().split(":")[1].split()]
-    menu = Image.open(RAW / "win_cpu.png").convert("RGBA")
+    full = load("bar_hero.png")
+    bar_h = full.height
+    frame = [round(int(v) * SCALE) for v in (RAW / "cpu_frame.txt").read_text().split(":")[1].split()]
+    x0 = min(820, max(0, frame[0] - 80))
+    bar = full.crop((x0, 0, 1920, bar_h))
+    menu = load("win_cpu.png")
     h = frame[1] + menu.height + 36
-    hero = wallpaper(bar, h).convert("RGBA")
+    if (RAW / "wallpaper.png").exists():
+        # The wallpaper itself (screen-sized, as the screen shows it) below the bar, rather than the
+        # bar's colours continued: needed under an opaque bar (the Acer's, while an app is maximized).
+        hero = load("wallpaper.png").crop((x0, 0, 1920, h))
+    else:
+        hero = wallpaper(bar, h).convert("RGBA")
     hero.alpha_composite(bar, (0, 0))
     hero.alpha_composite(menu, (frame[0] - x0, frame[1]))  # the window capture keeps its own shadow
-    rounded(hero, 20).save(OUT / "hero.png", optimize=True)
+    hero = rounded(hero, 20)
+    if (RAW / "wallpaper.png").exists():  # a photo compresses badly as PNG: 256 colours, dithered (~1.1 MB -> ~170 KB)
+        hero = hero.quantize(256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.FLOYDSTEINBERG)
+    hero.save(OUT / "hero.png", optimize=True)
 
     # The bar folded and with hidden items revealed.
     x0 = 560
-    rows = [Image.open(RAW / n).convert("RGBA").crop((x0, 0, 1920, 41)) for n in ("bar_now.png", "bar_open.png")]
+    rows = [load(n).crop((x0, 0, 1920, bar_h)) for n in ("bar_now.png", "bar_open.png")]
     gap = 10
-    both = Image.new("RGBA", (rows[0].width, 41 * 2 + gap), (0, 0, 0, 0))
+    both = Image.new("RGBA", (rows[0].width, bar_h * 2 + gap), (0, 0, 0, 0))
     both.alpha_composite(rounded(rows[0], 12), (0, 0))
-    both.alpha_composite(rounded(rows[1], 12), (0, 41 + gap))
+    both.alpha_composite(rounded(rows[1], 12), (0, bar_h + gap))
     both.save(OUT / "bar.png", optimize=True)
 
     # Menus side by side.
-    cards = [card(Image.open(RAW / f"win_{n}.png").convert("RGBA")) for n in ("network", "timer", "ctx", "tools", "bentobar")
+    cards = [card(load(f"win_{n}.png")) for n in ("network", "timer", "ctx", "tools", "bentobar")
              if (RAW / f"win_{n}.png").exists()]
     pad, gap = 30, 28
     W = sum(c.width for c in cards) + gap * (len(cards) - 1) + 2 * pad
@@ -109,9 +135,9 @@ def main():
 
     # Settings: the Bar page, and Add + Look side by side at half size.
     top = 44  # where the (separate) caption window sits
-    main_page = rounded(Image.open(RAW / "app_bar.png").convert("RGBA").crop((0, top, 1382, 864)), 18)
+    main_page = rounded(load("app_bar.png").crop((0, top, 1382, 864)), 18)
     shadowed(main_page, blur=20, alpha=80, pad=36).save(OUT / "settings.png", optimize=True)
-    pages = [rounded(Image.open(RAW / f"app_{n}.png").convert("RGBA").crop((0, top, 1382, 864)), 18) for n in ("add", "look")]
+    pages = [rounded(load(f"app_{n}.png").crop((0, top, 1382, 864)), 18) for n in ("add", "look")]
     half = [p.resize((p.width // 2, p.height // 2), Image.LANCZOS) for p in pages]
     combo = Image.new("RGBA", (half[0].width * 2 + 24 + 2 * 24, half[0].height + 2 * 24), (0, 0, 0, 0))
     combo.alpha_composite(shadowed(half[0], blur=12, alpha=70, pad=24), (0, 0))

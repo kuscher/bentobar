@@ -46,8 +46,9 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
 - `tools/readme_images.py`: composes docs/images/*.png (README) from raw captures in
   ~/.cache/bentobar/shots (see its docstring). Capture with a **demo layout** (`./bento debug cfg` to
   save the user's, `./bento debug import <base64>` to load the demo and later restore theirs) so no
-  calendar titles or other personal data show, and with `./bento debug winshot [title|app]`, which
-  returns a PNG of BentoBar's own window (no pointer, no other apps) base64 in the broadcast result.
+  calendar titles or other personal data show, and with `./bento winshot TITLE|app FILE`, which
+  saves a PNG of one of BentoBar's own windows (no pointer, no other apps; written to the debug
+  app's cache and pulled with run-as, since a broadcast result can't carry a big image).
 - `docs/research/`: the device findings (probe results) and the official-docs research, with URLs.
 - `probe/`: the throwaway feasibility probe (Gradle-free build). Not part of the app.
 
@@ -75,7 +76,8 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
 
 ## Things learned the hard way (see docs/research/device-findings.md)
 - **The status bar window can be opaque.** On the HP it's glyphs on transparent; on the Acer
-  Googlebook 14 it's white glyphs on its own black. The colour sampler tells background and text
+  Googlebook 14 it's white glyphs on its own black while an app is maximized, and see-through over
+  the wallpaper (like the HP) otherwise. The colour sampler tells background and text
   apart (`barColors`), decides dark/light from the background, and `bar/Contrast.kt` holds every
   strip colour to 4.5:1, with pure black as the last fallback for mid grays where neither white nor
   near-black reaches it (`ContrastTest.everyOpaqueBarReaches45` sweeps every gray and a color grid).

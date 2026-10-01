@@ -34,13 +34,13 @@ Formerly DiscoBar (<a href="#coming-from-discobar">moving over</a>).</sub></p>
 ## What it does
 
 BentoBar puts **your own items** into the empty part of the status bar, right next to the
-system's icons, in the same font and colour. Items you don't need all the time go **behind the ‹
-button**; one click reveals them, another folds them away. Like a bento box: everything in its
-compartment, and the whole thing neat.
+system's icons, in the same font and colour. Items you don't need all the time can show only while
+they have something to say, or wait **behind the ‹ button**: one click reveals them, another folds
+them away. Like a bento box: everything in its compartment, and the whole thing neat.
 
 <p align="center">
   <img src="docs/images/bar.png" width="880" alt="The status bar with BentoBar folded, then with its hidden items revealed">
-  <br><sub>Folded (top) and revealed (bottom): a world clock, battery and memory slide in next to the running timer.</sub>
+  <br><sub>With hidden items behind ‹ (a Look setting; the default shows everything that fits), folded (top) and revealed (bottom): a world clock, battery and memory slide in next to the running timer.</sub>
 </p>
 
 - **Show when active:** a hidden item can pop out on its own while it has something to say, such
@@ -79,13 +79,13 @@ hides when an app goes full screen or the screen locks.
 | **Text or emoji**, **Spacer** | anything you like | optional link |
 
 <p align="center">
-  <img src="docs/images/menus.png" width="880" alt="BentoBar menus: network, timer, the right-click item menu, tools, and the list of hidden items">
+  <img src="docs/images/menus.png" width="880" alt="BentoBar menus: network, timer, the right-click item menu, tools, and BentoBar's ‹ menu with the hidden items">
 </p>
 
 ## Settings
 
 A live preview of your bar at the top; below it, your items in three groups (**in the bar**,
-**hidden behind ‹** and **off**) with each item's options on the right. Changes apply to the
+**hidden** and **off**; drag a row to move it) with each item's options on the right. Changes apply to the
 status bar right away.
 
 <p align="center">
@@ -93,7 +93,7 @@ status bar right away.
 </p>
 
 <p align="center">
-  <img src="docs/images/settings-pages.png" width="880" alt="Adding items, and the look and behaviour options">
+  <img src="docs/images/settings-pages.png" width="880" alt="Adding items, and the look and behavior options">
   <br><sub>Adding items, and choosing where BentoBar sits and how it looks.</sub>
 </p>
 

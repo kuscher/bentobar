@@ -228,8 +228,9 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 Text(Dates.format(Dates.timeSkeleton(h24), now) + "   " + Dates.format("EEEMMMd", now), color = look.fg,
                     fontFamily = Fonts.bar, fontSize = 14.sp)
                 if (cfg.position == Position.LEFT) Spacer(Modifier.width(16.dp)) else Spacer(Modifier.weight(1f))
-                Strip(entries(visible), if (expanded) entries(hidden) else emptyList(), hidden.isNotEmpty(), expanded,
-                    cfg.position != Position.LEFT, look, maxPx, 52.dp, events)
+                Strip(entries(visible), if (expanded) entries(hidden) else emptyList(), hidden.isNotEmpty(),
+                    chevronAlways = hidden.isNotEmpty(), chevronReservePx = 0, expanded = expanded,
+                    chevronOnLeft = cfg.position != Position.LEFT, look = look, maxWidthPx = maxPx, heightDp = 52.dp, events = events)
                 if (cfg.position == Position.LEFT) Spacer(Modifier.weight(1f)) else if (cfg.position == Position.CENTER) Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {

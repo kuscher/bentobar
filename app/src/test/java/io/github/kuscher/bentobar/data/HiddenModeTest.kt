@@ -39,6 +39,20 @@ class HiddenModeTest {
         assertTrue(c.shows(timer, active = true))
     }
 
+    @Test fun everythingDrawnIsSampled() {
+        // The ticker samples what couldShow() allows; an item drawn but not sampled freezes.
+        for (mode in HiddenMode.entries) for (section in Section.entries) for (rule in listOf(false, true)) {
+            val item = ItemConfig("x", "clock", section, whenActive = rule)
+            val c = BarConfig(hiddenMode = mode, items = listOf(item))
+            for (active in listOf(false, true)) {
+                if (c.shows(item, active)) assertTrue("$mode $section rule=$rule active=$active", c.couldShow(item))
+            }
+        }
+        // The case that froze: a hidden item without a rule under Show everything.
+        assertTrue(BarConfig(hiddenMode = HiddenMode.SHOW_ALL).couldShow(memory))
+        assertFalse(BarConfig(hiddenMode = HiddenMode.CLICK).couldShow(memory))
+    }
+
     @Test fun alreadyV3IsUntouched() {
         val c = BarConfig(hiddenMode = HiddenMode.HOVER)
         assertEquals(c, c.migrateToV3())

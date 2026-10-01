@@ -24,6 +24,8 @@ data class BarSnapshot(
 )
 
 object StatusBarScan {
+    /** [BarSnapshot.summary] when the window had no node tree to read: its free area is unknown. */
+    const val NO_TREE = "no-tree"
     private val timeRe = Regex("""\d{1,2}[:.]\d{2}""")
 
     /** The status bar window: a system window along the top edge, shorter than [maxHeight]. */
@@ -43,7 +45,7 @@ object StatusBarScan {
         val bar = Rect().also { w.getBoundsInScreen(it) }
         // One round trip: prefetch the (small, ~35 node) tree instead of an IPC per getChild().
         val root = w.getRoot(AccessibilityNodeInfo.FLAG_PREFETCH_DESCENDANTS_DEPTH_FIRST or
-            AccessibilityNodeInfo.FLAG_PREFETCH_UNINTERRUPTIBLE) ?: return BarSnapshot(w.id, bar, Rect(bar), null, "no-tree")
+            AccessibilityNodeInfo.FLAG_PREFETCH_UNINTERRUPTIBLE) ?: return BarSnapshot(w.id, bar, Rect(bar), null, NO_TREE)
         var spacer: Rect? = null
         var spacerNode: AccessibilityNodeInfo? = null
         var clock: Rect? = null

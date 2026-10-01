@@ -96,6 +96,9 @@ data class StripLook(
     val alertFg: Color get() = if (lightText) Color(0xFF690005) else Color.White
 }
 
+/** The pill's padding at each end (none without a pill); the controller counts it in the width budget. */
+val STRIP_PILL_PADDING = 6.dp
+
 @androidx.compose.runtime.Immutable
 data class StripEntry(val item: ItemConfig, val state: ItemState)
 
@@ -126,6 +129,10 @@ fun Strip(
     visible: List<StripEntry>,
     revealed: List<StripEntry>,
     showChevron: Boolean,
+    /** ‹ shows whatever fits (presenting, or hidden items behind it), so its room is always kept. */
+    chevronAlways: Boolean,
+    /** Room kept for ‹ inside [maxWidthPx] when it shows. */
+    chevronReservePx: Int,
     expanded: Boolean,
     chevronOnLeft: Boolean,
     look: StripLook,
@@ -159,7 +166,7 @@ fun Strip(
             .padding(vertical = 3.dp)
             .clip(RoundedCornerShape(50))
             .background(pillBg)
-            .padding(horizontal = if (look.pill == Pill.NONE) 0.dp else 6.dp),
+            .padding(horizontal = if (look.pill == Pill.NONE) 0.dp else STRIP_PILL_PADDING),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val chevron: @Composable () -> Unit = {
@@ -167,7 +174,8 @@ fun Strip(
         }
         val items = if (chevronOnLeft) revealed + visible else visible + revealed
         if (chevronOnLeft) chevron()
-        FitRow(ids = items.map { it.item.id }, maxWidthPx = maxWidthPx, keepEnd = chevronOnLeft, spacing = look.spacing, onDropped = onOverflow) {
+        FitRow(ids = items.map { it.item.id }, maxWidthPx = maxWidthPx, chevronAlways = chevronAlways, chevronPx = chevronReservePx,
+            keepEnd = chevronOnLeft, spacing = look.spacing, onDropped = onOverflow) {
             // key(): remembered state (hover, held width) belongs to the item, not to its position,
             // or an item popping in would inherit its neighbour's width.
             items.forEach { androidx.compose.runtime.key(it.item.id) { ItemView(it, look, events) } }
@@ -177,26 +185,43 @@ fun Strip(
 }
 
 /**
+ * Which of [widths] fit in [limit] with [gap] between them, keeping from the start (or the end with
+ * [keepEnd]) and stopping at the first that doesn't fit; and the width they take.
+ */
+internal fun fitWidths(widths: List<Int>, gap: Int, limit: Int, keepEnd: Boolean): Pair<BooleanArray, Int> {
+    val keep = BooleanArray(widths.size)
+    var used = 0
+    for (i in if (keepEnd) widths.indices.reversed() else widths.indices) {
+        val w = widths[i] + if (used > 0) gap else 0
+        if (used + w > limit) break
+        keep[i] = true
+        used += w
+    }
+    return keep to used
+}
+
+/** [fitWidths] for the strip: everything in [budget] if it fits there (‹ needn't show), else room for ‹. */
+internal fun fitStrip(widths: List<Int>, gap: Int, budget: Int, chevronAlways: Boolean, chevronPx: Int, keepEnd: Boolean) =
+    fitWidths(widths, gap, if (chevronAlways) budget - chevronPx else budget, keepEnd).takeIf { (k, _) -> k.all { it } }
+        ?: fitWidths(widths, gap, budget - chevronPx, keepEnd)
+
+/**
  * A row that drops children which don't fit, from the start (or the end when !keepEnd), and
  * reports the dropped [ids] so they can be offered elsewhere instead of silently vanishing.
+ * [maxWidthPx] includes ‹: its [chevronPx] is kept when it shows anyway, or when something has to be
+ * dropped (‹ then offers it). Decided from this measure pass alone, so the strip can't stay
+ * overflowed just because it was overflowed before.
  */
 @Composable
-private fun FitRow(ids: List<String>, maxWidthPx: Int, keepEnd: Boolean, spacing: Dp, onDropped: (Set<String>) -> Unit,
-                   content: @Composable () -> Unit) {
+private fun FitRow(ids: List<String>, maxWidthPx: Int, chevronAlways: Boolean, chevronPx: Int, keepEnd: Boolean, spacing: Dp,
+                   onDropped: (Set<String>) -> Unit, content: @Composable () -> Unit) {
     val last = remember { arrayOf<Set<String>?>(null) }
     Layout(content) { measurables, constraints ->
         val gap = spacing.roundToPx()
         val placeables = measurables.map { it.measure(Constraints(maxHeight = constraints.maxHeight)) }
-        val keep = BooleanArray(placeables.size)
-        var used = 0
-        val order = if (keepEnd) placeables.indices.reversed() else placeables.indices
-        val limit = minOf(maxWidthPx, constraints.maxWidth).coerceAtLeast(0)
-        for (i in order) {
-            val w = placeables[i].width + if (used > 0) gap else 0
-            if (used + w > limit) break
-            keep[i] = true
-            used += w
-        }
+        val widths = placeables.map { it.width }
+        val budget = minOf(maxWidthPx, constraints.maxWidth).coerceAtLeast(0)
+        val (keep, used) = fitStrip(widths, gap, budget, chevronAlways, chevronPx, keepEnd)
         val dropped = ids.filterIndexed { i, _ -> i < keep.size && !keep[i] }.toSet()
         if (dropped != last[0]) { last[0] = dropped; onDropped(dropped) }
         val height = placeables.maxOfOrNull { it.height } ?: 0

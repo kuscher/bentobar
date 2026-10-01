@@ -39,6 +39,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.Switch
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +58,7 @@ import io.github.kuscher.bentobar.data.Pill
 import io.github.kuscher.bentobar.data.Position
 import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
+import io.github.kuscher.bentobar.data.Uses
 import io.github.kuscher.bentobar.data.TextSize
 import io.github.kuscher.bentobar.items.Env
 import io.github.kuscher.bentobar.items.Items
@@ -134,6 +139,9 @@ fun LookPage() {
             Position.CENTER to stringResource(R.string.look_position_center), Position.LEFT to stringResource(R.string.look_position_left)),
             cfg.position) { p -> Store.update { it.copy(position = p) } }
         SliderRow(stringResource(R.string.look_spacing), cfg.spacing, 0..24, { "$it dp" }) { v -> Store.update { it.copy(spacing = v) } }
+        SwitchRow(stringResource(R.string.look_presenting), cfg.presenting, help = stringResource(R.string.look_presenting_help)) { on ->
+            Store.update { it.copy(presenting = on) }
+        }
         SectionLabel(stringResource(R.string.look_look))
         ChoiceRow(stringResource(R.string.look_text_size), listOf(TextSize.SMALL to stringResource(R.string.look_text_small),
             TextSize.DEFAULT to stringResource(R.string.option_like_system), TextSize.LARGE to stringResource(R.string.look_text_large)), cfg.textSize) { v ->
@@ -255,8 +263,9 @@ fun SetupPage(activity: Activity, setup: SetupState) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Step(2, stringResource(R.string.setup_notifications_title), setup.notifications) {
-            Body(stringResource(R.string.setup_notifications_text))
-            if (!setup.notifications) StepAction(stringResource(R.string.common_allow)) { activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 3) }
+            UseSwitch(stringResource(R.string.setup_notifications_text), stringResource(R.string.setup_notifications_title), setup.notifications) { on ->
+                setRuntimeUse(activity, Uses.NOTIFICATIONS, Manifest.permission.POST_NOTIFICATIONS, 3, R.string.setup_use_name_notifications, on)
+            }
         }
         Step(3, stringResource(R.string.setup_live_title), setup.liveUpdates, optional = true) {
             Body(stringResource(R.string.setup_live_text))
@@ -267,16 +276,62 @@ fun SetupPage(activity: Activity, setup: SetupState) {
             if (setup.liveUpdates) StepLink(stringResource(R.string.setup_open_setting)) { open() } else StepAction(stringResource(R.string.setup_turn_on)) { open() }
         }
         Step(4, stringResource(R.string.setup_calendar_title), setup.calendar, optional = true) {
-            Body(stringResource(R.string.setup_calendar_text))
-            if (!setup.calendar) StepAction(stringResource(R.string.common_allow)) { activity.requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 4) }
+            UseSwitch(stringResource(R.string.setup_calendar_text), stringResource(R.string.setup_calendar_title), setup.calendar) { on ->
+                setRuntimeUse(activity, Uses.CALENDAR, Manifest.permission.READ_CALENDAR, 4, R.string.setup_use_name_calendar, on)
+            }
         }
         Step(5, stringResource(R.string.setup_alarms_title), setup.exactAlarms, optional = true) {
-            Body(stringResource(R.string.setup_alarms_text))
-            if (!setup.exactAlarms) StepAction(stringResource(R.string.common_allow)) {
-                Env.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + activity.packageName)))
+            UseSwitch(stringResource(R.string.setup_alarms_text), stringResource(R.string.setup_alarms_title), setup.exactAlarms) { on ->
+                setExactAlarmsUse(activity, on)
             }
         }
     }
+}
+
+/**
+ * "BentoBar uses this": a switch beside the step's explanation. It reads as on only when Android
+ * granted the permission and the user hasn't switched it off here, so a fresh install starts off.
+ */
+@Composable
+private fun UseSwitch(text: String, label: String, on: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().toggleable(on, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f)) { Body(text) }
+        Spacer(Modifier.width(16.dp))
+        Switch(checked = on, onCheckedChange = null, modifier = Modifier.semantics { contentDescription = label })
+    }
+}
+
+/**
+ * On: asks Android if needed. Off: BentoBar stops using it at once and gives the permission back
+ * (revokeSelfPermissionOnKill), which Android completes the next time BentoBar's process restarts;
+ * the accessibility service keeps it running, so in practice at the next update or reboot.
+ */
+private fun setRuntimeUse(activity: Activity, key: String, permission: String, request: Int, name: Int, on: Boolean) {
+    val granted = activity.checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    if (on) {
+        Store.update { it.copy(turnedOff = it.turnedOff - key) }
+        if (!granted) activity.requestPermissions(arrayOf(permission), request)
+    } else {
+        Store.update { it.copy(turnedOff = it.turnedOff + key) }
+        if (granted) activity.revokeSelfPermissionOnKill(permission)
+        Notice.post(activity.getString(R.string.setup_use_off_runtime, activity.getString(name)))
+    }
+    Setup.refresh(activity)
+}
+
+/** Exact alarms are a special access an app can't give back itself: off stops using it, and says where to remove it. */
+private fun setExactAlarmsUse(activity: Activity, on: Boolean) {
+    val open = { Env.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + activity.packageName))) }
+    val can = activity.getSystemService(android.app.AlarmManager::class.java)?.canScheduleExactAlarms() == true
+    if (on) {
+        Store.update { it.copy(turnedOff = it.turnedOff - Uses.EXACT_ALARMS) }
+        if (!can) open()
+    } else {
+        Store.update { it.copy(turnedOff = it.turnedOff + Uses.EXACT_ALARMS) }
+        if (can) Notice.post(activity.getString(R.string.setup_use_off_exact), activity.getString(R.string.common_open_settings)) { open() }
+    }
+    Setup.refresh(activity)
 }
 
 /** A step's main action, while it isn't done. */

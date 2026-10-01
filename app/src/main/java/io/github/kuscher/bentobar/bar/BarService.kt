@@ -89,6 +89,9 @@ class BarService : AccessibilityService() {
     companion object { const val TAG = "BentoBar" }
 }
 
+/** Item types still shown while presenting (when active): a running timer, a meeting about to start. */
+private val PRESENTING_TYPES = setOf("timer", "countdown", "event")
+
 class BarController(private val service: AccessibilityService) {
     private val tag = BarService.TAG
     private val main = Handler(Looper.getMainLooper())
@@ -156,6 +159,7 @@ class BarController(private val service: AccessibilityService) {
         if (!hovering && menuKey == null && expanded.value) {
             Log.i(tag, "collapse (pinned=$pinned autoCollapse=${Store.config.value.autoCollapseSec}s)")
             expanded.value = false; pinned = false
+            if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
         }
     }
     private val awakeExpiry = Runnable { Caffeine.check() }
@@ -172,6 +176,8 @@ class BarController(private val service: AccessibilityService) {
 
     fun start() {
         started = true
+        // Pinned open with ‹ before a restart: open again.
+        Store.config.value.let { if (it.pinnedOpen && it.chevron) { expanded.value = true; pinned = true } }
         service.registerReceiver(screen, IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_ON); addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
         })
@@ -206,6 +212,7 @@ class BarController(private val service: AccessibilityService) {
     }
 
     fun onEvent(e: AccessibilityEvent) {
+        if (tracing) trace("event windows id=${e.windowId} changes=0x${Integer.toHexString(e.windowChanges)} ours=${e.windowId in overlayIds}")
         when (e.eventType) {
             AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
                 if (Log.isLoggable("BentoBarEvents", Log.DEBUG)) Log.d(tag, "windows changed id=${e.windowId} changes=0x${Integer.toHexString(e.windowChanges)} ours=${e.windowId in overlayIds}")
@@ -294,6 +301,11 @@ class BarController(private val service: AccessibilityService) {
         }
     }
 
+    /** adb `debug trace on|off`: logs every move and resize with its cause, to chase jitter. */
+    private var tracing = false
+    private var lastPlace = ""
+    private fun trace(what: String) { if (tracing) Log.i(tag, "trace ${SystemClock.uptimeMillis() % 100_000} $what") }
+
     private fun place(s: BarSnapshot, screenW: Int) {
         val cfg = Store.config.value
         val gap = (6 * density).toInt()
@@ -306,9 +318,11 @@ class BarController(private val service: AccessibilityService) {
             Position.CENTER -> { p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; p.x = s.free.centerX() - screenW / 2 }
         }
         // Keep room for the chevron (~26 dp) inside the free area, when it shows.
-        val chevron = cfg.chevron && (hiddenItems().isNotEmpty() || BarOverflow.ids.value.isNotEmpty())
+        val chevron = cfg.presenting || (cfg.chevron && (hiddenItems().isNotEmpty() || BarOverflow.ids.value.isNotEmpty()))
         maxWidth.intValue = (s.free.width() - 2 * gap - if (chevron) (30 * density).toInt() else 0).coerceAtLeast(0)
         heightDp.value = (s.bar.height() / density).dp
+        val where = "free=${s.free.toShortString()} x=${p.x} maxW=${maxWidth.intValue} [${s.summary}]"
+        if (where != lastPlace) { trace("place $where"); lastPlace = where }
         BarStatus.current.value = if (maxWidth.intValue == 0) BarStatus.NO_ROOM else BarStatus.SHOWN
         if (!strip.shown) {
             strip.show { StripHost() }
@@ -421,18 +435,20 @@ class BarController(private val service: AccessibilityService) {
         val cfg by Store.config.collectAsState()
         val states by Ticker.states.collectAsState()
         val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.stateOf(it)) } }
-        val visible = cfg.items.filter { it.section == Section.SHOWN || (it.section == Section.HIDDEN && isActive(it, states)) }
-        val hidden = cfg.items.filter { it.section == Section.HIDDEN && !isActive(it, states) }
+        // Presenting (screen sharing): only what matters on stage, whatever its section.
+        val visible = if (cfg.presenting) cfg.items.filter { it.section != Section.OFF && it.type in PRESENTING_TYPES && states[it.id]?.active == true }
+        else cfg.items.filter { it.section == Section.SHOWN || (it.section == Section.HIDDEN && isActive(it, states)) }
+        val hidden = if (cfg.presenting) emptyList() else cfg.items.filter { it.section == Section.HIDDEN && !isActive(it, states) }
         val overflow by BarOverflow.ids.collectAsState()
         // Without the ‹ button there's no way to fold hidden items back, so they stay folded.
-        val open = expanded.value && cfg.chevron
+        val open = expanded.value && cfg.chevron && !cfg.presenting
         MeasuredStrip(bias = when (cfg.position) { Position.RIGHT -> 1f; Position.CENTER -> 0f; Position.LEFT -> -1f },
             onWidth = { w -> if (w != strip.params.width) main.post { applyWidth(w) } }) {
             Strip(
                 visible = entries(visible),
                 revealed = if (open) entries(hidden) else emptyList(),
                 // Items that don't fit are offered in the ‹ menu, so ‹ shows for them too.
-                showChevron = cfg.chevron && (hidden.isNotEmpty() || overflow.isNotEmpty()),
+                showChevron = cfg.presenting || (cfg.chevron && (hidden.isNotEmpty() || overflow.isNotEmpty())),
                 expanded = open,
                 chevronOnLeft = cfg.position != Position.LEFT,
                 look = look.value,
@@ -448,6 +464,7 @@ class BarController(private val service: AccessibilityService) {
     private fun applyWidth(w: Int) {
         val width = w.coerceAtLeast(1)
         if (strip.params.width == width) return
+        trace("width ${strip.params.width} -> $width")
         strip.params.width = width
         strip.relayout()
     }
@@ -480,9 +497,12 @@ class BarController(private val service: AccessibilityService) {
         }
 
         override fun chevron(at: Rect) {
+            // While presenting, ‹ is only the way back to the menu (and out of presenting).
+            if (Store.config.value.presenting) return chevronContext(at)
             val next = !expanded.value
             expanded.value = next
             pinned = next
+            if (Store.config.value.pinnedOpen != next) Store.update { it.copy(pinnedOpen = next) }
             main.removeCallbacks(collapse)
             val secs = Store.config.value.autoCollapseSec
             if (next && secs > 0) main.postDelayed(collapse, secs * 1000L)
@@ -504,6 +524,7 @@ class BarController(private val service: AccessibilityService) {
         }
 
         override fun hover(inside: Boolean) {
+            trace("hover $inside")
             hovering = inside
             main.removeCallbacks(expandOnHover); main.removeCallbacks(collapse)
             if (inside) {
@@ -646,6 +667,7 @@ class BarController(private val service: AccessibilityService) {
                 "${w.id}:t${w.type}:${w.title}:${r.toShortString()}"
             }
             "sample" -> { sampleColor(); "sampling" }
+            "trace" -> { tracing = cmd.getOrNull(1) != "off"; "trace=$tracing" }
             else -> "unknown"
         }
     }

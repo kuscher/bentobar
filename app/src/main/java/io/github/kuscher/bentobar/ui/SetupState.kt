@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.compose.runtime.Immutable
+import io.github.kuscher.bentobar.data.Uses
 import io.github.kuscher.bentobar.items.Env
 import io.github.kuscher.bentobar.items.Notify
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,8 +40,9 @@ object Setup {
             serviceOn = MainActivity.serviceOn(app),
             notifications = Notify.allowed(app),
             liveUpdates = runCatching { nm?.canPostPromotedNotifications() == true }.getOrDefault(false),
-            calendar = app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED,
-            exactAlarms = app.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true,
+            calendar = app.checkSelfPermission(Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED &&
+                Uses.on(Uses.CALENDAR),
+            exactAlarms = app.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true && Uses.on(Uses.EXACT_ALARMS),
             advancedProtection = Env.advancedProtection(),
         )
     }

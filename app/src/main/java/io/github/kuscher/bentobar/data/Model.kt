@@ -59,6 +59,12 @@ data class BarConfig(
     val revealOnHover: Boolean = false,
     /** Hide revealed items again after this many seconds; 0 (default) keeps them until ‹ is clicked. */
     val autoCollapseSec: Int = 0,
+    /** Hidden items pinned open with ‹, kept across restarts (an update, a reboot). */
+    val pinnedOpen: Boolean = false,
+    /** Presenting: only a running timer or a meeting about to start, plus ‹ for the menu. */
+    val presenting: Boolean = false,
+    /** Permissions the user switched off in Setup ([Uses] keys): BentoBar doesn't use them even if granted. */
+    val turnedOff: Set<String> = emptySet(),
     val textSize: TextSize = TextSize.DEFAULT,
     val pill: Pill = Pill.NONE,
     val color: ColorMode = ColorMode.AUTO,
@@ -71,3 +77,15 @@ data class BarConfig(
     val chipMode: ChipMode = ChipMode.FALLBACK,
     val onboarded: Boolean = false,
 )
+
+/**
+ * What BentoBar uses, as switched in Setup: a permission counts only if Android granted it and the
+ * user hasn't switched it off here.
+ */
+object Uses {
+    const val NOTIFICATIONS = "notifications"
+    const val CALENDAR = "calendar"
+    const val EXACT_ALARMS = "exactAlarms"
+
+    fun on(key: String) = key !in Store.config.value.turnedOff
+}

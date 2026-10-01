@@ -54,4 +54,46 @@ object Fmt {
     }
 
     fun percent(f: Double) = "${(f * 100).toInt()}%"
+
+    /**
+     * The widest text [text] can become while its numbers change, for a fixed-width slot in the
+     * strip. A number, whole or with one decimal ("0", "8.4", "999"), becomes "888": the formats
+     * here switch from 9.9 to 10 and stay under 1000 before the unit steps up, and with tabular
+     * digits three 8s are wider than any of them. Clock digits keep their shape ("9:42" holds
+     * "88:88"), and K/M/G/T after a number take the widest letter.
+     */
+    fun widthTemplate(text: String): String {
+        val out = StringBuilder()
+        var i = 0
+        while (i < text.length) {
+            val c = text[i]
+            if (!c.isDigit()) {
+                // A unit right after a number ("4K", "15.9 GB"), not the start of a word ("Keep").
+                val afterNumber = text.getOrNull(i - 1)?.isDigit() == true ||
+                    (text.getOrNull(i - 1) == ' ' && text.getOrNull(i - 2)?.isDigit() == true)
+                val unit = c in "KMGT" && afterNumber && text.getOrNull(i + 1)?.isLowerCase() != true
+                out.append(if (unit) 'M' else c)
+                i++
+                continue
+            }
+            var j = i
+            while (j < text.length && text[j].isDigit()) j++
+            val clock = text.getOrNull(i - 1) == ':' || text.getOrNull(j) == ':'
+            if (clock) {
+                val len = j - i
+                repeat(if (text.getOrNull(j) == ':' && text.getOrNull(i - 1) != ':') maxOf(len, 2) else len) { out.append('8') }
+                i = j
+                continue
+            }
+            // Take a decimal part with it: "8.4" is one number.
+            if (j + 1 < text.length && (text[j] == '.' || text[j] == ',') && text[j + 1].isDigit()) {
+                j++
+                while (j < text.length && text[j].isDigit()) j++
+            }
+            val digits = text.substring(i, j).count { it.isDigit() }
+            repeat(maxOf(digits, 3)) { out.append('8') }
+            i = j
+        }
+        return out.toString()
+    }
 }

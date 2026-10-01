@@ -103,7 +103,9 @@ status bar may work, but haven't been tested.
 1. On your Googlebook, download
    **[BentoBar.apk](../../releases/latest/download/BentoBar.apk)** from the latest release.
 2. Open it from Chrome's downloads or the Files app. If Android asks, allow Chrome (or Files) to
-   install apps, then tap **Install**.
+   install apps, then tap **Install**. Google Play Protect may then say *"App blocked to protect
+   your device"* because it hasn't seen an app from this developer before: tap **More details** ›
+   **Install anyway**.
 3. Open **BentoBar** and go to **Setup** › **Turn on**. Android opens Accessibility settings.
 4. Because BentoBar came from a download, Android guards this switch the first time:
    1. Open **BentoBar** and tap the switch. Android says *"Restricted setting"*. Tap **OK**.

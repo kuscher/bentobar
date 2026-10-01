@@ -257,7 +257,9 @@ private fun ItemRow(item: ItemConfig, state: ItemState?, index: Int, count: Int,
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(type.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            val detail = listOfNotNull(state?.text?.takeIf { it.isNotBlank() },
+            val overflow by io.github.kuscher.bentobar.bar.BarOverflow.ids.collectAsState()
+            val detail = listOfNotNull(if (item.id in overflow) "doesn't fit in the bar right now (in the ‹ menu)" else null,
+                state?.text?.takeIf { it.isNotBlank() },
                 if (item.whenActive && item.section == Section.HIDDEN) "shows when active" else null,
                 when (item.display) { Display.ICON -> "icon only"; Display.TEXT -> "text only"; else -> null }).joinToString(" · ")
             if (detail.isNotEmpty()) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,

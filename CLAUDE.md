@@ -57,6 +57,15 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
 - adb uses VSCodeBook's Unix socket (`~/.config/vscodebook/android.env`), never tcp:5037.
 
 ## Things learned the hard way (see docs/research/device-findings.md)
+- **The status bar window can be opaque.** On the HP it's glyphs on transparent; on the Acer
+  Googlebook 14 it's white glyphs on its own black. The colour sampler tells background and text
+  apart (`barColors`), decides dark/light from the background, and `bar/Contrast.kt` holds every
+  strip colour to 4.5:1 (unit-tested in `ContrastTest`). Re-check on any new device: `look fg=…
+  bg=… contrast=…` in the log.
+- **Settings state is observed, not read while drawing** (`ui/SetupState.kt`, `bar/BarStatus.kt`).
+  In desktop windowing, Settings opens in its own window and BentoBar's stays resumed, so onResume
+  alone misses changes; and with strong skipping (Kotlin 2.x) a composable reading Android state
+  inside isn't redrawn when its parameters are unchanged.
 - **Least privilege** (user feedback): the accessibility config subscribes only to
   `typeWindowsChanged`. No content events, key filtering or motion events. Code reads only the
   status bar window. Don't add broader access for nice-to-haves.

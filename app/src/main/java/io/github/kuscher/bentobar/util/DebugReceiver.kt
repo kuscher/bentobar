@@ -121,10 +121,18 @@ class DebugReceiver : BroadcastReceiver() {
             object : android.accessibilityservice.AccessibilityService.TakeScreenshotCallback {
                 override fun onSuccess(r: android.accessibilityservice.AccessibilityService.ScreenshotResult) {
                     val hb = r.hardwareBuffer
-                    val bmp = android.graphics.Bitmap.wrapHardwareBuffer(hb, r.colorSpace)!!.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                    var bmp = android.graphics.Bitmap.wrapHardwareBuffer(hb, r.colorSpace)!!.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
                     hb.close()
-                    val out = java.io.ByteArrayOutputStream()
+                    // A broadcast result over about 1 MB fails (TransactionTooLarge), the broadcast
+                    // never finishes and Android reports BentoBar as not responding: halve big
+                    // windows (the settings window) until the PNG fits.
+                    var out = java.io.ByteArrayOutputStream()
                     bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    while (out.size() > 600_000 && bmp.width > 200) {
+                        bmp = android.graphics.Bitmap.createScaledBitmap(bmp, bmp.width / 2, bmp.height / 2, true)
+                        out = java.io.ByteArrayOutputStream()
+                        bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+                    }
                     pending.resultData = android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
                     pending.finish()
                 }

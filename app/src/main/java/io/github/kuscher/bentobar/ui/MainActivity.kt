@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kuscher.bentobar.bar.BarService
@@ -171,8 +172,11 @@ class MainActivity : ComponentActivity() {
                     }
                     // Only meaningful once the service runs; before that, Setup is the way in.
                     if (running) {
-                        Text("Show in status bar", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 10.dp))
-                        Switch(checked = cfg.enabled, onCheckedChange = { on -> Store.update { it.copy(enabled = on) } })
+                        Row(Modifier.toggleable(cfg.enabled, role = androidx.compose.ui.semantics.Role.Switch) { on -> Store.update { it.copy(enabled = on) } },
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Text("Show in status bar", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(end = 10.dp))
+                            Switch(checked = cfg.enabled, onCheckedChange = null)
+                        }
                     }
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {

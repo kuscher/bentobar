@@ -43,6 +43,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -98,6 +100,8 @@ interface StripEvents {
     fun hover(inside: Boolean)
     /** Where an item (or "chevron") was drawn, in window coordinates. */
     fun placed(id: String, at: Rect)
+    /** The pointer is over [item] (or has left it), for its tooltip. */
+    fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {}
 }
 
 /**
@@ -196,7 +200,11 @@ private fun Chevron(expanded: Boolean, onLeft: Boolean, look: StripLook, events:
             .background(if (hovered) look.fg.copy(alpha = 0.14f) else Color.Transparent)
             .hoverable(source)
             .clicks({ events.chevron(bounds) }, { events.chevronContext(bounds) }, null)
-            .semantics { contentDescription = if (expanded) "Hide BentoBar's hidden items" else "Show BentoBar's hidden items"; role = Role.Button }
+            .semantics {
+                contentDescription = if (expanded) "Hide BentoBar's hidden items" else "Show BentoBar's hidden items"; role = Role.Button
+                onClick { events.chevron(bounds); true }
+                onLongClick("BentoBar menu") { events.chevronContext(bounds); true }
+            }
             .padding(horizontal = 3.dp),
         contentAlignment = Alignment.Center,
     ) { SymIcon(sym, size = look.iconSp, color = look.fg.copy(alpha = 0.85f)) }
@@ -214,6 +222,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     var bounds by remember { mutableStateOf(Rect()) }
+    LaunchedEffect(hovered) { events.itemHover(entry.item, bounds, hovered) }
     // Numbers change width every second; hold the widest size for a while so neighbours don't jump
     // (and the window doesn't resize every tick), then ease back to the natural width.
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -249,7 +258,12 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
             })
             .hoverable(source)
             .clicks({ events.click(entry.item, bounds) }, { events.context(entry.item, bounds) }, { events.scroll(entry.item, it) })
-            .semantics(mergeDescendants = true) { contentDescription = s.desc.ifEmpty { s.text.orEmpty() }; role = Role.Button }
+            .semantics(mergeDescendants = true) {
+                contentDescription = s.desc.ifEmpty { s.text.orEmpty() }; role = Role.Button
+                // The clicks come from raw pointer input, so tell assistive tech how to press it.
+                onClick { events.click(entry.item, bounds); true }
+                onLongClick("Item menu") { events.context(entry.item, bounds); true }
+            }
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -333,5 +347,14 @@ fun MeasuredStrip(bias: Float, onWidth: (Int) -> Unit, content: @Composable () -
         onWidth(p.width)
         val w = if (constraints.hasBoundedWidth) constraints.maxWidth else p.width
         layout(w, p.height) { p.place((((w - p.width) * (1 + bias)) / 2).toInt(), 0) }
+    }
+}
+
+/** A strip item's tooltip: dark, high-contrast (white on #303134 is over 12:1) on any bar. */
+@Composable
+fun Tooltip(label: String) {
+    Box(Modifier.fillMaxHeight().clip(RoundedCornerShape(6.dp)).background(Color(0xF0303134)).padding(horizontal = 10.dp),
+        contentAlignment = Alignment.Center) {
+        Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1)
     }
 }

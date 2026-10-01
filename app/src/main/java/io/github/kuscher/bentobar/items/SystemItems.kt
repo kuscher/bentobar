@@ -75,7 +75,8 @@ object CpuItem : ItemType("cpu", "CPU load", Sym.MEMORY, "How busy the processor
         if (!c.available) return ItemState(icon = Sym.MEMORY, text = "–", desc = "This device doesn't share CPU load with apps")
         val limit = item.optInt("activePct", 80) / 100.0
         return ItemState(icon = Sym.MEMORY, text = Fmt.percent(c.total), active = c.total >= limit,
-            tone = if (c.total >= 0.9) Tone.WARN else Tone.NORMAL, widthKey = "cpu", desc = "CPU ${Fmt.percent(c.total)} busy")
+            tone = if (c.total >= 0.9) Tone.WARN else Tone.NORMAL, widthKey = "cpu",
+            desc = "CPU ${Fmt.percent(c.total)} busy" + if (c.total >= 0.9) ", high" else "")
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->

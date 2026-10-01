@@ -262,7 +262,9 @@ object ToolsItem : ItemType("tools", R.string.item_tools_title, Sym.HANDYMAN, R.
         Tool(Sym.SETTINGS, R.string.tools_settings, settings(Settings.ACTION_SETTINGS)),
     )
 
-    override fun state(item: ItemConfig) = ItemState(icon = Sym.HANDYMAN, text = Env.str(R.string.item_tools_title), desc = Env.str(R.string.item_tools_title))
+    // Just the icon: the name told nothing the icon (and its tooltip) doesn't, and took the room of an item.
+    override val iconOnly = true
+    override fun state(item: ItemConfig) = ItemState(icon = Sym.HANDYMAN, desc = Env.str(R.string.item_tools_title))
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host ->
         MenuCard(Sym.HANDYMAN, stringResource(R.string.item_tools_title)) {

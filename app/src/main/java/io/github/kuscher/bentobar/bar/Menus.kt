@@ -19,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -98,25 +99,38 @@ fun ItemContextMenu(itemId: String, host: MenuHost, openMenu: () -> Unit) {
     }
 }
 
-/** Right-click on ‹, or the list view of hidden items. */
+/**
+ * Right-click on ‹, or the list view of hidden items. From the keyboard ([everything], the "BentoBar
+ * menu" shortcut) it lists every item in the bar, focused on the first, so arrows and Enter reach
+ * any item's menu.
+ */
 @Composable
-fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> Unit) {
+fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> Unit, everything: Boolean = false) {
     val states by Ticker.states.collectAsState()
     // Worked out here, not when the menu opened, so an item popping out (or in) updates the list.
     val cfg by Store.config.collectAsState()
     val overflow by io.github.kuscher.bentobar.bar.BarOverflow.ids.collectAsState()
-    val hidden = cfg.items.filter {
+    val hidden = if (everything) cfg.items.filter { it.section != Section.OFF }
+    else cfg.items.filter {
         (it.section == Section.HIDDEN && !(it.whenActive && states[it.id]?.active == true)) || it.id in overflow
     }
+    val first = remember { androidx.compose.ui.focus.FocusRequester() }
+    if (everything) androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
     MenuCard(Sym.WYSIWYG, stringResource(R.string.app_name),
-        if (hidden.isEmpty()) stringResource(R.string.barmenu_no_hidden) else pluralStringResource(R.plurals.barmenu_hidden_count, hidden.size, hidden.size),
+        when {
+            everything -> null // it lists every item, not just hidden ones
+            hidden.isEmpty() -> stringResource(R.string.barmenu_no_hidden)
+            else -> pluralStringResource(R.plurals.barmenu_hidden_count, hidden.size, hidden.size)
+        },
         iconRes = io.github.kuscher.bentobar.R.drawable.ic_bentobar) {
         if (hidden.isNotEmpty()) {
-            SectionLabel(stringResource(R.string.barmenu_hidden_items))
-            hidden.forEach { item ->
-                val type = Items.of(item.type) ?: return@forEach
+            SectionLabel(stringResource(if (everything) R.string.barmenu_all_items else R.string.barmenu_hidden_items))
+            hidden.forEachIndexed { i, item ->
+                val type = Items.of(item.type) ?: return@forEachIndexed
                 val s = states[item.id]
-                MenuEntry(s?.icon?.takeIf { it.isNotEmpty() } ?: type.icon, s?.text ?: type.title, detail = type.title.takeIf { s?.text != null }) { openItem(item) }
+                val label = s?.label ?: s?.text
+                MenuEntry(s?.icon?.takeIf { it.isNotEmpty() } ?: type.icon, label ?: type.title, detail = type.title.takeIf { label != null && label != it },
+                    modifier = if (i == 0) Modifier.focusRequester(first) else Modifier) { openItem(item) }
             }
             MenuDivider()
         }

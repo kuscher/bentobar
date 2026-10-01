@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased
+
+- **A keyboard shortcut for the bar.** A second launcher entry, **BentoBar menu**, opens BentoBar's
+  menu with every item listed and the first one focused: arrows and Enter open any item's menu,
+  Escape closes it. Give it a shortcut once in the system's keyboard shortcuts (Action + / ›
+  Customize), e.g. Action + T. BentoBar still reads no keys itself.
+- **The meeting chip keeps up on its own.** It appears 15 minutes before a meeting, switches to a
+  countdown to the end when it starts and goes away when it ends, without waiting for something else
+  to change. Join and Open open the meeting the chip shows, straight from the notification.
+- **Timers keep time.** A running timer still goes off after a restart or a reboot. Setting the
+  clock no longer ends a timer early or makes it (or keep awake) run long. Switching exact alarms on
+  or off applies to a timer that's already running. The stopwatch counts whole seconds (0:00 until a
+  second has passed).
+- **Hidden items keep updating.** Under Show everything, an item in Hidden without a "Show when"
+  rule is in the bar, but it wasn't refreshed: a clock stopped, network speed froze.
+- **Readable on mid-gray bars too.** On a solid status bar between about #777 and #858585, neither
+  white nor near-black text reaches 4.5:1; BentoBar uses black there.
+- **The bar fits its space.** With a pill background, a full bar no longer reaches into the system
+  icons, and items that went into ‹ come back as soon as there's room. ‹ with nothing hidden behind
+  it (only items that don't fit) opens its menu instead of revealing nothing. While the status bar is
+  being rebuilt, BentoBar keeps its last place instead of briefly covering the clock.
+- **Calendar.** The 7-day agenda shows up to 12 events and then "+N more", which opens Calendar on
+  the first day left out. Switching Calendar off in Setup also forgets the events already read. A
+  sync that changes many events reloads once, not once per change.
+- **Settings.** Paste settings only accepts a BentoBar layout (pasting anything else, even `{}`,
+  emptied the bar). A countdown date that doesn't exist (2026-02-30) is marked as an error instead of
+  quietly becoming another day. Settings stays on its page when the theme, language or text size
+  changes. Delete's Undo is shown above the list instead of under it. The Storage menu updates while
+  open. In the ‹ menu, "Edit the bar…" and "Hide BentoBar" are now "Edit" and "Hide". Tools is just
+  its icon in the bar (its name shows on hover).
+- **Accessibility.** In the app picker each app is one control named by the app; calendar days read
+  as the full date, whether anything is on, and whether the day is selected.
+- On Android 14 and 15 (the APK from GitHub installs there), starting a timer no longer crashes:
+  Live Update features are used on Android 16 QPR2 and later only.
+
 ## 0.6 (2026-10-01)
 
 - **On Google Play, BentoBar is for Googlebooks and other desktop-class Android devices only**

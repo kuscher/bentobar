@@ -231,6 +231,7 @@ object StorageItem : ItemType("storage", R.string.item_storage_title, Sym.HARD_D
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
+        rememberTick() // the sampler's fields aren't observable: redraw with the tick, like the other menus
         val s = Env.storage
         val used = if (s.total == 0L) 0.0 else (s.total - s.free).toDouble() / s.total
         MenuCard(Sym.HARD_DRIVE, stringResource(R.string.item_storage_title), stringResource(R.string.storage_free_of, Fmt.bytes(s.free.toDouble()), Fmt.bytes(s.total.toDouble()))) {

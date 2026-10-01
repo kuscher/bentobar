@@ -597,4 +597,9 @@
     <string name="section_hidden_reveal_show_all">Shown while their Show when… rule applies. Items without a rule always show.</string>
     <string name="calendar_tomorrow">Tomorrow</string>
     <string name="calendar_no_events_week">Nothing in the next 7 days</string>
+    <string name="calendar_day_has_events">%1$s, has events</string>
+    <plurals name="calendar_more">
+        <item quantity="one">+%1$d more</item>
+        <item quantity="other">+%1$d more</item>
+    </plurals>
 </resources>

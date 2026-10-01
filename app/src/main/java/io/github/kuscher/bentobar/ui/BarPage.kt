@@ -123,7 +123,6 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
         Undo.deleted.value = null
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
         val wide = maxWidth >= 900.dp
         val listScroll = rememberScrollState()
         Column(Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 8.dp)) {
@@ -150,6 +149,8 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
                 }
             }
         }
+        // Last, so it's drawn over the section cards (in a Box, later children are on top).
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(16.dp))
     }
 }
 

@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
@@ -98,7 +99,7 @@ object Ticker {
             val last = lastRun[item.id] ?: 0L
             if (item.id in next && now - last < type.refreshMs) continue
             next[item.id] = try { type.state(item) } catch (e: Exception) {
-                Log.w(TAG, "item ${item.type} failed", e); ItemState(icon = type.icon, text = "!", desc = "${type.title} failed")
+                Log.w(TAG, "item ${item.type} failed", e); ItemState(icon = type.icon, text = "!", desc = Env.str(R.string.item_failed, type.title))
             }
             lastRun[item.id] = now
         }

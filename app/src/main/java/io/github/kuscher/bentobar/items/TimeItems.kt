@@ -43,6 +43,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.ui.ChipRow
@@ -58,6 +61,7 @@ import io.github.kuscher.bentobar.ui.SliderRow
 import io.github.kuscher.bentobar.ui.SwitchRow
 import io.github.kuscher.bentobar.ui.TextRow
 import io.github.kuscher.bentobar.ui.rememberTick
+import io.github.kuscher.bentobar.util.Dates
 import io.github.kuscher.bentobar.util.Fmt
 import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
@@ -79,8 +83,8 @@ private fun is24(item: ItemConfig) = when (item.opt("hours", "system")) {
     else -> DateFormat.is24HourFormat(Env.app)
 }
 
-private fun timeFormatter(h24: Boolean, seconds: Boolean): DateTimeFormatter =
-    DateTimeFormatter.ofPattern(if (h24) (if (seconds) "HH:mm:ss" else "HH:mm") else (if (seconds) "h:mm:ss a" else "h:mm a"), Locale.getDefault())
+/** The time in [t]'s zone, 24-hour or 12-hour as asked, laid out the locale's way. */
+private fun formatTime(t: ZonedDateTime, h24: Boolean, seconds: Boolean): String = Dates.format(Dates.timeSkeleton(h24, seconds), t)
 
 private fun zoneOf(item: ItemConfig): ZoneId =
     item.options["zone"]?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
@@ -88,10 +92,10 @@ private fun zoneOf(item: ItemConfig): ZoneId =
 /** "Tokyo" from "Asia/Tokyo". */
 private fun cityOf(zone: ZoneId) = zone.id.substringAfterLast('/').replace('_', ' ')
 
-object ClockItem : ItemType("clock", "Clock", Sym.SCHEDULE, "A second clock: seconds, 24-hour or another time zone") {
+object ClockItem : ItemType("clock", R.string.item_clock_title, Sym.SCHEDULE, R.string.item_clock_desc) {
     override fun state(item: ItemConfig): ItemState {
         val zone = zoneOf(item)
-        val time = ZonedDateTime.now(zone).format(timeFormatter(is24(item), item.optBool("seconds", true)))
+        val time = formatTime(ZonedDateTime.now(zone), is24(item), item.optBool("seconds", true))
         val label = item.opt("label", "")
         return ItemState(icon = Sym.SCHEDULE, text = if (label.isBlank()) time else "$label $time", widthKey = "clock",
             desc = "${label.ifBlank { cityOf(zone) }} $time")
@@ -102,35 +106,41 @@ object ClockItem : ItemType("clock", "Clock", Sym.SCHEDULE, "A second clock: sec
         val zones = (listOf(ZoneId.systemDefault()) + Store.config.value.items.filter { it.type == "clock" }.map { zoneOf(it) })
             .distinctBy { it.id }
         val local = ZonedDateTime.now()
-        MenuCard(Sym.PUBLIC, "World clock", local.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault()))) {
+        MenuCard(Sym.PUBLIC, stringResource(R.string.clock_world), Dates.format("EEEEdMMMM", local)) {
             zones.forEach { z ->
                 val t = ZonedDateTime.now(z)
                 val diffH = (t.offset.totalSeconds - local.offset.totalSeconds) / 3600.0
-                val day = when (t.toLocalDate().compareTo(local.toLocalDate())) { 0 -> ""; 1 -> "Tomorrow · "; else -> if (t.toLocalDate() > local.toLocalDate()) "Tomorrow · " else "Yesterday · " }
-                val off = if (diffH == 0.0) "Local" else (if (diffH > 0) "+" else "−") + Fmt.oneDecimal(kotlin.math.abs(diffH)).removeSuffix(".0") + "h"
+                val day = when (t.toLocalDate().compareTo(local.toLocalDate())) {
+                    0 -> null
+                    1 -> stringResource(R.string.clock_tomorrow)
+                    else -> stringResource(if (t.toLocalDate() > local.toLocalDate()) R.string.clock_tomorrow else R.string.clock_yesterday)
+                }
+                val off = if (diffH == 0.0) stringResource(R.string.clock_local) else (if (diffH > 0) "+" else "−") + Fmt.oneDecimal(kotlin.math.abs(diffH)).removeSuffix(".0") + "h"
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text(if (z == ZoneId.systemDefault()) "Here (${cityOf(z)})" else cityOf(z), style = MaterialTheme.typography.bodyLarge)
-                        Text(day + off, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (z == ZoneId.systemDefault()) stringResource(R.string.clock_here, cityOf(z)) else cityOf(z), style = MaterialTheme.typography.bodyLarge)
+                        Text(listOfNotNull(day, off).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text(t.format(timeFormatter(is24(item), false)), style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"))
+                    Text(formatTime(t, is24(item), false), style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"))
                 }
             }
             MenuDivider()
-            MenuEntry(Sym.ALARM, "Alarms and timers") { host.close(); Env.launch(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
-            MenuEntry(Sym.SETTINGS, "Date and time settings") { host.close(); Env.launch(Intent(Settings.ACTION_DATE_SETTINGS)) }
+            MenuEntry(Sym.ALARM, stringResource(R.string.clock_alarms)) { host.close(); Env.launch(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
+            MenuEntry(Sym.SETTINGS, stringResource(R.string.clock_date_settings)) { host.close(); Env.launch(Intent(Settings.ACTION_DATE_SETTINGS)) }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
         ZonePicker(item.options["zone"]) { set(item.with("zone", it)) }
-        TextRow("Label", item.opt("label", ""), help = "Shown before the time, e.g. NYC", placeholder = "None") {
+        TextRow(stringResource(R.string.option_label), item.opt("label", ""), help = stringResource(R.string.clock_label_help),
+            placeholder = stringResource(R.string.option_none)) {
             set(item.with("label", it.take(12).ifBlank { null }))
         }
-        ChoiceRow("Hours", listOf("system" to "Like the system", "24" to "24-hour", "12" to "12-hour"), item.opt("hours", "system")) {
+        ChoiceRow(stringResource(R.string.clock_hours), listOf("system" to stringResource(R.string.option_like_system),
+            "24" to stringResource(R.string.clock_hours_24), "12" to stringResource(R.string.clock_hours_12)), item.opt("hours", "system")) {
             set(item.with("hours", it))
         }
-        SwitchRow("Seconds", item.optBool("seconds", true)) { set(item.with("seconds", it.toString())) }
+        SwitchRow(stringResource(R.string.clock_seconds), item.optBool("seconds", true)) { set(item.with("seconds", it.toString())) }
     }
 }
 
@@ -139,37 +149,47 @@ object ClockItem : ItemType("clock", "Clock", Sym.SCHEDULE, "A second clock: sec
 fun ZonePicker(current: String?, onPick: (String?) -> Unit) {
     var query by remember { mutableStateOf("") }
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Text("Time zone: " + (current?.let { cityOf(ZoneId.of(it)) + " ($it)" } ?: "this device's"), style = MaterialTheme.typography.labelLarge)
-        TextRow("Find a city or zone", query, placeholder = "e.g. Tokyo, London, New York") { query = it }
+        Text(current?.let { stringResource(R.string.clock_zone_named, cityOf(ZoneId.of(it)), it) } ?: stringResource(R.string.clock_zone_device),
+            style = MaterialTheme.typography.labelLarge)
+        TextRow(stringResource(R.string.clock_zone_find), query, placeholder = stringResource(R.string.clock_zone_find_hint)) { query = it }
         if (query.length >= 2) {
             val q = query.trim().replace(' ', '_').lowercase(Locale.ROOT)
             val hits = ZoneId.getAvailableZoneIds().filter { it.lowercase(Locale.ROOT).contains(q) && it.contains('/') }.sorted().take(8)
             hits.forEach { id -> MenuEntry(Sym.PUBLIC, cityOf(ZoneId.of(id)), id) { onPick(id); query = "" } }
-            if (hits.isEmpty()) Text("No zone matches", style = MaterialTheme.typography.bodySmall)
+            if (hits.isEmpty()) Text(stringResource(R.string.clock_zone_none), style = MaterialTheme.typography.bodySmall)
         }
-        if (current != null) TextButton(onClick = { onPick(null) }) { Text("Use this device's time zone") }
+        if (current != null) TextButton(onClick = { onPick(null) }) { Text(stringResource(R.string.clock_zone_use_device)) }
     }
 }
 
-object CalendarItem : ItemType("calendar", "Date and calendar", Sym.CALENDAR_MONTH, "Today's date; click for a month view with your events") {
+object CalendarItem : ItemType("calendar", R.string.item_calendar_title, Sym.CALENDAR_MONTH, R.string.item_calendar_desc) {
     override val refreshMs = 10_000L
 
     override fun state(item: ItemConfig): ItemState {
         val today = LocalDate.now()
-        val text = runCatching { today.format(DateTimeFormatter.ofPattern(item.opt("format", "EEE d MMM"), Locale.getDefault())) }
-            .getOrDefault(today.toString())
-        return ItemState(icon = Sym.CALENDAR_MONTH, text = text,
-            desc = today.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale.getDefault())))
+        // No pattern chosen: the locale's own short date ("Sun, Sep 28" in the US, "Sun 28 Sep" in the UK).
+        val pattern = item.options["format"]?.takeIf { it.isNotBlank() }
+        val text = if (pattern == null) Dates.format("EEEdMMM", today)
+            else runCatching { today.format(DateTimeFormatter.ofPattern(pattern, Locale.getDefault())) }.getOrDefault(today.toString())
+        return ItemState(icon = Sym.CALENDAR_MONTH, text = text, desc = Dates.format("EEEEdMMMMyyyy", today))
     }
+
+    /** A Sunday, to show what each date pattern looks like. */
+    private val sample = LocalDate.of(2025, 9, 28)
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host -> MonthMenu(item, host) }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        ChoiceRow("Date in the bar", listOf("EEE d MMM" to "Sun 28 Sep", "d MMM" to "28 Sep", "EEEE" to "Sunday",
-            "'W'w" to "Week number", "d.M." to "28.9."), item.opt("format", "EEE d MMM")) { set(item.with("format", it)) }
-        TextRow("Or your own pattern", item.opt("format", "EEE d MMM"),
-            help = "Java date pattern, e.g. EEE d MMM yyyy") { if (it.isNotBlank()) set(item.with("format", it)) }
-        SwitchRow("Week numbers in the month view", item.optBool("weeks", true)) { set(item.with("weeks", it.toString())) }
+        fun sampleOf(p: String) = sample.format(DateTimeFormatter.ofPattern(p, Locale.getDefault()))
+        // "" is the locale's own date; choosing it removes the option rather than storing a pattern.
+        ChoiceRow(stringResource(R.string.calendar_date_in_bar), listOf("" to stringResource(R.string.option_like_system),
+            "EEE d MMM" to sampleOf("EEE d MMM"), "d MMM" to sampleOf("d MMM"), "EEEE" to sampleOf("EEEE"),
+            "'W'w" to stringResource(R.string.calendar_week_number), "d.M." to sampleOf("d.M.")), item.opt("format", "")) {
+            set(item.with("format", it.ifBlank { null }))
+        }
+        TextRow(stringResource(R.string.calendar_own_pattern), item.opt("format", ""),
+            help = stringResource(R.string.calendar_own_pattern_help)) { if (it.isNotBlank()) set(item.with("format", it)) }
+        SwitchRow(stringResource(R.string.calendar_week_numbers), item.optBool("weeks", true)) { set(item.with("weeks", it.toString())) }
     }
 }
 
@@ -191,14 +211,14 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
         return Calendar.on(s, e, d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
     }
     val weekOf = WeekFields.of(Locale.getDefault()).weekOfWeekBasedYear()
-    MenuCard(Sym.CALENDAR_MONTH, today.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault())),
-        "Week ${today.get(weekOf)}") {
+    MenuCard(Sym.CALENDAR_MONTH, Dates.format("EEEEdMMMM", today),
+        stringResource(R.string.calendar_week, today.get(weekOf))) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(month.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + month.year,
+            Text(Dates.format("MMMMyyyy", month.atDay(1)),
                 style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            SmallIconButton(Sym.CHEVRON_LEFT, "Previous month") { offset-- }
-            if (offset != 0) TextButton(onClick = { offset = 0; picked = today }) { Text("Today") }
-            SmallIconButton(Sym.CHEVRON_RIGHT, "Next month") { offset++ }
+            SmallIconButton(Sym.CHEVRON_LEFT, stringResource(R.string.calendar_previous_month)) { offset-- }
+            if (offset != 0) TextButton(onClick = { offset = 0; picked = today }) { Text(stringResource(R.string.calendar_today)) }
+            SmallIconButton(Sym.CHEVRON_RIGHT, stringResource(R.string.calendar_next_month)) { offset++ }
         }
         val weeks = item.optBool("weeks", true)
         Row(Modifier.fillMaxWidth()) {
@@ -243,16 +263,16 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
         }
         MenuDivider()
         if (!allowed) {
-            Text("Allow calendar access to see your events here.", style = MaterialTheme.typography.bodySmall,
+            Text(stringResource(R.string.calendar_allow_hint), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
-            MenuEntry(Sym.EVENT, "Allow calendar access") { host.close(); MainActivity.requestPermission(Env.app, Manifest.permission.READ_CALENDAR) }
+            MenuEntry(Sym.EVENT, stringResource(R.string.calendar_allow)) { host.close(); MainActivity.requestPermission(Env.app, Manifest.permission.READ_CALENDAR) }
         } else {
-            SectionLabel(if (picked == today) "Today" else picked.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault())))
+            SectionLabel(if (picked == today) stringResource(R.string.calendar_today) else Dates.format("EEEEdMMMM", picked))
             val list = eventsOn(picked)
-            if (list.isEmpty()) Text("No events", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (list.isEmpty()) Text(stringResource(R.string.calendar_no_events), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             list.take(6).forEach { e -> EventRow(e) { host.close(); Calendar.open(e) } }
         }
-        MenuEntry(Sym.OPEN_IN_NEW, "Open Calendar") {
+        MenuEntry(Sym.OPEN_IN_NEW, stringResource(R.string.calendar_open)) {
             host.close(); Calendar.openDay(picked.atTime(9, 0).atZone(zone).toInstant().toEpochMilli())
         }
     }
@@ -267,13 +287,13 @@ private fun SmallIconButton(sym: String, label: String, onClick: () -> Unit) {
     }
 }
 
-private val shortTime get() = DateTimeFormatter.ofPattern(if (DateFormat.is24HourFormat(Env.app)) "HH:mm" else "h:mm a", Locale.getDefault())
+/** A wall time as the system shows it: its 12/24-hour setting, the locale's layout. */
+private fun shortTime(millis: Long): String = Dates.format(Dates.timeSkeleton(DateFormat.is24HourFormat(Env.app)), millis)
 
 @Composable
 fun EventRow(e: Calendar.Event, onClick: () -> Unit) {
     val zone = ZoneId.systemDefault()
-    val range = if (e.allDay) "All day" else
-        Instant.ofEpochMilli(e.begin).atZone(zone).format(shortTime) + " – " + Instant.ofEpochMilli(e.end).atZone(zone).format(shortTime)
+    val range = if (e.allDay) stringResource(R.string.calendar_all_day) else shortTime(e.begin) + " – " + shortTime(e.end)
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand)
         .padding(vertical = 6.dp, horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(width = 4.dp, height = 30.dp).clip(RoundedCornerShape(2.dp)).background(Color(e.color or 0xFF000000.toInt())))
@@ -288,67 +308,67 @@ fun EventRow(e: Calendar.Event, onClick: () -> Unit) {
     }
 }
 
-object EventItem : ItemType("event", "Next meeting", Sym.EVENT_UPCOMING, "Your next calendar event and a countdown, with a Join button") {
+object EventItem : ItemType("event", R.string.item_event_title, Sym.EVENT_UPCOMING, R.string.item_event_desc) {
     override val refreshMs = 5_000L
     override val canBeActive = true
     override val permissions = listOf(Manifest.permission.READ_CALENDAR)
 
     override fun state(item: ItemConfig): ItemState {
-        if (!Calendar.allowed()) return ItemState(icon = Sym.EVENT_UPCOMING, text = "Allow calendar", desc = "Calendar access needed")
+        if (!Calendar.allowed()) return ItemState(icon = Sym.EVENT_UPCOMING, text = Env.str(R.string.event_allow), desc = Env.str(R.string.event_access_needed))
         Calendar.refresh()
         val now = System.currentTimeMillis()
         val max = item.optInt("chars", 20)
         fun short(t: String) = if (t.length <= max) t else t.take(max - 1).trimEnd() + "…"
         val soon = item.optInt("soonMin", 15) * 60_000L
         Calendar.current(now)?.let { e ->
-            return ItemState(icon = Sym.EVENT, filled = true, text = "${short(e.title)} · ${Fmt.duration(e.end - now)} left",
-                active = true, tone = Tone.ACCENT, desc = "Now: ${e.title}, ends in ${Fmt.duration(e.end - now)}")
+            return ItemState(icon = Sym.EVENT, filled = true, text = Env.str(R.string.event_now_text, short(e.title), Fmt.duration(e.end - now)),
+                active = true, tone = Tone.ACCENT, desc = Env.str(R.string.event_now_desc, e.title, Fmt.duration(e.end - now)))
         }
-        val next = Calendar.next(now) ?: return ItemState(icon = Sym.EVENT_UPCOMING, text = "No more events", desc = "No upcoming events")
+        val next = Calendar.next(now) ?: return ItemState(icon = Sym.EVENT_UPCOMING, text = Env.str(R.string.event_no_more), desc = Env.str(R.string.event_none_upcoming))
         val until = next.begin - now
         val sameDay = LocalDate.now() == Instant.ofEpochMilli(next.begin).atZone(ZoneId.systemDefault()).toLocalDate()
         val whenText = when {
-            until < 60 * 60_000L -> "in ${Fmt.duration(until.coerceAtLeast(60_000))}"
-            sameDay -> Instant.ofEpochMilli(next.begin).atZone(ZoneId.systemDefault()).format(shortTime)
+            until < 60 * 60_000L -> Env.str(R.string.event_in, Fmt.duration(until.coerceAtLeast(60_000)))
+            sameDay -> shortTime(next.begin)
             else -> Instant.ofEpochMilli(next.begin).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("EEE", Locale.getDefault()))
         }
-        return ItemState(icon = Sym.EVENT_UPCOMING, text = "${short(next.title)} $whenText", active = until <= soon,
-            tone = if (until <= 5 * 60_000L) Tone.ACCENT else Tone.NORMAL, desc = "Next: ${next.title} $whenText")
+        return ItemState(icon = Sym.EVENT_UPCOMING, text = Env.str(R.string.event_next_text, short(next.title), whenText), active = until <= soon,
+            tone = if (until <= 5 * 60_000L) Tone.ACCENT else Tone.NORMAL, desc = Env.str(R.string.event_next_desc, next.title, whenText))
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
         rememberTick()
         val now = System.currentTimeMillis()
         if (!Calendar.allowed()) {
-            MenuCard(Sym.EVENT_UPCOMING, "Next meeting", "BentoBar needs to read your calendar for this") {
-                MenuEntry(Sym.EVENT, "Allow calendar access") { host.close(); MainActivity.requestPermission(Env.app, Manifest.permission.READ_CALENDAR) }
+            MenuCard(Sym.EVENT_UPCOMING, stringResource(R.string.item_event_title), stringResource(R.string.event_needs_calendar)) {
+                MenuEntry(Sym.EVENT, stringResource(R.string.calendar_allow)) { host.close(); MainActivity.requestPermission(Env.app, Manifest.permission.READ_CALENDAR) }
             }
         } else {
             val cur = Calendar.current(now)
             val next = Calendar.next(now)
             val focus = cur ?: next
-            MenuCard(Sym.EVENT_UPCOMING, focus?.title ?: "Nothing coming up",
+            MenuCard(Sym.EVENT_UPCOMING, focus?.title ?: stringResource(R.string.event_nothing_coming),
                 when {
-                    cur != null -> "Now · ends in ${Fmt.duration(cur.end - now)}"
-                    next != null -> "Starts in ${Fmt.duration(next.begin - now)}"
+                    cur != null -> stringResource(R.string.event_now_ends_in, Fmt.duration(cur.end - now))
+                    next != null -> stringResource(R.string.event_starts_in, Fmt.duration(next.begin - now))
                     else -> null
                 }) {
                 if (focus != null) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (focus.link != null) FilledTonalButton(onClick = { host.close(); Calendar.join(focus) }) {
-                        SymIcon(Sym.VIDEOCAM, size = 18.sp); Spacer(Modifier.width(8.dp)); Text("Join")
+                        SymIcon(Sym.VIDEOCAM, size = 18.sp); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.common_join))
                     }
-                    OutlinedButton(onClick = { host.close(); Calendar.open(focus) }) { Text("Open") }
+                    OutlinedButton(onClick = { host.close(); Calendar.open(focus) }) { Text(stringResource(R.string.common_open)) }
                 }
                 MenuDivider()
-                SectionLabel("Coming up")
+                SectionLabel(stringResource(R.string.event_coming_up))
                 val upcoming = Calendar.timed(now).filter { it != focus }.take(6)
-                if (upcoming.isEmpty()) Text("Nothing else in the next weeks", style = MaterialTheme.typography.bodyMedium,
+                if (upcoming.isEmpty()) Text(stringResource(R.string.event_nothing_else), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
                 var lastDay: LocalDate? = null
                 upcoming.forEach { e ->
                     val d = Instant.ofEpochMilli(e.begin).atZone(ZoneId.systemDefault()).toLocalDate()
                     if (d != lastDay && d != LocalDate.now()) {
-                        Text(d.format(DateTimeFormatter.ofPattern("EEEE d MMM", Locale.getDefault())), style = MaterialTheme.typography.labelMedium,
+                        Text(Dates.format("EEEEdMMM", d), style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                     }
                     lastDay = d
@@ -359,12 +379,15 @@ object EventItem : ItemType("event", "Next meeting", Sym.EVENT_UPCOMING, "Your n
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        SliderRow("Counts as active from", item.optInt("soonMin", 15), 1..60, { "$it min before" }) { set(item.with("soonMin", it.toString())) }
-        SliderRow("Longest title", item.optInt("chars", 20), 8..40, { "$it characters" }) { set(item.with("chars", it.toString())) }
+        val res = androidx.compose.ui.platform.LocalResources.current
+        SliderRow(stringResource(R.string.event_active_from), item.optInt("soonMin", 15), 1..60,
+            { res.getQuantityString(R.plurals.event_minutes_before, it, it) }) { set(item.with("soonMin", it.toString())) }
+        SliderRow(stringResource(R.string.event_longest_title), item.optInt("chars", 20), 8..40,
+            { res.getQuantityString(R.plurals.event_characters, it, it) }) { set(item.with("chars", it.toString())) }
     }
 }
 
-object TimerItem : ItemType("timer", "Timer", Sym.TIMER, "Countdown, stopwatch and Pomodoro; scroll to add minutes") {
+object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.string.item_timer_desc) {
     override val canBeActive = true
 
     override fun state(item: ItemConfig): ItemState {
@@ -372,20 +395,21 @@ object TimerItem : ItemType("timer", "Timer", Sym.TIMER, "Countdown, stopwatch a
         val now = Timers.now()
         if (s == null) {
             val done = Timers.finishedAt != 0L && now - Timers.finishedAt < 60_000
-            return if (done) ItemState(icon = Sym.TIMER, filled = true, text = "Done", active = true, tone = Tone.ALERT, desc = "Timer finished")
-            else ItemState(icon = Sym.TIMER, desc = "Timer")
+            return if (done) ItemState(icon = Sym.TIMER, filled = true, text = Env.str(R.string.common_done), active = true, tone = Tone.ALERT,
+                desc = Env.str(R.string.timer_finished_desc))
+            else ItemState(icon = Sym.TIMER, desc = Env.str(R.string.item_timer_title))
         }
         return when (s.mode) {
             Timers.Mode.STOPWATCH -> ItemState(icon = if (s.running) Sym.AVG_PACE else Sym.PAUSE, filled = true,
                 text = Fmt.clock(Timers.elapsed(s, now)), active = true, widthKey = "stopwatch",
-                desc = "Stopwatch ${Fmt.clock(Timers.elapsed(s, now))}")
+                desc = Env.str(R.string.timer_stopwatch_desc, Fmt.clock(Timers.elapsed(s, now))))
             else -> {
                 val left = Timers.remaining(s, now)
                 val onBreak = s.mode == Timers.Mode.POMODORO && s.phase != Timers.Phase.WORK
                 ItemState(icon = if (!s.running) Sym.PAUSE else if (onBreak) Sym.COFFEE else Sym.TIMER, filled = true,
                     text = Fmt.clock(left), active = true, tone = if (left < 60_000 && s.running) Tone.ACCENT else Tone.NORMAL,
                     widthKey = "countdown",
-                    desc = "${if (onBreak) "Break" else "Timer"} ${Fmt.clock(left)} left")
+                    desc = Env.str(if (onBreak) R.string.timer_break_left_desc else R.string.timer_left_desc, Fmt.clock(left)))
             }
         }
     }
@@ -400,31 +424,31 @@ object TimerItem : ItemType("timer", "Timer", Sym.TIMER, "Countdown, stopwatch a
         val s = Timers.state.collectAsStateValue()
         if (s == null) {
             var custom by remember { mutableStateOf("") }
-            MenuCard(Sym.TIMER, "Timer", "Scroll over the timer in the bar to add minutes") {
-                SectionLabel("Countdown")
+            MenuCard(Sym.TIMER, stringResource(R.string.item_timer_title), stringResource(R.string.timer_menu_hint)) {
+                SectionLabel(stringResource(R.string.timer_countdown))
                 val presets = listOf(1, 3, 5, 10, 15, 25, 45, 60)
-                ChipRow(presets.map { if (it < 60) "$it min" else "1 hour" }) { i -> Timers.startTimer(presets[i] * 60_000L, item.opt("label", "")) }
+                ChipRow(presets.map { if (it < 60) pluralStringResource(R.plurals.common_minutes_short, it, it) else pluralStringResource(R.plurals.common_hours, 1, 1) }) { i -> Timers.startTimer(presets[i] * 60_000L, item.opt("label", "")) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) { TextRow("Minutes", custom, numeric = true) { custom = it.filter(Char::isDigit).take(4) } }
+                    Box(Modifier.weight(1f)) { TextRow(stringResource(R.string.timer_minutes), custom, numeric = true) { custom = it.filter(Char::isDigit).take(4) } }
                     Spacer(Modifier.width(8.dp))
                     FilledTonalButton(onClick = { custom.toIntOrNull()?.takeIf { it > 0 }?.let { Timers.startTimer(it * 60_000L, item.opt("label", "")) } },
-                        enabled = (custom.toIntOrNull() ?: 0) > 0) { Text("Start") }
+                        enabled = (custom.toIntOrNull() ?: 0) > 0) { Text(stringResource(R.string.timer_start)) }
                 }
                 MenuDivider()
-                MenuEntry(Sym.AVG_PACE, "Stopwatch") { Timers.startStopwatch() }
-                MenuEntry(Sym.COFFEE, "Pomodoro", "25 + 5 min") { Timers.startPomodoro() }
+                MenuEntry(Sym.AVG_PACE, stringResource(R.string.timer_stopwatch)) { Timers.startStopwatch() }
+                MenuEntry(Sym.COFFEE, stringResource(R.string.timer_pomodoro), stringResource(R.string.timer_pomodoro_detail)) { Timers.startPomodoro() }
             }
         } else {
             val now = Timers.now()
             val title = when (s.mode) {
-                Timers.Mode.STOPWATCH -> "Stopwatch"
-                Timers.Mode.POMODORO -> if (s.phase == Timers.Phase.WORK) "Focus" else "Break"
-                Timers.Mode.TIMER -> s.label.ifBlank { "Timer" }
+                Timers.Mode.STOPWATCH -> stringResource(R.string.timer_stopwatch)
+                Timers.Mode.POMODORO -> stringResource(if (s.phase == Timers.Phase.WORK) R.string.timer_focus else R.string.timer_break)
+                Timers.Mode.TIMER -> s.label.ifBlank { stringResource(R.string.item_timer_title) }
             }
             val sub = when (s.mode) {
-                Timers.Mode.POMODORO -> "Round ${s.round + if (s.phase == Timers.Phase.WORK) 1 else 0} · long break every 4"
-                Timers.Mode.STOPWATCH -> if (s.running) "Running" else "Paused"
-                Timers.Mode.TIMER -> if (s.running) "Ends at " + Instant.ofEpochMilli(s.at).atZone(ZoneId.systemDefault()).format(shortTime) else "Paused"
+                Timers.Mode.POMODORO -> stringResource(R.string.timer_round, s.round + if (s.phase == Timers.Phase.WORK) 1 else 0)
+                Timers.Mode.STOPWATCH -> stringResource(if (s.running) R.string.timer_running else R.string.common_paused)
+                Timers.Mode.TIMER -> if (s.running) stringResource(R.string.common_ends_at, shortTime(s.at)) else stringResource(R.string.common_paused)
             }
             MenuCard(if (s.mode == Timers.Mode.STOPWATCH) Sym.AVG_PACE else Sym.TIMER, title, sub) {
                 val face = if (s.mode == Timers.Mode.STOPWATCH) Timers.elapsed(s, now) else Timers.remaining(s, now)
@@ -438,13 +462,13 @@ object TimerItem : ItemType("timer", "Timer", Sym.TIMER, "Countdown, stopwatch a
                     FilledTonalButton(onClick = { Timers.toggle() }, modifier = Modifier.weight(1f),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) {
                         SymIcon(if (s.running) Sym.PAUSE else Sym.PLAY_ARROW, size = 18.sp); Spacer(Modifier.width(6.dp))
-                        Text(if (s.running) "Pause" else "Resume", maxLines = 1)
+                        Text(stringResource(if (s.running) R.string.common_pause else R.string.common_resume), maxLines = 1)
                     }
                     if (s.mode != Timers.Mode.STOPWATCH) OutlinedButton(onClick = { Timers.add(60_000) },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) { Text("+1 min", maxLines = 1) }
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp)) { Text(stringResource(R.string.common_plus_one_min), maxLines = 1) }
                     androidx.compose.material3.OutlinedIconButton(onClick = { Timers.stop() }) {
                         SymIcon(if (s.mode == Timers.Mode.STOPWATCH) Sym.RESTART_ALT else Sym.STOP, size = 20.sp,
-                            contentDescription = if (s.mode == Timers.Mode.STOPWATCH) "Reset stopwatch" else "Stop timer")
+                            contentDescription = stringResource(if (s.mode == Timers.Mode.STOPWATCH) R.string.timer_reset_stopwatch else R.string.timer_stop))
                     }
                 }
             }
@@ -452,13 +476,14 @@ object TimerItem : ItemType("timer", "Timer", Sym.TIMER, "Countdown, stopwatch a
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow("Name for countdowns", item.opt("label", ""), placeholder = "Timer", help = "Shown in the alert when it ends") {
+        TextRow(stringResource(R.string.timer_name), item.opt("label", ""), placeholder = stringResource(R.string.item_timer_title),
+            help = stringResource(R.string.timer_name_help)) {
             set(item.with("label", it.take(30).ifBlank { null }))
         }
     }
 }
 
-object CountdownItem : ItemType("countdown", "Countdown", Sym.HOURGLASS_TOP, "Days and hours until a date you pick") {
+object CountdownItem : ItemType("countdown", R.string.item_countdown_title, Sym.HOURGLASS_TOP, R.string.item_countdown_desc) {
     override val refreshMs = 10_000L
     override val canBeActive = true
 
@@ -467,32 +492,36 @@ object CountdownItem : ItemType("countdown", "Countdown", Sym.HOURGLASS_TOP, "Da
     }.getOrNull()
 
     override fun state(item: ItemConfig): ItemState {
-        val t = target(item) ?: return ItemState(icon = Sym.HOURGLASS_TOP, text = "Set a date", desc = "Countdown without a date")
+        val t = target(item) ?: return ItemState(icon = Sym.HOURGLASS_TOP, text = Env.str(R.string.countdown_set_date), desc = Env.str(R.string.countdown_no_date))
         val left = t.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() - System.currentTimeMillis()
         val label = item.opt("label", "")
-        val text = if (left <= 0) "${label.ifBlank { "Now" }} ✓" else (if (label.isBlank()) "" else "$label ") + Fmt.duration(left)
+        val text = if (left <= 0) "${label.ifBlank { Env.str(R.string.countdown_now) }} ✓" else (if (label.isBlank()) "" else "$label ") + Fmt.duration(left)
         return ItemState(icon = Sym.HOURGLASS_TOP, text = text.trim(), active = left in 0..86_400_000L,
-            desc = "${label.ifBlank { "Countdown" }}: ${Fmt.duration(left.coerceAtLeast(0))} left")
+            desc = Env.str(R.string.countdown_desc, label.ifBlank { Env.str(R.string.item_countdown_title) }, Fmt.duration(left.coerceAtLeast(0))))
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host ->
         rememberTick()
         val t = target(item)
-        MenuCard(Sym.HOURGLASS_TOP, item.opt("label", "Countdown").ifBlank { "Countdown" },
-            t?.format(DateTimeFormatter.ofPattern("EEEE d MMMM yyyy, HH:mm", Locale.getDefault()))) {
+        val name = stringResource(R.string.item_countdown_title)
+        MenuCard(Sym.HOURGLASS_TOP, item.opt("label", name).ifBlank { name },
+            t?.let { Dates.format("EEEEdMMMMyyyy" + Dates.timeSkeleton(DateFormat.is24HourFormat(Env.app)), it.atZone(ZoneId.systemDefault())) }) {
             if (t != null) {
                 val left = t.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() - System.currentTimeMillis()
-                InfoRow("Time left", if (left > 0) Fmt.duration(left) else "Done")
-                InfoRow("Days", (left / 86_400_000L).coerceAtLeast(0).toString())
+                InfoRow(stringResource(R.string.countdown_time_left), if (left > 0) Fmt.duration(left) else stringResource(R.string.common_done))
+                InfoRow(stringResource(R.string.countdown_days), (left / 86_400_000L).coerceAtLeast(0).toString())
             }
             MenuDivider()
-            MenuEntry(Sym.EDIT, "Change date") { host.openItemSettings(item.id) }
+            MenuEntry(Sym.EDIT, stringResource(R.string.countdown_change_date)) { host.openItemSettings(item.id) }
         }
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow("Label", item.opt("label", ""), placeholder = "e.g. Launch") { set(item.with("label", it.take(16).ifBlank { null })) }
-        TextRow("Date and time", item.opt("at", ""), placeholder = "2026-12-24 18:00", help = "Year-month-day hour:minute") {
+        TextRow(stringResource(R.string.option_label), item.opt("label", ""), placeholder = stringResource(R.string.countdown_label_hint)) {
+            set(item.with("label", it.take(16).ifBlank { null }))
+        }
+        TextRow(stringResource(R.string.countdown_date_time), item.opt("at", ""), placeholder = "2026-12-24 18:00",
+            help = stringResource(R.string.countdown_date_time_help)) {
             set(item.with("at", it.trim().ifBlank { null }))
         }
     }

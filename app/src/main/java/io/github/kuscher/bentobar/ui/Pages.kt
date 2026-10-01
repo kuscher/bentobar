@@ -44,7 +44,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import io.github.kuscher.bentobar.BuildConfig
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ChipMode
 import io.github.kuscher.bentobar.data.ColorMode
 import io.github.kuscher.bentobar.data.Pill
@@ -73,13 +76,13 @@ private fun Page(content: @Composable () -> Unit) {
 fun AddPage(onAdded: (String) -> Unit) {
     val cfg by Store.config.collectAsState()
     val groups = listOf(
-        "System" to listOf("cpu", "network", "memory", "battery", "storage"),
-        "Time" to listOf("calendar", "event", "clock", "timer", "countdown"),
-        "Tools" to listOf("caffeine", "sound", "tools", "folder", "app", "text", "spacer"),
+        R.string.add_group_system to listOf("cpu", "network", "memory", "battery", "storage"),
+        R.string.add_group_time to listOf("calendar", "event", "clock", "timer", "countdown"),
+        R.string.add_group_tools to listOf("caffeine", "sound", "tools", "folder", "app", "text", "spacer"),
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp)) {
         groups.forEach { (group, types) ->
-            SectionLabel(group)
+            SectionLabel(stringResource(group))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 types.mapNotNull { Items.of(it) }.forEach { type ->
                     val count = cfg.items.count { it.type == type.type }
@@ -94,7 +97,7 @@ fun AddPage(onAdded: (String) -> Unit) {
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(type.title, style = MaterialTheme.typography.titleMedium)
-                                    if (count > 0) Text(if (count == 1) "In your bar" else "$count in your bar", style = MaterialTheme.typography.labelSmall,
+                                    if (count > 0) Text(pluralStringResource(R.plurals.add_in_your_bar, count, count), style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.primary)
                                 }
                             }
@@ -104,10 +107,10 @@ fun AddPage(onAdded: (String) -> Unit) {
                             Spacer(Modifier.height(10.dp))
                             Row {
                                 FilledTonalButton(onClick = { onAdded(Store.add(type.type, Section.SHOWN, type.defaultOptions())) }) {
-                                    SymIcon(Sym.ADD, size = 18.sp); Spacer(Modifier.width(6.dp)); Text("Add")
+                                    SymIcon(Sym.ADD, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.add_add))
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                TextButton(onClick = { onAdded(Store.add(type.type, Section.HIDDEN, type.defaultOptions())) }) { Text("Add hidden") }
+                                TextButton(onClick = { onAdded(Store.add(type.type, Section.HIDDEN, type.defaultOptions())) }) { Text(stringResource(R.string.add_add_hidden)) }
                             }
                         }
                     }
@@ -124,43 +127,50 @@ fun AddPage(onAdded: (String) -> Unit) {
 fun LookPage() {
     val cfg by Store.config.collectAsState()
     val context = LocalContext.current
+    val res = androidx.compose.ui.platform.LocalResources.current
     Page {
-        SectionLabel("Placement")
-        ChoiceRow("Where BentoBar sits", listOf(Position.RIGHT to "Next to the system icons", Position.CENTER to "Centre", Position.LEFT to "After the clock"),
+        SectionLabel(stringResource(R.string.look_placement))
+        ChoiceRow(stringResource(R.string.look_position), listOf(Position.RIGHT to stringResource(R.string.look_position_right),
+            Position.CENTER to stringResource(R.string.look_position_center), Position.LEFT to stringResource(R.string.look_position_left)),
             cfg.position) { p -> Store.update { it.copy(position = p) } }
-        SliderRow("Space between items", cfg.spacing, 0..24, { "$it dp" }) { v -> Store.update { it.copy(spacing = v) } }
-        SectionLabel("Look")
-        ChoiceRow("Text size", listOf(TextSize.SMALL to "Small", TextSize.DEFAULT to "Like the system", TextSize.LARGE to "Large"), cfg.textSize) { v ->
+        SliderRow(stringResource(R.string.look_spacing), cfg.spacing, 0..24, { "$it dp" }) { v -> Store.update { it.copy(spacing = v) } }
+        SectionLabel(stringResource(R.string.look_look))
+        ChoiceRow(stringResource(R.string.look_text_size), listOf(TextSize.SMALL to stringResource(R.string.look_text_small),
+            TextSize.DEFAULT to stringResource(R.string.option_like_system), TextSize.LARGE to stringResource(R.string.look_text_large)), cfg.textSize) { v ->
             Store.update { it.copy(textSize = v) }
         }
-        ChoiceRow("Colour", listOf(ColorMode.AUTO to "Match the status bar", ColorMode.LIGHT to "Light", ColorMode.DARK to "Dark"), cfg.color,
-            help = "Matching reads the colour of the status bar clock") { v -> Store.update { it.copy(color = v) } }
-        ChoiceRow("Background", listOf(Pill.NONE to "None, like the system", Pill.SUBTLE to "Soft pill", Pill.SOLID to "Solid pill"), cfg.pill) { v ->
+        ChoiceRow(stringResource(R.string.look_color), listOf(ColorMode.AUTO to stringResource(R.string.look_color_auto),
+            ColorMode.LIGHT to stringResource(R.string.look_color_light), ColorMode.DARK to stringResource(R.string.look_color_dark)), cfg.color,
+            help = stringResource(R.string.look_color_help)) { v -> Store.update { it.copy(color = v) } }
+        ChoiceRow(stringResource(R.string.look_background), listOf(Pill.NONE to stringResource(R.string.look_pill_none),
+            Pill.SUBTLE to stringResource(R.string.look_pill_subtle), Pill.SOLID to stringResource(R.string.look_pill_solid)), cfg.pill) { v ->
             Store.update { it.copy(pill = v) }
         }
-        SectionLabel("Hidden items")
-        SwitchRow("Show the ‹ button", cfg.chevron,
-            help = "Click it to show or hide your hidden items. Without it, hidden items only appear while active.") { v ->
+        SectionLabel(stringResource(R.string.barmenu_hidden_items))
+        SwitchRow(stringResource(R.string.look_chevron), cfg.chevron, help = stringResource(R.string.look_chevron_help)) { v ->
             Store.update { it.copy(chevron = v) }
         }
-        ChoiceRow("After revealing, hide them again", listOf(0 to "Only when I click ‹", 5 to "After 5 s", 10 to "After 10 s", 30 to "After 30 s"),
+        ChoiceRow(stringResource(R.string.look_collapse), listOf(0 to stringResource(R.string.look_collapse_never),
+            5 to pluralStringResource(R.plurals.look_collapse_after, 5, 5), 10 to pluralStringResource(R.plurals.look_collapse_after, 10, 10),
+            30 to pluralStringResource(R.plurals.look_collapse_after, 30, 30)),
             if (cfg.autoCollapseSec in listOf(0, 5, 10, 30)) cfg.autoCollapseSec else 0) { v -> Store.update { it.copy(autoCollapseSec = v) } }
-        SwitchRow("Reveal them when the pointer rests on BentoBar", cfg.revealOnHover) { v -> Store.update { it.copy(revealOnHover = v) } }
-        SectionLabel("Live Update chip")
-        ChoiceRow("Timer or meeting chip", listOf(ChipMode.OFF to "Off", ChipMode.FALLBACK to "When BentoBar is off", ChipMode.ALWAYS to "Always"),
-            cfg.chipMode, help = "Android shows one chip per app next to the system icons, and hides it while that app's own window is open. BentoBar uses it for a running timer, or a meeting that starts within 15 minutes.") { v ->
+        SwitchRow(stringResource(R.string.look_reveal_hover), cfg.revealOnHover) { v -> Store.update { it.copy(revealOnHover = v) } }
+        SectionLabel(stringResource(R.string.channel_live))
+        ChoiceRow(stringResource(R.string.look_chip), listOf(ChipMode.OFF to stringResource(R.string.common_off),
+            ChipMode.FALLBACK to stringResource(R.string.look_chip_fallback), ChipMode.ALWAYS to stringResource(R.string.look_chip_always)),
+            cfg.chipMode, help = stringResource(R.string.look_chip_help)) { v ->
             Store.update { it.copy(chipMode = v) }
         }
-        SectionLabel("Backup")
+        SectionLabel(stringResource(R.string.look_backup))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = {
-                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("BentoBar settings", Store.export()))
-                Toast.makeText(context, "Settings copied", Toast.LENGTH_SHORT).show()
-            }) { Text("Copy settings") }
+                context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(res.getString(R.string.look_clip_label), Store.export()))
+                Toast.makeText(context, res.getString(R.string.look_copied), Toast.LENGTH_SHORT).show()
+            }) { Text(stringResource(R.string.look_copy)) }
             OutlinedButton(onClick = {
                 val text = context.getSystemService(ClipboardManager::class.java)?.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
-                Toast.makeText(context, if (Store.import(text)) "Settings restored" else "The clipboard doesn't hold BentoBar settings", Toast.LENGTH_SHORT).show()
-            }) { Text("Paste settings") }
+                Toast.makeText(context, res.getString(if (Store.import(text)) R.string.look_restored else R.string.look_not_settings), Toast.LENGTH_SHORT).show()
+            }) { Text(stringResource(R.string.look_paste)) }
         }
     }
 }
@@ -182,8 +192,8 @@ private fun Step(n: Int, title: String, done: Boolean, optional: Boolean = false
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(title, style = MaterialTheme.typography.titleMedium)
-                    if (optional) { Spacer(Modifier.width(8.dp)); Text("optional", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline) }
-                    if (done) { Spacer(Modifier.width(8.dp)); Text("done", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
+                    if (optional) { Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.setup_optional), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline) }
+                    if (done) { Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.setup_done), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
                 }
                 Spacer(Modifier.height(4.dp))
                 content()
@@ -214,58 +224,55 @@ fun SetupPage(activity: Activity, setup: SetupState) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
                 Column(Modifier.padding(18.dp)) {
-                    Text("Advanced Protection is on", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onErrorContainer)
-                    Text("It allows only assistive accessibility services, so BentoBar can't run. The Live Update chip " +
-                        "and the Quick Settings tiles still work.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text(stringResource(R.string.setup_aap_title), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text(stringResource(R.string.setup_aap_text), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
                 }
             }
         }
-        Step(1, "Turn on BentoBar", running) {
-            Body("Android lets apps draw on the status bar only through an accessibility service, so turning BentoBar on " +
-                "happens in Accessibility settings. Android will say BentoBar can \"view and control your screen\"; here is what it actually does with that:")
+        Step(1, stringResource(R.string.setup_turn_on_title), running) {
+            Body(stringResource(R.string.setup_turn_on_text))
             Spacer(Modifier.height(6.dp))
-            Bullet("reads the layout of the status bar, and nothing else, to find free space for your items")
-            Bullet("copies the colour of the status bar clock so your items match it")
-            Bullet("runs system actions (screenshot, lock, overview…) when you pick them in the Tools menu")
+            Bullet(stringResource(R.string.setup_turn_on_reads))
+            Bullet(stringResource(R.string.setup_turn_on_copies))
+            Bullet(stringResource(R.string.setup_turn_on_runs))
             Spacer(Modifier.height(6.dp))
-            Body("It doesn't read other apps' windows, doesn't watch your keyboard, mouse or touches, and has no internet access: nothing leaves your device.")
+            Body(stringResource(R.string.setup_turn_on_doesnt))
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (running) TextButton(onClick = { MainActivity.openAccessibility(activity) }) { Text("Accessibility settings") }
-                else FilledTonalButton(onClick = { MainActivity.openAccessibility(activity) }, enabled = !setup.advancedProtection) { Text("Turn on") }
-                TextButton(onClick = { MainActivity.openAppInfo(activity) }) { Text("App info") }
+                if (running) TextButton(onClick = { MainActivity.openAccessibility(activity) }) { Text(stringResource(R.string.setup_accessibility_settings)) }
+                else FilledTonalButton(onClick = { MainActivity.openAccessibility(activity) }, enabled = !setup.advancedProtection) { Text(stringResource(R.string.setup_turn_on)) }
+                TextButton(onClick = { MainActivity.openAppInfo(activity) }) { Text(stringResource(R.string.setup_app_info)) }
             }
             if (!running) {
                 Spacer(Modifier.height(10.dp))
-                Text("Installed BentoBar from a download? Android guards this switch for such apps:", style = MaterialTheme.typography.bodyMedium)
-                Bullet("In Accessibility, open BentoBar and tap the switch. Android says \"Restricted setting\"; tap OK.")
-                Bullet("Tap App info above, then ⋮ (top right) › Allow restricted settings, and confirm with your PIN.")
-                Bullet("Come back to Accessibility › BentoBar and turn it on.")
+                Text(stringResource(R.string.setup_restricted_intro), style = MaterialTheme.typography.bodyMedium)
+                Bullet(stringResource(R.string.setup_restricted_1))
+                Bullet(stringResource(R.string.setup_restricted_2))
+                Bullet(stringResource(R.string.setup_restricted_3))
             }
             Spacer(Modifier.height(8.dp))
-            Text("About a day later, Android asks you to review apps with full device access. That's a standard check for every app " +
-                "like this; keep BentoBar if you're happy with what it does.", style = MaterialTheme.typography.bodySmall,
+            Text(stringResource(R.string.setup_review_note), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Step(2, "Notifications", setup.notifications) {
-            Body("For timer alerts, and the Live Update chip that shows a running timer when BentoBar is off.")
-            if (!setup.notifications) StepAction("Allow") { activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 3) }
+        Step(2, stringResource(R.string.setup_notifications_title), setup.notifications) {
+            Body(stringResource(R.string.setup_notifications_text))
+            if (!setup.notifications) StepAction(stringResource(R.string.common_allow)) { activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 3) }
         }
-        Step(3, "Live Updates", setup.liveUpdates, optional = true) {
-            Body("Lets Android show BentoBar's chip in the status bar. On by default; you can turn it off in Android's settings.")
+        Step(3, stringResource(R.string.setup_live_title), setup.liveUpdates, optional = true) {
+            Body(stringResource(R.string.setup_live_text))
             val open = {
                 if (!Env.launch(Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName)))
                     Env.launch(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName))
             }
-            if (setup.liveUpdates) StepLink("Open setting") { open() } else StepAction("Turn on") { open() }
+            if (setup.liveUpdates) StepLink(stringResource(R.string.setup_open_setting)) { open() } else StepAction(stringResource(R.string.setup_turn_on)) { open() }
         }
-        Step(4, "Calendar", setup.calendar, optional = true) {
-            Body("For the Next meeting item and the events in the month view. Read on this device only.")
-            if (!setup.calendar) StepAction("Allow") { activity.requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 4) }
+        Step(4, stringResource(R.string.setup_calendar_title), setup.calendar, optional = true) {
+            Body(stringResource(R.string.setup_calendar_text))
+            if (!setup.calendar) StepAction(stringResource(R.string.common_allow)) { activity.requestPermissions(arrayOf(Manifest.permission.READ_CALENDAR), 4) }
         }
-        Step(5, "Alarms and reminders", setup.exactAlarms, optional = true) {
-            Body("Lets timers ring on the second even while the Googlebook sleeps. Without it they may be a little late.")
-            if (!setup.exactAlarms) StepAction("Allow") {
+        Step(5, stringResource(R.string.setup_alarms_title), setup.exactAlarms, optional = true) {
+            Body(stringResource(R.string.setup_alarms_text))
+            if (!setup.exactAlarms) StepAction(stringResource(R.string.common_allow)) {
                 Env.launch(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + activity.packageName)))
             }
         }
@@ -295,32 +302,28 @@ fun AboutPage() {
             }
             Spacer(Modifier.width(16.dp))
             Column {
-                Text("BentoBar ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
-                Text("Add, hide and organise items in your Googlebook's status bar.", style = MaterialTheme.typography.bodyMedium,
+                Text(stringResource(R.string.about_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.about_tagline), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("Called DiscoBar until version 0.4.", style = MaterialTheme.typography.bodySmall,
+                Text(stringResource(R.string.about_formerly), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        SectionLabel("Privacy")
-        Body("BentoBar has no internet permission. Your settings, calendar events and everything it measures stay on this device. " +
-            "Its accessibility service reads only the status bar (its layout, and the colour of its clock), never other apps.")
-        SectionLabel("How it works")
-        Body("Android doesn't let apps change the system's own status bar icons. BentoBar draws its items in the empty part of the " +
-            "status bar, in windows of its own, and moves them out of the way when the system's icons change or an app goes full screen. " +
-            "Your running timer can also appear as an official Android Live Update chip.")
-        SectionLabel("Open source")
-        Body("BentoBar is free software under the MIT License.")
+        SectionLabel(stringResource(R.string.about_privacy))
+        Body(stringResource(R.string.about_privacy_text))
+        SectionLabel(stringResource(R.string.about_how))
+        Body(stringResource(R.string.about_how_text))
+        SectionLabel(stringResource(R.string.about_open_source))
+        Body(stringResource(R.string.about_open_source_text))
         Spacer(Modifier.height(4.dp))
-        Bullet("Material Symbols, © Google, Apache License 2.0")
-        Bullet("Jetpack Compose and AndroidX, © The Android Open Source Project, Apache License 2.0")
-        Bullet("Kotlin and kotlinx.serialization, © JetBrains, Apache License 2.0")
-        SectionLabel("Who made this")
-        Body("BentoBar is a personal hobby project by Alexander Kuscher (github.com/kuscher), proudly developed entirely on a Googlebook.")
+        Bullet(stringResource(R.string.about_credit_symbols))
+        Bullet(stringResource(R.string.about_credit_compose))
+        Bullet(stringResource(R.string.about_credit_kotlin))
+        SectionLabel(stringResource(R.string.about_who))
+        Body(stringResource(R.string.about_who_text))
         Spacer(Modifier.height(6.dp))
-        Body("It isn't affiliated with the author's employer: that employer didn't make, sponsor or endorse it, and BentoBar doesn't " +
-            "endorse that employer or its products either. The views and choices in it are the author's own.")
-        SectionLabel("Not affiliated")
-        Body("BentoBar is an independent project, not made by or affiliated with Google, or with Surtees Studios (Bartender) or Bjango (iStat Menus).")
+        Body(stringResource(R.string.about_employer_text))
+        SectionLabel(stringResource(R.string.about_not_affiliated))
+        Body(stringResource(R.string.about_not_affiliated_text))
     }
 }

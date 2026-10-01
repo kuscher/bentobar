@@ -9,6 +9,7 @@ import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import io.github.kuscher.bentobar.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.Serializable
@@ -130,11 +131,14 @@ object Timers {
                 else -> Phase.BREAK
             }
             val len = when (next) { Phase.WORK -> POMO_WORK; Phase.BREAK -> POMO_BREAK; Phase.LONG_BREAK -> POMO_LONG }
-            Notify.timerDone(app, if (s.phase == Phase.WORK) "Focus round done" else "Break's over",
-                if (next == Phase.WORK) "Next: 25 minutes of focus" else "Next: a ${len / 60_000}-minute break")
+            val minutes = (len / 60_000).toInt()
+            Notify.timerDone(app, app.getString(if (s.phase == Phase.WORK) R.string.timer_alert_focus_done else R.string.timer_alert_break_over),
+                if (next == Phase.WORK) app.getString(R.string.timer_alert_next_focus)
+                else app.resources.getQuantityString(R.plurals.timer_alert_next_break, minutes, minutes))
             set(State(Mode.POMODORO, true, now() + len, lengthMs = len, phase = next, round = round))
         } else {
-            Notify.timerDone(app, if (s.label.isNotBlank()) s.label else "Timer done", "${io.github.kuscher.bentobar.util.Fmt.duration(s.lengthMs)} timer finished")
+            Notify.timerDone(app, if (s.label.isNotBlank()) s.label else app.getString(R.string.timer_alert_done),
+                app.getString(R.string.timer_alert_finished, io.github.kuscher.bentobar.util.Fmt.duration(s.lengthMs)))
             set(null)
         }
     }

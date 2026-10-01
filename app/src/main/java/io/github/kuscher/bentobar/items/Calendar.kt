@@ -11,6 +11,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.CalendarContract
 import android.util.Log
+import io.github.kuscher.bentobar.R
 import java.util.concurrent.Executors
 
 /** Upcoming calendar events from the Calendar provider (needs READ_CALENDAR). */
@@ -75,7 +76,7 @@ object Calendar {
                 if (c.getInt(8) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
                 val location = c.getString(6).orEmpty()
                 out += Event(
-                    eventId = c.getLong(0), title = c.getString(1).orEmpty().ifBlank { "(No title)" },
+                    eventId = c.getLong(0), title = c.getString(1).orEmpty().ifBlank { app.getString(R.string.calendar_no_title) },
                     begin = c.getLong(2), end = c.getLong(3), allDay = c.getInt(4) != 0,
                     color = c.getInt(5), location = location,
                     link = findLink(location + "\n" + c.getString(7).orEmpty()),

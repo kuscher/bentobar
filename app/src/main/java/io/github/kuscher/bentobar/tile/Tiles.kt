@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.items.Caffeine
 import io.github.kuscher.bentobar.items.Env
@@ -32,7 +33,7 @@ class BarTile : TileService() {
         val running = Env.service != null
         val on = Store.config.value.enabled
         t.state = if (running && on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        t.subtitle = when { !running -> "Set up"; on -> "Shown"; else -> "Hidden" }
+        t.subtitle = getString(when { !running -> R.string.tile_set_up; on -> R.string.tile_shown; else -> R.string.tile_hidden })
         t.updateTile()
     }
 }
@@ -53,9 +54,9 @@ class AwakeTile : TileService() {
         val on = Caffeine.active()
         t.state = if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         t.subtitle = when {
-            Env.service == null -> "Set up BentoBar"
-            !on -> "Off"
-            Caffeine.until.value == Caffeine.FOREVER -> "On"
+            Env.service == null -> getString(R.string.tile_set_up_bentobar)
+            !on -> getString(R.string.common_off)
+            Caffeine.until.value == Caffeine.FOREVER -> getString(R.string.common_on)
             else -> Fmt.duration(Caffeine.until.value - System.currentTimeMillis())
         }
         t.updateTile()
@@ -77,9 +78,9 @@ class TimerTile : TileService() {
         val s = Timers.state.value
         t.state = if (s?.running == true) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         t.subtitle = when {
-            s == null -> "25 min"
-            s.mode == Timers.Mode.STOPWATCH -> Fmt.clock(Timers.elapsed(s)) + if (s.running) "" else " · paused"
-            else -> Fmt.clock(Timers.remaining(s)) + if (s.running) " left" else " · paused"
+            s == null -> resources.getQuantityString(R.plurals.common_minutes_short, 25, 25)
+            s.mode == Timers.Mode.STOPWATCH -> Fmt.clock(Timers.elapsed(s)).let { if (s.running) it else getString(R.string.tile_paused, it) }
+            else -> Fmt.clock(Timers.remaining(s)).let { getString(if (s.running) R.string.tile_left else R.string.tile_paused, it) }
         }
         t.updateTile()
     }

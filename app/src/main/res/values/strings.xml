@@ -5,14 +5,14 @@
     <!-- base -->
     <string name="app_name">BentoBar</string>
     <string name="a11y_label">BentoBar</string>
-    <string name="a11y_summary">Draws your BentoBar items in the status bar</string>
-    <string name="a11y_description">BentoBar draws the items you add (network speed, timer, calendar, tools…) on top of the status bar. Android only allows that through an accessibility service.\n\nWhat BentoBar does with it: it reads the layout of the status bar, and nothing else, to find free space; it copies the color of the status bar clock so your items match; and it runs system actions such as screenshot or lock when you pick them in its Tools menu.\n\nIt does not read other apps\' windows, does not watch your keyboard, mouse or touches, and has no internet access.</string>
+    <string name="a11y_summary">Draws your items in the status bar</string>
+    <string name="a11y_description">BentoBar draws your items (network speed, timer, calendar, tools…) on the status bar. Android allows that only through an accessibility service.\n\nWith it on, BentoBar: reads only the status bar\'s layout, to find free space for your items; reads the color of the status bar clock, so your items match it; and runs the system actions you pick in the Tools menu, such as screenshot or lock.\n\nIt doesn\'t read other apps\' windows or watch your keyboard, mouse or touches. What it reads stays on your Googlebook: BentoBar never collects or shares it. It has no internet permission.</string>
     <string name="tile_bar">BentoBar</string>
     <string name="tile_awake">Keep awake</string>
     <string name="tile_timer">Timer</string>
 
     <!-- env -->
-    <string name="toast_nothing_can_open">Nothing on this device can open that</string>
+    <string name="toast_nothing_can_open">No app can open this</string>
     <string name="common_unknown">Unknown</string>
     <string name="network_kind_offline">Offline</string>
     <string name="network_kind_wifi">Wi-Fi</string>
@@ -117,7 +117,7 @@
     <string name="storage_free_up">Free up space</string>
     <string name="usage_optin_data">See which apps use the most data</string>
     <string name="usage_optin_storage">See which apps use the most storage</string>
-    <string name="usage_explain">Usage access lets BentoBar read how much data and storage each app uses. Android\'s switch also covers which apps you use and when; BentoBar doesn\'t read that, and nothing leaves your device.</string>
+    <string name="usage_explain">Lets BentoBar read how much data and storage each app uses. Android\'s switch also covers which apps you use and when; BentoBar doesn\'t read that, and nothing leaves your device.</string>
     <string name="usage_turn_on">Turn on Usage access</string>
     <string name="usage_top_data">Most data today</string>
     <string name="usage_top_storage">Largest apps</string>
@@ -141,7 +141,7 @@
     <string name="clock_alarms">Alarms and timers</string>
     <string name="clock_date_settings">Date and time settings</string>
     <string name="option_label">Label</string>
-    <string name="clock_label_help">Shown before the time, e.g. NYC</string>
+    <string name="clock_label_help">Shown before the time, like NYC</string>
     <string name="option_none">None</string>
     <string name="clock_hours">Hours</string>
     <string name="option_like_system">Like the system</string>
@@ -151,7 +151,7 @@
     <string name="clock_zone_named">Time zone: %1$s (%2$s)</string>
     <string name="clock_zone_device">Time zone: this device\'s</string>
     <string name="clock_zone_find">Find a city or zone</string>
-    <string name="clock_zone_find_hint">e.g. Tokyo, London, New York</string>
+    <string name="clock_zone_find_hint">Tokyo, London, New York…</string>
     <string name="clock_zone_none">No zone matches</string>
     <string name="clock_zone_use_device">Use this device\'s time zone</string>
     <string name="item_calendar_title">Date and calendar</string>
@@ -159,7 +159,7 @@
     <string name="calendar_date_in_bar">Date in the bar</string>
     <string name="calendar_week_number">Week number</string>
     <string name="calendar_own_pattern">Or your own pattern</string>
-    <string name="calendar_own_pattern_help">Java date pattern, e.g. EEE d MMM yyyy</string>
+    <string name="calendar_own_pattern_help">A Java date pattern, like EEE d MMM yyyy</string>
     <string name="calendar_week_numbers">Week numbers in the month view</string>
     <string name="calendar_week">Week %1$d</string>
     <string name="calendar_previous_month">Previous month</string>
@@ -167,7 +167,6 @@
     <string name="calendar_next_month">Next month</string>
     <string name="calendar_allow_hint">Allow calendar access to see your events here.</string>
     <string name="calendar_allow">Allow calendar access</string>
-    <string name="calendar_no_events">No events</string>
     <string name="calendar_open">Open Calendar</string>
     <string name="calendar_all_day">All day</string>
     <string name="item_event_title">Next meeting</string>
@@ -221,17 +220,17 @@
     <string name="countdown_time_left">Time left</string>
     <string name="countdown_days">Days</string>
     <string name="countdown_change_date">Change date</string>
-    <string name="countdown_label_hint">e.g. Launch</string>
+    <string name="countdown_label_hint">Launch</string>
     <string name="countdown_date_time">Date and time</string>
     <string name="countdown_date_time_help">Year-month-day hour:minute</string>
 
     <!-- tool -->
     <string name="item_caffeine_title">Keep awake</string>
-    <string name="item_caffeine_desc">Stops the screen from turning off; click to switch</string>
+    <string name="item_caffeine_desc">Keeps the screen on; click to turn on or off</string>
     <string name="common_on">On</string>
     <string name="caffeine_on_desc">Keeping the screen on</string>
     <string name="caffeine_off_desc">Keep awake is off</string>
-    <string name="caffeine_needs_service">Turn on BentoBar (accessibility) to use this</string>
+    <string name="caffeine_needs_service">Turn on BentoBar in Setup to use this</string>
     <string name="caffeine_off_subtitle">The screen turns off as usual</string>
     <string name="caffeine_until_off_subtitle">Screen stays on until you turn this off</string>
     <string name="caffeine_for_subtitle">Screen stays on for %1$s</string>
@@ -292,7 +291,7 @@
     <string name="folder_choose_apps">Choose apps</string>
     <string name="folder_name">Name</string>
     <string name="item_text_title">Text or emoji</string>
-    <string name="item_text_desc">Your own label, optionally opening a link</string>
+    <string name="item_text_desc">Your own label, with an optional link</string>
     <string name="text_default">Hello</string>
     <string name="text_icon_star">Star</string>
     <string name="text_icon_heart">Heart</string>
@@ -348,7 +347,7 @@
     <!-- menus -->
     <string name="context_shown">Shown in the bar</string>
     <string name="context_hidden_when_active">Hidden, shows when active</string>
-    <string name="section_hidden">Hidden behind ‹</string>
+    <string name="section_hidden">Hidden</string>
     <string name="context_always_show">Always show</string>
     <string name="context_show_when_active">Show when active</string>
     <string name="display_show_as">Show as</string>
@@ -360,8 +359,8 @@
     <string name="barmenu_hidden_items">Hidden items</string>
     <string name="barmenu_edit">Edit the bar…</string>
     <string name="barmenu_hide">Hide BentoBar</string>
-    <string name="barmenu_hide_detail">e.g. to present</string>
-    <string name="barmenu_bring_back">Bring it back from BentoBar\'s app or its Quick Settings tile.</string>
+    <string name="barmenu_hide_detail">All items, until you show it again</string>
+    <string name="barmenu_bring_back">Show it again from the BentoBar app or its Quick Settings tile.</string>
 
     <!-- barui -->
     <string name="chevron_hide">Hide BentoBar\'s hidden items</string>
@@ -381,11 +380,11 @@
     <string name="page_setup">Setup</string>
     <string name="page_about">About BentoBar</string>
     <string name="status_service_off">BentoBar\'s accessibility service is off. Turn it on in Setup.</string>
-    <string name="status_hidden">Hidden for now; switch it back on here or with the Quick Settings tile.</string>
+    <string name="status_hidden">Hidden. Show it again here or with the Quick Settings tile.</string>
     <string name="status_starting">Starting…</string>
-    <string name="status_no_room">The status bar has no free space for BentoBar\'s items right now.</string>
-    <string name="status_no_bar">The status bar is hidden right now (a full-screen app), so BentoBar is too.</string>
-    <string name="status_covered">A system panel covers the status bar; BentoBar is back when it closes.</string>
+    <string name="status_no_room">No free space in the status bar right now.</string>
+    <string name="status_no_bar">A full-screen app hides the status bar, and BentoBar with it.</string>
+    <string name="status_covered">A system panel covers the status bar. BentoBar returns when it closes.</string>
     <string name="status_live">Live in the status bar. Changes apply right away.</string>
     <string name="show_in_status_bar">Show in status bar</string>
 
@@ -395,7 +394,7 @@
     <string name="bar_undo">Undo</string>
     <string name="bar_all_items">All items</string>
     <string name="bar_banner_title">One step left: turn on BentoBar</string>
-    <string name="bar_banner_text">Android only lets apps draw on the status bar through an accessibility service. Setup explains what that means.</string>
+    <string name="bar_banner_text">Apps can draw on the status bar only through an accessibility service. Setup explains what BentoBar does with it.</string>
     <string name="bar_banner_set_up">Set up</string>
     <string name="bar_placeholder_title">Pick an item to change it</string>
     <string name="bar_placeholder_text">Or right-click an item in the status bar.</string>
@@ -403,12 +402,12 @@
     <string name="bar_preview_hint_hidden">Preview. Click an item to edit it, and ‹ to show hidden items.</string>
     <string name="section_shown">In the bar</string>
     <string name="section_shown_help">Left to right, as they appear</string>
-    <string name="section_hidden_reveal_both">Revealed by the ‹ button or by hovering over BentoBar.</string>
-    <string name="section_hidden_reveal_chevron">Revealed by the ‹ button.</string>
-    <string name="section_hidden_help">%1$s Items set to show when active pop out on their own.</string>
+    <string name="section_hidden_reveal_both">Click ‹ or hover over BentoBar to see them.</string>
+    <string name="section_hidden_reveal_chevron">Click ‹ to see them.</string>
+    <string name="section_hidden_help">%1$s Items with a Show when… rule pop out on their own.</string>
     <string name="section_off_help">Kept with their settings, not shown</string>
     <string name="section_empty">Nothing here</string>
-    <string name="row_overflow">doesn\'t fit in the bar right now (in the ‹ menu)</string>
+    <string name="row_overflow">doesn\'t fit right now (in the ‹ menu)</string>
     <string name="row_when_active">shows when active</string>
     <string name="row_icon_only">icon only</string>
     <string name="row_text_only">text only</string>
@@ -418,12 +417,12 @@
     <string name="row_more">More for %1$s</string>
     <string name="row_show_in_bar">Show in the bar</string>
     <string name="common_delete">Delete</string>
-    <string name="detail_needs_calendar">This item needs access to your calendar. It stays on this device.</string>
+    <string name="detail_needs_calendar">This item needs calendar access. Your events stay on this device.</string>
     <string name="common_allow">Allow</string>
     <string name="detail_where">Where</string>
     <string name="detail_trigger_help">Waits behind ‹ and pops into the bar while this is true</string>
-    <string name="detail_trigger_help_not_hidden">Only items behind ‹ pop into the bar. This one is not hidden now.</string>
-    <string name="detail_trigger_help_move">Turning this on moves it behind ‹. It pops into the bar while this is true.</string>
+    <string name="detail_trigger_help_not_hidden">Only hidden items pop into the bar, and this one isn\'t hidden.</string>
+    <string name="detail_trigger_help_move">Turning this on moves it to Hidden. It pops into the bar while this is true.</string>
     <string name="trigger_network">Show when downloading or uploading faster than %1$s</string>
     <string name="trigger_network_short">shows above %1$s</string>
     <string name="trigger_cpu">Show when CPU load is above %1$s</string>
@@ -440,7 +439,7 @@
     <string name="trigger_timer_short">shows while a timer runs</string>
     <string name="trigger_countdown">Show in the last 24 hours before the date</string>
     <string name="trigger_countdown_short">shows in the last 24 hours</string>
-    <string name="trigger_caffeine">Show while keep awake is on</string>
+    <string name="trigger_caffeine">Show while Keep awake is on</string>
     <string name="trigger_caffeine_short">shows while on</string>
     <string name="detail_options">Options</string>
     <string name="detail_duplicate">Duplicate</string>
@@ -471,63 +470,61 @@
     <string name="look_pill_subtle">Soft pill</string>
     <string name="look_pill_solid">Solid pill</string>
     <string name="look_collapse">After revealing, hide them again</string>
-    <string name="look_collapse_never">Only when I click ‹</string>
-    <string name="look_chip">Timer or meeting chip</string>
+    <string name="look_collapse_never">When I click elsewhere</string>
+    <string name="look_chip">Live Update chip</string>
     <string name="look_chip_fallback">When BentoBar is off</string>
     <string name="look_chip_always">Always</string>
-    <string name="look_chip_help">Android shows one chip per app next to the system icons, and hides it while that app\'s own window is open. BentoBar uses it for a running timer, or a meeting that starts within 15 minutes.</string>
+    <string name="look_chip_help">Android shows one chip per app, next to the system icons, and hides it while that app\'s window is open. BentoBar uses it for a running timer or a meeting starting within 15 minutes.</string>
     <string name="look_backup">Backup</string>
     <string name="look_clip_label">BentoBar settings</string>
     <string name="look_copied">Settings copied</string>
     <string name="look_copy">Copy settings</string>
     <string name="look_restored">Settings restored</string>
-    <string name="look_not_settings">The clipboard doesn\'t hold BentoBar settings</string>
+    <string name="look_not_settings">No BentoBar settings on the clipboard</string>
     <string name="look_paste">Paste settings</string>
     <string name="setup_optional">optional</string>
     <string name="setup_done">done</string>
     <string name="setup_aap_title">Advanced Protection is on</string>
-    <string name="setup_aap_text">It allows only assistive accessibility services, so BentoBar can\'t run. The Live Update chip and the Quick Settings tiles still work.</string>
+    <string name="setup_aap_text">It allows only assistive accessibility services, so BentoBar can\'t run. The Live Update chip and Quick Settings tiles still work.</string>
     <string name="setup_turn_on_title">Turn on BentoBar</string>
-    <string name="setup_turn_on_text">Android lets apps draw on the status bar only through an accessibility service, so turning BentoBar on happens in Accessibility settings. Android will say BentoBar can \"view and control your screen\"; here is what it actually does with that:</string>
-    <string name="setup_turn_on_reads">reads the layout of the status bar, and nothing else, to find free space for your items</string>
-    <string name="setup_turn_on_copies">copies the color of the status bar clock so your items match it</string>
-    <string name="setup_turn_on_runs">runs system actions (screenshot, lock, overview…) when you pick them in the Tools menu</string>
-    <string name="setup_turn_on_doesnt">It doesn\'t read other apps\' windows, doesn\'t watch your keyboard, mouse or touches, and has no internet access: nothing leaves your device.</string>
+    <string name="setup_turn_on_text">Apps can draw on the status bar only through an accessibility service, which Android says can \"view and control your screen\". With it on, BentoBar:</string>
+    <string name="setup_turn_on_reads">reads only the status bar\'s layout, to find free space for your items</string>
+    <string name="setup_turn_on_copies">reads the color of the status bar clock, so your items match it</string>
+    <string name="setup_turn_on_runs">runs the system actions you pick in the Tools menu, such as screenshot or lock</string>
+    <string name="setup_turn_on_doesnt">It doesn\'t read other apps\' windows or watch your keyboard, mouse or touches. What it reads stays on your Googlebook: BentoBar never collects or shares it.</string>
     <string name="setup_accessibility_settings">Accessibility settings</string>
     <string name="setup_turn_on">Turn on</string>
     <string name="setup_app_info">App info</string>
-    <string name="setup_restricted_intro">Installed BentoBar from a download? Android guards this switch for such apps:</string>
-    <string name="setup_restricted_1">In Accessibility, open BentoBar and tap the switch. Android says \"Restricted setting\"; tap OK.</string>
-    <string name="setup_restricted_2">Tap App info above, then ⋮ (top right) › Allow restricted settings, and confirm with your PIN.</string>
-    <string name="setup_restricted_3">Come back to Accessibility › BentoBar and turn it on.</string>
-    <string name="setup_review_note">About a day later, Android asks you to review apps with full device access. That\'s a standard check for every app like this; keep BentoBar if you\'re happy with what it does.</string>
+    <string name="setup_restricted_intro">Installed from a download? Android restricts the switch until you allow it:</string>
+    <string name="setup_restricted_1">In Accessibility settings, open BentoBar and tap the switch. At \"Restricted setting\", tap OK.</string>
+    <string name="setup_restricted_2">Tap App info above, then ⋮ › Allow restricted settings, and enter your PIN.</string>
+    <string name="setup_restricted_3">Go back to Accessibility settings › BentoBar and turn it on.</string>
+    <string name="setup_review_note">About a day later, Android asks you to review apps with full device access. That\'s routine for apps like this.</string>
     <string name="setup_notifications_title">Notifications</string>
-    <string name="setup_notifications_text">For timer alerts, and the Live Update chip that shows a running timer when BentoBar is off.</string>
+    <string name="setup_notifications_text">For timer alerts and the Live Update chip.</string>
     <string name="setup_live_title">Live Updates</string>
-    <string name="setup_live_text">Lets Android show BentoBar\'s chip in the status bar. On by default; you can turn it off in Android\'s settings.</string>
+    <string name="setup_live_text">Lets the Live Update chip appear in the status bar. On by default.</string>
     <string name="setup_open_setting">Open setting</string>
     <string name="setup_calendar_title">Calendar</string>
-    <string name="setup_calendar_text">For the Next meeting item and the events in the month view. Read on this device only.</string>
+    <string name="setup_calendar_text">For the Next meeting item and events in the month view. Stays on this device.</string>
     <string name="setup_alarms_title">Alarms and reminders</string>
-    <string name="setup_alarms_text">Lets timers ring on the second even while the Googlebook sleeps. Without it they may be a little late.</string>
+    <string name="setup_alarms_text">Lets timers ring on time while your Googlebook sleeps; without it, they may run late.</string>
     <string name="setup_usage_title">Usage access</string>
     <string name="about_version">BentoBar %1$s</string>
     <string name="about_tagline">Add, hide and organize items in your Googlebook\'s status bar.</string>
-    <string name="about_formerly">Called DiscoBar until version 0.4.</string>
+    <string name="about_formerly">Called DiscoBar until version 0.4.1.</string>
     <string name="about_privacy">Privacy</string>
-    <string name="about_privacy_text">BentoBar has no internet permission. Your settings, calendar events and everything it measures stay on this device. Its accessibility service reads only the status bar (its layout, and the color of its clock), never other apps. If you turn on Usage access, BentoBar also reads how much data and storage each app uses, for the Network and Storage menus, and nothing else with that access.</string>
+    <string name="about_privacy_text">BentoBar has no internet permission: your settings, calendar events and everything it measures stay on your Googlebook. Its accessibility service reads only the status bar (its layout and its clock\'s color), never other apps. With Usage access on, it also reads how much data and storage each app uses, for the Network and Storage menus, and nothing else.</string>
     <string name="about_how">How it works</string>
-    <string name="about_how_text">Android doesn\'t let apps change the system\'s own status bar icons. BentoBar draws its items in the empty part of the status bar, in windows of its own, and moves them out of the way when the system\'s icons change or an app goes full screen. Your running timer can also appear as an official Android Live Update chip.</string>
+    <string name="about_how_text">Apps can\'t change Android\'s own status bar icons, so BentoBar draws its items in its own windows over the status bar\'s free space. It moves them aside when the system icons change and hides them when an app goes full screen. A running timer or meeting can also appear as a Live Update chip.</string>
     <string name="about_open_source">Open source</string>
     <string name="about_open_source_text">BentoBar is free software under the MIT License.</string>
     <string name="about_credit_symbols">Material Symbols, © Google, Apache License 2.0</string>
     <string name="about_credit_compose">Jetpack Compose and AndroidX, © The Android Open Source Project, Apache License 2.0</string>
     <string name="about_credit_kotlin">Kotlin and kotlinx.serialization, © JetBrains, Apache License 2.0</string>
     <string name="about_who">Who made this</string>
-    <string name="about_who_text">BentoBar is a personal hobby project by Alexander Kuscher (github.com/kuscher), proudly developed entirely on a Googlebook.</string>
-    <string name="about_employer_text">It isn\'t affiliated with the author\'s employer: that employer didn\'t make, sponsor or endorse it, and BentoBar doesn\'t endorse that employer or its products either. The views and choices in it are the author\'s own.</string>
-    <string name="about_not_affiliated">Not affiliated</string>
-    <string name="about_not_affiliated_text">BentoBar is an independent project, not made by or affiliated with Google, or with Surtees Studios (Bartender) or Bjango (iStat Menus).</string>
+    <string name="about_who_text">A personal project by Alexander Kuscher (github.com/kuscher), built entirely on a Googlebook.</string>
+    <string name="about_independent_text">BentoBar isn\'t made, sponsored or endorsed by Google, or by the makers of Bartender (Surtees Studios) or iStat Menus (Bjango), and it doesn\'t endorse them. The views and choices in it are the author\'s own.</string>
 
     <!-- plurals: system -->
     <plurals name="cpu_menu_subtitle">
@@ -581,11 +578,9 @@
         <item quantity="other">After %1$d s</item>
     </plurals>
     <string name="add_added">Added %1$s</string>
-    <string name="setup_use_name_notifications">notifications</string>
-    <string name="setup_use_name_calendar">your calendar</string>
-    <string name="setup_use_off_runtime">BentoBar stopped using %1$s. Android takes the permission back the next time BentoBar restarts.</string>
-    <string name="setup_use_off_exact">BentoBar stopped using exact alarms. Android keeps the access until you remove it under Alarms and reminders.</string>
-    <string name="setup_denied_settings">Android won\'t ask again. You can still allow it in BentoBar\'s app info.</string>
+    <string name="setup_use_off_runtime">Permission revoked at next restart</string>
+    <string name="setup_use_off_exact">Stopped using exact alarms</string>
+    <string name="setup_denied_settings">Android won\'t ask again. You can allow it in App info.</string>
     <string name="common_open_settings">Open settings</string>
     <string name="barmenu_presenting">Presenting mode</string>
     <string name="barmenu_presenting_detail">For screen sharing</string>
@@ -596,7 +591,9 @@
     <string name="look_hidden_show_all">Show everything</string>
     <string name="look_hidden_click">Behind ‹, on click</string>
     <string name="look_hidden_hover">Behind ‹, on hover</string>
-    <string name="look_hidden_mode_help">Show everything puts every item in the bar while it fits. Items with a Show when rule appear only while it applies.</string>
+    <string name="look_hidden_mode_help">Show everything puts all items in the bar when there\'s room. Items with a Show when… rule appear only while it applies.</string>
     <string name="section_when_active">When active</string>
-    <string name="section_hidden_reveal_show_all">Shown while their Show when rule applies. Items here without a rule always show.</string>
+    <string name="section_hidden_reveal_show_all">Shown while their Show when… rule applies. Items without a rule always show.</string>
+    <string name="calendar_tomorrow">Tomorrow</string>
+    <string name="calendar_no_events_week">Nothing in the next 7 days</string>
 </resources>

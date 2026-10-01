@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -216,9 +217,11 @@ private fun Step(n: Int, title: String, done: Boolean, optional: Boolean = false
 private fun Body(text: String) = Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
 @Composable
-private fun Bullet(text: String) = Row(Modifier.padding(start = 4.dp, top = 2.dp)) {
-    Text("•  ", style = MaterialTheme.typography.bodyMedium)
-    Text(text, style = MaterialTheme.typography.bodyMedium)
+private fun Bullet(text: String) = Row(Modifier.padding(start = 4.dp, top = 4.dp)) {
+    // Same size and color as the paragraphs around it, so a list reads as part of the text.
+    Text("•", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(Modifier.width(8.dp))
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /**
@@ -248,7 +251,7 @@ fun SetupPage(activity: Activity, setup: SetupState) {
             Spacer(Modifier.height(6.dp))
             Body(stringResource(R.string.setup_turn_on_doesnt))
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.offset(x = if (running) (-12).dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (running) TextButton(onClick = { MainActivity.openAccessibility(activity) }) { Text(stringResource(R.string.setup_accessibility_settings)) }
                 else FilledTonalButton(onClick = { MainActivity.openAccessibility(activity) }, enabled = !setup.advancedProtection) { Text(stringResource(R.string.setup_turn_on)) }
                 TextButton(onClick = { MainActivity.openAppInfo(activity) }) { Text(stringResource(R.string.setup_app_info)) }
@@ -266,7 +269,7 @@ fun SetupPage(activity: Activity, setup: SetupState) {
         }
         Step(2, stringResource(R.string.setup_notifications_title), setup.notifications) {
             UseSwitch(stringResource(R.string.setup_notifications_text), stringResource(R.string.setup_notifications_title), setup.notifications) { on ->
-                setRuntimeUse(activity, Uses.NOTIFICATIONS, Manifest.permission.POST_NOTIFICATIONS, 3, R.string.setup_use_name_notifications, on)
+                setRuntimeUse(activity, Uses.NOTIFICATIONS, Manifest.permission.POST_NOTIFICATIONS, 3, on)
             }
         }
         Step(3, stringResource(R.string.setup_live_title), setup.liveUpdates, optional = true) {
@@ -279,7 +282,7 @@ fun SetupPage(activity: Activity, setup: SetupState) {
         }
         Step(4, stringResource(R.string.setup_calendar_title), setup.calendar, optional = true) {
             UseSwitch(stringResource(R.string.setup_calendar_text), stringResource(R.string.setup_calendar_title), setup.calendar) { on ->
-                setRuntimeUse(activity, Uses.CALENDAR, Manifest.permission.READ_CALENDAR, 4, R.string.setup_use_name_calendar, on)
+                setRuntimeUse(activity, Uses.CALENDAR, Manifest.permission.READ_CALENDAR, 4, on)
             }
         }
         Step(5, stringResource(R.string.setup_alarms_title), setup.exactAlarms, optional = true) {
@@ -314,7 +317,7 @@ private fun UseSwitch(text: String, label: String, on: Boolean, onChange: (Boole
  * (revokeSelfPermissionOnKill), which Android completes the next time BentoBar's process restarts;
  * the accessibility service keeps it running, so in practice at the next update or reboot.
  */
-private fun setRuntimeUse(activity: Activity, key: String, permission: String, request: Int, name: Int, on: Boolean) {
+private fun setRuntimeUse(activity: Activity, key: String, permission: String, request: Int, on: Boolean) {
     val granted = activity.checkSelfPermission(permission) == android.content.pm.PackageManager.PERMISSION_GRANTED
     if (on) {
         Store.update { it.copy(turnedOff = it.turnedOff - key) }
@@ -322,7 +325,7 @@ private fun setRuntimeUse(activity: Activity, key: String, permission: String, r
     } else {
         Store.update { it.copy(turnedOff = it.turnedOff + key) }
         if (granted) activity.revokeSelfPermissionOnKill(permission)
-        Notice.post(activity.getString(R.string.setup_use_off_runtime, activity.getString(name)))
+        Notice.post(activity.getString(R.string.setup_use_off_runtime))
     }
     Setup.refresh(activity)
 }
@@ -336,7 +339,7 @@ private fun setExactAlarmsUse(activity: Activity, on: Boolean) {
         if (!can) open()
     } else {
         Store.update { it.copy(turnedOff = it.turnedOff + Uses.EXACT_ALARMS) }
-        if (can) Notice.post(activity.getString(R.string.setup_use_off_exact), activity.getString(R.string.common_open_settings)) { open() }
+        if (can) Notice.post(activity.getString(R.string.setup_use_off_exact))
     }
     Setup.refresh(activity)
 }
@@ -349,7 +352,7 @@ private fun StepAction(label: String, onClick: () -> Unit) =
 /** A done step's way to change it. */
 @Composable
 private fun StepLink(label: String, onClick: () -> Unit) =
-    TextButton(onClick = onClick, modifier = Modifier.padding(top = 4.dp)) { Text(label) }
+    TextButton(onClick = onClick, modifier = Modifier.padding(top = 4.dp).offset(x = (-12).dp)) { Text(label) }
 
 // ---- About ---------------------------------------------------------------------------------
 
@@ -383,9 +386,7 @@ fun AboutPage() {
         Bullet(stringResource(R.string.about_credit_kotlin))
         SectionLabel(stringResource(R.string.about_who))
         Body(stringResource(R.string.about_who_text))
-        Spacer(Modifier.height(6.dp))
-        Body(stringResource(R.string.about_employer_text))
-        SectionLabel(stringResource(R.string.about_not_affiliated))
-        Body(stringResource(R.string.about_not_affiliated_text))
+        Spacer(Modifier.height(8.dp))
+        Body(stringResource(R.string.about_independent_text))
     }
 }

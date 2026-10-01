@@ -11,6 +11,35 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## Unreleased (2026-09-30): fixes and polish from a second device (Acer Googlebook 14)
+Found testing 0.5 on an Acer Googlebook 14, whose status bar is opaque black (the HP's is
+transparent), with a release installed from GitHub (Play Protect, restricted settings). Nine PRs,
+merged in order; CHANGELOG "Unreleased" has the user-facing list. What changed, by area:
+- **Strip:** color sampled apart from the bar's own background, every color held to 4.5:1
+  (`bar/Contrast.kt`); Google Sans Flex (`google-sans-flex`, the Acer's name for it); live numbers
+  in fixed-width slots (`Fmt.widthTemplate`); items that don't fit go to the ‹ menu; items fade in;
+  drag items sideways in the bar itself (neighbors slide aside, the order is saved on release);
+  the screenshot preview no longer hides the strip; Next meeting is pinned to the far left and new
+  items are added at the left.
+- **Settings:** Setup, the header and banners follow observed state (`ui/SetupState.kt`,
+  `bar/BarStatus.kt`); switches for what BentoBar uses (notifications, calendar, exact alarms);
+  drag to reorder and "Show when…" rules in words on the Bar page; Hidden items is one setting
+  (Show everything, the default, or behind ‹ on click or hover; ‹ folds on a click elsewhere and
+  the wheel reveals); Presenting mode; Undo for add and delete; toasts for messages without an
+  action.
+- **Calendar:** two items with clear rules. Next meeting: a call link or other guests, own
+  calendars, until 03:00 tonight (`items/Meetings.kt`). Calendar: today's day number in the bar, a
+  7-day agenda without meetings. Events synced in by task apps (Todoist) are left out of both.
+- **System menus:** richer CPU and memory detail; top apps for data and storage with opt-in Usage
+  access.
+- **Text:** all in resources, US English by default, British spellings for en-GB/AU/NZ/IE/IN/ZA;
+  a copy-edit pass.
+- **Defaults** (new installs and Reset): Next meeting (when one is near), Calendar, Timer, Keep awake.
+- Tests: JVM unit tests for contrast, width templates, call links, meetings, migrations, hidden
+  modes, reorder and thresholds (`./gradlew :app:testDebugUnitTest`).
+- Not yet done: the jitter some report when hovering across the bar (adb `debug trace on` logs
+  every move with its cause, to find it); Alt+↑/↓ in the Bar page list may be taken by the system.
+
 ## 0.5 (2026-09-29): renamed BentoBar, new icon
 - The user asked: rename DiscoBar to BentoBar, a better and more modern icon, and the GitHub repo
   and the app updated to the new brand.

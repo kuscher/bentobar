@@ -83,6 +83,13 @@ class Overlay(
     /** Applies changed [params] (position, size, flags). */
     fun relayout() { root?.let { runCatching { wm.updateViewLayout(it, params) } } }
 
+    /** Hear about clicks outside this window ([onOutside]) only while it matters, e.g. while hidden items are out. */
+    fun watchOutside(on: Boolean) {
+        val f = WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+        val flags = if (on) params.flags or f else params.flags and f.inv()
+        if (flags != params.flags) { params.flags = flags; relayout() }
+    }
+
     fun hide() {
         val r = root ?: return
         runCatching { wm.removeViewImmediate(r) }

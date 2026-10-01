@@ -93,8 +93,8 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
 - `ACTION_ACCESSIBILITY_DETAILS_SETTINGS` isn't public; we open Accessibility settings with the
   `:settings:fragment_args_key` highlight extras.
 - Compose in the strip: `ItemState`, `ItemConfig` and `StripEntry` are `@Immutable` so unchanged
-  items skip recomposition; items with a `widthKey` (ticking numbers) hold their widest text width for 5 s so neighbours
-  don't jump; the held width is keyed by item id (`key()` in the strip) and resets when the key changes.
+  items skip recomposition; items with a `widthKey` (ticking numbers) sit in a fixed-width slot sized for their widest
+  reading (`Fmt.widthTemplate`: every number becomes 888, clock digits keep their shape), so neighbors never move.
   The release build uses about 0.8% of one core with network speed on (debug builds are 3–4×
   slower; measure release).
 - **Window width:** never WRAP_CONTENT for overlay windows. ViewRootImpl first measures a WRAP_CONTENT

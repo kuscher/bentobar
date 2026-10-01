@@ -28,7 +28,8 @@
   emptied the bar). A countdown date that doesn't exist (2026-02-30) is marked as an error instead of
   quietly becoming another day. Settings stays on its page when the theme, language or text size
   changes. Delete's Undo is shown above the list instead of under it. The Storage menu updates while
-  open. In the ‹ menu, "Edit the bar…" and "Hide BentoBar" are now "Edit" and "Hide".
+  open. In the ‹ menu, "Edit the bar…" and "Hide BentoBar" are now "Edit" and "Hide". Tools is just
+  its icon in the bar (its name shows on hover).
 - **Accessibility.** In the app picker each app is one control named by the app; calendar days read
   as the full date, whether anything is on, and whether the day is selected.
 - On Android 14 and 15 (the APK from GitHub installs there), starting a timer no longer crashes:

@@ -6,6 +6,11 @@ package, so it installs next to DiscoBar rather than over it. Same signing key.)
 A Bartender-style status bar organiser for Googlebooks (Googlebook OS = Android 17 desktop). A
 plain APK: no adb grants, root or system changes in the product (the user's hard requirement).
 
+## This repo is public
+The Play listing links here. Keep out of every file, commit message and release note: device serial numbers and
+adb names, build numbers and codenames, what else is installed or open on the owner's devices, the names of his
+private projects and paths into their repos, and where signing keys are backed up (say "backed up privately").
+
 ## Layout
 - `app/src/main/java/io/github/kuscher/bentobar/`
   - `bar/BarService.kt`: the AccessibilityService plus `BarController`. It scans the status bar,

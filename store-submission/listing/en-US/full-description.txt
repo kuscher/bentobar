@@ -24,4 +24,4 @@ No internet permission, no accounts, no ads, no analytics. Your layout, your cal
 Made for Android laptops with Android 17. Other devices with a status bar may work, but haven't been tested. The system's own icons stay where Android puts them: BentoBar organises its items next to them.
 
 Free and open source
-BentoBar is a personal hobby project by Alexander Kuscher, not affiliated with or endorsed by any employer. The code is MIT-licensed: github.com/kuscher/bentobar
+BentoBar is a personal hobby project, not affiliated with or endorsed by any employer. The code is MIT-licensed: github.com/kuscher/bentobar

@@ -527,7 +527,7 @@
     <string name="about_credit_compose">Jetpack Compose and AndroidX, © The Android Open Source Project, Apache License 2.0</string>
     <string name="about_credit_kotlin">Kotlin and kotlinx.serialization, © JetBrains, Apache License 2.0</string>
     <string name="about_who">Who made this</string>
-    <string name="about_who_text">A personal project by Alexander Kuscher (github.com/kuscher), built entirely on a Googlebook.</string>
+    <string name="about_who_text">A personal project by Fika Labs (github.com/kuscher), developed on a Googlebook.</string>
     <string name="about_independent_text">BentoBar isn\'t made, sponsored or endorsed by Google, or by the makers of Bartender (Surtees Studios) or iStat Menus (Bjango), and it doesn\'t endorse them. The views and choices in it are the author\'s own.</string>
 
     <!-- plurals: system -->

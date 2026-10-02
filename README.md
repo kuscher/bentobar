@@ -20,10 +20,10 @@
   <img src="https://img.shields.io/badge/Googlebook_OS-Android_17-34397E" alt="Googlebook OS, Android 17">
   <img src="https://img.shields.io/badge/internet_permission-none-2E7D32" alt="No internet permission">
   <img src="https://img.shields.io/badge/license-MIT-555555" alt="MIT license">
-  <img src="https://img.shields.io/badge/developed_entirely_on-a_Googlebook-F4533F" alt="Developed entirely on a Googlebook">
+  <img src="https://img.shields.io/badge/developed_on-a_Googlebook-F4533F" alt="Developed on a Googlebook">
 </p>
 
-<p align="center"><sub>A personal hobby project by <a href="https://github.com/kuscher">Alexander Kuscher</a>, proudly developed entirely on a Googlebook.
+<p align="center"><sub>A personal hobby project by Fika Labs, proudly developed on a Googlebook.
 Not affiliated with or endorsed by any employer (<a href="#about-this-project">more</a>).
 Formerly DiscoBar (<a href="#coming-from-discobar">moving over</a>).</sub></p>
 
@@ -202,16 +202,16 @@ the release key on their machine: see [docs/RELEASING.md](docs/RELEASING.md).
 
 ## About this project
 
-BentoBar is my personal hobby project, made by me, [Alexander Kuscher](https://github.com/kuscher).
+BentoBar is my personal hobby project, published as Fika Labs.
 It has no affiliation with my employer: my employer didn't make, sponsor, review or endorse it,
 and BentoBar doesn't endorse my employer or its products either. The views, choices and any
 mistakes here are mine alone.
 
-It was proudly developed entirely on a Googlebook: written, built and tested on the device
+It was proudly developed on a Googlebook: written, built and tested on the device
 itself, in its Linux terminal and on its own Android, from the first probe of the status bar to
 this release.
 
-— Alexander ([@kuscher](https://github.com/kuscher))
+— Fika Labs
 
 ## License
 

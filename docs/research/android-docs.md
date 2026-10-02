@@ -2,7 +2,7 @@
 
 Research date: 2026-09-28. Target: Googlebook OS (Android 17 / API 37, desktop mode), app delivered as a normal sideloaded APK (GitHub; maybe Play later), no adb grants, no root.
 
-Sources are official Google pages (developer.android.com, android-developers.googleblog.com, support.google.com, source.android.com, cs.android.com / android.googlesource.com). Anything not confirmed on an official page is marked **(unverified)**. A few device facts are tagged **(probe)**; they come from the on-device probe on 2026-09-27 (SDK 37.1 build (build)), not from docs.
+Sources are official Google pages (developer.android.com, android-developers.googleblog.com, support.google.com, source.android.com, cs.android.com / android.googlesource.com). Anything not confirmed on an official page is marked **(unverified)**. A few device facts are tagged **(probe)**; they come from the on-device probe on 2026-09-27 (SDK 37.1), not from docs.
 
 Status: complete (all 8 topics + gotchas).
 

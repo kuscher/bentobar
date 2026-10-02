@@ -14,7 +14,7 @@ commit at every milestone.
   "fixes after 0.6" section below): the next release needs a new version. 0.6 is the first build signed with the new key on GitHub, so a 0.5 installed from GitHub has to
   be uninstalled once (Look › Copy settings first; docs/release-notes/0.6.md says how).
 - Release key: in the secrets of the GitHub environment `release` (the Play key in `play`). New key since
-  2026-09-30 (also Google Play's), backed up with its password to a private folder, file bentobar-keystore.jks.
+  2026-09-30 (also Google Play's), backed up privately, outside the repo.
   A machine with `~/.config/bentobar/keystore.jks` + `keystore.pass` (not in git) can still sign a local build.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).

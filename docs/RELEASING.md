@@ -66,7 +66,7 @@ closed-testing track. Do this after changing the workflow or the build.
   exact commits, and the Play job never sees the signing key.
 - Anyone with write access can push a tag, and so can release. Give write access only to people
   you'd trust with the key.
-- **Backup:** the keystore and its password are in Alex's a private folder (file `bentobar-keystore.jks`, with a README). Agents
+- **Backup:** the keystore and its password are backed up privately, outside the repo. Agents
   never need the key file.
 - The key is never committed (`.gitignore` covers `*.jks` and `*.keystore`).
 

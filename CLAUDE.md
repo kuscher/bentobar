@@ -67,8 +67,8 @@ plain APK: no adb grants, root or system changes in the product (the user's hard
   "Send for review" in the Play Console. "Run workflow" on the Actions tab is a dry run.
 - The release key (alias `bentobar`, cert SHA-256 17:1F:D5:44:…:29:E5:F9:0C; a new key since 2026-09-30, the one Google Play uses too, so GitHub
   installs of 0.5 and earlier must be uninstalled once) lives in the secrets of the GitHub environment
-  `release`; you never need the key file. The keystore and its password are backed up in the user's
-  a private folder ((private)), file bentobar-keystore.jks, with a README.
+  `release`; you never need the key file. The keystore and its password are backed up privately,
+  outside the repo.
   On a machine that has `~/.config/bentobar/keystore.jks` and `keystore.pass`, `./gradlew :app:assembleRelease`
   still signs with it; without them the release build is unsigned. A debug and a release install
   can't replace each other (different keys), so uninstall first.

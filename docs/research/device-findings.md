@@ -1,4 +1,4 @@
-# BentoBar: device findings (HP Googlebook 14, Android 17 / SDK 37, build (build))
+# BentoBar: device findings (HP Googlebook 14, Android 17 / SDK 37)
 
 Checked over adb with the throwaway probe in `probe/` (package local.bentobar.probe).
 

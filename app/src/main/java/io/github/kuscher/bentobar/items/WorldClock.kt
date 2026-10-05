@@ -84,10 +84,7 @@ object WorldClock {
         val found = LinkedHashMap<String, Found>()
         found[local.id] = Found(local)
         for (c in clocks) found.getOrPut(c.zone.id) { Found(c.zone) }.run { if (label.isEmpty()) label = clean(c.label) }
-        for (c in cities.take(LOOKED_AT)) {
-            val zone = zone(c.zone) ?: continue
-            found.getOrPut(zone.id) { Found(zone) }.run { if (city == null) city = c }
-        }
+        for ((c, zone) in shown(cities)) found.getOrPut(zone.id) { Found(zone) }.city = c
         val at = Instant.ofEpochMilli(now)
         val all = found.values.map { f ->
             val name = f.label.ifEmpty { f.city?.let { clean(it.name) }.orEmpty() }.ifEmpty { cityOf(f.zone.id) }
@@ -181,22 +178,35 @@ object WorldClock {
             parts += "$weekday${words.time(moment, p.zone)} ${p.name}"
         }
         // The system can put a narrow or a no-break space before "AM"; in a mail or a chat a plain one pastes best.
-        return parts.joinToString(" · ").replace(' ', ' ').replace(' ', ' ')
+        return parts.joinToString(" · ").replace('\u202F', ' ').replace('\u00A0', ' ')
     }
 
     // ---- the added cities ----
 
-    fun full(cities: List<WorldCity>): Boolean = cities.size >= MAX_CITIES
+    /**
+     * The cities that get a row, each with its zone: of the first [LOOKED_AT], those whose zone this
+     * device knows, one a zone (the first). The rows are made of these, and the list is counted by
+     * them: a city without a row has no button in the menu to remove it, so it must not fill the list.
+     */
+    private fun shown(cities: List<WorldCity>): List<Pair<WorldCity, ZoneId>> {
+        val seen = HashSet<String>()
+        return cities.take(LOOKED_AT).mapNotNull { c -> zone(c.zone)?.takeIf { seen.add(it.id) }?.let { c to it } }
+    }
 
-    /** Whether the list has a city of this zone: it is not added a second time. */
-    fun added(cities: List<WorldCity>, zone: String): Boolean = cities.any { it.zone == zone }
+    /** Whether the list is full: [MAX_CITIES] cities have a row. What a pasted layout holds besides (unknown zones, a zone twice) doesn't count. */
+    fun full(cities: List<WorldCity>): Boolean = shown(cities).size >= MAX_CITIES
+
+    /** Whether a city of this zone has a row: it is not added a second time. */
+    fun added(cities: List<WorldCity>, zone: String): Boolean = shown(cities).any { it.first.zone == zone }
 
     /**
-     * [cities] with one more at its end; the same list when it is full, has this zone already, or the
-     * zone is none this device knows.
+     * [cities] with one more; the same list when it is full, has a city of this zone already, or the
+     * zone is none this device knows. The new city goes at the end, or in a layout longer than what is
+     * looked at, at the end of that part: put after it, the city would be added and never get a row.
      */
     fun add(cities: List<WorldCity>, zone: String, name: String = ""): List<WorldCity> =
-        if (full(cities) || added(cities, zone) || zone(zone) == null) cities else cities + WorldCity(zone, clean(name))
+        if (full(cities) || added(cities, zone) || zone(zone) == null) cities
+        else (LOOKED_AT - 1).let { cities.take(it) + WorldCity(zone, clean(name)) + cities.drop(it) }
 
     fun remove(cities: List<WorldCity>, zone: String): List<WorldCity> = cities.filterNot { it.zone == zone }
 
@@ -287,20 +297,20 @@ object WorldClock {
          * [rank] by name. Two results with one name get their [Hit.region], unless they are one place
          * under two zone names (Asia/Istanbul and Europe/Istanbul), which is listed once.
          *
-         * A result reads as added when the list has a city of its zone ([cities]: a zone is not added
-         * twice), and also when a row of its zone is among the [places] anyway (the device's own, a
-         * Clock item's) and taking the result would change nothing there. It would change something
-         * where it brings the row a name: with the device in Los Angeles, "Los Angeles" is there
-         * already, while "San Francisco" makes the row "Here (San Francisco)". A row that a Clock
-         * item's label names keeps that name whatever is added. The differences beside the results are
+         * A result reads as added when the row of its zone among the [places] is an added city's (a
+         * zone is not added twice), and also when the row is there anyway (the device's own, a Clock
+         * item's) and taking the result would change nothing in it. It would change something where
+         * it brings the row a name: with the device in Los Angeles, "Los Angeles" is there already,
+         * while "San Francisco" makes the row "Here (San Francisco)". A row that a Clock item's label
+         * names keeps that name whatever is added. It goes by the rows, as [full] and [add] do: a city
+         * of the layout that has no row is not in the way. The differences beside the results are
          * those to the device's time at [now].
          */
-        fun search(text: String, places: List<Place>, cities: List<WorldCity>, now: Long, limit: Int = RESULTS): List<Hit> {
+        fun search(text: String, places: List<Place>, now: Long, limit: Int = RESULTS): List<Hit> {
             val q = key(cut(text, 64))
             if (q.length < MIN_LETTERS) return emptyList()
-            val inList = cities.mapTo(HashSet()) { it.zone }
             val rows = places.associateBy { it.zone.id }
-            fun there(e: Entry): Boolean = e.zone in inList || rows[e.zone]?.let { it.labeled || !e.named } == true
+            fun there(e: Entry): Boolean = rows[e.zone]?.let { it.city != null || it.labeled || !e.named } == true
             class Pick(var entry: Entry, val zone: ZoneId)
             val picked = ArrayList<Pick>()
             // The entries are in the order of their names, and sorting by rank keeps that order within a rank.

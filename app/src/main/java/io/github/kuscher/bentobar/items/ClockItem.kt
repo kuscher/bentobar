@@ -173,9 +173,10 @@ private fun WorldClockMenu(item: ItemConfig, host: MenuHost) {
             }
         }
         PlanTime(plan, here, time = { words.time(it, local) }, line = { WorldClock.copyLine(places, moment, words) }, onPlan = { plan = it }) { at ->
-            // The calendar app's own editor for a new event, at that moment; saving it is the calendar app's business.
+            // The calendar app's own editor for a new event, from that moment for an hour; saving it is the calendar app's business.
             host.close()
-            Env.launch(Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, at))
+            Env.launch(Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, at)
+                .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, PlanATime.eventEnd(at)))
         }
         MenuDivider()
         AddCity(cfg.cities, places, now, next = edit)
@@ -241,7 +242,8 @@ private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now
     // to the entry after it ([next], "Edit cities"); dropped, it would start again at the top of the menu.
     var refocus by remember { mutableStateOf(false) }
     val entry = remember { FocusRequester() }
-    val full = WorldClock.full(cities)
+    // Counted by the cities that have a row, which means looking their zones up: when the list changes, not with every tick.
+    val full = remember(cities) { WorldClock.full(cities) }
     LaunchedEffect(full) { if (full) adding = false }
     if (!adding || full) {
         MenuEntry(Sym.ADD, stringResource(R.string.clock_add_city), enabled = !full, modifier = Modifier.focusRequester(entry)) { adding = true }
@@ -252,7 +254,7 @@ private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now
     }
     var query by remember { mutableStateOf("") }
     // The differences beside the results are those of this minute.
-    val hits = remember(query, cities, places, now / 60_000) { zoneIndex.search(query, places, cities, now) }
+    val hits = remember(query, places, now / 60_000) { zoneIndex.search(query, places, now) }
     val free = WorldClock.firstFree(hits)
     val focus = LocalFocusManager.current
     val field = remember { FocusRequester() }

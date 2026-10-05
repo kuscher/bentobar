@@ -576,8 +576,13 @@ object WeatherRules {
 
         val high = today?.high
         val low = today?.low
-        val chance = today?.chance
-        // Today's highest chance; on a snow day it is the chance of snow.
+        val date = moment.atZone(zone).toLocalDate()
+        // The highest chance in what is left of today, from the hours: the day's own figure counts the hours
+        // that are over, and read "Rain 90%" on a clear afternoon after a wet morning, beside six dry hours.
+        // Without hours for today, the day's figure. On a snow day it is the chance of snow.
+        val chance = if (today == null) null else r.hours
+            .filter { it.at * 1000 + HOUR_MS > now && Instant.ofEpochSecond(it.at).atZone(zone).toLocalDate() == date }
+            .mapNotNull { it.chance }.maxOrNull() ?: today.chance
         val falls = if (WeatherCodes.falls(today?.code) == Falls.SNOW) Falls.SNOW else Falls.RAIN
         val wind = cur?.windKmh?.let { if (look.miles) Units.milesPerHour(it).roundToInt() else it.roundToInt() }
         val heroDesc = listOfNotNull(
@@ -594,7 +599,6 @@ object WeatherRules {
                 spokenLine(w, listOfNotNull(time, WeatherCodes.sky(h.code)?.let { w.say(it.word) }, h.temp?.let(::spoken), likely?.let { w.say(W.CHANCE_DESC, it) })))
         }
 
-        val date = moment.atZone(zone).toLocalDate()
         val days = r.days.filter { dateOf(it, zone) > date }.distinctBy { it.at }.sortedBy { it.at }.take(DAY_ROWS).map { d ->
             val noon = (d.at + DAY_SEC / 2) * 1000
             val likely = d.chance?.takeIf { it >= SHOWN_CHANCE }

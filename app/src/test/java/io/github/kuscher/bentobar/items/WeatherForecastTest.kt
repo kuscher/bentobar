@@ -38,7 +38,7 @@ class WeatherForecastTest {
             Hour(sec(21), 16.0, 0, 0, false),
         ),
         days = listOf(
-            Day(sec(0), 2, 25.6, 16.1, 20, sec(7, 8), sec(18, 42)),                              // today: 78° / 61°, 20%
+            Day(sec(0), 2, 25.6, 16.1, 70, sec(7, 8), sec(18, 42)),                              // today: 78° / 61°, 70% at its wettest
             Day(sec(0, day = 6), 63, 25.6, 16.1, 60, sec(7, 9, 6), sec(18, 41, 6)),              // Tue: 60%, 78° 61°
             Day(sec(0, day = 7), 1, 23.9, 15.0, 0, sec(7, 10, 7), sec(18, 39, 7)),               // Wed: 75° 59°
             Day(sec(0, day = 8), 0, 26.7, 16.7, 5, sec(7, 11, 8), sec(18, 38, 8)),               // Thu: 80° 62°
@@ -63,8 +63,32 @@ class WeatherForecastTest {
         val m = menu()
         assertEquals("72°", m.temp)
         assertEquals("High 78° · Low 61°", m.highLow)
-        assertEquals("Rain 20% · Wind 9${nbsp}mph", m.rainWind)
-        assertEquals("72 degrees. High 78, low 61. Rain, 20 percent chance. Wind 9 miles per hour.", m.heroDesc)
+        assertEquals("Rain 70% · Wind 9${nbsp}mph", m.rainWind)
+        assertEquals("72 degrees. High 78, low 61. Rain, 70 percent chance. Wind 9 miles per hour.", m.heroDesc)
+    }
+
+    /**
+     * Seen with a real forecast: rain at breakfast, a clear afternoon, and "Rain 90%" beside six dry
+     * hours, because the service's figure for the day counts the hours that are over.
+     */
+    @Test fun theChanceIsForWhatIsLeftOfToday() {
+        val wetMorning = design().let { it.copy(hours = listOf(Hour(sec(7), 15.0, 90, 61, true), Hour(sec(13), 21.0, 85, 61, true)) + it.hours,
+            days = listOf(it.days[0].copy(chance = 90)) + it.days.drop(1)) }
+        assertEquals("Rain 70% · Wind 9${nbsp}mph", menu(wetMorning).rainWind)
+        // The hour that is running counts: it is 2:45 PM and its rain may still fall.
+        val running = design().let { it.copy(hours = listOf(it.hours[0].copy(chance = 95)) + it.hours.drop(1)) }
+        assertEquals("Rain 95% · Wind 9${nbsp}mph", menu(running).rainWind)
+        // Tomorrow's hours are tomorrow's.
+        val wetNight = design().let { it.copy(hours = it.hours + Hour(sec(1, day = 6), 14.0, 99, 63, false)) }
+        assertEquals("Rain 70% · Wind 9${nbsp}mph", menu(wetNight).rainWind)
+        // Late in the evening only what is left counts.
+        assertEquals("Rain 0% · Wind 9${nbsp}mph", menu(at = at(20, 30)).rainWind)
+        // No hours for today (an old reading, a reply without them): the day's own figure.
+        assertEquals("Rain 70% · Wind 9${nbsp}mph", menu(design().copy(hours = emptyList())).rainWind)
+        assertEquals("Rain 35% · Wind 9${nbsp}mph", menu(design().let { it.copy(hours = emptyList(), days = listOf(it.days[0].copy(chance = 35)) + it.days.drop(1)) }).rainWind)
+        // Hours that name no chance say nothing.
+        assertEquals("Rain 35% · Wind 9${nbsp}mph",
+            menu(design().let { it.copy(hours = it.hours.map { h -> h.copy(chance = null) }, days = listOf(it.days[0].copy(chance = 35)) + it.days.drop(1)) }).rainWind)
     }
 
     @Test fun theHeroIsAlwaysTheMeasuredTemperatureWhateverShowSays() {
@@ -139,39 +163,39 @@ class WeatherForecastTest {
         assertEquals("22°", m.temp)
         assertEquals("Partly cloudy · feels like 20°", m.subtitle)
         assertEquals("High 26° · Low 16°", m.highLow)
-        assertEquals("Rain 20% · Wind 15${nbsp}km/h", m.rainWind)
+        assertEquals("Rain 70% · Wind 15${nbsp}km/h", m.rainWind)
         assertEquals(listOf("22°", "22°", "21°", "19°", "18°", "17°"), m.hours.map { it.temp })
-        assertEquals("22 degrees. High 26, low 16. Rain, 20 percent chance. Wind 15 kilometers per hour.", m.heroDesc)
+        assertEquals("22 degrees. High 26, low 16. Rain, 70 percent chance. Wind 15 kilometers per hour.", m.heroDesc)
     }
 
     @Test fun inTheUnitedKingdomDegreesAreCelsiusAndWindIsInMiles() {
         val m = menu(look = look(fahrenheit = false, miles = true))
         assertEquals("22°", m.temp)
-        assertEquals("Rain 20% · Wind 9${nbsp}mph", m.rainWind)
+        assertEquals("Rain 70% · Wind 9${nbsp}mph", m.rainWind)
     }
 
     @Test fun britishSpellingWhereItDiffers() {
         val british = WeatherRules.menu(design(), look(fahrenheit = false), now, WeatherFileWords("values-en-rGB"), t)
-        assertEquals("22 degrees. High 26, low 16. Rain, 20 percent chance. Wind 15 kilometres per hour.", british.heroDesc)
+        assertEquals("22 degrees. High 26, low 16. Rain, 70 percent chance. Wind 15 kilometres per hour.", british.heroDesc)
         val one = WeatherRules.menu(design().let { it.copy(current = it.current!!.copy(windKmh = 1.0)) }, look(fahrenheit = false), now, WeatherFileWords("values-en-rGB"), t)
         assertTrue(one.heroDesc, one.heroDesc.endsWith("Wind 1 kilometre per hour."))
     }
 
     @Test fun oneMileIsSingular() {
         val calm = menu(design().let { it.copy(current = it.current!!.copy(windKmh = 1.7)) })
-        assertEquals("Rain 20% · Wind 1${nbsp}mph", calm.rainWind)
+        assertEquals("Rain 70% · Wind 1${nbsp}mph", calm.rainWind)
         assertTrue(calm.heroDesc, calm.heroDesc.endsWith("Wind 1 mile per hour."))
     }
 
     @Test fun onASnowDayTodaysChanceSaysSnow() {
         val r = design().let { it.copy(days = listOf(it.days[0].copy(code = 73)) + it.days.drop(1)) }
         val m = menu(r)
-        assertEquals("Snow 20% · Wind 9${nbsp}mph", m.rainWind)
-        assertTrue(m.heroDesc, m.heroDesc.contains(" Snow, 20 percent chance. "))
+        assertEquals("Snow 70% · Wind 9${nbsp}mph", m.rainWind)
+        assertTrue(m.heroDesc, m.heroDesc.contains(" Snow, 70 percent chance. "))
     }
 
     @Test fun theWidestHeroRowTheDesignMeasured() {
-        val r = design().let { it.copy(current = it.current!!.copy(temp = 37.8, windKmh = 112.0), days = listOf(it.days[0].copy(chance = 100)) + it.days.drop(1)) }
+        val r = design().let { it.copy(current = it.current!!.copy(temp = 37.8, windKmh = 112.0), hours = it.hours.dropLast(1) + it.hours.last().copy(chance = 100), days = listOf(it.days[0].copy(chance = 100)) + it.days.drop(1)) }
         val m = menu(r, look(fahrenheit = true, miles = false))
         assertEquals("100°", m.temp)
         assertEquals("Rain 100% · Wind 112${nbsp}km/h", m.rainWind)
@@ -234,7 +258,7 @@ class WeatherForecastTest {
         val m = menu(design().let { it.copy(current = it.current!!.copy(temp = null)) })
         assertNull(m.temp)
         assertEquals("High 78° · Low 61°", m.highLow)
-        assertEquals("High 78, low 61. Rain, 20 percent chance. Wind 9 miles per hour.", m.heroDesc)
+        assertEquals("High 78, low 61. Rain, 70 percent chance. Wind 9 miles per hour.", m.heroDesc)
     }
 
     @Test fun inPolarDayAndNightThereAreNoSunriseAndSunsetRows() {

@@ -61,7 +61,8 @@ class WeatherReplyTest {
         assertEquals("Mostly clear · feels like 19° · 11:25 AM there", m.subtitle)
         assertEquals("18°", m.temp)
         assertEquals("High 22° · Low 15°", m.highLow)
-        assertEquals("Rain 90% · Wind 3\u00A0km/h", m.rainWind)
+        // The day's own figure is 90%: rain at breakfast. What is left of the day at 11:25 AM is dry.
+        assertEquals("Rain 5% · Wind 3\u00A0km/h", m.rainWind)
         // The hours are Zurich's, from the next full one.
         assertEquals(listOf("12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM"), m.hours.map { it.time })
         assertEquals(listOf("19°", "21°", "22°", "22°", "22°", "22°"), m.hours.map { it.temp })
@@ -91,7 +92,8 @@ class WeatherReplyTest {
         assertEquals("Cloudy · feels like −49° · 10:25 PM there", m.subtitle)
         // Today there (it is 10:25 PM on the same Monday) is a day of light snow: the chance says "Snow".
         assertEquals("High −41° · Low −45°", m.highLow)
-        assertEquals("Snow 59% · Wind 21\u00A0km/h", m.rainWind)
+        // The day's own figure is 59%; the two hours left of it are dry.
+        assertEquals("Snow 0% · Wind 21\u00A0km/h", m.rainWind)
     }
 
     @Test fun inPolarNightTheServiceSendsNoRealSunriseAndTheRowsAreLeftOut() {

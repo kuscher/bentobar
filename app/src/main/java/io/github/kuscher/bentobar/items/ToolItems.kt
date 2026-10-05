@@ -8,13 +8,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
-import android.media.AudioManager
 import android.net.Uri
 import android.provider.Settings
-import android.view.KeyEvent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,16 +20,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,13 +35,10 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.semantics.Role
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.annotation.StringRes
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -69,7 +59,6 @@ import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.ClockAnchor
 import io.github.kuscher.bentobar.util.Fmt
 import io.github.kuscher.bentobar.util.Sym
-import io.github.kuscher.bentobar.util.SymIcon
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Locale
 
@@ -163,73 +152,6 @@ object CaffeineItem : ItemType("caffeine", R.string.item_caffeine_title, Sym.COF
             "30" to pluralStringResource(R.plurals.common_minutes_short, 30, 30), "60" to pluralStringResource(R.plurals.common_hours, 1, 1),
             "120" to pluralStringResource(R.plurals.common_hours, 2, 2)),
             item.opt("minutes", "")) { set(item.with("minutes", it.ifBlank { null })) }
-    }
-}
-
-object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R.string.item_sound_desc) {
-    private fun am() = Env.app.getSystemService(AudioManager::class.java)
-
-    override fun state(item: ItemConfig): ItemState {
-        val am = am() ?: return ItemState(icon = Sym.VOLUME_UP)
-        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-        val v = am.getStreamVolume(AudioManager.STREAM_MUSIC)
-        val muted = am.isStreamMute(AudioManager.STREAM_MUSIC) || v == 0
-        val pct = v * 100 / max
-        return ItemState(icon = when { muted -> Sym.VOLUME_OFF; pct < 34 -> Sym.VOLUME_MUTE; pct < 67 -> Sym.VOLUME_DOWN; else -> Sym.VOLUME_UP },
-            text = if (muted) Env.str(R.string.sound_muted) else "$pct%", widthKey = if (muted) null else "pct",
-            desc = if (muted) Env.str(R.string.sound_muted_desc) else Env.plural(R.plurals.sound_volume_desc, pct))
-    }
-
-    override val usesWheel = true
-    override fun onScroll(item: ItemConfig, steps: Int) {
-        am()?.adjustStreamVolume(AudioManager.STREAM_MUSIC, if (steps > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER, 0)
-    }
-
-    private fun mediaKey(code: Int) {
-        val am = am() ?: return
-        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
-        am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
-    }
-
-    override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
-        rememberTick()
-        val am = am()
-        if (am != null) {
-            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-            // Follows the volume keys and the scroll wheel while the menu is open, except mid-drag.
-            val actual = am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
-            var dragging by remember { mutableStateOf(false) }
-            var v by remember { mutableFloatStateOf(actual) }
-            LaunchedEffect(actual) { if (!dragging) v = actual }
-            val muted = am.isStreamMute(AudioManager.STREAM_MUSIC)
-            val volumeLabel = stringResource(R.string.sound_media_volume)
-            MenuCard(Sym.VOLUME_UP, stringResource(R.string.item_sound_title),
-                if (muted) stringResource(R.string.sound_muted) else stringResource(R.string.sound_media_volume_pct, (v * 100 / max).toInt())) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    FilledTonalIconButton(onClick = {
-                        am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, 0)
-                    }) { SymIcon(if (muted) Sym.VOLUME_OFF else Sym.VOLUME_UP, size = 20.sp, contentDescription = stringResource(if (muted) R.string.sound_unmute else R.string.sound_mute)) }
-                    Spacer(Modifier.width(8.dp))
-                    Slider(value = v, onValueChange = {
-                        dragging = true
-                        v = it
-                        am.setStreamVolume(AudioManager.STREAM_MUSIC, it.toInt(), 0)
-                    }, onValueChangeFinished = { dragging = false }, valueRange = 0f..max.toFloat(), steps = (max - 1).coerceAtLeast(0),
-                        modifier = Modifier.weight(1f).semantics { contentDescription = volumeLabel })
-                }
-                SectionLabel(stringResource(R.string.sound_media))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS) }) { SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = stringResource(R.string.sound_previous)) }
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }) {
-                        SymIcon(if (am.isMusicActive) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp, contentDescription = stringResource(if (am.isMusicActive) R.string.common_pause else R.string.sound_play))
-                    }
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT) }) { SymIcon(Sym.SKIP_NEXT, size = 22.sp, contentDescription = stringResource(R.string.sound_next)) }
-                }
-                MenuDivider()
-                MenuEntry(Sym.TUNE, stringResource(R.string.sound_all_volumes)) { host.close(); Env.launch(Intent(Settings.Panel.ACTION_VOLUME)) }
-                MenuEntry(Sym.SETTINGS, stringResource(R.string.sound_settings)) { host.close(); Env.launch(Intent(Settings.ACTION_SOUND_SETTINGS)) }
-            }
-        }
     }
 }
 

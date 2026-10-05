@@ -6,12 +6,16 @@ import android.content.Intent
 import android.util.Log
 import io.github.kuscher.bentobar.bar.BarService
 import io.github.kuscher.bentobar.data.Defaults
+import io.github.kuscher.bentobar.data.Online
 import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.items.Caffeine
 import io.github.kuscher.bentobar.items.Env
+import io.github.kuscher.bentobar.items.Items
 import io.github.kuscher.bentobar.items.Ticker
 import io.github.kuscher.bentobar.items.Timers
+import io.github.kuscher.bentobar.net.Host
+import io.github.kuscher.bentobar.net.Http
 
 /**
  * Test hooks for development over adb, in debug builds only (src/debug: release builds don't
@@ -19,6 +23,10 @@ import io.github.kuscher.bentobar.items.Timers
  * system hold, so apps on the device can't use it.
  *
  *   adb shell am broadcast -a io.github.kuscher.bentobar.DEBUG -p io.github.kuscher.bentobar --es c 'dump'
+ *
+ * Hooks for a single item type live with the type (`ItemType.debug`): a command that isn't one of
+ * the receiver's own and starts with a type's id goes there (`heat stage 3`, `flight show air`), and
+ * `item TYPE …` reaches a type whose id is also a command here (`item timer …`).
  */
 class DebugReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -69,8 +77,27 @@ class DebugReceiver : BroadcastReceiver() {
                 }
                 "state" -> { // what an item shows right now
                     val item = Store.config.value.items.firstOrNull { it.type == args[1] || it.id == args[1] } ?: error("no item")
-                    Ticker.stateOf(item).let { "${it.text} active=${it.active}" }
+                    // What a discreet type shows (a track's title) is not for a log: its length says enough for a test.
+                    val discreet = Items.of(item.type)?.discreet == true
+                    Ticker.stateOf(item).let { "${if (discreet) "text of ${it.text?.length ?: 0}" else it.text} icon=${iconName(it.icon)} active=${it.active} tone=${it.tone}" }
                 }
+                "now" -> { // the staged clock for everything that reads Now: +3h, +90m, +45s, -2h, or off
+                    val a = args.getOrElse(1) { "off" }
+                    Now.ahead = if (a == "off") 0 else span(a)
+                    Ticker.refresh()
+                    "the clock is ${Now.ahead / 1000} s ahead"
+                }
+                "net" -> { // how many requests went out, per host, and whether each service may be asked right now
+                    if (args.getOrNull(1) == "reset") Http.resetCounts()
+                    Host.entries.joinToString(" ") { "${it.domain}=${Http.sent(it)}" } + " | " +
+                        Online.Service.entries.joinToString(" ") { s -> "${s.id}: on=${Online.on(s)} setUp=${Online.setUp(s)} mayAsk=${Http.allowed(s.hosts.first())}" }
+                }
+                "online" -> { // online weather|flights on|off (on only works once the item was set up here, as in Setup)
+                    val s = when (args[1]) { "weather" -> Online.Service.OPEN_METEO; "flights" -> Online.Service.AIRLABS; else -> error("weather or flights") }
+                    if (args.getOrNull(2) == "on") Online.turnOn(s) else Online.turnOff(s)
+                    "${s.id} on=${Online.on(s)}"
+                }
+                "item" -> Items.of(args[1])?.debug(args.drop(2)) ?: "no hook for ${args.drop(1).joinToString(" ")}"
                 "finish" -> { io.github.kuscher.bentobar.ui.MainActivity.current?.finish(); "ok" }
                 "bar" -> { Store.update { it.copy(enabled = args.getOrNull(1) != "off") }; "ok" }
                 "look" -> {
@@ -97,13 +124,23 @@ class DebugReceiver : BroadcastReceiver() {
                 "pomodoro" -> { Timers.startPomodoro(); "ok" }
                 "stop" -> { Timers.stop(); "ok" }
                 "awake" -> { if (args.getOrNull(1) == "off") Caffeine.off() else Caffeine.on(args.getOrNull(1)?.toIntOrNull()); "ok" }
-                else -> bar?.debug(args) ?: "bar not running"
+                else -> Items.of(args[0])?.debug(args.drop(1)) ?: bar?.debug(args) ?: "bar not running"
             }
         } catch (e: Exception) {
             "failed: $e"
         }
         Log.i("BentoBar", "debug ${args.joinToString(" ")} -> $out")
     }
+
+    /** "+3h", "+90m", "-45s" as milliseconds. */
+    private fun span(text: String): Long {
+        val n = text.dropLast(1).toLong()
+        return n * when (text.last()) { 'h' -> 3_600_000L; 'm' -> 60_000L; 's' -> 1_000L; else -> error("h, m or s") }
+    }
+
+    /** A symbol's name for the log (the glyph itself is a private-use character). */
+    private fun iconName(sym: String?): String = if (sym.isNullOrEmpty()) "none" else
+        Sym::class.java.declaredFields.firstOrNull { it.type == String::class.java && runCatching { it.get(null) }.getOrNull() == sym }?.name?.lowercase() ?: "?"
 
     /**
      * One of BentoBar's own windows as a PNG, returned base64 in the broadcast result (for README

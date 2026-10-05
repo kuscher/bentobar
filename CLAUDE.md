@@ -20,16 +20,47 @@ private projects and paths into their repos, and where signing keys are backed u
     (the `DesktopStatusBarSpacer` node on Googlebook OS, else the widest gap).
   - `bar/BarPixels.kt`: the status bar's text and background color from the pixels around its clock
     (pure, unit-tested); `bar/Contrast.kt` then holds every strip color to 4.5:1.
+  - `bar/BarNeighbours.kt`: which app windows make the bar look different (one against its lower
+    edge, one under it), remembered from one window list to the next; a change asks for a new color
+    reading (pure, unit-tested).
   - `bar/Overlay.kt`: a Compose host in a TYPE_ACCESSIBILITY_OVERLAY window (outside-touch and
     key callbacks for menus).
-  - `bar/BarUi.kt`: the strip (chevron, FitRow, items, clicks/right-clicks/wheel).
+  - `bar/BarUi.kt`: the strip (chevron, FitRow, items, clicks/right-clicks/wheel), and the slider an
+    item can have in its text's place (`ItemState.slider`: `VolumeTrack` draws it, `Modifier.slides`
+    takes the pointer in its zone and consumes the press, so `clicks` on the item around it sees
+    neither a click nor a drag). Its arithmetic and the rules of a press (`SliderGesture`: a click, a
+    drag, a finger's tap, swipe and long hold, a press that is taken away) are in `bar/SliderMath.kt`,
+    pure and unit-tested; change the rules there, not in the pointer loop.
   - `bar/Menus.kt`: the menu card, the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
     visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
-    glyph icons, `Chips` for the Live Update chip), and the item types in `SystemItems.kt`,
-    `TimeItems.kt` and `ToolItems.kt`.
+    glyph icons, `Chips` for the Live Update chip), and the item types: several each in
+    `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
+    (`CpuItem`, `ClockItem`, `SoundItem`, `MediaItem`, `DevicesItem`, `HeatItem`, `WeatherItem`,
+    `FlightItem`). A type gets `onLive()`, `sample(now)` once a second and `onIdle()` from the
+    `Ticker`: listeners and polls hang on those, so none exists while the bar is hidden, the screen is
+    off or no such item is outside Off.
+  - `items/Refresher.kt` is `Calendar`'s way of loading as one class (a background thread, one load
+    per key, an immutable snapshot, a generation counter); `items/Ask.kt` is the same for one
+    question at a time (a search). Both are pure Kotlin; `items/Background.kt` wires them to the app.
+    `state()` calls `want(key)` and reads `peek(key)`: nothing is scheduled, so nothing loads while
+    no item is sampled.
+  - `items/NowPlaying.kt`: the media players' sessions as one immutable value, for the Now playing
+    item, alive only while such an item is. `items/MediaAccess.kt` is the entry in Android's
+    "Notification access" list that Android wants for it: it asks for no notification type and is
+    not bound by Android by itself (see the manifest's comment). Its pure rules are in
+    `items/NowPlayingRules.kt`.
+  - `net/`: the only code that opens a connection (pure Kotlin). `Host` is an enum of the three
+    hosts BentoBar may ask; a `Request` names one of them, a path and a query, so no call takes an
+    address. `Http.get` refuses unless the service is switched on, an item that uses it is outside
+    Off and something that shows items is on screen, and never runs on the main thread. A query can
+    hold a key: a `Request` prints as host and path only, and no exception leaves `HttpTransport`.
   - `data/`: `Model.kt` (`BarConfig`, `ItemConfig`, `Section`…) and `Store` (JSON in
-    SharedPreferences, a process-wide StateFlow shared by the service and settings).
+    SharedPreferences, a process-wide StateFlow shared by the service and settings). `Online.kt`
+    holds what belongs to one install and never travels: whether each online service is switched on
+    and the user's own key for one, in a file in Android's no-backup directory (so in no backup, no
+    device transfer and no copied layout). `Kept.kt` keeps small texts there too (a service's last
+    answer, as the app's own model, never the reply as it came).
   - `ui/`: `MainActivity` (nav rail), `BarPage` (preview, sections, item detail), `Reorder` (drag
     and drop across the section cards: the gesture sits on the container, a copy of the row floats
     above the cards, the Store changes once on the drop), `Pages` (Add, Look, Setup, About),
@@ -39,11 +70,16 @@ private projects and paths into their repos, and where signing keys are backed u
     is the one source of the option key and default for both `state()` and the settings slider.
   - `tile/Tiles.kt`: the BentoBar, Keep awake and Timer tiles.
   - `util/`: `Sym.kt` (generated), `Ui.kt` (fonts, `SymIcon`), `Fmt.kt`, `Dates.kt` (locale-aware dates
-    and times from skeletons), `DebugReceiver.kt`.
+    and times from skeletons), `Now.kt` (the clock for ages and countdowns, which a debug build's
+    test hook can move), `Units.kt` (temperatures in the user's unit), `DebugReceiver.kt`.
 - Text: every user-facing string is a resource. `res/values/strings.xml` is US English (the default);
   `res/values-en-rGB/strings.xml` holds only the strings whose British spelling differs. Item titles and
   blurbs are `@StringRes` ids on `ItemType`; non-Compose code uses `Env.str`/`Env.plural`. Counts use
   `<plurals>`, values use positional format args. `res/xml/locales_config.xml` lists the languages.
+  A newer feature's text is in a file of its own, `res/values/strings_<feature>.xml`, where every name
+  starts with `<feature>_`, `item_<feature>_` or `trigger_<feature>`; its British spellings go in
+  `values-en-rGB/strings_<feature>.xml` with identical copies in en-rAU, en-rNZ, en-rIE, en-rIN and
+  en-rZA. `LocaleCopiesTest` checks every `strings*.xml`.
 - `tools/logo.py`: draws the icon (a bento box seen from above: a status bar compartment with a ‹
   and dots cut out, over three item compartments; rice, salmon, tamago and edamame on ink blue):
   launcher foreground/monochrome/background, `ic_bentobar` (24 dp, app header, ‹ menu) and
@@ -64,6 +100,17 @@ private projects and paths into their repos, and where signing keys are backed u
 - `./bento app` builds the debug APK, installs it, enables the service and opens settings.
 - `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|set ID k=v|look KEY VALUE|windows`.
   The receiver (`src/debug`, debug builds only) is guarded by DUMP, so only adb can call it.
+  Also `now +3h|+90m|off` (moves the clock everything newer reads, `util/Now`), `net [reset]` (requests
+  sent per host, and whether each service may be asked right now), `online weather|flights on|off`,
+  and `TYPE …` or `item TYPE …`, which go to that item type's own `debug(args)`. What a hook prints
+  is logged: no hook takes or prints a key, and a type marked `discreet` prints no title (`state media`
+  and `state flight` print the text's length).
+  The types' own hooks stage what a test can't make happen: `media stage playing|paused|none|notitle|two|
+  live|noaccess|starting|long|wide|emoji|rtl|off`; `devices stage mouse=15 keyboard=40c stylus=unknown`
+  and `devices off`; `heat stage 0..6`, `heat level 0.84`, `heat temp 41.3`, `heat off`; `weather stage
+  clear|rain-soon|rain-this-hour|rain-later|raining|storm|snow|old|error|slow-down|offline|offline-new|no-answer|loading`, `weather search …`,
+  `weather fail …`, `weather off`; `flight show NAME [TURN]` (`flight show` lists the names), `flight off`;
+  `sound fixed on|off`. Each type's bare name prints what it knows (`media`, `devices`, `heat`, `flight`).
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
   the settings window. Menu crops include the menu's shadow margin, which can show other windows
   behind it, so don't publish them.
@@ -97,6 +144,19 @@ private projects and paths into their repos, and where signing keys are backed u
   The text color is the glyphs' cores, not the average of everything that stands out: blended edges
   made it #EFEFEF beside the system's white. A reading with nothing opaque (the bar caught fading)
   keeps the last colors and is retried.
+  A third look: on a Googlebook that keeps the bar when an app goes full screen (the keyboard's
+  full-screen key), the app's window lies under the bar, which then takes that app's light or dark
+  icons (black on a light app, and the strip stayed white). So the window
+  under the bar counts too, by which window it is (`bar/BarNeighbours.kt`).
+- **The window list can end early.** With a dialog on top, or some apps' own windows, the
+  accessibility window list holds that window and nothing below it: no home screen, no other app.
+  A window missing from the list has not left. `BarNeighbours` reads only what is listed: the home
+  screen or a maximized window coming and going with every dialog would otherwise cost a screenshot
+  of the bar each time, for a bar that never changed (see Play Protect below). Readings the windows
+  ask for also keep two seconds apart (`BarNeighbours.wait`).
+  One case is left on purpose: a full-screen app that turns its own status bar icons from dark to
+  light in the same window (a light page, then a dark one) says so with no event, and the strip keeps
+  the old color until the next change of windows. Only a timer would catch it.
 - **Name the weight in every text style that uses `Fonts.bar`.** Compose asks the typeface for the
   style's weight, 400 when it names none, whatever weight the typeface was created with: the strip
   drew regular text beside the system's semibold clock. The status bar's style is the family
@@ -112,6 +172,22 @@ private projects and paths into their repos, and where signing keys are backed u
   In desktop windowing, Settings opens in its own window and BentoBar's stays resumed, so onResume
   alone misses changes; and with strong skipping (Kotlin 2.x) a composable reading Android state
   inside isn't redrawn when its parameters are unchanged.
+- **Going online is two items' business, and each install's own decision.** Weather and Flight ask a
+  service; nothing else does, and nothing the accessibility service or any other item reads can get
+  there (`net/` is the only way out, and only those two types name a service in `ItemType.online`).
+  A service is asked only after its item was set up on this install: `data/Online.kt` records that
+  outside the layout, so a pasted layout or a restored backup turns nothing on. Off (Setup › Online
+  services) stops requests at once and deletes what was fetched (`ItemType.forgetFetched`).
+  `ManifestTest` pins the permissions, the backup rules, cleartext off and the listener's entry;
+  `HttpTest` and `HttpTransportTest` pin the three hosts and what a request may carry.
+- **A flight service's reply repeats the key it was asked with**, and the platform puts addresses
+  into exception messages. So: never keep or log a reply as it came, never log or rethrow what a
+  request threw, and keep a key out of every state, description and debug line. Its count of lookups
+  left (`request.key.limits_total`) lags: the same figure after three lookups in a row, so the app
+  says "about".
+- **A weather service's hourly chance of rain is for the hour that ends at its time** (Open-Meteo:
+  "preceding hour"), while the temperature and the weather code are of that instant. The rain rule
+  names the hour the chance is for, and an hour's cell takes its chance from the entry after it.
 - **Least privilege** (user feedback): the accessibility config subscribes only to
   `typeWindowsChanged`. No content events, key filtering or motion events. Code reads only the
   status bar window. Don't add broader access for nice-to-haves.

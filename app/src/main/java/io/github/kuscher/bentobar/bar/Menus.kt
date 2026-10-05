@@ -68,6 +68,20 @@ fun MenuSurface(width: Dp, maxHeight: Dp, content: @Composable () -> Unit) {
     }
 }
 
+/**
+ * An item's own menu, drawn for the item as the layout has it now: a menu that changes its item (a
+ * city added, a flight tracked) is drawn again with the new options. An item that is deleted or
+ * turned off while its menu is open closes it.
+ */
+@Composable
+fun ItemMenu(itemId: String, host: MenuHost) {
+    val cfg by Store.config.collectAsState()
+    val item = cfg.items.firstOrNull { it.id == itemId && it.section != Section.OFF }
+    val menu = item?.let { Items.of(it.type)?.menu }
+    if (item == null || menu == null) { LaunchedEffect(itemId) { host.close() }; return }
+    menu(item, host)
+}
+
 /** Right-click on an item: where it lives and how it looks, without opening settings. */
 @Composable
 fun ItemContextMenu(itemId: String, host: MenuHost, openMenu: () -> Unit) {
@@ -89,7 +103,7 @@ fun ItemContextMenu(itemId: String, host: MenuHost, openMenu: () -> Unit) {
         SectionLabel(stringResource(R.string.display_show_as))
         val displays = listOf(Display.ICON_AND_TEXT to stringResource(R.string.display_icon_and_text), Display.TEXT to stringResource(R.string.display_text),
             Display.ICON to stringResource(R.string.display_icon))
-        ChipRow(displays.map { (d, l) -> if (d == item.display) "✓ $l" else l }) { i ->
+        ChipRow(displays.map { it.second }, selected = displays.indexOfFirst { it.first == item.display }) { i ->
             Store.updateItem(item.id) { it.copy(display = displays[i].first) }
             Ticker.refresh()
         }

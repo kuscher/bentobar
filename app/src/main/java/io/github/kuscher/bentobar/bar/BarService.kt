@@ -164,8 +164,8 @@ class BarController(private val service: AccessibilityService) {
         }
     }
     private var lastFullScan = 0L
-    /** The app windows sitting against the bar's lower edge, as their left and right edges ([check]). */
-    private var againstBar = ""
+    /** The app windows against the bar's lower edge and under the bar, as [check] last saw them. */
+    private var neighbours = BarNeighbours()
 
     private fun lightCheck() {
         val s = snap ?: return scan()
@@ -180,13 +180,19 @@ class BarController(private val service: AccessibilityService) {
         if (r != s.spacer) scan()
     }
     private val expandOnHover = Runnable { if (hovering) expanded.value = true }
-    private val collapse = Runnable {
-        if (!hovering && menuKey == null && expanded.value) {
-            Log.i(tag, "collapse (pinned=$pinned autoCollapse=${Store.config.value.autoCollapseSec}s)")
-            expanded.value = false; pinned = false
-            if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
+    private val collapse: Runnable = object : Runnable {
+        override fun run() {
+            // A slider held by a pointer that has wandered off the strip: its item stays where it is until it lets go.
+            if (sliding) { main.postDelayed(this, 300); return }
+            if (!hovering && menuKey == null && expanded.value) {
+                Log.i(tag, "collapse (pinned=$pinned autoCollapse=${Store.config.value.autoCollapseSec}s)")
+                expanded.value = false; pinned = false
+                if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
+            }
         }
     }
+    /** A pointer holds an item's slider: between its first report and the one that says `done`. */
+    private var sliding = false
     private val awakeExpiry = Runnable { Caffeine.check() }
     private val sample = Runnable { sampleColor() }
 
@@ -331,19 +337,18 @@ class BarController(private val service: AccessibilityService) {
             s == null -> BarStatus.NO_BAR
             else -> BarStatus.COVERED
         }
-        // An app window settled against the bar's lower edge (maximized, or snapped to a side): SystemUI
-        // then gives the bar a background of its own, and takes it away when the window leaves, without
-        // an event of the bar's own. Only the windows' bounds are looked at, from the list at hand.
-        val against = if (s == null) "" else windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            .map { w -> Rect().also { w.getBoundsInScreen(it) } }
-            .filter { kotlin.math.abs(it.top - s.bar.bottom) <= 2 && it.width() >= s.bar.width() / 4 }
-            .sortedBy { it.left }.joinToString(" ") { "${it.left}-${it.right}" }
-        val moved = against != againstBar
-        againstBar = against
+        // An app window settled against the bar's lower edge (maximized, or snapped to a side), or a
+        // full-screen one lies under the bar: SystemUI then gives the bar a background of its own, or that
+        // app's light or dark icons, and takes them away when the window leaves, without an event of the
+        // bar's own. Only the windows' ids and bounds are looked at, from the list at hand.
+        val moved = s != null && neighbours.next(s.bar.bottom, s.bar.width(),
+            windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                .map { w -> Rect().also { w.getBoundsInScreen(it) }.let { AppWindow(w.id, it.left, it.top, it.right, it.bottom) } })
+            .let { (seen, moved) -> neighbours = seen; moved }
         if (show) {
             place(s!!, screenW)
             // A new status bar window can look different (see requestSample for the other triggers).
-            if (newWindow) requestSample(250) else if (moved) requestSample(300)
+            if (newWindow) requestSample(250) else if (moved) requestSample(BarNeighbours.wait(SystemClock.uptimeMillis() - lastSampleAt))
         } else {
             if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { "${it.title} " + Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
                 "enabled=${cfg.enabled} interactive=${pm.isInteractive} locked=${km.isKeyguardLocked})")
@@ -415,6 +420,8 @@ class BarController(private val service: AccessibilityService) {
     }
 
     private var sampleFailures = 0
+    /** When the last screenshot of the bar was asked for (uptime): readings the windows ask for keep apart ([BarNeighbours.wait]). */
+    private var lastSampleAt = -BarNeighbours.APART_MS
     /** A reading that differs from the last one is taken once more ([onSample]). */
     private var confirmOwed = false
 
@@ -422,6 +429,7 @@ class BarController(private val service: AccessibilityService) {
         if (!started || !strip.shown || !pm.isInteractive) return
         val s = snap ?: return applyLook()
         if (Store.config.value.color != ColorMode.AUTO) return applyLook()
+        lastSampleAt = SystemClock.uptimeMillis()
         service.takeScreenshotOfWindow(s.windowId, callbacks, object : AccessibilityService.TakeScreenshotCallback {
             override fun onSuccess(r: AccessibilityService.ScreenshotResult) {
                 val c = runCatching { barColors(r, s) }.getOrNull()
@@ -575,8 +583,8 @@ class BarController(private val service: AccessibilityService) {
             placed[item.id] = at
             val type = Items.of(item.type) ?: return
             if (type.onClick(item)) { Ticker.refresh(); return }
-            val menuUi = type.menu ?: return
-            toggleMenu("item:${item.id}", at, type.menuWidthDp) { host -> menuUi(item, host) }
+            if (type.menu == null) return
+            toggleMenu("item:${item.id}", at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
         }
 
         override fun context(item: ItemConfig, at: Rect) {
@@ -584,8 +592,7 @@ class BarController(private val service: AccessibilityService) {
             toggleMenu("ctx:${item.id}", at, 280) { host ->
                 ItemContextMenu(item.id, host) {
                     val type = Items.of(item.type)
-                    val menuUi = type?.menu
-                    if (menuUi != null) { closeMenu(); menuClosedKey = null; toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> menuUi(item, h) } }
+                    if (type?.menu != null) { closeMenu(); menuClosedKey = null; toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
                 }
             }
         }
@@ -593,6 +600,14 @@ class BarController(private val service: AccessibilityService) {
         override fun scroll(item: ItemConfig, steps: Int) {
             Items.of(item.type)?.onScroll(item, steps)
             Ticker.refresh()
+        }
+
+        /** The slider in the bar: the item sets what it stands for, and only that item is drawn again (no sampler runs for a drag). */
+        override fun slide(item: ItemConfig, level: Float, done: Boolean) {
+            sliding = !done
+            hideTip()
+            Items.of(item.type)?.onSlide(item, level, done)
+            Ticker.refresh(item)
         }
 
         override fun chevron(at: Rect) {
@@ -651,7 +666,7 @@ class BarController(private val service: AccessibilityService) {
 
         override fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {
             main.removeCallbacks(showTip)
-            if (inside && menu == null) { tipFor = item to Rect(at); main.postDelayed(showTip, 600) } else hideTip()
+            if (inside && menu == null && !sliding) { tipFor = item to Rect(at); main.postDelayed(showTip, 600) } else hideTip()
         }
 
         override fun hover(inside: Boolean) {
@@ -671,12 +686,11 @@ class BarController(private val service: AccessibilityService) {
     private fun barMenu(at: Rect, everything: Boolean) = toggleMenu("bentobar", at, 290) { host ->
         BentoBarMenu(host, openItem = { item ->
             val type = Items.of(item.type)
-            val menuUi = type?.menu
             closeMenu(); menuClosedKey = null
             // From the list of every item, an item's menu opens under the item itself.
             val anchor = placed[item.id]?.takeIf { everything } ?: at
             if (type != null && type.onClick(item)) Ticker.refresh()
-            else if (menuUi != null) toggleMenu("item:${item.id}", anchor, type.menuWidthDp) { h -> menuUi(item, h) }
+            else if (type?.menu != null) toggleMenu("item:${item.id}", anchor, type.menuWidthDp) { h -> ItemMenu(item.id, h) }
         }, hideBar = { Store.update { it.copy(enabled = false) } }, everything = everything)
     }
 
@@ -743,17 +757,19 @@ class BarController(private val service: AccessibilityService) {
 
     /**
      * The item's name below it, after a short hover: icon-only items otherwise give a mouse user
-     * nothing to go on. A no-touch window, so it never takes a click.
+     * nothing to go on. An item whose state has a tooltip of its own (a track's whole title and
+     * artist, which flight this is) shows that instead. A no-touch window, so it never takes a click.
      */
     private fun showTooltip(item: ItemConfig, anchor: Rect) {
         hideTip()
         val s = snap ?: return
         if (menu != null || !strip.shown) return
-        val label = Items.of(item.type)?.title ?: return
+        val label = Ticker.states.value[item.id]?.tooltip?.takeIf { it.isNotBlank() } ?: Items.of(item.type)?.title ?: return
         val loc = strip.locationOnScreen()
         val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
         val paint = android.text.TextPaint().apply { textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 13f, service.resources.displayMetrics) }
-        val w = (paint.measureText(label) + 2 * 10 * density).toInt() + 2
+        // A long tip ends in an ellipsis: the window is never wider than this.
+        val w = ((paint.measureText(label) + 2 * 10 * density).toInt() + 2).coerceAtMost((TOOLTIP_MAX_DP * density).toInt())
         val bounds = wm.currentWindowMetrics.bounds
         val o = Overlay(service, "BentoBar tooltip", touchable = false)
         o.params.gravity = Gravity.TOP or Gravity.LEFT
@@ -847,6 +863,7 @@ class BarController(private val service: AccessibilityService) {
 
     companion object {
         const val SYSTEMUI = "com.android.systemui"
+        private const val TOOLTIP_MAX_DP = 360
         private const val RELEVANT = AccessibilityEvent.WINDOWS_CHANGE_ADDED or AccessibilityEvent.WINDOWS_CHANGE_REMOVED or
             AccessibilityEvent.WINDOWS_CHANGE_BOUNDS
     }

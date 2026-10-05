@@ -62,6 +62,14 @@ fun List<ItemConfig>.moved(id: String, section: Section, index: Int): List<ItemC
     return rest.toMutableList().apply { add(at, item.copy(section = section)) }
 }
 
+/**
+ * A city added to World clock's list: its time zone (an IANA id such as "Asia/Tokyo") and the name
+ * the user gave it; without one it is called by the zone's own city.
+ */
+@Serializable
+@androidx.compose.runtime.Immutable
+data class WorldCity(val zone: String, val name: String = "")
+
 @Serializable
 data class BarConfig(
     val version: Int = 3,
@@ -94,6 +102,11 @@ data class BarConfig(
      */
     val chipMode: ChipMode = ChipMode.FALLBACK,
     val onboarded: Boolean = false,
+    /**
+     * The cities added to World clock: one list for the bar, shown in every clock item's menu, and
+     * part of the layout (Copy settings carries it). Layouts saved before it existed have none.
+     */
+    val cities: List<WorldCity> = emptyList(),
 )
 
 /** This config with the settings that belong to one install taken from [local] (see [Store.import]). */

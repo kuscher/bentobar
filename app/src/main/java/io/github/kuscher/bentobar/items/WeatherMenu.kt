@@ -1,0 +1,338 @@
+package io.github.kuscher.bentobar.items
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.github.kuscher.bentobar.R
+import io.github.kuscher.bentobar.data.ItemConfig
+import io.github.kuscher.bentobar.data.Online
+import io.github.kuscher.bentobar.data.Section
+import io.github.kuscher.bentobar.data.Store
+import io.github.kuscher.bentobar.ui.ChoiceRow
+import io.github.kuscher.bentobar.ui.InfoRow
+import io.github.kuscher.bentobar.ui.MenuCard
+import io.github.kuscher.bentobar.ui.MenuDivider
+import io.github.kuscher.bentobar.ui.MenuEntry
+import io.github.kuscher.bentobar.ui.MenuNote
+import io.github.kuscher.bentobar.ui.SearchField
+import io.github.kuscher.bentobar.ui.SectionLabel
+import io.github.kuscher.bentobar.ui.TextRow
+import io.github.kuscher.bentobar.ui.rememberTick
+import io.github.kuscher.bentobar.util.Now
+import io.github.kuscher.bentobar.util.Sym
+import io.github.kuscher.bentobar.util.SymIcon
+import java.time.ZoneId
+
+// The Weather item's menu and settings, drawn from what WeatherRules works out. Nothing here asks the
+// service: a click that could goes through WeatherItem.source, where the rules for that are.
+
+/** Open-Meteo's site. Its licence asks for the credit and a link; a click opens the browser, which is the user's act and no request of BentoBar's. */
+private const val SITE = "https://open-meteo.com/"
+
+/**
+ * "Next hours": six cells of time, glyph and temperature, and the chance of rain under them where it
+ * is 20% or more. The chance's line keeps its height in every cell when one cell has it, and is left
+ * out when none has. A value the reply left out leaves its place empty.
+ */
+@Composable
+internal fun HourStrip(cells: List<HourCell>) {
+    val anyChance = cells.any { it.chance != null }
+    Row(Modifier.fillMaxWidth()) {
+        // Always six places, so the cells stand where they stood when fewer hours are left to show.
+        for (i in 0 until 6) {
+            val cell = cells.getOrNull(i)
+            Column(Modifier.weight(1f).clearAndSetSemantics { if (cell != null) contentDescription = cell.desc },
+                horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(cell?.time.orEmpty(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                Spacer(Modifier.height(4.dp))
+                SymIcon(cell?.glyph.orEmpty(), size = 20.sp, filled = true, color = MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(4.dp))
+                Text(cell?.temp.orEmpty(), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                if (anyChance) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(cell?.chance.orEmpty(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/** One of "Next days": the weekday, its glyph, the chance from 20%, then high and low as two aligned columns of numbers. */
+@Composable
+internal fun DayRow(line: DayLine) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 32.dp).clearAndSetSemantics { contentDescription = line.desc },
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(line.day, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
+            modifier = Modifier.width(44.dp))
+        // The glyph's place stays when the reply named no condition, so the chances stay in line.
+        Box(Modifier.widthIn(min = 20.dp), contentAlignment = Alignment.Center) {
+            SymIcon(line.glyph.orEmpty(), size = 18.sp, filled = true, color = MaterialTheme.colorScheme.onSurface)
+        }
+        Spacer(Modifier.width(8.dp))
+        if (line.chance != null) Text(line.chance, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+        Spacer(Modifier.weight(1f))
+        Text(line.high.orEmpty(), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"), fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(40.dp))
+        Text(line.low.orEmpty(), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(40.dp))
+    }
+}
+
+/** The item's menu: one card for each state the item can be in. */
+@Composable
+internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
+    // Redrawn with the tick: a reading that came in, the minute passing, Refresh's wait running out.
+    rememberTick()
+    // The switch can change under an open menu: turned on here, or off in Setup's window beside it.
+    val online by Online.state.collectAsState()
+    val on = Online.Service.OPEN_METEO in online.on
+    val source = WeatherItem.source
+    val now = Now.wall()
+    val staged = WeatherItem.staged(item) != null
+    val place = WeatherRules.place(item)
+    // On opening (and when the city or the switch changes under the menu): a reading older than ten minutes is asked again.
+    LaunchedEffect(item.id, place, on, staged) { if (!staged) source.opened(item) }
+
+    var changing by remember(item.id) { mutableStateOf(false) }
+    // A press of Refresh shows at once (the entry dims), not at the next tick.
+    var pressed by remember { mutableIntStateOf(0) }
+    val entry = if (pressed >= 0) WeatherItem.againEntry(item) else Again.WAIT
+    val again: () -> Unit = { WeatherItem.again(item); pressed++ }
+
+    val name = stringResource(R.string.item_weather_title)
+    val city = WeatherRules.city(item) ?: if (staged) WeatherSamples.CITY else name
+    val by = "menu:" + item.id
+    val pick: (City, String?) -> Unit = { found, region ->
+        Store.updateItem(item.id) { WeatherRules.picked(it, found, region) }
+        source.typed(by)
+        changing = false
+        Ticker.refresh()
+    }
+    val changeCity: @Composable () -> Unit = { MenuEntry(Sym.LOCATION_ON, stringResource(R.string.weather_change_city)) { changing = true } }
+
+    val status = WeatherItem.status(item, now)
+    when {
+        // The words before anything is sent, and the field. Typing sends nothing; Search (or Enter) sends the name.
+        status == Status.NotSetUp -> MenuCard(Sym.CLOUD, name, stringResource(R.string.common_not_set_up)) {
+            MenuNote(stringResource(R.string.weather_consent))
+            CitySearch(item, by, initial = WeatherRules.cityOf(ZoneId.systemDefault().id), onPick = pick)
+        }
+        // The same card for another city: no note (it was read before), and a way back.
+        changing -> MenuCard(Sym.CLOUD, city, stringResource(R.string.weather_change_city)) {
+            CitySearch(item, by, initial = WeatherRules.city(item).orEmpty(), onPick = pick)
+            MenuDivider()
+            MenuEntry(Sym.CLOSE, stringResource(R.string.common_cancel)) { source.typed(by); changing = false }
+        }
+        // A layout that came with a city, or the switch off in Setup: the words, and the one entry that turns it on. Nothing is sent before it.
+        status is Status.Off -> MenuCard(Sym.CLOUD, city, stringResource(if (status.everOn) R.string.common_off_in_setup else R.string.weather_not_turned_on)) {
+            MenuNote(stringResource(R.string.weather_consent))
+            MenuEntry(Sym.TOGGLE_ON, stringResource(R.string.weather_turn_on)) { source.turnOn(); Ticker.refresh() }
+        }
+        // No spinner: the subtitle says it, and the body shows nothing that isn't known yet.
+        status == Status.Loading -> MenuCard(Sym.CLOUD, city, stringResource(R.string.usage_loading)) { changeCity() }
+        status is Status.Missing -> {
+            val offline = status.failure == Failure.OFFLINE
+            MenuCard(Sym.CLOUD, city, stringResource(if (offline) R.string.common_no_connection else R.string.weather_no_answer)) {
+                if (!offline) Text(stringResource(if (status.failure == Failure.SLOW_DOWN) R.string.weather_no_answer_hour else R.string.weather_no_answer_15),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+                // Dimmed for ten seconds after the try that failed (longer if the service asked for that), with no word of its own: the card says what went wrong.
+                MenuEntry(Sym.REFRESH, stringResource(R.string.common_try_again), enabled = entry == Again.READY, onClick = again)
+                changeCity()
+            }
+        }
+        status is Status.Live -> {
+            val f = WeatherRules.menu(status.reading, WeatherItem.look(item), now, WeatherItem.Words, WeatherItem.times())
+            MenuCard(f.glyph, city, f.subtitle) {
+                ForecastBody(f)
+                MenuDivider()
+                // Dimmed for a minute after an answer (an automatic one too), and then it says why.
+                MenuEntry(Sym.REFRESH, stringResource(R.string.common_refresh),
+                    detail = if (entry == Again.UP_TO_DATE) stringResource(R.string.weather_up_to_date) else null, enabled = entry == Again.READY, onClick = again)
+                changeCity()
+                val site = stringResource(R.string.weather_open_site)
+                val opens = stringResource(R.string.common_opens_browser, site)
+                MenuEntry(Sym.OPEN_IN_NEW, site, modifier = Modifier.semantics { contentDescription = opens }) {
+                    host.close()
+                    Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse(SITE)))
+                }
+            }
+        }
+    }
+}
+
+/** A reading, top to bottom: the hero row, the next hours, the next days, sunrise and sunset, and the service's credit with the reading's time. */
+@Composable
+private fun ForecastBody(f: Forecast) {
+    if (f.temp != null || f.highLow != null || f.rainWind != null) {
+        // One node for a screen reader: "72 degrees. High 78, low 61. Rain, 20 percent chance. Wind 9 miles per hour."
+        Row(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = f.heroDesc }, verticalAlignment = Alignment.CenterVertically) {
+            if (f.temp != null) {
+                Text(f.temp, style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                Spacer(Modifier.width(16.dp))
+            }
+            Column {
+                if (f.highLow != null) Text(f.highLow, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (f.rainWind != null) Text(f.rainWind, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+    if (f.hours.isNotEmpty()) {
+        SectionLabel(stringResource(R.string.weather_next_hours))
+        HourStrip(f.hours)
+    }
+    if (f.days.isNotEmpty()) {
+        SectionLabel(stringResource(R.string.weather_next_days))
+        f.days.forEach { DayRow(it) }
+    }
+    Spacer(Modifier.height(4.dp))
+    // In the city's own time; neither row in polar day and night.
+    if (f.sunrise != null) InfoRow(stringResource(R.string.weather_sunrise), f.sunrise)
+    if (f.sunset != null) InfoRow(stringResource(R.string.weather_sunset), f.sunset)
+    MenuNote(f.note)
+}
+
+/**
+ * The city search, in the menu and in the item's settings: the field with its Search button, and
+ * under it what the last search came to. Typing sends nothing; the button or Enter sends the name
+ * (and turns the Weather switch on, see [WeatherSource.search]). [by] names this field, so an answer
+ * shows only where it was asked for. Not [canSubmit]: an item in Off, which may ask nothing.
+ */
+@Composable
+internal fun CitySearch(item: ItemConfig, by: String, initial: String, canSubmit: Boolean = true, onPick: (City, String?) -> Unit) {
+    val source = WeatherItem.source
+    val asked by source.searching.collectAsState()
+    // A debug build's test hook can put an answer here without asking anyone; it is looked for with the tick.
+    rememberTick()
+    val state = WeatherItem.stagedSearch ?: WeatherSource.shown(asked, by)
+    var short by remember { mutableStateOf(false) }
+    val field = remember { FocusRequester() }
+    val first = remember { FocusRequester() }
+    val places = ((state as? Ask.State.Done)?.answer as? Found.Places)?.list.orEmpty()
+    // What was found belongs to this field while it is drawn: gone with it, so a menu opened later starts empty.
+    DisposableEffect(by) { onDispose { source.typed(by) } }
+    // When places arrive the focus moves to the first, so Enter, Enter is search and take.
+    LaunchedEffect(places) { if (places.isNotEmpty()) runCatching { first.requestFocus() } }
+
+    // Down from the field goes to the first place, Up from there comes back.
+    Box(Modifier.onPreviewKeyEvent { e ->
+        if (places.isEmpty() || e.key != Key.DirectionDown) false
+        else { if (e.type == KeyEventType.KeyDown) runCatching { first.requestFocus() }; true }
+    }) {
+        SearchField(label = stringResource(R.string.weather_city_label), initial = initial, submit = stringResource(R.string.common_search), selectAll = true,
+            error = if (short) stringResource(R.string.weather_two_letters) else null, canSubmit = canSubmit, focus = field,
+            onChange = { short = false; source.typed(by) },
+            onEnter = { text -> short = WeatherRules.query(text) == null; if (!short) source.search(text, item, by) })
+    }
+    if (short) return
+    when (state) {
+        Ask.State.Idle -> {}
+        is Ask.State.Busy -> SearchStatus(stringResource(R.string.weather_searching))
+        is Ask.State.Done -> when (val found = state.answer) {
+            Found.Offline -> SearchStatus(stringResource(R.string.common_no_connection))
+            Found.NoAnswer -> SearchStatus(stringResource(R.string.weather_search_no_answer))
+            Found.Unasked -> {}
+            is Found.Places -> if (found.list.isEmpty()) SearchStatus(stringResource(R.string.weather_not_found)) else found.list.forEachIndexed { i, city ->
+                // Region and country on every place, so two of one name can be told apart.
+                val region = WeatherRules.region(city, WeatherItem.Words)
+                MenuEntry(Sym.LOCATION_ON, city.name, sub = region, modifier = if (i != 0) Modifier else Modifier.focusRequester(first).onPreviewKeyEvent { e ->
+                    if (e.key != Key.DirectionUp) false else { if (e.type == KeyEventType.KeyDown) runCatching { field.requestFocus() }; true }
+                }) { onPick(city, region) }
+            }
+        }
+    }
+}
+
+/** The line under the search field: read out when it changes, without taking the focus. */
+@Composable
+private fun SearchStatus(text: String) = Box(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) { MenuNote(text) }
+
+/** The item's settings: the city (the same search as in the menu), what the bar shows, the unit and a label. */
+@Composable
+internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
+    val online by Online.state.collectAsState()
+    val on = Online.Service.OPEN_METEO in online.on
+    val source = WeatherItem.source
+    val city = WeatherRules.city(item)
+    val by = "settings:" + item.id
+    // One card serves whichever item is selected: nothing typed or opened for one item stays for the next.
+    key(item.id) {
+        var changing by remember { mutableStateOf(false) }
+        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+            Text(if (city != null) stringResource(R.string.weather_city_current, city) else stringResource(R.string.weather_city_none),
+                style = MaterialTheme.typography.labelLarge)
+            // The words before the first request, here as in the menu.
+            Text(stringResource(R.string.weather_consent), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (WeatherRules.place(item) == null || changing) {
+                // An item in Off may ask nothing: the Where row above says where it is.
+                CitySearch(item, by, initial = city ?: WeatherRules.cityOf(ZoneId.systemDefault().id), canSubmit = item.section != Section.OFF) { found, region ->
+                    set(WeatherRules.picked(item, found, region))
+                    source.typed(by)
+                    changing = false
+                }
+                if (changing) TextButton(onClick = { source.typed(by); changing = false }) { Text(stringResource(R.string.common_cancel)) }
+            } else Row(Modifier.offset(x = (-12).dp)) { // a text button's own padding: its words then start where the lines above do
+                // The field appears on a click, as in the menu, and takes the focus then: not each time the item is selected.
+                TextButton(onClick = { changing = true }) { Text(stringResource(R.string.weather_change_city)) }
+                // A layout that came with a city, or the switch off in Setup: the same act as the menu's.
+                if (!on) TextButton(onClick = { source.turnOn(); Ticker.refresh() }) { Text(stringResource(R.string.weather_turn_on)) }
+            }
+        }
+    }
+    ChoiceRow(stringResource(R.string.option_show), listOf(WeatherRules.SHOW_TEMP to stringResource(R.string.weather_show_temp),
+        WeatherRules.SHOW_HIGH_LOW to stringResource(R.string.weather_show_high_low), WeatherRules.SHOW_FEELS to stringResource(R.string.weather_show_feels)),
+        item.opt("show", WeatherRules.SHOW_TEMP)) { set(item.with("show", it)) }
+    // Converted on the device: switching redraws the bar and the menu at once, and nothing is asked.
+    ChoiceRow(stringResource(R.string.option_temperature_unit), listOf("system" to stringResource(R.string.option_like_system),
+        "c" to stringResource(R.string.option_celsius), "f" to stringResource(R.string.option_fahrenheit)), item.opt("unit", "system")) {
+        set(item.with("unit", it))
+    }
+    TextRow(stringResource(R.string.option_label), item.opt("label", ""), help = stringResource(R.string.weather_label_help),
+        placeholder = stringResource(R.string.option_none)) { set(item.with("label", WeatherRules.label(it).ifEmpty { null })) }
+}

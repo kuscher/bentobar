@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- British English for strings_flight.xml: only the strings whose spelling differs from the US default. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="flight_bar_canceled">%1$s cancelled</string>
+    <string name="flight_canceled">Cancelled</string>
+    <string name="flight_desc_canceled">%1$s is cancelled</string>
+</resources>

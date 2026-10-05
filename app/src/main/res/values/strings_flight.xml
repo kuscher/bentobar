@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flight (AirLabs, with the user's own key). Every name here starts with flight_, item_flight_ or trigger_flight. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="item_flight_title">Flight</string>
+    <string name="item_flight_desc">A flight\'s countdown, gate and delays; needs your own AirLabs key</string>
+    <string name="trigger_flight">Show from %1$s before departure until an hour after landing</string>
+    <string name="trigger_flight_short">shows from %1$s before departure</string>
+    <string name="flight_consent">Flight times come from AirLabs, a flight data service, with a free key of your own. BentoBar sends AirLabs your key and the flight number when you track a flight and while it follows it, nothing else. AirLabs sees your IP address and knows which key asked.</string>
+
+    <!-- In the bar: 20 characters at most. flight_bar_plan also joins any two parts there ("1h 37m · Gate G13"). -->
+    <string name="flight_bar_looking">%1$s …</string>
+    <string name="flight_bar_plan">%1$s · %2$s</string>
+    <string name="flight_bar_gate">Gate %1$s</string>
+    <string name="flight_bar_landed_belt">Landed · Belt %1$s</string>
+    <string name="flight_bar_landed_at">Landed %1$s</string>
+    <string name="flight_bar_canceled">%1$s canceled</string>
+    <string name="flight_bar_diverted">%1$s diverted</string>
+    <string name="flight_bar_no_update">%1$s · no update</string>
+    <string name="flight_bar_not_live">%1$s · not live</string>
+    <string name="flight_bar_late">+%1$s</string>
+    <string name="flight_bar_early">−%1$s</string>
+    <string name="flight_tooltip">%1$s · %2$s → %3$s</string>
+
+    <!-- The menu: no key, no flight, looking up. -->
+    <string name="flight_none">No flight tracked</string>
+    <string name="flight_add_key">Add your key…</string>
+    <string name="flight_turn_on">Turn on flights</string>
+    <string name="flight_number_label">Flight number</string>
+    <string name="flight_number_hint">LH 455</string>
+    <string name="flight_day_next">Next flight</string>
+    <string name="flight_track">Track</string>
+    <string name="flight_lookup_note">A lookup uses 1 to 3 of your key\'s lookups.</string>
+    <plurals name="flight_lookups_left">
+        <item quantity="one">About %1$d lookup left this month.</item>
+        <item quantity="other">About %1$d lookups left this month.</item>
+    </plurals>
+    <string name="flight_looking_up">Looking up %1$s…</string>
+
+    <!-- The menu: a flight that is followed. -->
+    <string name="flight_header">%1$s · %2$s</string>
+    <string name="flight_route">%1$s → %2$s</string>
+    <string name="flight_leaves_at">Leaves %1$s</string>
+    <string name="flight_leaves_in">Leaves in %1$s</string>
+    <string name="flight_lands_in">Lands in %1$s</string>
+    <string name="flight_in_air">In the air</string>
+    <string name="flight_just_landed">Just landed</string>
+    <string name="flight_landed_ago">Landed %1$s ago</string>
+    <string name="flight_landed">Landed</string>
+    <string name="flight_canceled">Canceled</string>
+    <string name="flight_diverted">Diverted</string>
+    <string name="flight_timetable">From the timetable</string>
+    <string name="flight_no_update">No update</string>
+    <string name="flight_badge_planned">Planned</string>
+    <string name="flight_badge_on_time">On time</string>
+    <string name="flight_badge_delayed">Delayed %1$s</string>
+    <string name="flight_badge_late">%1$s late</string>
+    <string name="flight_badge_early">%1$s early</string>
+    <string name="flight_terminal">Terminal %1$s</string>
+    <string name="flight_belt">Belt %1$s</string>
+    <string name="flight_operated_as">Operated as %1$s</string>
+    <string name="flight_note">Times are each airport\'s own. Flight data by AirLabs · %1$s</string>
+    <string name="flight_status_refused">key not accepted, updated %1$s</string>
+    <string name="flight_status_used_up">no lookups left this month, updated %1$s</string>
+    <string name="flight_status_few">few lookups left, refresh by hand; updated %1$s</string>
+    <string name="flight_note_timetable">Times may be an hour off until the airline confirms them.</string>
+    <string name="flight_open_page">Open flight page</string>
+    <string name="flight_open_page_desc">Open flight page, opens FlightAware in the browser</string>
+    <string name="flight_copy_status">Copy status</string>
+    <string name="flight_copy_head">%1$s %2$s → %3$s</string>
+    <string name="flight_copy_left">Left %1$s</string>
+    <string name="flight_copy_lands">Lands %1$s</string>
+    <string name="flight_track_another">Track another flight</string>
+    <string name="flight_another_subtitle">%1$s stays until another is found</string>
+    <string name="flight_stop">Stop tracking</string>
+    <string name="flight_up_to_date">up to date</string>
+
+    <!-- What went wrong, under the field. -->
+    <string name="flight_err_not_number">A flight number looks like LH 455 or DLH455.</string>
+    <string name="flight_err_not_found">No flight %1$s found. Check the number.</string>
+    <string name="flight_err_not_that_day">%1$s doesn\'t fly on %2$s.</string>
+    <string name="flight_err_refused">AirLabs doesn\'t accept this key.</string>
+    <string name="flight_err_used_up">This key\'s lookups for the month are used up.</string>
+    <string name="flight_err_no_answer">AirLabs didn\'t answer. Try again in a moment.</string>
+    <string name="flight_change_key">Change key</string>
+
+    <!-- The key, in the item's settings. -->
+    <string name="flight_key_section">AirLabs key</string>
+    <string name="flight_get_key">Get a free key</string>
+    <string name="flight_save_key">Save key</string>
+    <string name="flight_key_help">Stays on this device. It is never shown again, and never copied with your settings.</string>
+    <string name="flight_key_saved">Key saved</string>
+    <string name="flight_replace_key">Replace key</string>
+    <string name="flight_remove_key">Remove key</string>
+    <string name="flight_remove_key_help">Removing the key also stops tracking and deletes what was fetched.</string>
+
+    <!-- Spoken: the item in the bar. The ones that start with a comma follow a countdown's sentence. -->
+    <string name="flight_desc_leaves_at">%1$s to %2$s leaves %3$s</string>
+    <string name="flight_desc_leaves_in">%1$s to %2$s leaves in %3$s</string>
+    <string name="flight_desc_lands_in">%1$s to %2$s lands in %3$s</string>
+    <string name="flight_desc_landed">%1$s landed at %2$s</string>
+    <string name="flight_desc_late">, %1$s late</string>
+    <string name="flight_desc_early">, %1$s early</string>
+    <string name="flight_desc_gate">, gate %1$s</string>
+    <string name="flight_desc_belt">, belt %1$s</string>
+    <string name="flight_desc_canceled">%1$s is canceled</string>
+    <string name="flight_desc_diverted">%1$s was diverted</string>
+    <string name="flight_desc_no_update">%1$s: no update</string>
+    <string name="flight_desc_not_live">, not live, updated %1$s</string>
+    <string name="flight_desc_looking">Looking up %1$s</string>
+    <string name="flight_desc_not_set_up">Flight: not set up</string>
+    <string name="flight_desc_off">Flight: off in Setup</string>
+
+    <!-- Spoken: the menu. Headline and badge are one sentence each; an end of the line is city, letters, then its time and the words under it. -->
+    <string name="flight_desc_headline_badge">%1$s. %2$s.</string>
+    <string name="flight_route_from">From %1$s, %2$s, %3$s.</string>
+    <string name="flight_route_to">To %1$s, %2$s, %3$s.</string>
+    <string name="flight_route_from_code">From %1$s, %2$s.</string>
+    <string name="flight_route_to_code">To %1$s, %2$s.</string>
+    <string name="flight_time_was">was %1$s</string>
+</resources>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- British English for strings_media.xml: only the strings whose spelling differs from the US default. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="media_access_restricted">Switch greyed out? Tap it, tap OK, then turn on Allow restricted settings in App info.</string>
+</resources>

@@ -1,0 +1,7 @@
+{
+ "error": {
+  "message": "Unknown api_key",
+  "code": "unknown_api_key"
+ },
+ "terms": "Unauthorized access is prohibited and punishable by law. \nReselling data 'As Is' without AirLabs.Co permission is strictly prohibited. \nFull terms on https://airlabs.co/. \nContact us info@airlabs.co"
+}

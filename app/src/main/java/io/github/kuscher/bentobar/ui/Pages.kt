@@ -60,11 +60,14 @@ import io.github.kuscher.bentobar.data.Position
 import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.data.HiddenMode
+import io.github.kuscher.bentobar.data.Online
 import io.github.kuscher.bentobar.data.Uses
 import io.github.kuscher.bentobar.data.TextSize
 import io.github.kuscher.bentobar.items.Env
 import io.github.kuscher.bentobar.items.Items
+import io.github.kuscher.bentobar.items.MediaAccess
 import io.github.kuscher.bentobar.items.Notify
+import io.github.kuscher.bentobar.items.Ticker
 import io.github.kuscher.bentobar.items.Usage
 import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
@@ -91,13 +94,17 @@ private fun PageLabel(text: String) {
 fun AddPage(onAdded: (String) -> Unit) {
     val cfg by Store.config.collectAsState()
     val groups = listOf(
-        R.string.add_group_system to listOf("cpu", "network", "memory", "battery", "storage"),
-        R.string.add_group_time to listOf("calendar", "event", "clock", "timer", "countdown"),
-        R.string.add_group_tools to listOf("caffeine", "sound", "tools", "folder", "app", "text", "spacer"),
+        AddGroup(R.string.add_group_system, listOf("cpu", "network", "memory", "battery", "storage", "heat", "devices")),
+        AddGroup(R.string.add_group_time, listOf("calendar", "event", "clock", "timer", "countdown")),
+        AddGroup(R.string.add_group_tools, listOf("caffeine", "media", "sound", "tools", "folder", "app", "text", "spacer")),
+        // The only items that go online, in a group that says so.
+        AddGroup(R.string.add_group_online, listOf("weather", "flight"), caption = R.string.add_group_online_caption),
     )
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp)) {
-        groups.forEach { (group, types) ->
+        groups.forEach { (group, types, caption) ->
             SectionLabel(stringResource(group))
+            if (caption != null) Text(stringResource(caption), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 types.mapNotNull { Items.of(it) }.forEach { type ->
                     val count = cfg.items.count { it.type == type.type }
@@ -121,11 +128,19 @@ fun AddPage(onAdded: (String) -> Unit) {
                                 minLines = 2)
                             Spacer(Modifier.height(10.dp))
                             Row {
-                                FilledTonalButton(onClick = { onAdded(Store.add(type.type, Section.SHOWN, type.defaultOptions())) }) {
+                                // An item that speaks up now and then goes to When active, with its rule on: it
+                                // shows when it has something to say. Its second button puts it in the bar for good.
+                                val quiet = type.addsWhenActive
+                                FilledTonalButton(onClick = {
+                                    onAdded(if (quiet) Store.add(type.type, Section.HIDDEN, type.defaultOptions(), whenActive = true)
+                                    else Store.add(type.type, Section.SHOWN, type.defaultOptions()))
+                                }) {
                                     SymIcon(Sym.ADD, size = 18.sp); Spacer(Modifier.width(6.dp)); Text(stringResource(R.string.add_add))
                                 }
                                 Spacer(Modifier.width(8.dp))
-                                TextButton(onClick = { onAdded(Store.add(type.type, Section.HIDDEN, type.defaultOptions())) }) { Text(stringResource(R.string.add_add_hidden)) }
+                                TextButton(onClick = { onAdded(Store.add(type.type, if (quiet) Section.SHOWN else Section.HIDDEN, type.defaultOptions())) }) {
+                                    Text(stringResource(if (quiet) R.string.add_add_shown else R.string.add_add_hidden))
+                                }
                             }
                         }
                     }
@@ -135,6 +150,9 @@ fun AddPage(onAdded: (String) -> Unit) {
         }
     }
 }
+
+/** A group of the catalog: its heading, the types in it, and a line under the heading where the group needs one. */
+private data class AddGroup(val title: Int, val types: List<String>, val caption: Int? = null)
 
 // ---- Look ----------------------------------------------------------------------------------
 
@@ -288,6 +306,47 @@ fun SetupPage(activity: Activity, setup: SetupState, onTurnOn: () -> Unit) {
             if (setup.usageAccess) StepLink(stringResource(R.string.setup_open_setting)) { Usage.openSettings(activity) }
             else StepAction(stringResource(R.string.setup_turn_on)) { Usage.openSettings(activity) }
         }
+        Step(7, stringResource(R.string.setup_listener_title), setup.mediaAccess, optional = true) {
+            Body(stringResource(R.string.setup_listener_text))
+            // Installed from a download, Android guards this switch like the accessibility one: say how, and offer App info.
+            val guarded = !setup.mediaAccess && setup.sideloaded
+            if (guarded) { Spacer(Modifier.height(4.dp)); Body(stringResource(R.string.media_access_restricted)) }
+            if (setup.mediaAccess) StepLink(stringResource(R.string.setup_open_setting)) { MediaAccess.openSettings(activity) }
+            else Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+                StepAction(stringResource(R.string.setup_turn_on)) { MediaAccess.openSettings(activity) }
+                if (guarded) TextButton(onClick = { MainActivity.openAppInfo(activity) }) { Text(stringResource(R.string.setup_app_info)) }
+            }
+        }
+        // Observed where it is kept: an item's menu can change it while this page is open.
+        val online by Online.state.collectAsState()
+        Step(8, stringResource(R.string.setup_online_title), online.on.isNotEmpty(), optional = true) {
+            Body(stringResource(R.string.setup_online_text))
+            Spacer(Modifier.height(4.dp))
+            OnlineSwitch(Online.Service.OPEN_METEO, online, stringResource(R.string.setup_online_weather), stringResource(R.string.setup_online_weather_first))
+            OnlineSwitch(Online.Service.AIRLABS, online, stringResource(R.string.setup_online_flights), stringResource(R.string.setup_online_flights_first))
+            // The key outlives the Flight item it was typed into: without this, taking it off the device
+            // would mean adding a Flight item again first.
+            if (Online.Service.AIRLABS in online.keyed) TextButton(onClick = { Online.removeKey(Online.Service.AIRLABS); Ticker.refresh() }) {
+                Text(stringResource(R.string.flight_remove_key), color = MaterialTheme.colorScheme.error)
+            }
+            Text(stringResource(R.string.setup_online_off_note), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+/**
+ * One online service's switch. It can be turned on here only once its item was set up on this
+ * install (a city searched, a key saved): until then it is off and says where to start. Off stops
+ * requests at once and deletes what the service sent.
+ */
+@Composable
+private fun OnlineSwitch(service: Online.Service, state: Online.State, label: String, first: String) {
+    val on = service in state.on
+    val setUp = service in state.setUp
+    SwitchRow(label, on, help = if (!on && !setUp) first else null, enabled = on || setUp) { want ->
+        if (want) Online.turnOn(service) else Online.turnOff(service)
+        Ticker.refresh()
     }
 }
 
@@ -352,6 +411,7 @@ private fun StepLink(label: String, onClick: () -> Unit) =
 // ---- About ---------------------------------------------------------------------------------
 
 private const val PRIVACY_URL = "https://googlebook.studio/privacy/bentobar"
+private const val OPEN_METEO_URL = "https://open-meteo.com/"
 
 @Composable
 fun AboutPage() {
@@ -373,6 +433,13 @@ fun AboutPage() {
         }
         PageLabel(stringResource(R.string.about_privacy))
         Body(stringResource(R.string.about_privacy_text))
+        Spacer(Modifier.height(4.dp))
+        Bullet(stringResource(R.string.about_privacy_weather))
+        Bullet(stringResource(R.string.about_privacy_flight))
+        Bullet(stringResource(R.string.about_privacy_media))
+        Bullet(stringResource(R.string.about_privacy_others))
+        Spacer(Modifier.height(8.dp))
+        Body(stringResource(R.string.about_privacy_backup))
         // Google Play asks for the privacy policy to be reachable from inside the app.
         TextButton(onClick = { Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL))) }, modifier = Modifier.offset(x = (-12).dp)) {
             Text(stringResource(R.string.about_privacy_policy))
@@ -385,6 +452,12 @@ fun AboutPage() {
         Bullet(stringResource(R.string.about_credit_symbols))
         Bullet(stringResource(R.string.about_credit_compose))
         Bullet(stringResource(R.string.about_credit_kotlin))
+        Bullet(stringResource(R.string.about_credit_openmeteo))
+        Bullet(stringResource(R.string.about_credit_airlabs))
+        // Open-Meteo's licence asks for the credit and a link to it.
+        TextButton(onClick = { Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse(OPEN_METEO_URL))) }, modifier = Modifier.offset(x = (-12).dp)) {
+            Text(stringResource(R.string.weather_open_site))
+        }
         PageLabel(stringResource(R.string.about_who))
         Body(stringResource(R.string.about_who_text))
         Spacer(Modifier.height(8.dp))

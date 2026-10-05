@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.9 (2026-10-05)
+
+- **Now playing.** A new item shows what's playing and pops out only while it plays; its menu has the
+  artwork, the position, and previous, play and next. With no access at all it shows that something
+  plays and controls it. For the title Android wants notification access: BentoBar tells Android to
+  send it no notifications, and receives none.
+- **Device batteries and Heat.** Device batteries shows the lowest of your mouse, keyboard, stylus or
+  controller, and pops out below 20%. Heat appears when Android starts slowing a hot device, and the
+  CPU item can use the same signal ("Also show when the device runs hot"). Neither needs a permission.
+- **Weather.** The temperature and conditions of a city you pick, the next hours and days in its menu,
+  and a rule that brings it out before rain or snow. From Open-Meteo, with no account and no location
+  permission.
+- **Flight.** Enter a flight number in the item's menu, and the bar counts down to departure with the
+  gate, then to landing, and says when it's late. With a free AirLabs key of your own; asked
+  sparingly, never while the screen is off.
+- **World clock.** Add cities in the menu ("Munich" finds its time zone) and name them in settings.
+  Offsets with half and quarter hours read right (+5:30, +5:45). A slider, Plan a time, shows any time
+  of day in every city: copy the line, or start a calendar event there.
+- **Sound.** An option draws a volume slider in the bar: click or drag it.
+- **BentoBar now has the internet permission.** Two items use it, Weather and Flight, and only after
+  you set them up on this device; Setup › Online services switches each off. Requests go to
+  Open-Meteo and AirLabs and nowhere else. Everything else stays on your Googlebook, as before.
+- **Colors under a full-screen app.** On Googlebooks that keep the status bar when an app goes
+  full screen (the keyboard's full-screen key), the bar takes that app's light or dark icons, and
+  BentoBar stayed white on a light app. It now reads the bar's colors again when another window
+  takes the place under the bar.
+- Smaller things: an item that updates every second (a clock with seconds, the volume) could skip a
+  second now and then, and no longer does; the volume's percentage is rounded, not cut (ten of
+  fifteen steps is 67%); the preview in settings uses the window's width and says when it has no room
+  for every item; the accessibility notice no longer comes up over a service that is already on (it
+  could, right after an update with the settings window open); a layout that can't be read is logged
+  by the kind of fault only, not with the text around it.
+- The tag workflow's upload to Google Play works after Google has rejected an update (Play then
+  wants the commit marked as not sent for review).
+
 ## 0.8 (2026-10-05)
 
 - **BentoBar asks before it uses its accessibility service.** The first time you open it, and

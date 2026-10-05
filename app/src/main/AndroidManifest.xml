@@ -2,7 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- BentoBar has NO INTERNET permission: nothing it reads leaves the device. -->
+    <!-- Two items go online, and only after the user set them up on this device: Weather asks Open-Meteo,
+         Flight asks AirLabs with the user's own key. net/Http.kt names the three hosts and is the only code
+         that opens a connection; nothing the accessibility service or any other item reads goes there. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Keep awake while BentoBar's bar is hidden: the bar's own window holds the screen otherwise. -->
@@ -31,13 +34,19 @@
          doesn't check this, so the APK from GitHub still installs anywhere. -->
     <uses-feature android:name="android.hardware.type.pc" android:required="true" />
 
+    <!-- Backups carry the layout, as before. What belongs to one install (whether an online service is
+         switched on, the user's key, what a service last sent) is kept in Android's no-backup directory,
+         and the rules say so once more. No connection is ever made in clear text. -->
     <application
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:localeConfig="@xml/locales_config"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
-        android:theme="@style/Theme.BentoBar">
+        android:theme="@style/Theme.BentoBar"
+        android:usesCleartextTraffic="false">
 
         <!-- Lets the shell (adb) profile release builds with simpleperf; no effect for users. -->
         <profileable android:shell="true" />
@@ -85,6 +94,25 @@
             <meta-data
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service" />
+        </service>
+
+        <!-- BentoBar's entry in Android's "Notification access" list, for Now playing: Android tells an app
+             what the media players are playing only if the user turned the app on there. BentoBar wants the
+             players' titles and no notifications, and says so three times over: it asks for no notification
+             type (an empty default list means none), it marks all four types as never wanted (15 is
+             conversations, alerting, silent and ongoing together; Android's page for the listener then shows
+             them off and disabled), and Android is not to start this service by itself. Off until the user
+             turns it on; Now playing works without it, with an icon and the media keys. items/MediaAccess.kt. -->
+        <service
+            android:name=".items.MediaAccess"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+            <meta-data android:name="android.service.notification.default_filter_types" android:value="" />
+            <meta-data android:name="android.service.notification.disabled_filter_types" android:value="15" />
+            <meta-data android:name="android.service.notification.default_autobind_listenerservice" android:value="false" />
         </service>
 
         <service

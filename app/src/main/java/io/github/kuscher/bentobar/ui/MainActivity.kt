@@ -78,7 +78,7 @@ class MainActivity : ComponentActivity() {
             handle(intent)
             // First opening, service still off: the disclosure comes up by itself, in the app's normal
             // use, not behind a page someone has to find. Once answered, only Turn on brings it back.
-            disclosure = Store.consent.value == Store.Consent.NOT_ASKED && !serviceOn(this) && !Env.advancedProtection()
+            disclosure = Store.consent.value == Store.Consent.NOT_ASKED && !serviceOn(this) && !turnedOn(this) && !Env.advancedProtection()
         } else {
             page = savedInstanceState.getInt(STATE_PAGE); selected = savedInstanceState.getString(STATE_SELECTED)
             disclosure = savedInstanceState.getBoolean(STATE_DISCLOSURE)
@@ -225,8 +225,13 @@ class MainActivity : ComponentActivity() {
                         0 -> BarPage(running, selected, onSelect = { selected = it }, onSetup = { page = 3 })
                         // Adding keeps you on Add: a message confirms it, with Undo, instead of jumping pages.
                         1 -> AddPage { id ->
-                            val title = Store.config.value.items.firstOrNull { it.id == id }?.let { Items.of(it.type)?.title }.orEmpty()
-                            Notice.post(getString(R.string.add_added, title), getString(R.string.bar_undo)) { Store.remove(id) }
+                            val added = Store.config.value.items.firstOrNull { it.id == id }
+                            val type = added?.let { Items.of(it.type) }
+                            val title = type?.title.orEmpty()
+                            // Added to When active, the bar looks as before: the message says when the item will show.
+                            val rule = added?.takeIf { it.whenActive && it.section == io.github.kuscher.bentobar.data.Section.HIDDEN }?.let { type?.trigger?.short(it) }
+                            Notice.post(if (rule != null) getString(R.string.add_added_rule, title, rule) else getString(R.string.add_added, title),
+                                getString(R.string.bar_undo)) { Store.remove(id) }
                         }
                         2 -> LookPage()
                         3 -> SetupPage(this@MainActivity, setup, onTurnOn = ::turnOn)
@@ -287,6 +292,17 @@ class MainActivity : ComponentActivity() {
             return am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
                 .any { it.resolveInfo.serviceInfo.let { s -> s.packageName == me.packageName && s.name == me.className } }
         }
+
+        /**
+         * Turned on in Accessibility settings, as Android's own setting has it. It says so before the
+         * service is bound again, as in the first moments after an update, when [serviceOn] still says no
+         * and the disclosure came up over a service that was on.
+         */
+        private fun turnedOn(context: Context): Boolean = runCatching {
+            val me = serviceComponent(context)
+            Settings.Secure.getString(context.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES).orEmpty()
+                .split(':').any { ComponentName.unflattenFromString(it) == me }
+        }.getOrDefault(false)
 
         /**
          * Accessibility settings. The extras ask Settings to scroll to and highlight BentoBar

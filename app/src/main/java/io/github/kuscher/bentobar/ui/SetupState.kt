@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import androidx.compose.runtime.Immutable
 import io.github.kuscher.bentobar.data.Uses
 import io.github.kuscher.bentobar.items.Env
+import io.github.kuscher.bentobar.items.MediaAccess
 import io.github.kuscher.bentobar.items.Notify
 import io.github.kuscher.bentobar.items.Usage
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,10 @@ data class SetupState(
     val advancedProtection: Boolean = false,
     /** Optional: Usage access, for the top apps in the Network and Storage menus. */
     val usageAccess: Boolean = false,
+    /** Optional: Android's notification access, which Now playing needs for titles and artwork. */
+    val mediaAccess: Boolean = false,
+    /** Installed from a download: Android guards the accessibility and notification access switches until they are allowed in App info. */
+    val sideloaded: Boolean = false,
 )
 
 /**
@@ -49,6 +54,8 @@ object Setup {
             exactAlarms = app.getSystemService(AlarmManager::class.java)?.canScheduleExactAlarms() == true && Uses.on(Uses.EXACT_ALARMS),
             advancedProtection = Env.advancedProtection(),
             usageAccess = Usage.granted(app),
+            mediaAccess = MediaAccess.granted(app),
+            sideloaded = Env.sideloaded(),
         )
         // A running timer's alarm is exact only while exact alarms are allowed and used: follow a change.
         if (state.value.exactAlarms != before.exactAlarms) io.github.kuscher.bentobar.items.Timers.reschedule()

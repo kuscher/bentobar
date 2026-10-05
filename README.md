@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Googlebook_OS-Android_17-34397E" alt="Googlebook OS, Android 17">
-  <img src="https://img.shields.io/badge/internet_permission-none-2E7D32" alt="No internet permission">
+  <img src="https://img.shields.io/badge/goes_online-only_for_Weather_and_Flight-2E7D32" alt="Goes online only for Weather and Flight">
   <img src="https://img.shields.io/badge/license-MIT-555555" alt="MIT license">
   <img src="https://img.shields.io/badge/developed_on-a_Googlebook-F4533F" alt="Developed on a Googlebook">
 </p>
@@ -49,7 +49,8 @@ them away. Like a bento box: everything in its compartment, and the whole thing 
 - **Drag to reorder** in settings, within a section or into another one.
 - **Click any item** for its menu: charts, details and actions.
 - **Right-click an item** to hide it, move it or change how it looks.
-- **Scroll** over the sound item to change the volume, or over the timer to add minutes.
+- **Scroll** over the sound item to change the volume, or over the timer to add minutes. The sound
+  item can also draw a **volume slider** right in the bar.
 - **Quick Settings tiles** switch BentoBar off (for presenting), keep the screen awake, or start a
   25-minute timer.
 - **Live Update chip:** when BentoBar is off, a running timer still shows as Android's own status
@@ -62,18 +63,23 @@ hides when an app goes full screen or the screen locks.
 
 | Item | In the bar | In its menu |
 |---|---|---|
-| **CPU load** | busy % | chart, per-core load, clock speeds, GPU load |
+| **CPU load** | busy %; can also pop out when the device runs hot | chart, per-core load, clock speeds, GPU load |
 | **Network speed** | ↓ download ↑ upload | chart, totals since start-up, connection |
 | **Memory** | RAM in use | used, available, chart |
 | **Battery details** | watts, %, temperature or time to full | power in or out, voltage, current, health, cycles, thermal state |
 | **Storage** | free space | used and free, shortcuts to clean up |
 | **Date and calendar** | the date, in your format | a month view, and the day's events (all-day ones too) with **Join** and **Directions**; tasks that apps like Todoist sync to your calendar are left out, here and in Next meeting |
 | **Next meeting** | title and countdown, until 3 a.m. tomorrow; just the icon when there are no more meetings | today's meetings with **Join** and **Directions** |
-| **Clock** | a second clock: seconds, 24-hour or another city | world clocks |
+| **Clock** | a second clock: seconds, 24-hour or another city | world clocks: add cities in the menu, and **Plan a time**, a slider that shows any time of day in every city (copy the line, or start a calendar event there) |
 | **Timer** | countdown, stopwatch or Pomodoro | start, pause, +1 min, stop |
 | **Countdown** | days and hours to a date | exact time left |
 | **Keep awake** | coffee cup: click to switch | 15 min to "until I turn it off" |
-| **Sound** | volume | volume slider, play/pause/next |
+| **Sound** | volume, as a number or as a slider you click or drag | volume slider, play/pause/next |
+| **Now playing** | the title while something plays | artwork, position, previous, play and next, other players. The title needs notification access (optional); without it the item still shows that something plays and controls it |
+| **Device batteries** | the lowest of your mouse, keyboard, stylus or controller, when it's low | every device that reports a battery |
+| **Heat** | a word when Android slows a hot device | heat level, battery temperature |
+| **Weather** *(online)* | conditions and temperature of a city you pick; rain or snow that is coming | the next hours and days, sunrise and sunset. From [Open-Meteo](https://open-meteo.com) |
+| **Flight** *(online)* | a countdown to departure with the gate, then to landing, and delays | times at both airports, terminal, gate, baggage belt. From AirLabs, with a free key of your own |
 | **Tools** | toolbox | screenshot, lock, overview, all apps, power, settings shortcuts |
 | **App folder** / **App shortcut** | your apps | a grid of apps / one click to open |
 | **Text or emoji**, **Spacer** | anything you like | optional link |
@@ -148,9 +154,32 @@ with that access:
 - It runs **system actions** (screenshot, lock, overview, all apps, power) when you pick them in
   the Tools menu.
 
-BentoBar doesn't read other apps' windows, doesn't watch your keyboard, mouse or touches, and has
-**no internet permission**: your layout, your calendar and everything it measures stay on your
-Googlebook.
+BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse or touches.
+
+**BentoBar goes online for two items only, and only after you set them up** on this device:
+
+- **Weather** sends [Open-Meteo](https://open-meteo.com) the city you search for, and for the forecast
+  the coordinates of the city you pick, rounded to about a kilometre: about every 30 minutes while the
+  bar is on screen, and when you open its menu or press Refresh. Open-Meteo sees your IP address, as
+  any website does. There is no location permission.
+- **Flight** sends [AirLabs](https://airlabs.co) the flight number and your own AirLabs key: when you
+  track a flight, when you press Refresh, and while it follows the flight (about every 3 hours, then
+  every 30 minutes or sooner from 3 hours before departure until it lands). AirLabs sees your IP
+  address and can tie lookups to your key's account. BentoBar ships no key.
+
+Requests can go to those two services and nowhere else (the code has no way to name another
+address), **Setup › Online services** switches each off, and a layout pasted from another install
+never turns them on. BentoBar sends nothing else anywhere: not your layout, your calendar, what's
+playing or anything it measures. It has no accounts of its own, no ads and no analytics, and it
+sends its developer nothing.
+
+**Now playing** reads the title, artist and artwork your media players publish, which Android shares
+only with apps that have notification access. That access is optional, and BentoBar tells Android to
+send it no notifications: it receives none. Without it the item still shows that something plays and
+controls it. Nothing about what you play is stored or sent.
+
+If you use Android's backup, Android keeps a copy of BentoBar's settings in your Google account. Your
+AirLabs key and the two online switches are left out of it.
 
 **Usage access is optional and off by default.** If you turn it on (Setup, or the Network and
 Storage menus), BentoBar reads how much data and storage each app uses, to list the top five in
@@ -167,6 +196,8 @@ show the whole system instead.
 | Calendar *(optional)* | Next meeting, and events in the month view |
 | Alarms and reminders *(optional)* | timers that ring on the second while the Googlebook sleeps |
 | Usage access *(optional)* | the apps using the most data today and the largest apps, in the Network and Storage menus |
+| Internet | Weather (Open-Meteo) and Flight (AirLabs), only after you set them up; nothing else |
+| Notification access *(optional)* | Now playing's title, artist and artwork; BentoBar receives no notifications |
 | Network state, launcher apps | the network menu, and picking apps for shortcuts |
 
 ## Good to know

@@ -33,6 +33,26 @@ title toggle_on touch_app tune update videocam visibility visibility_off volume_
 volume_off volume_up warning widgets wifi wysiwyg memory_alt
 """.split()
 
+# Added for 0.9 in one run, so that nobody working on a single item has to rerun this: now playing,
+# device batteries, heat, weather (day and night), flights, world clock, and what goes with being online.
+ICONS += """
+album fast_forward fast_rewind graphic_eq headphones music_off pause_circle play_circle queue_music
+battery_1_bar battery_3_bar battery_5_bar battery_alert battery_low battery_unknown battery_very_low
+bluetooth bluetooth_connected earbuds gamepad headset_mic speaker sports_esports stadia_controller
+stylus stylus_note trackpad_input watch
+ac_unit heat local_fire_department mode_cool mode_fan mode_heat severe_cold thermometer
+air clear_day clear_night cloud cloud_off cloudy_snowing cyclone explore foggy humidity_percentage
+location_on mist my_location navigation near_me nights_stay partly_cloudy_day partly_cloudy_night
+rainy rainy_heavy rainy_light rainy_snow snowing storm sunny sunny_snowing thunderstorm tornado
+travel_explore umbrella water_drop wb_twilight weather_hail weather_mix weather_snowy
+airlines airplane_ticket airplanemode_active airplanemode_inactive connecting_airports
+departure_board door_front flight flight_land flight_takeoff local_airport luggage meeting_room travel
+add_circle calendar_add_on calendar_clock cancel edit_calendar language more_time remove_circle today
+arrow_forward backspace block cloud_done cloud_sync content_paste east error key lock_open north
+notifications_active notifications_off password pending priority_high privacy_tip send shield south
+sync sync_problem toggle_off trending_flat vpn_key west wifi_off
+""".split()
+
 # Symbols also exported as vector drawables (tiles, notifications, launcher icon), from the filled font.
 DRAWABLES = ["coffee", "timer", "avg_pace", "event", "pause", "play_arrow", "add", "stop", "videocam", "open_in_new"]
 

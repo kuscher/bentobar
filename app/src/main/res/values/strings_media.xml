@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Now playing. Every name here starts with media_, item_media_ or trigger_media. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="item_media_title">Now playing</string>
+    <string name="item_media_desc">What\'s playing, with pause and skip; shows while something plays</string>
+    <string name="trigger_media">Show while something is playing, and for %1$s after it pauses</string>
+    <string name="trigger_media_short">shows while playing</string>
+    <string name="media_nothing">Nothing playing</string>
+    <string name="media_playing">Playing</string>
+    <!-- The menu's subtitle for a paused player: "Spotify · Paused". -->
+    <string name="media_player_paused">%1$s · Paused</string>
+    <!-- A player that gives no title, in the menu and spoken: "Chrome is playing". -->
+    <string name="media_app_playing">%1$s is playing</string>
+    <string name="media_app_paused">%1$s is paused</string>
+    <!-- Title and artist, in the bar and in the tooltip: "Clocks · Coldplay". -->
+    <string name="media_bar_both">%1$s · %2$s</string>
+    <!-- A track, spoken: "Blue in Green by Miles Davis", and with its album "Blue in Green by Miles Davis, Kind of Blue". -->
+    <string name="media_track_by">%1$s by %2$s</string>
+    <string name="media_track_album">%1$s, %2$s</string>
+    <string name="media_position">Position</string>
+    <!-- Where a track stands, spoken: "1:42 of 5:37". -->
+    <string name="media_position_state">%1$s of %2$s</string>
+    <string name="media_other_players">Other players</string>
+    <string name="media_other_pause">Pause %1$s</string>
+    <string name="media_other_play">Play %1$s</string>
+    <string name="media_open_player">Open %1$s</string>
+    <!-- The next four are also what the item's settings card and Setup's "Notification access" step say: keep their names. -->
+    <string name="media_access_lead">See what\'s playing</string>
+    <string name="media_access_explain">Android shares the title, artist and artwork only with apps that have notification access. BentoBar tells Android to send it no notifications at all; it reads only what your media players say is playing, and keeps that on this device.</string>
+    <string name="media_access_restricted">Switch grayed out? Tap it, tap OK, then turn on Allow restricted settings in App info.</string>
+    <string name="media_access_allow">Allow notification access</string>
+    <string name="media_show_title">Title</string>
+    <string name="media_show_both">Title and artist</string>
+    <string name="media_show_artist">Artist</string>
+    <string name="media_show_needs_access">Shows once notification access is on</string>
+    <string name="media_click">A click</string>
+    <string name="media_click_menu">Opens the menu</string>
+    <string name="media_click_toggle">Plays or pauses</string>
+    <!-- What a screen reader says for the item in the bar. -->
+    <string name="media_desc_playing_by">Playing: %1$s by %2$s</string>
+    <string name="media_desc_playing">Playing: %1$s</string>
+    <string name="media_desc_paused">Paused: %1$s</string>
+    <string name="media_desc_playing_unknown">Something is playing</string>
+    <string name="media_desc_paused_unknown">Playback paused</string>
+</resources>

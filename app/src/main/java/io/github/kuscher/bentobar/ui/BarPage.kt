@@ -83,6 +83,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.bar.Strip
@@ -211,17 +212,23 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
         override fun click(item: ItemConfig, at: Rect) = onSelect(item.id)
         override fun context(item: ItemConfig, at: Rect) = onSelect(item.id)
         override fun scroll(item: ItemConfig, steps: Int) { Items.of(item.type)?.onScroll(item, steps); Ticker.refresh() }
+        // A slider is only drawn here: a click on it selects the item, like a click anywhere on an item.
+        override val slidable: Boolean get() = false
         override fun chevron(at: Rect) { expanded = !expanded }
         override fun chevronContext(at: Rect) { expanded = !expanded }
         override fun hover(inside: Boolean) {}
         override fun placed(id: String, at: Rect) {}
     }
-    val maxPx = with(LocalDensity.current) { 900.dp.roundToPx() }
+    // The preview is narrower than a status bar: what it has no room for is said under it, or an item
+    // that is in the list and not in the picture looks lost.
+    var dropped by remember { mutableStateOf(emptySet<String>()) }
     Column {
-        Box(
+        BoxWithConstraints(
             Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(18.dp))
                 .background(barBrush),
         ) {
+            // The strip may take what the mock clock and system icons leave (about 380 dp go to them and the gaps).
+            val maxPx = with(LocalDensity.current) { (maxWidth - 380.dp).coerceAtLeast(200.dp).roundToPx() }
             val now = remember(tick) { ZonedDateTime.now() }
             // The system's 12/24-hour setting and the locale's own short date, like the real status bar.
             val h24 = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
@@ -231,7 +238,8 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 if (cfg.position == Position.LEFT) Spacer(Modifier.width(16.dp)) else Spacer(Modifier.weight(1f))
                 Strip(entries(visible), if (expanded) entries(hidden) else emptyList(), hidden.isNotEmpty(),
                     chevronAlways = hidden.isNotEmpty(), chevronReservePx = 0, expanded = expanded,
-                    chevronOnLeft = cfg.position != Position.LEFT, look = look, maxWidthPx = maxPx, heightDp = 52.dp, events = events)
+                    chevronOnLeft = cfg.position != Position.LEFT, look = look, maxWidthPx = maxPx, heightDp = 52.dp, events = events,
+                    onOverflow = { dropped = it })
                 if (cfg.position == Position.LEFT) Spacer(Modifier.weight(1f)) else if (cfg.position == Position.CENTER) Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -242,7 +250,8 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 }
             }
         }
-        Text(stringResource(if (hidden.isNotEmpty()) R.string.bar_preview_hint_hidden else R.string.bar_preview_hint),
+        val hint = stringResource(if (hidden.isNotEmpty()) R.string.bar_preview_hint_hidden else R.string.bar_preview_hint)
+        Text(if (dropped.isEmpty()) hint else hint + " " + pluralStringResource(R.plurals.bar_preview_more, dropped.size, dropped.size),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 6.dp, top = 6.dp))
     }
@@ -479,6 +488,24 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
                 }
                 Spacer(Modifier.height(8.dp))
             }
+            // The same for notification access (Now playing): the words, then the way to Android's switch.
+            if (type.notificationAccess && !setup.mediaAccess) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer), modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.media_access_explain), style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer)
+                            if (setup.sideloaded) Text(stringResource(R.string.media_access_restricted), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.padding(top = 4.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        FilledTonalButton(onClick = { io.github.kuscher.bentobar.items.MediaAccess.openSettings(context) }) {
+                            Text(stringResource(R.string.media_access_allow))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
             ChoiceRow(stringResource(R.string.detail_where), listOf(Section.SHOWN to stringResource(R.string.section_shown),
                 Section.HIDDEN to stringResource(R.string.section_hidden), Section.OFF to stringResource(R.string.common_off)), item.section) { s ->
                 Store.move(item.id, s, 999)
@@ -491,7 +518,7 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
             }
             type.options?.let { opts ->
                 Spacer(Modifier.height(4.dp))
-                SectionLabel(stringResource(R.string.detail_options))
+                SectionLabel(stringResource(type.optionsTitle))
                 opts(item) { changed -> Store.updateItem(item.id) { changed }; Ticker.refresh() }
             }
             Spacer(Modifier.height(12.dp))

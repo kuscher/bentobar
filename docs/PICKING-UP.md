@@ -19,7 +19,8 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
-## 0.9 (built 2026-10-05, NOT released: no tag, nothing sent to Google Play)
+## 0.9 (2026-10-05): six new things for the bar, and the internet permission for two of them
+Merged as pull request #17 and released as 0.9 (version code 10) from the tag `v0.9`; the next release needs a new version.
 Five new items and three additions to old ones: Now playing, Device batteries, Heat (and a CPU rule),
 Weather, Flight; more cities and "Plan a time" in World clock; a volume slider in the bar. Two of them
 go online (Weather: Open-Meteo; Flight: AirLabs with the user's own key), each only after its item was
@@ -46,13 +47,12 @@ set up on this install. CLAUDE.md has the rules ("Going online…") and every te
   checked live, the item was driven with staged flights); a right mouse button on the slider (read
   in the code, and the same press opens the menu by touch); an arm64 Googlebook; a light
   wallpaper. The README's pictures and the store's screenshots don't show the new items yet.
-- **Before a release** (each is the owner's): the Data safety form (`store-submission/forms/data-safety.md`
-  has the draft; "No data collected" is no longer true), the privacy policy page (it must be public
-  before the build is sent), a new video for the Accessibility declaration (the description Android
-  shows beside the switch lost "It has no internet permission"), then the tag. The version is 0.9
-  (code 10) on this branch; the release notes (`docs/release-notes/0.9.md`), Play's "What's new", the
-  README and the store description are written; the changelog's heading still says "Unreleased (0.9)"
-  and takes its date at the tag.
+- **What the internet permission changed outside the code**, done with this release: the privacy
+  policy page (googlebook.studio/privacy/bentobar, public before the build was sent), Google Play's
+  Data safety form (`store-submission/forms/data-safety.md` has what was declared and why: "No data
+  collected" is no longer true), and a new video for the Accessibility declaration (the description
+  Android shows beside the switch lost "It has no internet permission"). A later release that sends
+  anything else, or to anyone else, changes all three again.
 - **Left as they are, on purpose**: the answer to the accessibility disclosure is kept with the other
   settings, so a restored backup brings it along (better: beside the online switches, outside
   backups); the fifteen saved AirLabs replies under `app/src/test/resources/airlabs/` are real replies

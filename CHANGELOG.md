@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.9)
+## 0.9 (2026-10-05)
 
 - **Now playing.** A new item shows what's playing and pops out only while it plays; its menu has the
   artwork, the position, and previous, play and next. With no access at all it shows that something

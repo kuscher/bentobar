@@ -19,29 +19,44 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
-## Next (in work since 2026-10-05, not released; the version is still 0.8)
+## 0.9 (built 2026-10-05, NOT released: no tag, nothing sent to Google Play)
 Five new items and three additions to old ones: Now playing, Device batteries, Heat (and a CPU rule),
 Weather, Flight; more cities and "Plan a time" in World clock; a volume slider in the bar. Two of them
 go online (Weather: Open-Meteo; Flight: AirLabs with the user's own key), each only after its item was
-set up on this install. CLAUDE.md has the rules ("Going online…").
-- **The groundwork is in** (the commits after 0.8): `net/` (three hosts, nothing else), `data/Online.kt`
-  and `data/Kept.kt` (switches, the key and fetched data, outside the layout and outside backups),
-  `items/Refresher.kt`, `Ask.kt` and `Background.kt` (loading), `items/NowPlaying.kt` and
-  `MediaAccess.kt` (media sessions), the slider in the strip (`bar/BarUi.kt`, `bar/SliderMath.kt`), the
-  type life cycle in `Ticker`, the catalog's Online group, Setup's steps 7 and 8, About › Privacy, the
-  icons, per-feature text files, and debug hooks (`now`, `net`, `online`, `item`).
-- **The five new items are first cuts**: each is in the catalog with its rule and its empty state and
-  nothing more (`items/MediaItem.kt`, `DevicesItem.kt`, `HeatItem.kt`, `WeatherItem.kt`, `FlightItem.kt`).
-  Sound has no slider option yet, World clock no cities, CPU no heat rule: the strip, the layout
-  (`BarConfig.cities`) and `Trigger` are ready for them.
-- **Not tried on a device yet**: the slider's pointer rules (click, drag, long touch, right-click and
-  wheel on the track; reorder from the icon), media sessions through a listener that is turned on but
-  not running (`./bento debug media` says `sessions=direct`, or `bound` where a device insists, and
-  `received=0`), Setup's two new steps.
-- **Before a release**: the README (its "internet permission: none" badge and the permission table),
-  the store description and Play's Data safety form (the app now sends a city, coordinates and a
-  flight number to two services when the user sets those items up), the privacy policy page, release
-  notes and a new version.
+set up on this install. CLAUDE.md has the rules ("Going online…") and every test hook.
+- **How it was made**: a shared groundwork first (`net/`, `data/Online.kt`, `data/Kept.kt`,
+  `items/Refresher.kt`, `Ask.kt`, `Background.kt`, `NowPlaying.kt`, `MediaAccess.kt`, the slider in the
+  strip, the type life cycle, Setup's steps 7 and 8, About › Privacy), then the five parts in files of
+  their own, then two full readings of the branch (one for correctness, one for privacy, security and
+  Google Play's rules) and a second look at what was fixed after them, the acceptance lists on an
+  emulator (staged values, the real weather service, a real player), a look at pictures from a device
+  by the designer, and a pass on a Googlebook.
+- **Checked on a Googlebook** (an Intel 15-inch): the strip with every new item beside the system's
+  icons, on a see-through bar, a black one (a maximized window) and a light one (a light app made
+  full screen with the keyboard's full-screen key, which keeps the status bar there); every new
+  menu; the slider with a mouse (click, drag, wheel) and by touch (tap, swipe, long hold for the
+  item's menu); click, long-press and drag to reorder on the other items; a city added by typing
+  in the World clock menu; Weather with the real service from a typed city; the release build's
+  cost (0.75% of one core with eleven items). `docs/research/device-findings.md` has what the
+  devices showed.
+- **Not checked, for want of the hardware or the moment**: a mouse, keyboard or stylus that reports
+  a battery (Device batteries was seen with staged values only: no such device was at hand); a
+  device that actually runs hot; a real player with notification access on a Googlebook (seen on
+  the emulator); a flight followed from gate to gate with a real key (the service's replies were
+  checked live, the item was driven with staged flights); a right mouse button on the slider (read
+  in the code, and the same press opens the menu by touch); an arm64 Googlebook; a light
+  wallpaper. The README's pictures and the store's screenshots don't show the new items yet.
+- **Before a release** (each is the owner's): the Data safety form (`store-submission/forms/data-safety.md`
+  has the draft; "No data collected" is no longer true), the privacy policy page (it must be public
+  before the build is sent), a new video for the Accessibility declaration (the description Android
+  shows beside the switch lost "It has no internet permission"), then the tag. The version is 0.9
+  (code 10) on this branch; the release notes (`docs/release-notes/0.9.md`), Play's "What's new", the
+  README and the store description are written; the changelog's heading still says "Unreleased (0.9)"
+  and takes its date at the tag.
+- **Left as they are, on purpose**: the answer to the accessibility disclosure is kept with the other
+  settings, so a restored backup brings it along (better: beside the online switches, outside
+  backups); the fifteen saved AirLabs replies under `app/src/test/resources/airlabs/` are real replies
+  without their `request` part; Open-Meteo's free service is for non-commercial use.
 
 ## 0.8 (2026-10-05): the consent screen Google Play asked for, and a review pass
 Merged as pull request #16 and released as 0.8 (version code 9); the next release needs a new version.

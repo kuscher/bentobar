@@ -108,7 +108,7 @@ private projects and paths into their repos, and where signing keys are backed u
   The types' own hooks stage what a test can't make happen: `media stage playing|paused|none|notitle|two|
   live|noaccess|starting|long|wide|emoji|rtl|off`; `devices stage mouse=15 keyboard=40c stylus=unknown`
   and `devices off`; `heat stage 0..6`, `heat level 0.84`, `heat temp 41.3`, `heat off`; `weather stage
-  clear|rain-soon|rain-later|raining|storm|snow|old|error|slow-down|offline|loading`, `weather search …`,
+  clear|rain-soon|rain-this-hour|rain-later|raining|storm|snow|old|error|slow-down|offline|offline-new|no-answer|loading`, `weather search …`,
   `weather fail …`, `weather off`; `flight show NAME [TURN]` (`flight show` lists the names), `flight off`;
   `sound fixed on|off`. Each type's bare name prints what it knows (`media`, `devices`, `heat`, `flight`).
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and

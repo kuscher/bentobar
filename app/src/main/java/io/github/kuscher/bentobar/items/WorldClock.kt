@@ -114,14 +114,22 @@ object WorldClock {
         val date: (moment: Long, zone: ZoneId) -> String,
     )
 
-    /** A row as it is drawn: "Tokyo" over "Tomorrow · +16h", "6:10 AM" at its end, and whether it is night there. */
+    /** A row as it is drawn: "Tokyo" over "Tomorrow · +16h", "6:10 AM" at its end, and whether the moon for night there shows. */
     data class Row(val place: Place, val title: String, val time: String, val sub: String, val night: Boolean)
+
+    /**
+     * Whether Plan a time is offered: only with a second row beside the device's own (an added city,
+     * a Clock item's zone). It compares a time across places, and alone there is nothing to compare.
+     */
+    fun plannable(places: List<Place>): Boolean = places.any { !it.here }
 
     /**
      * The rows for [moment]: now, or with [planned] the moment that is being planned. Under a name
      * stands the day there, where it isn't the device's ("Tomorrow"), and the difference to the
      * device's time at that moment, so a clock change before a planned day shows. A planned moment
-     * names its weekday in every row instead: "Wed · +9h", "Thu · +16h".
+     * names its weekday in every row instead: "Wed · +9h", "Thu · +16h". The moon shows where it is
+     * night at that moment; on the device's own row only for a planned one (that it is night here
+     * now needs no saying).
      */
     fun rows(places: List<Place>, moment: Long, planned: Boolean, words: Words): List<Row> {
         val local = places.firstOrNull { it.here }?.zone ?: return emptyList()
@@ -138,7 +146,8 @@ object WorldClock {
             }
             val ahead = there.offset.totalSeconds - here.offset.totalSeconds
             val difference = when { p.here -> words.local; ahead == 0 -> words.sameTime; else -> offset(ahead) }
-            Row(p, if (p.here) words.here(p.name) else p.name, words.time(moment, p.zone), listOfNotNull(day, difference).joinToString(" · "), night(there.hour))
+            Row(p, if (p.here) words.here(p.name) else p.name, words.time(moment, p.zone), listOfNotNull(day, difference).joinToString(" · "),
+                night = night(there.hour) && (planned || !p.here))
         }
     }
 

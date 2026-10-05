@@ -175,6 +175,32 @@ class WorldClockTest {
         assertEquals("11:30 PM", rows[1].time)
     }
 
+    @Test fun theDevicesOwnRowShowsNightOnlyForAPlannedMoment() {
+        // Half past eleven at night in Los Angeles: night here, and in Denver, where it is half past midnight.
+        val late = at("2026-10-05T23:30", la)
+        val places = WorldClock.places(la, emptyList(), cities("America/Denver", "Pacific/Honolulu"), late)
+        assertEquals(listOf("Here (Los Angeles)", "Honolulu", "Denver"), WorldClock.rows(places, late, false, words).map { it.title })
+        // Now, the moon is for the other places ("night there"): that it is night here needs no saying.
+        assertEquals(listOf(false, false, true), WorldClock.rows(places, late, false, words).map { it.night })
+        assertEquals("Here (Los Angeles), 11:30 PM, Local", WorldClock.spoken(WorldClock.rows(places, late, false, words)[0], appText("clock_night")))
+        // A planned moment is asked about in every row, the device's own too.
+        assertEquals(listOf(true, false, true), WorldClock.rows(places, late, true, words).map { it.night })
+    }
+
+    @Test fun planATimeIsOfferedOnlyWithASecondPlaceToCompare() {
+        fun offered(clocks: List<Clock> = emptyList(), cities: List<WorldCity> = emptyList()) = WorldClock.plannable(WorldClock.places(la, clocks, cities, monday))
+        assertFalse(offered())
+        assertTrue(offered(cities = cities("Asia/Tokyo")))
+        assertTrue(offered(clocks = listOf(Clock(berlin, "MUC"))))
+        // A clock that follows the device and a city where the device is are the device's own row: still nothing to compare.
+        assertFalse(offered(clocks = listOf(Clock(la, "Home"))))
+        assertFalse(offered(cities = listOf(city("America/Los_Angeles", "San Francisco"))))
+        // Nor is a city this device can't place a row.
+        assertFalse(offered(cities = cities("Mars/Olympus_Mons")))
+        // Another place with the device's own time is a second row all the same.
+        assertTrue(offered(cities = cities("America/Vancouver")))
+    }
+
     @Test fun nightIsFromTenInTheEveningUntilSevenInTheMorning() {
         for (hour in listOf(22, 23, 0, 3, 6)) assertTrue("$hour", WorldClock.night(hour))
         for (hour in listOf(7, 8, 12, 18, 21)) assertFalse("$hour", WorldClock.night(hour))

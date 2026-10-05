@@ -1,20 +1,29 @@
 package io.github.kuscher.bentobar.items
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -26,11 +35,11 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.ui.CopyEntry
@@ -116,11 +125,12 @@ object PlanATime {
 
 /**
  * Plan a time, under World clock's places: a slider over the device's day in quarter hours, and
- * under it the day with a button to each side. At rest ([plan] is null) the slider stands on the
- * present quarter hour and the word beside the heading is "Now". Moving the slider or stepping the
- * day starts a plan ([onPlan]); the places above then show that moment, and two entries appear here:
+ * under it the day's name with the two day buttons at the row's end. At rest ([plan] is null) the
+ * slider stands on the present quarter hour and the word beside the heading is "Now". Moving the
+ * slider or stepping the day starts a plan ([onPlan]); the places above then show that moment, a
+ * "Now" button appears before the day buttons to end the plan with, and two entries appear here:
  * "Copy times" ([line] is what it copies) and "New event at 9:00 AM" ([onNewEvent], with the moment
- * in milliseconds). "Now" ends the plan.
+ * in milliseconds). Offered only where there is a second place to compare (`WorldClock.plannable`).
  *
  * [now] is the present moment in the device's zone; [time] writes a moment as the menu's rows do.
  */
@@ -142,30 +152,50 @@ fun PlanTime(plan: PlanATime.Plan?, now: ZonedDateTime, time: (moment: Long) -> 
     val sliderState = if (planned != null && chosen != null) stringResource(R.string.clock_plan_state, chosen, Dates.format("EEEEMMMMd", planned, now.zone)) else word
     val focus = LocalFocusManager.current
     val slider = remember { FocusRequester() }
-    // Whether the keyboard's focus is on one of the three buttons under the slider.
+    // Whether the keyboard's focus is on one of the buttons under the slider.
     val below = remember { BooleanArray(1) }
-    // "Now" disables itself when it is pressed, and a day button at the last day it reaches. A button that does so while
-    // it holds the keyboard's focus would drop it, and the next Tab would start at the top of the menu: the slider takes it.
+    // "Now" goes away when it is pressed, and a day button is dimmed at the last day it reaches. A button that does so
+    // while it holds the keyboard's focus would drop it, and the next Tab would start at the top of the menu: the slider
+    // takes it.
     fun go(next: PlanATime.Plan?, stays: Boolean) {
         if (below[0] && !stays) runCatching { slider.requestFocus() }
         onPlan(next)
     }
-    Slider(
-        value = (plan?.quarter ?: PlanATime.quarter(now.toLocalTime())).toFloat(),
-        onValueChange = { onPlan(PlanATime.slid(plan, now, it.roundToInt())) },
-        valueRange = 0f..PlanATime.LAST_QUARTER.toFloat(),
-        // A stop every quarter hour, so that Left, Right and a screen reader move 15 minutes; 94 tick marks would only clutter.
-        steps = PlanATime.LAST_QUARTER - 1,
-        track = { SliderDefaults.Track(it, drawTick = { _, _ -> }) },
-        modifier = Modifier.fillMaxWidth().focusRequester(slider)
-            // Up and Down go on to the control above or below. Material's slider would take them as Right and Left: whoever
-            // walks down the menu with the arrow keys would start a plan here, and never get past it.
-            .onPreviewKeyEvent { e ->
-                val to = when (e.key) { Key.DirectionUp -> FocusDirection.Up; Key.DirectionDown -> FocusDirection.Down; else -> null }
-                if (to == null) false else { if (e.type == KeyEventType.KeyDown) focus.moveFocus(to); true }
-            }
-            .semantics { contentDescription = sliderLabel; stateDescription = sliderState },
-    )
+    val source = remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
+    // Drawn as Now playing's position bar is: a line 6 dp high with a small upright mark on it for the time, and no part
+    // of it filled (filled from midnight to the mark, it read as a second volume control). 32 dp high, all of it taking
+    // the pointer: Material's own minimum of 48 dp is switched off, and the slider is then as high as its thumb's slot.
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+        Slider(
+            value = (plan?.quarter ?: PlanATime.quarter(now.toLocalTime())).toFloat(),
+            onValueChange = { onPlan(PlanATime.slid(plan, now, it.roundToInt())) },
+            valueRange = 0f..PlanATime.LAST_QUARTER.toFloat(),
+            // A stop every quarter hour, so that Left, Right and a screen reader move 15 minutes; 94 tick marks would only clutter.
+            steps = PlanATime.LAST_QUARTER - 1,
+            interactionSource = source,
+            modifier = Modifier.fillMaxWidth().height(32.dp).focusRequester(slider)
+                // The menus' ring for what the keyboard is on: with a thumb of its own, Material's slider shows none.
+                .then(if (focused) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)) else Modifier)
+                // Up and Down go on to the control above or below. Material's slider would take them as Right and Left:
+                // whoever walks down the menu with the arrow keys would start a plan here, and never get past it.
+                .onPreviewKeyEvent { e ->
+                    val to = when (e.key) { Key.DirectionUp -> FocusDirection.Up; Key.DirectionDown -> FocusDirection.Down; else -> null }
+                    if (to == null) false else { if (e.type == KeyEventType.KeyDown) focus.moveFocus(to); true }
+                }
+                .semantics { contentDescription = sliderLabel; stateDescription = sliderState },
+            track = {
+                val line = MaterialTheme.colorScheme.surfaceContainerHighest
+                SliderDefaults.Track(it, modifier = Modifier.height(6.dp), drawStopIndicator = null, drawTick = { _, _ -> }, thumbTrackGapSize = 0.dp,
+                    colors = SliderDefaults.colors(activeTrackColor = line, inactiveTrackColor = line))
+            },
+            thumb = {
+                Box(Modifier.size(width = 4.dp, height = 32.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(width = 4.dp, height = 16.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)))
+                }
+            },
+        )
+    }
     Row(Modifier.onFocusChanged { below[0] = it.hasFocus }, verticalAlignment = Alignment.CenterVertically) {
         val date = plan?.date ?: today
         Text(when (PlanATime.day(date, today)) {
@@ -175,13 +205,12 @@ fun PlanTime(plan: PlanATime.Plan?, now: ZonedDateTime, time: (moment: Long) -> 
             PlanATime.Day.OTHER -> Dates.format("EEEMMMd", date.atStartOfDay(now.zone))
         }, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f),
             maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // "Now" is there only while a time is planned, and stands before the two day buttons: those keep their place at
+        // the row's end whether it shows or not, so a step never moves a button from under the pointer.
+        if (plan != null) TextButton(onClick = { go(null, stays = false) }) { Text(word, maxLines = 1) }
         SmallIconButton(Sym.CHEVRON_LEFT, stringResource(R.string.clock_plan_previous_day), enabled = PlanATime.canStep(plan, today, -1)) {
             PlanATime.stepped(plan, now, -1).let { go(it, stays = PlanATime.canStep(it, today, -1)) }
         }
-        // "Now" is only there while a time is planned, but its room is kept at rest: the first step back would
-        // otherwise put it under the pointer, where the next click would undo the step.
-        TextButton(onClick = { go(null, stays = false) }, enabled = plan != null,
-            modifier = if (plan != null) Modifier else Modifier.alpha(0f).clearAndSetSemantics { }) { Text(word, maxLines = 1) }
         SmallIconButton(Sym.CHEVRON_RIGHT, stringResource(R.string.clock_plan_next_day), enabled = PlanATime.canStep(plan, today, 1)) {
             PlanATime.stepped(plan, now, 1).let { go(it, stays = PlanATime.canStep(it, today, 1)) }
         }

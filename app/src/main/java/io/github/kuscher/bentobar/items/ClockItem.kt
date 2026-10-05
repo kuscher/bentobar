@@ -156,7 +156,12 @@ private fun WorldClockMenu(item: ItemConfig, host: MenuHost) {
         WorldClock.places(local, clocks.map { (zone, label) -> WorldClock.Clock(WorldClock.zone(zone) ?: local, label) }, cfg.cities, now)
     }
     // A plan lives as long as the menu is open: opening it again is the present.
-    var plan by remember { mutableStateOf<PlanATime.Plan?>(null) }
+    var chosen by remember { mutableStateOf<PlanATime.Plan?>(null) }
+    // Plan a time compares places, so it is there only with a second row. A plan made while there was one ends with
+    // that row: its "Now" goes with the slider, and nothing else would bring the present back.
+    val plannable = WorldClock.plannable(places)
+    LaunchedEffect(plannable) { if (!plannable) chosen = null }
+    val plan = chosen.takeIf { plannable }
     var editing by remember { mutableStateOf(false) }
     val edit = remember { FocusRequester() }
     // With the last city gone there is no "Done" left to end editing with.
@@ -172,7 +177,7 @@ private fun WorldClockMenu(item: ItemConfig, host: MenuHost) {
                 PlaceRow(row, planned != null, editing && cfg.cities.isNotEmpty()) { city -> Store.update { it.copy(cities = WorldClock.remove(it.cities, city.zone)) } }
             }
         }
-        PlanTime(plan, here, time = { words.time(it, local) }, line = { WorldClock.copyLine(places, moment, words) }, onPlan = { plan = it }) { at ->
+        if (plannable) PlanTime(plan, here, time = { words.time(it, local) }, line = { WorldClock.copyLine(places, moment, words) }, onPlan = { chosen = it }) { at ->
             // The calendar app's own editor for a new event, from that moment for an hour; saving it is the calendar app's business.
             host.close()
             Env.launch(Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, at)

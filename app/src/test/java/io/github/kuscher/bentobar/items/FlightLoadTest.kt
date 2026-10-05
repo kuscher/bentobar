@@ -116,10 +116,16 @@ class FlightLoadTest {
 
     @Test fun whatIsNotAFlightNumberIsNeverAsked() {
         online { net ->
-            for (text in listOf("hello", "", "LH", "455", "LH 455 tomorrow")) assertNull(text, FlightLoad.question(item, text, null))
-            assertEquals("LH 455", FlightLoad.question(item, "lh455", null)!!.number.shown)
-            assertEquals(0, net.asked.size)
+            net.says(AirLabs.FLIGHT to reply("flight-LH455-in-the-air"))
+            // What the field does with its text on Track: only a flight number makes a question, and only a question is sent.
+            fun entered(text: String): Outcome? = FlightLoad.question(item, text, null)?.let { FlightLoad.track(it, asked) }
+            for (text in listOf("hello", "", "LH", "455", "LH 455 tomorrow", "api_key=x", "LH455&flight_iata=UA1")) assertNull(text, entered(text))
+            assertEquals(emptyList<Request>(), net.asked)
             assertEquals(0, sent())
+            // The same way does send for a number, with the service there to answer: the zero above is not zero by construction.
+            assertTrue(entered("lh455") is Outcome.Found)
+            assertEquals(listOf("flight_iata" to "LH455", "api_key" to key), net.asked.single().query)
+            assertEquals(1, sent())
         }
     }
 

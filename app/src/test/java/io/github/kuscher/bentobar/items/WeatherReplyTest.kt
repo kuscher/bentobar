@@ -61,8 +61,8 @@ class WeatherReplyTest {
         assertEquals("Mostly clear · feels like 19° · 11:25 AM there", m.subtitle)
         assertEquals("18°", m.temp)
         assertEquals("High 22° · Low 15°", m.highLow)
-        // The day's own figure is 90%: rain at breakfast. What is left of the day at 11:25 AM is dry.
-        assertEquals("Rain 5% · Wind 3\u00A0km/h", m.rainWind)
+        // The day's own figure is 90%: rain at breakfast. What is left of the day at 11:25 AM is dry (the 5% of the first entry was for the hour before 11).
+        assertEquals("Rain 0% · Wind 3\u00A0km/h", m.rainWind)
         // The hours are Zurich's, from the next full one.
         assertEquals(listOf("12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM"), m.hours.map { it.time })
         assertEquals(listOf("19°", "21°", "22°", "22°", "22°", "22°"), m.hours.map { it.temp })

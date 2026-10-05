@@ -23,18 +23,22 @@ class WeatherForecastTest {
     private fun sec(h: Int, m: Int = 0, day: Int = 5) = at(h, m, day) / 1000
     private val now = at(14, 45)
 
-    /** The picture's numbers as the service sends them: °C and km/h. */
+    /**
+     * The picture's numbers as the service sends them: °C and km/h, and each hour's chance of rain filed under
+     * the time that hour ends at (the temperature and the sky are of the entry's own time). So the 40% the
+     * picture has under 5 PM is in the entry of 6 PM, and the 70% under 6 PM in the entry of 7 PM.
+     */
     private fun design(): Reading = Reading(
         place = "37.77,-122.42", fetchedAt = at(14, 40), zone = "America/Los_Angeles", offsetSec = -7 * 3600,
         current = Current(sec(14, 30), temp = 22.2, feels = 20.0, code = 2, day = true, windKmh = 14.5),
         hours = listOf(
             Hour(sec(14), 22.4, 0, 2, true),
             Hour(sec(15), 22.2, 0, 2, true),    // 72°
-            Hour(sec(16), 21.7, 10, 3, true),   // 71°
-            Hour(sec(17), 20.6, 40, 3, true),   // 69°, 40%
-            Hour(sec(18), 18.9, 70, 61, true),  // 66°, 70%
-            Hour(sec(19), 17.8, 19, 2, false),  // 64°
-            Hour(sec(20), 16.7, 0, 0, false),   // 62°
+            Hour(sec(16), 21.7, 0, 3, true),    // 71°
+            Hour(sec(17), 20.6, 10, 3, true),   // 69°; 10% from 4 to 5
+            Hour(sec(18), 18.9, 40, 61, true),  // 66°; 40% from 5 to 6
+            Hour(sec(19), 17.8, 70, 2, false),  // 64°; 70% from 6 to 7
+            Hour(sec(20), 16.7, 19, 0, false),  // 62°; 19% from 7 to 8
             Hour(sec(21), 16.0, 0, 0, false),
         ),
         days = listOf(
@@ -72,17 +76,24 @@ class WeatherForecastTest {
      * hours, because the service's figure for the day counts the hours that are over.
      */
     @Test fun theChanceIsForWhatIsLeftOfToday() {
-        val wetMorning = design().let { it.copy(hours = listOf(Hour(sec(7), 15.0, 90, 61, true), Hour(sec(13), 21.0, 85, 61, true)) + it.hours,
+        // An entry's chance is for the hour that ends at its time. Rain at breakfast, and rain between 1 and 2 PM
+        // (the entry of 2 PM): at 2:45 PM both are over.
+        val wetMorning = design().let { it.copy(hours = listOf(Hour(sec(7), 15.0, 90, 61, true), Hour(sec(14), 22.4, 85, 61, true)) + it.hours.drop(1),
             days = listOf(it.days[0].copy(chance = 90)) + it.days.drop(1)) }
         assertEquals("Rain 70% · Wind 9${nbsp}mph", menu(wetMorning).rainWind)
-        // The hour that is running counts: it is 2:45 PM and its rain may still fall.
-        val running = design().let { it.copy(hours = listOf(it.hours[0].copy(chance = 95)) + it.hours.drop(1)) }
+        // The hour that is running counts: it is 2:45 PM, and what the entry of 3 PM says may still fall.
+        val running = design().let { it.copy(hours = it.hours.map { h -> if (h.at == sec(15)) h.copy(chance = 95) else h }) }
         assertEquals("Rain 95% · Wind 9${nbsp}mph", menu(running).rainWind)
-        // Tomorrow's hours are tomorrow's.
+        // The day's last hour is filed under midnight, tomorrow's first moment: it is still today's.
+        val lastHour = design().let { it.copy(hours = it.hours + Hour(sec(0, day = 6), 14.0, 88, 63, false)) }
+        assertEquals("Rain 88% · Wind 9${nbsp}mph", menu(lastHour).rainWind)
+        // The hour after that is tomorrow's.
         val wetNight = design().let { it.copy(hours = it.hours + Hour(sec(1, day = 6), 14.0, 99, 63, false)) }
         assertEquals("Rain 70% · Wind 9${nbsp}mph", menu(wetNight).rainWind)
-        // Late in the evening only what is left counts.
+        // Late in the evening only what is left counts, and an hour that ends this minute is over.
         assertEquals("Rain 0% · Wind 9${nbsp}mph", menu(at = at(20, 30)).rainWind)
+        assertEquals("Rain 70% · Wind 9${nbsp}mph", menu(at = at(18, 59)).rainWind)
+        assertEquals("Rain 19% · Wind 9${nbsp}mph", menu(at = at(19, 0)).rainWind)
         // No hours for today (an old reading, a reply without them): the day's own figure.
         assertEquals("Rain 70% · Wind 9${nbsp}mph", menu(design().copy(hours = emptyList())).rainWind)
         assertEquals("Rain 35% · Wind 9${nbsp}mph", menu(design().let { it.copy(hours = emptyList(), days = listOf(it.days[0].copy(chance = 35)) + it.days.drop(1)) }).rainWind)
@@ -104,6 +115,33 @@ class WeatherForecastTest {
         assertEquals(listOf(null, null, "40%", "70%", null, null), m.hours.map { it.chance })
         // By day and by night, in the city's time.
         assertEquals(listOf(Sym.PARTLY_CLOUDY_DAY, Sym.CLOUD, Sym.CLOUD, Sym.RAINY, Sym.PARTLY_CLOUDY_NIGHT, Sym.CLEAR_NIGHT), m.hours.map { it.glyph })
+    }
+
+    @Test fun aCellsChanceIsForTheHourThatStartsThere() {
+        // A cell is a time, the temperature and the sky at that time, and the chance for the hour from then on:
+        // the service files that under the time the hour ends at, so it is the next entry's.
+        assertEquals("40%", menu().hours.single { it.time == "5 PM" }.chance)
+        // 90% in the entry of 4 PM: likely between 3 and 4, so it stands under 3 PM, beside 3 PM's own temperature and sky.
+        val moved = design().let { it.copy(hours = it.hours.map { h -> if (h.at == sec(16)) h.copy(chance = 90) else h }) }
+        val cells = menu(moved).hours
+        assertEquals(listOf("90%", null, "40%", "70%", null, null), cells.map { it.chance })
+        assertEquals("3 PM, Partly cloudy, 72 degrees, 90 percent chance", cells[0].desc)
+        assertEquals("4 PM, Cloudy, 71 degrees", cells[1].desc)
+    }
+
+    @Test fun theLastCellNeedsTheEntryAfterItForItsChance() {
+        // 60% in the entry of 9 PM: likely between 8 and 9, which is the last of the six cells.
+        val wetLate = design().let { it.copy(hours = it.hours.dropLast(1) + it.hours.last().copy(chance = 60)) }
+        assertEquals("8 PM", menu(wetLate).hours.last().time)
+        assertEquals("60%", menu(wetLate).hours.last().chance)
+        // Without that entry nothing is known of the hour from 8 PM: the cell stays, without a chance.
+        val short = wetLate.copy(hours = wetLate.hours.dropLast(1))
+        assertEquals(6, menu(short).hours.size)
+        assertNull(menu(short).hours.last().chance)
+        // An entry missing in between leaves only the hour before it without a chance: entries are found by their time.
+        val gap = design().let { it.copy(hours = it.hours.filter { h -> h.at != sec(19) } + Hour(sec(22), 15.0, 0, 0, false)) }
+        assertEquals(listOf("3 PM", "4 PM", "5 PM", "6 PM", "8 PM", "9 PM"), menu(gap).hours.map { it.time })
+        assertEquals(listOf(null, null, "40%", null, null, null), menu(gap).hours.map { it.chance })
     }
 
     @Test fun theHourThatHasBegunIsNotAmongTheNext() {
@@ -225,7 +263,8 @@ class WeatherForecastTest {
     @Test fun aValueMissingFromTheReplyLeavesItsCellOut() {
         val r = design().let { d ->
             d.copy(current = d.current!!.copy(feels = null),
-                hours = d.hours.map { if (it.at == sec(16)) it.copy(temp = null) else if (it.at == sec(17)) it.copy(code = null, chance = null) else it },
+                // 4 PM without its temperature, 5 PM without its sky, and no chance for the hour from 5 PM (which the entry of 6 PM would hold).
+                hours = d.hours.map { when (it.at) { sec(16) -> it.copy(temp = null); sec(17) -> it.copy(code = null); sec(18) -> it.copy(chance = null); else -> it } },
                 days = d.days.map { if (it.at == sec(0, day = 7)) it.copy(high = null, code = null) else it })
         }
         val m = menu(r)

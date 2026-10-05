@@ -98,7 +98,11 @@ data class City(val name: String, val region: String, val country: String, val l
 data class Current(val at: Long, val temp: Double? = null, val feels: Double? = null, val code: Int? = null, val day: Boolean = true,
                    val windKmh: Double? = null)
 
-/** One hour of the forecast, starting at [at]. [chance]: of rain or snow, in percent. */
+/**
+ * One entry of the hourly forecast. [temp], [code] and [day] are of the moment [at]. [chance], of
+ * rain or snow in percent, is not: the service files an hour's chance under the time that hour
+ * ends at ("preceding hour"), so it is for the hour before [at] (see [WeatherRules.begins]).
+ */
 @Serializable
 @Immutable
 data class Hour(val at: Long, val temp: Double? = null, val chance: Int? = null, val code: Int? = null, val day: Boolean = true)
@@ -205,6 +209,7 @@ object WeatherRules {
     private const val HOUR_CELLS = 6
     private const val DAY_ROWS = 5
     private const val DAY_SEC = 86_400L
+    private const val HOUR_SEC = 3_600L
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -470,13 +475,21 @@ object WeatherRules {
     // ---- the rain rule ---------------------------------------------------------------------------
 
     /**
-     * The first hour within the next [hours] hours in which rain or snow is likely (a chance of 50%
-     * or more), or null. Hours are found by their time: one that has begun is the present, which the
-     * sky of this minute speaks for.
+     * When the hour an entry's chance is for begins, in seconds since 1970: an hour before the
+     * entry's own time. The service files an hour's chance under the time that hour ends at, so 80%
+     * in the entry of 3 PM says that rain is likely between 2 and 3.
+     */
+    fun begins(entry: Hour): Long = entry.at - HOUR_SEC
+
+    /**
+     * The entry of the first hour that begins within the next [hours] hours and in which rain or
+     * snow is likely (a chance of 50% or more), or null. Its hour is the one before its time
+     * ([begins]), and that is the hour the bar names. Hours are found by their time: one that has
+     * begun is the present, which the sky of this minute speaks for.
      */
     fun coming(r: Reading, now: Long, hours: Int): Hour? {
         val until = now + hours * HOUR_MS
-        return r.hours.filter { it.at * 1000 > now && it.at * 1000 <= until && (it.chance ?: 0) >= LIKELY }.minByOrNull { it.at }
+        return r.hours.filter { begins(it) * 1000 > now && begins(it) * 1000 <= until && (it.chance ?: 0) >= LIKELY }.minByOrNull { it.at }
     }
 
     // ---- the bar ---------------------------------------------------------------------------------
@@ -500,11 +513,13 @@ object WeatherRules {
 
         val falling = WeatherCodes.falls(cur.code)
         val next = if (falling == null) coming(r, now, look.rainHours) else null
-        // The chance comes from many forecasts and an hour's code from one: a likely hour whose code names
-        // nothing that falls is rain, or snow when it freezes.
+        // What falls in a likely hour is told by the code of the entry that holds its chance: the code at the hour's
+        // end comes of what fell in it. The chance comes from many forecasts and the code from one, so a likely
+        // hour whose code names nothing that falls is rain, or snow when it freezes.
         val falls = falling ?: next?.let { WeatherCodes.falls(it.code) ?: if ((it.temp ?: cur.temp ?: 1.0) <= 0.0) Falls.SNOW else Falls.RAIN }
         val word = falls?.let { w.say(it.word) }
-        val time = next?.let { t.hour(it.at * 1000, zone) }
+        // The hour that is named is the one the chance is for: it begins an hour before the entry's time.
+        val time = next?.let { t.hour(begins(it) * 1000, zone) }
 
         // Something falling or coming is said in words, whatever Show says: that is why the item came out.
         val short = when {
@@ -579,9 +594,11 @@ object WeatherRules {
         val date = moment.atZone(zone).toLocalDate()
         // The highest chance in what is left of today, from the hours: the day's own figure counts the hours
         // that are over, and read "Rain 90%" on a clear afternoon after a wet morning, beside six dry hours.
+        // An entry's chance is for the hour before its time: it counts when that hour ends after now (the one
+        // that is running included) and begins today in the city, so the day's last hour is the entry of midnight.
         // Without hours for today, the day's figure. On a snow day it is the chance of snow.
         val chance = if (today == null) null else r.hours
-            .filter { it.at * 1000 + HOUR_MS > now && Instant.ofEpochSecond(it.at).atZone(zone).toLocalDate() == date }
+            .filter { it.at * 1000 > now && Instant.ofEpochSecond(begins(it)).atZone(zone).toLocalDate() == date }
             .mapNotNull { it.chance }.maxOrNull() ?: today.chance
         val falls = if (WeatherCodes.falls(today?.code) == Falls.SNOW) Falls.SNOW else Falls.RAIN
         val wind = cur?.windKmh?.let { if (look.miles) Units.milesPerHour(it).roundToInt() else it.roundToInt() }
@@ -592,9 +609,13 @@ object WeatherRules {
             wind?.let { w.count(if (look.miles) W.WIND_MPH_DESC else W.WIND_KMH_DESC, it, it) },
         ).joinToString(" ")
 
+        // A cell is a time, the temperature and the sky at that time, and the chance for the hour from then on.
+        // That chance is filed under the time the hour ends at: it is the entry an hour later, found by its
+        // time. Without that entry (the last cell needs one more than there are cells), no chance.
+        val chanceFrom = r.hours.associate { begins(it) to it.chance }
         val hours = r.hours.filter { it.at * 1000 > now }.distinctBy { it.at }.sortedBy { it.at }.take(HOUR_CELLS).map { h ->
             val time = t.hour(h.at * 1000, zone)
-            val likely = h.chance?.takeIf { it >= SHOWN_CHANCE }
+            val likely = chanceFrom[h.at]?.takeIf { it >= SHOWN_CHANCE }
             HourCell(time, h.code?.let { WeatherCodes.glyph(it, h.day) }, h.temp?.let(::degrees), likely?.let { w.say(W.CHANCE, it) },
                 spokenLine(w, listOfNotNull(time, WeatherCodes.sky(h.code)?.let { w.say(it.word) }, h.temp?.let(::spoken), likely?.let { w.say(W.CHANCE_DESC, it) })))
         }

@@ -62,6 +62,16 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     /** A press of Track: one lookup at a time, whose answer is taken by [takeAnswer]. */
     internal val search: Ask<FlightLoad.Question, FlightLoad.Outcome> = Background.ask(type, online) { q -> FlightLoad.track(q, Now.wall()) }
 
+    /**
+     * What an item was just told to follow, or to follow no more, until the loader has read that back
+     * from where it is kept (a moment): the bar and the menu go from one thing to the next with
+     * nothing empty between. Main thread.
+     */
+    private val fresh = HashMap<String, Tracked>()
+
+    /** What the item [id] follows, as far as that is known: the loader's word, or what was taken a moment ago. Null: not read yet. Main thread. */
+    internal fun followed(id: String): Tracked? = tracker.peek(id)?.also { fresh.remove(id) } ?: fresh[id]
+
     /** Where each flight's plane was last drawn on its line, by [FlightText.Card.plane]: it only goes forward. Main thread. */
     private val places = HashMap<String, Double>()
 
@@ -204,14 +214,24 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         if (!Online.hasKey(online)) return FlightText.Bar(Sym.FLIGHT, desc = Env.str(R.string.flight_desc_not_set_up))
         if (!Online.on(online)) return FlightText.Bar(Sym.FLIGHT, desc = Env.str(R.string.flight_desc_off))
         tracker.want(item.id)
-        val t = tracker.peek(item.id)
+        val t = followed(item.id)
         return FlightText.bar(t, looking(item.id, t), now, hours, voice())
     }
 
-    /** The number that is being looked up for the item [id], as it is shown: a press of Track, or a flight that is asked for afresh. */
-    internal fun looking(id: String, t: Tracked?): String? =
-        (search.state.value as? Ask.State.Busy)?.question?.takeIf { it.item == id }?.number?.shown
+    /**
+     * The number that is being looked up for the item [id], as it is shown: a press of Track (until
+     * its answer is taken, which is the next thing to happen once a flight was found), or a flight
+     * that is asked for afresh.
+     */
+    internal fun looking(id: String, t: Tracked?): String? {
+        val asked = when (val s = search.state.value) {
+            is Ask.State.Busy -> s.question
+            is Ask.State.Done -> s.question.takeIf { s.answer is FlightLoad.Outcome.Found }
+            else -> null
+        }
+        return asked?.takeIf { it.item == id }?.number?.shown
             ?: t?.takeIf { it.following && it.flight == null && tracker.loading(id) }?.let { FlightNumber.shown(it.number) }
+    }
 
     /** Where the plane of [card]'s flight is drawn now: where the times put it, but never behind where it was drawn before. */
     internal fun place(card: FlightText.Card): Double? = FlightRules.forward(places[card.plane], card.share).also {
@@ -238,7 +258,10 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         val id = done.question.item
         search.clear()
         if (id !in ids() || !FlightLoad.take(id, found.tracked, Now.wall())) return false
+        fresh[id] = found.tracked
         reread(id)
+        // The bar has the flight now, and an open menu draws again.
+        Ticker.refresh(type)
         return true
     }
 
@@ -252,8 +275,9 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     internal fun stop(item: ItemConfig) {
         if (stagedFor(item) != null) { unstage(); return }
         FlightLoad.stop(item.id)
+        fresh[item.id] = Tracked()
         reread(item.id)
-        Ticker.refresh(item)
+        Ticker.refresh(type)
     }
 
     /** What is kept for [id] has changed: what was known is dropped, and it is read anew (which asks nobody). */
@@ -316,6 +340,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     /** The service was switched off or its key removed: the loader and the lookup have forgotten already; this is the rest. */
     override fun forgetFetched() {
         FlightLoad.forget(keyGone = !Online.hasKey(online))
+        fresh.clear()
         places.clear()
     }
 

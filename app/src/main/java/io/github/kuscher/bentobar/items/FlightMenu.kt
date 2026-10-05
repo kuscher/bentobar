@@ -132,7 +132,7 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
     val v = FlightItem.voice()
     // With a sample staged, the real thing is out of sight: what is followed, and any lookup of its own.
     val tracked: Tracked? = when (staged) {
-        null -> FlightItem.tracker.peek(item.id)
+        null -> FlightItem.followed(item.id)
         is Staged.Following -> staged.tracked
         else -> Tracked()
     }
@@ -145,7 +145,7 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
         }
     }
     // Not read yet: the item asks for it when it is next looked at, which can be ten seconds off; an open menu asks with every tick.
-    if (tracked == null) LaunchedEffect(tick) { FlightItem.tracker.want(item.id) }
+    if (staged == null && FlightItem.tracker.peek(item.id) == null) LaunchedEffect(tick) { FlightItem.tracker.want(item.id) }
     // The rules take whatever a reply or a file holds; should one trip all the same, the menu still opens, on the field.
     val card = tracked?.let { runCatching { FlightText.card(it, now, v) }.getOrNull() }
     val changeKey = { host.openItemSettings(item.id) }

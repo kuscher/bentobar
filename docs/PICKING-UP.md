@@ -19,6 +19,30 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## Next (in work since 2026-10-05, not released; the version is still 0.8)
+Five new items and three additions to old ones: Now playing, Device batteries, Heat (and a CPU rule),
+Weather, Flight; more cities and "Plan a time" in World clock; a volume slider in the bar. Two of them
+go online (Weather: Open-Meteo; Flight: AirLabs with the user's own key), each only after its item was
+set up on this install. CLAUDE.md has the rules ("Going online…").
+- **The groundwork is in** (the commits after 0.8): `net/` (three hosts, nothing else), `data/Online.kt`
+  and `data/Kept.kt` (switches, the key and fetched data, outside the layout and outside backups),
+  `items/Refresher.kt`, `Ask.kt` and `Background.kt` (loading), `items/NowPlaying.kt` and
+  `MediaAccess.kt` (media sessions), the slider in the strip (`bar/BarUi.kt`, `bar/SliderMath.kt`), the
+  type life cycle in `Ticker`, the catalog's Online group, Setup's steps 7 and 8, About › Privacy, the
+  icons, per-feature text files, and debug hooks (`now`, `net`, `online`, `item`).
+- **The five new items are first cuts**: each is in the catalog with its rule and its empty state and
+  nothing more (`items/MediaItem.kt`, `DevicesItem.kt`, `HeatItem.kt`, `WeatherItem.kt`, `FlightItem.kt`).
+  Sound has no slider option yet, World clock no cities, CPU no heat rule: the strip, the layout
+  (`BarConfig.cities`) and `Trigger` are ready for them.
+- **Not tried on a device yet**: the slider's pointer rules (click, drag, long touch, right-click and
+  wheel on the track; reorder from the icon), media sessions through a listener that is turned on but
+  not running (`./bento debug media` says `sessions=direct`, or `bound` where a device insists, and
+  `received=0`), Setup's two new steps.
+- **Before a release**: the README (its "internet permission: none" badge and the permission table),
+  the store description and Play's Data safety form (the app now sends a city, coordinates and a
+  flight number to two services when the user sets those items up), the privacy policy page, release
+  notes and a new version.
+
 ## 0.8 (2026-10-05): the consent screen Google Play asked for, and a review pass
 Merged as pull request #16 and released as 0.8 (version code 9); the next release needs a new version.
 CHANGELOG has the user-facing list. Tested as a debug build on a Lenovo Googlebook 15: the consent

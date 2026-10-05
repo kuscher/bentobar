@@ -2,11 +2,11 @@
 <!-- Heat. Every name here starts with heat_, item_heat_ or trigger_heat. -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
     <string name="item_heat_title">Heat</string>
-    <string name="item_heat_desc">Says when Android slows a hot device; shows only then</string>
-    <string name="trigger_heat">Show when the device is at least %1$s</string>
+    <string name="item_heat_desc">Shows when Android slows a hot device; heat level in its menu</string>
+    <string name="trigger_heat">Show when the device is at least %1$s, and for a minute after it cools</string>
     <string name="trigger_heat_short">shows when %1$s</string>
-    <string name="heat_level_warm">warm</string>
-    <string name="heat_level_hot">hot</string>
-    <string name="heat_level_very_hot">very hot</string>
-    <string name="heat_note" formatted="false">At 100% Android slows the device down to cool it. Android doesn\'t share CPU temperature or fan speed with apps.</string>
+    <string name="heat_rule_warm">warm</string>
+    <string name="heat_rule_hot">hot</string>
+    <string name="heat_rule_very_hot">very hot</string>
+    <string name="heat_note" formatted="false">At 100% Android slows the device down noticeably to cool it; a little slowing can start sooner. Android doesn\'t share CPU temperature or fan speed with apps.</string>
 </resources>

@@ -126,14 +126,21 @@ object Ticker {
         lastRun[current.id] = SystemClock.elapsedRealtime()
     }
 
-    /** Recomputes the items of one type now, and nothing else (what its source shows has just changed). */
+    /**
+     * Recomputes the items of one type now, and nothing else: what was loaded for it has just come
+     * in. No sampler runs, so an answer that arrives between two ticks puts no extra reading into
+     * the network or CPU chart. Only the items that are being sampled anyway are computed, so an item
+     * that isn't on screen asks for nothing; menus that redraw with the tick redraw now. Main thread.
+     */
     fun refresh(type: String) {
         val t = Items.of(type) ?: return
-        val mine = Store.config.value.items.filter { it.type == type && it.id in _states.value }
+        if (users.isEmpty()) return
+        val mine = needed(Store.config.value).filter { it.type == type }
         if (mine.isEmpty()) return
         val now = SystemClock.elapsedRealtime()
         _states.value = _states.value + mine.associate { it.id to compute(t, it) }
         mine.forEach { lastRun[it.id] = now }
+        _tick.value = System.currentTimeMillis()
     }
 
     private fun compute(type: ItemType, item: ItemConfig): ItemState = try { type.state(item) } catch (e: Exception) {

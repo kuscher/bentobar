@@ -42,13 +42,13 @@ enum class Why {
     OFF,
     /** No network, no route, no such name, or a connection that isn't the service's own (a public network's sign-in page). */
     OFFLINE,
-    /** The time to connect or to read ran out. */
+    /** The time to connect or to read ran out, or the whole answer took longer than [Http.TOTAL_MS]. */
     TIMEOUT,
     /** A status outside 2xx. A redirect is one: it is never followed. 429 means "slow down". */
     STATUS,
     /** More than [Http.MAX_BYTES]. */
     TOO_LARGE,
-    /** Anything else: not JSON by its content type, a broken stream, a request that wasn't well formed. */
+    /** Anything else: a broken stream, a request that wasn't well formed. Whether a reply's text makes sense is its reader's question. */
     UNREADABLE,
 }
 
@@ -71,6 +71,8 @@ object Http {
     const val USER_AGENT = "BentoBar"
     const val CONNECT_MS = 4_000
     const val READ_MS = 6_000
+    /** A whole request, from asking to the last byte: an answer that trickles in is given up, so no load hangs on one. */
+    const val TOTAL_MS = 15_000
     const val MAX_BYTES = 256 * 1024
 
     /** Who may be asked right now. Closed until the app wires it. */

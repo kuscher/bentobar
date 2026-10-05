@@ -19,7 +19,9 @@ class TinyServer(private val answer: (Seen) -> Answer) : AutoCloseable {
     class Seen(val path: String, val headers: Map<String, String>)
 
     class Answer(val status: Int = 200, val body: ByteArray = ByteArray(0), val headers: Map<String, String> = mapOf("Content-Type" to "application/json"),
-                 val delayMs: Long = 0) {
+                 val delayMs: Long = 0,
+                 /** Above 0: the body is sent a tenth at a time, with this long a pause before each part. */
+                 val tricklesMs: Long = 0) {
         constructor(text: String) : this(body = text.toByteArray(Charsets.UTF_8))
     }
 
@@ -56,7 +58,18 @@ class TinyServer(private val answer: (Seen) -> Answer) : AutoCloseable {
         val out = client.getOutputStream()
         val headers = reply.headers + mapOf("Content-Length" to reply.body.size.toString(), "Connection" to "close")
         out.write(("HTTP/1.1 ${reply.status} X\r\n" + headers.entries.joinToString("") { "${it.key}: ${it.value}\r\n" } + "\r\n").toByteArray(Charsets.ISO_8859_1))
-        out.write(reply.body)
+        if (reply.tricklesMs <= 0) out.write(reply.body)
+        else {
+            out.flush()
+            val part = (reply.body.size / 10).coerceAtLeast(1)
+            var at = 0
+            while (at < reply.body.size) {
+                Thread.sleep(reply.tricklesMs)
+                val n = minOf(part, reply.body.size - at)
+                out.write(reply.body, at, n); out.flush()
+                at += n
+            }
+        }
         out.flush()
     }
 
@@ -64,9 +77,9 @@ class TinyServer(private val answer: (Seen) -> Answer) : AutoCloseable {
      * A transport that sends what would go to one of BentoBar's hosts to this server instead: the
      * address is the real one, with its beginning (`https://host`) swapped for this machine's.
      */
-    fun transport(readMs: Int = 2_000, maxBytes: Int = Http.MAX_BYTES) = HttpTransport(
+    fun transport(readMs: Int = 2_000, maxBytes: Int = Http.MAX_BYTES, totalMs: Int = Http.TOTAL_MS) = HttpTransport(
         open = { address -> URL(address.replaceFirst(Regex("^https://[^/]+"), "http://127.0.0.1:$port")).openConnection() as HttpURLConnection },
-        connectMs = 2_000, readMs = readMs, maxBytes = maxBytes,
+        connectMs = 2_000, readMs = readMs, maxBytes = maxBytes, totalMs = totalMs,
     )
 
     override fun close() { runCatching { socket.close() } }

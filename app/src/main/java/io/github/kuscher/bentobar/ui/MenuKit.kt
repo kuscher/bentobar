@@ -1,6 +1,5 @@
 package io.github.kuscher.bentobar.ui
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -48,16 +47,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -76,7 +74,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kuscher.bentobar.R
-import io.github.kuscher.bentobar.data.Online
 import io.github.kuscher.bentobar.items.Env
 import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
@@ -179,17 +176,18 @@ fun Sparkline(
 
 /**
  * A full-width row button, like a desktop menu entry. [sub]: a second, quieter line under the label
- * (a player's track). [image]: a picture in the symbol's place (an app's icon). [trailing]: a control
- * of its own at the row's end (a × to remove a city, a play button), which takes its own clicks.
+ * (a place's region); the row is then at least 48 dp high. [image]: a picture, 20 dp, in the
+ * symbol's place (an app's icon). [trailing]: one control of its own at the row's end (a × to remove
+ * a city, a player's play button), which takes its own clicks.
  */
 @Composable
 fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Boolean = true, modifier: Modifier = Modifier,
-              sub: String? = null, image: Bitmap? = null, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
+              sub: String? = null, image: ImageBitmap? = null, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     val focused by source.collectIsFocusedAsState()
     Row(
-        modifier.fillMaxWidth().heightIn(min = 40.dp).focusRing(focused, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
+        modifier.fillMaxWidth().heightIn(min = if (sub != null) 48.dp else 40.dp).focusRing(focused, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
             .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
             .hoverable(source)
             .clickable(enabled = enabled, interactionSource = source, indication = null, onClick = onClick)
@@ -198,7 +196,7 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val c = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        if (image != null) Image(remember(image) { image.asImageBitmap() }, null, Modifier.size(20.dp))
+        if (image != null) Image(image, null, Modifier.size(20.dp))
         else SymIcon(icon, size = 18.sp, color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else c)
         Spacer(Modifier.width(10.dp))
         if (sub == null) Text(label, style = MaterialTheme.typography.bodyMedium, color = c, modifier = Modifier.weight(1f),
@@ -209,7 +207,7 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant)
+            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         if (trailing != null) trailing()
     }
 }
@@ -231,12 +229,14 @@ fun SmallIconButton(sym: String, label: String, color: Color = LocalContentColor
 
 /**
  * Previous, play or pause, next: the media buttons of the Sound menu and of Now playing. What the
- * player doesn't offer is dimmed, not hidden, so the three keep their places.
+ * player doesn't offer is dimmed, not hidden, so the three keep their places. [arrangement]: Sound
+ * leaves them at the start, Now playing centers them.
  */
 @Composable
-fun MediaButtons(playing: Boolean, onPrevious: () -> Unit, onPlayPause: () -> Unit, onNext: () -> Unit,
-                 canPrevious: Boolean = true, canPlayPause: Boolean = true, canNext: Boolean = true) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+fun MediaButtons(playing: Boolean, canPrevious: Boolean = true, canPlayPause: Boolean = true, canNext: Boolean = true,
+                 arrangement: Arrangement.Horizontal = Arrangement.spacedBy(8.dp),
+                 onPrevious: () -> Unit, onPlayPause: () -> Unit, onNext: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = arrangement) {
         FilledTonalIconButton(onClick = onPrevious, enabled = canPrevious) {
             SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = stringResource(R.string.sound_previous))
         }
@@ -251,46 +251,54 @@ fun MediaButtons(playing: Boolean, onPrevious: () -> Unit, onPlayPause: () -> Un
 }
 
 /**
- * A text field in a menu. It takes the focus when it appears; Enter, the keyboard's own action and
- * the button ([action], where there is one) all submit. While [canSubmit] is false the button is
- * dimmed and Enter does nothing. [selectAll]: the text it starts with is selected, so typing
- * replaces it. [error] is said under the field, which is marked.
+ * A field in a menu to find something with: a city, a place, a flight number. It takes the focus
+ * when it appears, so the menu opens ready to type. Two kinds:
+ *
+ * With [submit] (a button's label: "Search", "Track"): typing only tells [onChange]; Enter and the
+ * button call [onEnter], while [canSubmit] holds. Nothing is looked up before that.
+ *
+ * Without [submit]: results follow the typing (the caller draws them from [onChange]), Enter
+ * ([onEnter]) takes the first, and with [onClose] a × at the field's end closes the search.
+ *
+ * [initial] is the text it starts with, selected with [selectAll] so that typing replaces it.
+ * [error]: the text can't be used; the field is marked and the words stand under it. What else stands
+ * under the field (a status, the results) is the caller's. [focus]: to bring the focus back to the
+ * field from a result.
  */
 @Composable
-fun MenuField(value: String, onValueChange: (String) -> Unit, label: String, onSubmit: () -> Unit, modifier: Modifier = Modifier,
-              placeholder: String = "", action: String? = null, canSubmit: Boolean = true, error: String? = null,
-              selectAll: Boolean = false, keyboard: KeyboardType = KeyboardType.Text) {
-    var field by remember { mutableStateOf(TextFieldValue(value, if (selectAll) TextRange(0, value.length) else TextRange(value.length))) }
-    // The text was changed from outside (cleared after a submit): follow it, with the caret at its end.
-    LaunchedEffect(value) { if (field.text != value) field = TextFieldValue(value, TextRange(value.length)) }
-    val focus = remember { FocusRequester() }
+fun SearchField(label: String, placeholder: String = "", initial: String = "", submit: String? = null, selectAll: Boolean = false,
+                error: String? = null, canSubmit: Boolean = true, keyboard: KeyboardType = KeyboardType.Text,
+                focus: FocusRequester = remember { FocusRequester() }, onClose: (() -> Unit)? = null,
+                onChange: (String) -> Unit, onEnter: (String) -> Unit) {
+    var field by remember { mutableStateOf(TextFieldValue(initial, if (selectAll) TextRange(0, initial.length) else TextRange(initial.length))) }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    fun submit() { if (canSubmit) onSubmit() }
-    Column(modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    fun enter() { if (canSubmit) onEnter(field.text) }
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = field,
-                onValueChange = { next -> val changed = next.text != field.text; field = next; if (changed) onValueChange(next.text) },
+                onValueChange = { next -> val changed = next.text != field.text; field = next; if (changed) onChange(next.text) },
                 label = { Text(label) },
                 placeholder = if (placeholder.isEmpty()) null else { { Text(placeholder) } },
+                trailingIcon = if (submit == null && onClose != null) { { SmallIconButton(Sym.CLOSE, stringResource(R.string.common_close_search), onClick = onClose) } } else null,
                 singleLine = true,
                 isError = error != null,
-                keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = ImeAction.Go),
-                keyboardActions = KeyboardActions(onGo = { submit() }, onDone = { submit() }, onSearch = { submit() }),
+                keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = if (submit != null) ImeAction.Search else ImeAction.Done),
+                keyboardActions = KeyboardActions(onGo = { enter() }, onDone = { enter() }, onSearch = { enter() }),
                 modifier = Modifier.weight(1f).focusRequester(focus).onPreviewKeyEvent { e ->
-                    // A hardware keyboard's Enter doesn't always arrive as the keyboard's action. Down and
-                    // up are both taken, so that action can't submit a second time.
-                    if (e.key == Key.Enter || e.key == Key.NumPadEnter) { if (e.type == KeyEventType.KeyDown) submit(); true } else false
+                    // A hardware keyboard's Enter doesn't always arrive as the keyboard's action. Down acts and
+                    // up is swallowed, so that action can't act a second time.
+                    if (e.key == Key.Enter || e.key == Key.NumPadEnter) { if (e.type == KeyEventType.KeyDown) enter(); true } else false
                 },
             )
-            if (action != null) FilledTonalButton(onClick = { submit() }, enabled = canSubmit) { Text(action, maxLines = 1) }
+            if (submit != null) FilledTonalButton(onClick = { enter() }, enabled = canSubmit) { Text(submit, maxLines = 1) }
         }
         if (error != null) Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
             modifier = Modifier.padding(start = 4.dp, top = 2.dp))
     }
 }
 
-/** An entry that puts [text] on the clipboard and reads "Copied" for two seconds; no toast. */
+/** An entry that puts [text] on the clipboard and reads "Copied", with a check, for two seconds; no toast. */
 @Composable
 fun CopyEntry(label: String, icon: String = Sym.CONTENT_COPY, text: () -> String) {
     var copied by remember { mutableStateOf(false) }
@@ -299,18 +307,6 @@ fun CopyEntry(label: String, icon: String = Sym.CONTENT_COPY, text: () -> String
         Env.copy(text())
         copied = true
     }
-}
-
-/**
- * The words shown before an online service is asked for the first time, in the item's menu and in
- * its settings: who is asked, what is sent, and nothing else.
- */
-@Composable
-fun OnlineWords(service: Online.Service, modifier: Modifier = Modifier) {
-    Text(stringResource(when (service) {
-        Online.Service.OPEN_METEO -> R.string.weather_words
-        Online.Service.AIRLABS -> R.string.flight_words
-    }), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier.padding(vertical = 2.dp))
 }
 
 /** A square-ish tile with an icon over a label, for grids of actions. */
@@ -347,8 +343,9 @@ fun TileGrid(content: @Composable () -> Unit) =
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
 
 /**
- * Pill buttons in a row (presets such as 5, 10, 25 min). With [selected], they are a choice: that
- * one is filled in the primary color and said to be selected (the day a flight is looked up for).
+ * Pill buttons in a row (presets such as 5, 10, 25 min). With [selected] they are a choice: that one
+ * has a check before its label and is said to be selected (how an item is shown, the day a flight is
+ * looked up for).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -359,14 +356,14 @@ fun ChipRow(labels: List<String>, selected: Int? = null, onClick: (Int) -> Unit)
             val hovered by source.collectIsHoveredAsState()
             val focused by source.collectIsFocusedAsState()
             val chosen = selected == i
-            val fill = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
-            Text(l, style = MaterialTheme.typography.labelLarge,
-                color = if (chosen) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
+            Text(if (chosen) "✓ $l" else l, style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.heightIn(min = 32.dp).focusRing(focused, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
-                    .background(if (hovered) fill.copy(alpha = 0.8f) else fill)
+                    .background(if (hovered) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
+                        else MaterialTheme.colorScheme.secondaryContainer)
                     .hoverable(source)
-                    .then(if (selected != null) Modifier.semantics { this.selected = chosen } else Modifier)
-                    .clickable(interactionSource = source, indication = null) { onClick(i) }
+                    .then(if (selected == null) Modifier.clickable(interactionSource = source, indication = null) { onClick(i) }
+                        else Modifier.selectable(selected = chosen, interactionSource = source, indication = null, role = Role.RadioButton) { onClick(i) })
                     .pointerHoverIcon(PointerIcon.Hand)
                     .padding(horizontal = 12.dp, vertical = 6.dp))
         }

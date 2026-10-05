@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit
 /**
  * The app's wiring for [Refresher] and [Ask]: each gets a thread of its own that exists only while
  * there is work, results arrive on the main thread, the clock is [Now], and a new snapshot makes the
- * ticker compute the items again, so the bar shows it at once.
+ * ticker compute the items of its type again, so the bar and an open menu show it at once.
  */
 object Background {
     private val main = Handler(Looper.getMainLooper())
@@ -25,23 +25,29 @@ object Background {
             Thread(r, "BentoBar-$name").apply { isDaemon = true; priority = Thread.MIN_PRIORITY }
         }
 
-    fun wiring(name: String) = Refresher.Wiring(thread(name), { main.post(it) }, Now::elapsed, changed = { Ticker.refresh() })
+    /**
+     * [type]: the id of the item type the work is for ("weather"). It names the thread, and what
+     * comes in recomputes that type's items (`Ticker.refresh(type)`: no sampler runs for it).
+     */
+    fun wiring(type: String) = Refresher.Wiring(thread(type), { main.post(it) }, Now::elapsed, changed = { Ticker.refresh(type) })
 
     /**
-     * A [Refresher] for an item type. With [service], its snapshots are forgotten the moment that
-     * service is switched off or loses its key (before the type's own `forgetFetched` runs).
+     * A [Refresher] for the item type with the id [type]. With [service], its snapshots are forgotten
+     * the moment that service is switched off or loses its key (before the type's own
+     * `forgetFetched` runs).
      */
     fun <K : Any, V : Any> refresher(
-        name: String,
+        type: String,
         service: Online.Service? = null,
         every: (key: K, value: V) -> Long?,
         restore: ((key: K) -> Refresher.Restored<V>?)? = null,
         load: (key: K, last: V?) -> V,
-    ): Refresher<K, V> = Refresher(wiring(name), every, restore, load).also { r ->
+    ): Refresher<K, V> = Refresher(wiring(type), every, restore, load).also { r ->
         if (service != null) synchronized(forServices) { forServices += service to { r.forget() } }
     }
 
-    fun <Q : Any, A : Any> ask(name: String, work: (Q) -> A): Ask<Q, A> = Ask(wiring(name), work)
+    /** An [Ask] for the item type with the id [type]. */
+    fun <Q : Any, A : Any> ask(type: String, work: (Q) -> A): Ask<Q, A> = Ask(wiring(type), work)
 
     /** [service] was switched off: every refresher made for it forgets what it has. Main thread. */
     internal fun forget(service: Online.Service) {

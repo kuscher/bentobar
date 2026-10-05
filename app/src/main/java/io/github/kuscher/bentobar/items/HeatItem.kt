@@ -20,7 +20,7 @@ object HeatItem : ItemType("heat", R.string.item_heat_title, Sym.DEVICE_THERMOST
 
     /** From which of Android's levels on the item shows: 1 warm, 2 hot (when Android starts to slow the device), 3 very hot. */
     private val atLeast = Threshold("level", 2, 1..3) {
-        Env.str(when (it) { 1 -> R.string.heat_level_warm; 3 -> R.string.heat_level_very_hot; else -> R.string.heat_level_hot })
+        Env.str(when (it) { 1 -> R.string.heat_rule_warm; 3 -> R.string.heat_rule_very_hot; else -> R.string.heat_rule_hot })
     }
     override val trigger = Trigger(R.string.trigger_heat, R.string.trigger_heat_short, atLeast)
 

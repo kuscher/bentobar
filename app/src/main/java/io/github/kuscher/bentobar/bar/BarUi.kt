@@ -36,6 +36,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
@@ -104,20 +105,36 @@ data class StripLook(
     val alertBg: Color get() = if (lightText) Color(0xFFFFB4AB) else Color(0xFFB3261E)
     val alertFg: Color get() = if (lightText) Color(0xFF690005) else Color.White
 
-    /** How thin the text color can be drawn and still stand out from the bar at 3:1, the contrast a control's parts need. */
-    private val trackAlpha: Float get() = SLIDER_ALPHAS.firstOrNull { Contrast.ratio(fg.copy(alpha = it).compositeOver(background), background) >= 3f } ?: 1f
-    /** The slider's empty track: the text color, as thin as it may be. On a bar where nothing thinner stands out, the text color itself. */
-    val sliderTrack: Color get() = fg.copy(alpha = trackAlpha).compositeOver(background)
-    /** The slider's filled part while muted: between the track and the text color, so the kept level still shows. */
-    val sliderDimmed: Color get() = fg.copy(alpha = (trackAlpha + 1f) / 2f).compositeOver(background)
+    /**
+     * How strongly the text color is drawn for the slider's empty track: 0.38 on a dark bar and 0.50
+     * on a light one (3.4:1 and 3.2:1 against black and white), raised in steps of 0.1 on a bar of
+     * another color until the track stands out from it at 3:1, the contrast a control's parts need.
+     * It stops at 0.7: any stronger and the track is no longer told from the filled part, which is
+     * what shows the level. On the few mid-tone bars where the text itself only just reaches 4.5:1
+     * the track then ends a little under 3:1 (2.8:1 at the least, see SliderMathTest).
+     */
+    val sliderTrackAlpha: Float get() {
+        var a = if (lightText) 0.38f else 0.50f
+        while (a < 0.7f && Contrast.ratio(fg.copy(alpha = a).compositeOver(background), background) < 3f) a = (a + 0.1f).coerceAtMost(0.7f)
+        return a
+    }
+    /** The slider's empty track. */
+    val sliderTrack: Color get() = fg.copy(alpha = sliderTrackAlpha)
+    /**
+     * The slider's filled part while muted: between the track and the text color, so the kept level
+     * still shows (0.62 on a dark bar, 0.74 on a light one; stronger where the track had to be).
+     */
+    val sliderMuted: Color get() = fg.copy(alpha = (sliderTrackAlpha + 0.24f).coerceAtMost(1f))
 }
 
-private val SLIDER_ALPHAS = floatArrayOf(0.45f, 0.6f, 0.8f)
-
-/** The slider in the bar: its track's width and height, and the handle that shows under the pointer. */
-val SLIDER_WIDTH = 64.dp
+/** The slider in the bar: the track, the zone that takes the pointer for it (the track and the item's end), its handle. */
+val SLIDER_TRACK = 64.dp
+private val SLIDER_ZONE = 70.dp
 private val SLIDER_HEIGHT = 4.dp
-private val SLIDER_HANDLE = 10.dp
+private val SLIDER_HANDLE_WIDTH = 4.dp
+private val SLIDER_HANDLE_HEIGHT = 14.dp
+/** A finger held this long without moving asks for the item's menu (the same time the items use). */
+private const val LONG_PRESS_MS = 550L
 
 /** The pill's padding at each end (none without a pill); the controller counts it in the width budget. */
 val STRIP_PILL_PADDING = 6.dp
@@ -143,6 +160,8 @@ interface StripEvents {
     fun drag(item: ItemConfig, dx: Float, done: Boolean) {}
     /** [item]'s slider was set to [level] (0 to 1, on one of its steps); [done] when the pointer let go. */
     fun slide(item: ItemConfig, level: Float, done: Boolean) {}
+    /** Whether a slider in this strip is a control. In the settings preview it is only drawn: a click there selects the item. */
+    val slidable: Boolean get() = true
 }
 
 /**
@@ -341,6 +360,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     // While the pointer holds the slider: the level under it. Otherwise the item's own, which is the real one.
     var held by remember { mutableStateOf<Float?>(null) }
     val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == LayoutDirection.Rtl
+    val context by rememberUpdatedState { events.context(entry.item, bounds) }
     val showIcon = display != Display.TEXT || s.text.isNullOrEmpty()
     val showText = slider == null && display != Display.ICON && !s.text.isNullOrEmpty()
     Row(
@@ -382,7 +402,8 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
                 alert -> look.alertBg
                 // Lifted, it's a solid tile in the bar's own colour, so text it passes over doesn't show through.
                 lifted -> look.fg.copy(alpha = 0.18f).compositeOver(look.background)
-                hovered -> look.fg.copy(alpha = 0.14f)
+                // The hover box stays while the slider is held, also when the pointer has left the item.
+                hovered || held != null -> look.fg.copy(alpha = 0.14f)
                 else -> Color.Transparent
             })
             .hoverable(source)
@@ -393,12 +414,15 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
                 onLongClick(itemMenuLabel) { events.context(entry.item, bounds); true }
                 if (slider == null) role = Role.Button
                 else {
-                    // A slider for assistive tech too: it reads the description and can raise and lower the level.
-                    progressBarRangeInfo = ProgressBarRangeInfo(slider.level.coerceIn(0f, 1f), 0f..1f, (slider.steps - 1).coerceAtLeast(0))
-                    setProgress { to -> events.slide(entry.item, SliderMath.snap(to, slider.steps), true); true }
+                    // A slider for assistive tech too: it reads the description and can raise and lower the
+                    // level, step by step where the slider has steps (0 to 15 for a volume of fifteen steps).
+                    val top = if (slider.steps > 0) slider.steps.toFloat() else 1f
+                    progressBarRangeInfo = ProgressBarRangeInfo(slider.level.coerceIn(0f, 1f) * top, 0f..top, (slider.steps - 1).coerceAtLeast(0))
+                    setProgress { to -> events.slide(entry.item, SliderMath.snap(to / top, slider.steps), true); true }
                 }
             }
-            .padding(horizontal = 6.dp),
+            // The slider's zone runs to the item's very end (the last 6 dp mean "full"), so it brings that padding itself.
+            .padding(start = 6.dp, end = if (slider != null) 0.dp else 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -415,85 +439,143 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
         }
         if (showIcon && (showText || slider != null) && (s.image != null || !s.icon.isNullOrEmpty())) Spacer(Modifier.width(5.dp))
         if (slider != null) {
-            SliderTrack(slider, held, handle = hovered || held != null, look = look, rtl = rtl,
-                modifier = Modifier.slides(slider.steps, rtl, onHeld = { held = it }) { level, done -> events.slide(entry.item, level, done) })
+            VolumeTrack(slider, held, handle = hovered || held != null, look = look, rtl = rtl,
+                modifier = if (!events.slidable) Modifier
+                else Modifier.slides(slider.steps, rtl, onHeld = { held = it }, onContext = { context() }) { level, done -> events.slide(entry.item, level, done) })
         }
         if (showText) {
             val template = if (s.widthKey != null) Fmt.widthTemplate(s.text!!) else null
             val slot = template?.let { tpl -> remember(tpl, textStyle) { measurer.measure(tpl, textStyle, maxLines = 1).size.width } }
             // With an icon, the number stays next to it and the spare room trails; text alone sits at the end.
             val iconShown = showIcon && (s.image != null || !s.icon.isNullOrEmpty())
+            // An item that promises a length is held to it in width too: 8.5 dp a character at the usual text
+            // size. The count decides what is said; this only catches scripts whose characters are wide.
+            val cap = if (s.textLimit > 0) (8.5f * s.textLimit * look.textSp.value / 14f).dp else Dp.Unspecified
             Text(s.text!!, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = if (iconShown) TextAlign.Start else TextAlign.End,
-                modifier = if (slot != null) Modifier.widthIn(min = with(density) { slot.toDp() }) else Modifier,
+                modifier = (if (slot != null) Modifier.widthIn(min = with(density) { slot.toDp() }) else Modifier).widthIn(max = cap),
                 style = textStyle)
         }
     }
 }
 
 /**
- * The slider in the bar: a track [SLIDER_WIDTH] wide over the item's whole height (all of it takes
- * the pointer), filled to the level. While the pointer holds it ([held]) the level under the pointer
- * is drawn, on the slider's own steps; otherwise the item's level, which is the real one. A handle
- * shows only with [handle] (the pointer is over the item, or holds the slider); at rest there is none.
+ * The slider in the bar, where the item's text would be: a track [SLIDER_TRACK] wide and 4 dp high,
+ * filled to the level, in a zone that runs on to the item's end and takes the pointer over the bar's
+ * whole height. A quiet line at rest. With [handle] (the pointer is over the item, or holds the
+ * slider) a small upright bar marks the level, with a gap on each side of it.
+ *
+ * While the pointer holds the slider ([held]) the level under the pointer is drawn; otherwise the
+ * item's own, which is the real one and glides when it changes from elsewhere (the volume keys).
  */
 @Composable
-private fun SliderTrack(slider: BarSlider, held: Float?, handle: Boolean, look: StripLook, rtl: Boolean, modifier: Modifier) {
-    val level = held ?: slider.level
+private fun VolumeTrack(slider: BarSlider, held: Float?, handle: Boolean, look: StripLook, rtl: Boolean, modifier: Modifier) {
+    val glided by androidx.compose.animation.core.animateFloatAsState(slider.level.coerceIn(0f, 1f),
+        androidx.compose.animation.core.tween(120, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "level")
+    val level = held ?: glided
     val track = look.sliderTrack
-    // The same color for the track and the text (a bar where nothing thinner stands out): a thinner track tells them apart.
-    val thinTrack = track == look.fg
-    val fill = if (slider.dimmed && held == null) look.sliderDimmed else look.fg
-    Canvas(modifier.width(SLIDER_WIDTH).fillMaxHeight()) {
+    val fill = if (slider.dimmed && held == null) look.sliderMuted else look.fg
+    val mark = look.fg
+    Canvas(modifier.width(SLIDER_ZONE).fillMaxHeight()) {
+        val w = SLIDER_TRACK.toPx()
         val h = SLIDER_HEIGHT.toPx()
-        val trackH = if (thinTrack) h / 2 else h
-        drawRoundRect(track, Offset(0f, (size.height - trackH) / 2), Size(size.width, trackH), CornerRadius(trackH / 2))
-        val w = SliderMath.filled(level, size.width)
-        if (w > 0f) drawRoundRect(fill, Offset(if (rtl) size.width - w else 0f, (size.height - h) / 2), Size(w, h), CornerRadius(h / 2))
-        if (handle) {
-            val r = SLIDER_HANDLE.toPx() / 2
-            val x = (if (rtl) size.width - w else w).coerceIn(r, (size.width - r).coerceAtLeast(r))
-            drawCircle(look.fg, r, Offset(x, size.height / 2))
+        val top = (size.height - h) / 2
+        val radius = CornerRadius(h / 2)
+        // The track starts where the zone starts; right to left, that is the zone's right edge.
+        fun x(along: Float) = if (rtl) size.width - along else along
+        fun span(from: Float, to: Float, color: Color) {
+            if (to - from <= 0f) return
+            drawRoundRect(color, Offset(minOf(x(from), x(to)), top), Size(to - from, h), radius)
+        }
+        // Any level above nothing shows at least a dot; nothing shows nothing.
+        val filled = SliderMath.fillWidth(level, w, min = h)
+        if (!handle) {
+            // The rest of the track is cut out of the whole track's shape, starting under the fill's round end:
+            // the two meet without a notch, and the track's far end stays round.
+            val from = (filled - h / 2).coerceAtLeast(0f)
+            clipRect(left = minOf(x(from), x(w)), right = maxOf(x(from), x(w))) {
+                drawRoundRect(track, Offset(minOf(x(0f), x(w)), top), Size(w, h), radius)
+            }
+            span(0f, filled, fill)
+        } else {
+            // The handle stands on the fill's end, and for 2 dp on each side of it neither fill nor track is drawn.
+            val hw = SLIDER_HANDLE_WIDTH.toPx()
+            val center = SliderMath.handleCenter(level, w, edge = hw / 2)
+            val gap = hw / 2 + 2.dp.toPx()
+            span(0f, center - gap, fill)
+            span(center + gap, w, track)
+            val hh = SLIDER_HANDLE_HEIGHT.toPx()
+            drawRoundRect(mark, Offset(x(center) - hw / 2, (size.height - hh) / 2), Size(hw, hh), CornerRadius(hw / 2))
         }
     }
 }
 
 /**
- * The slider's pointer rules. A primary press on the track sets the level under the pointer at once
- * and holds the slider: every move sets it again, and the release ends it ([onLevel] with done). The
- * press is consumed, so the item around it ([clicks]) takes it neither for a click nor for the start
- * of a drag to reorder. A secondary press is left alone: it is the item's menu, as anywhere on the item.
- * [onHeld] gets the level while the pointer holds the slider, and null when it lets go.
+ * The slider's pointer rules, on its zone (the track and the item's end; the icon and the gap after
+ * it stay the item's own, see [clicks]).
+ *
+ * A mouse, a touchpad or a stylus: the level follows from the moment the button goes down, with no
+ * slop, until it is released. A finger: a tap sets the level when it lifts, a finger that moves past
+ * the touch slop makes the level follow, and one held for [LONG_PRESS_MS] without moving opens the
+ * item's menu ([onContext]) and changes nothing. A click or a tap never sets nothing at all: its
+ * lowest level is one step (a slip at the track's start must not silence a call); a drag can reach 0.
+ *
+ * The press is consumed, so the item around the slider takes it neither for a click nor for the
+ * start of a drag to reorder. A secondary press is left alone: it is the item's menu, as anywhere on
+ * the item. [onHeld] gets the level while the pointer holds the slider, and null when it lets go.
  */
-private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, onLevel: (level: Float, done: Boolean) -> Unit): Modifier = composed {
+private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, onContext: () -> Unit,
+                            onLevel: (level: Float, done: Boolean) -> Unit): Modifier = composed {
     val level by rememberUpdatedState(onLevel)
     val holds by rememberUpdatedState(onHeld)
+    val menu by rememberUpdatedState(onContext)
     pointerInput(steps, rtl) {
+        val track = SLIDER_TRACK.toPx()
         try {
             awaitPointerEventScope {
-                var holding = false
+                var down = false          // a primary press began in the zone and hasn't ended
+                var following = false     // the level follows the pointer
+                var moved = false         // it has changed since the press: no longer "a click"
                 var last = Float.NaN
+                var downX = 0f
+                var downAt = 0L
                 while (true) {
                     val e = awaitPointerEvent()
                     val c = e.changes.firstOrNull() ?: continue
-                    fun at() = SliderMath.level(c.position.x, 0f, size.width.toFloat(), steps, rtl)
+                    fun at() = SliderMath.level(c.position.x, if (rtl) size.width - track else 0f, track, steps, rtl)
+                    fun set(l: Float, done: Boolean) { last = l; if (!done) holds(l); level(l, done) }
                     when (e.type) {
                         PointerEventType.Press -> if (!e.buttons.isSecondaryPressed && !c.isConsumed) {
-                            holding = true
-                            last = at()
-                            holds(last); level(last, false)
+                            down = true; moved = false; last = Float.NaN
+                            downX = c.position.x; downAt = c.uptimeMillis
+                            // A finger may still be about to scroll, tap or hold: nothing is set until it says which.
+                            following = c.type != androidx.compose.ui.input.pointer.PointerType.Touch
+                            if (following) set(SliderMath.atLeastOneStep(at(), steps), false)
                             c.consume()
                         }
-                        PointerEventType.Move -> if (holding) {
+                        PointerEventType.Move -> if (down) {
                             if (c.pressed) {
-                                val l = at()
-                                // Only a new step is news: a drag across the track is then as many reports as it has steps.
-                                if (l != last) { last = l; holds(l); level(l, false) }
+                                if (!following && kotlin.math.abs(c.position.x - downX) > viewConfiguration.touchSlop) following = true
+                                if (following) {
+                                    val l = at()
+                                    // Only a new step is news: a drag across the track is as many reports as it has steps.
+                                    if (l != last) { moved = true; set(l, false) }
+                                }
                             }
                             c.consume()
                         }
-                        PointerEventType.Release -> if (holding) {
-                            holding = false
-                            holds(null); level(at(), true)
+                        PointerEventType.Release -> if (down) {
+                            down = false
+                            holds(null)
+                            // A finger that never followed: where it lifts decides, as for a tap on any item.
+                            val inside = c.position.x >= 0 && c.position.y >= 0 && c.position.x <= size.width && c.position.y <= size.height
+                            when {
+                                // A drag ends where it is; a click ends on the level it set when the button went down.
+                                following -> level(if (moved) at() else last, true)
+                                !inside -> {}
+                                c.uptimeMillis - downAt > LONG_PRESS_MS -> menu()
+                                else -> level(SliderMath.atLeastOneStep(at(), steps), true)
+                            }
+                            following = false
                             c.consume()
                         }
                     }

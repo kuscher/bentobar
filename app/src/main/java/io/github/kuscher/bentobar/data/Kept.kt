@@ -14,7 +14,13 @@ import java.io.File
  * Never keep a service's reply as it came: a flight service's reply repeats the key it was asked
  * with. Keep your own model, serialized, which cannot hold what you did not put into it.
  */
-class Kept(private val dir: File, private val maxEntries: Int = 32, private val maxChars: Int = 200_000) {
+class Kept(
+    private val dir: File,
+    private val maxEntries: Int = 32,
+    private val maxChars: Int = 200_000,
+    /** Whether anything may be written right now. What a service sent is kept only while that service is on. */
+    private val open: () -> Boolean = { true },
+) {
     /** [savedAt]: wall-clock milliseconds, as given to [write]. */
     class Entry(val text: String, val savedAt: Long)
 
@@ -35,10 +41,14 @@ class Kept(private val dir: File, private val maxEntries: Int = 32, private val 
         }
     }
 
-    /** Keeps [text] under [name], in place of what was there. False if it is too long or the disk refused. */
+    /**
+     * Keeps [text] under [name], in place of what was there. False if it is too long, the disk
+     * refused, or nothing may be kept right now (the service it came from was switched off while it
+     * was on its way: [clear] has run, and this must not put it back).
+     */
     @Synchronized
     fun write(name: String, text: String, savedAt: Long): Boolean {
-        if (text.length > maxChars) return false
+        if (text.length > maxChars || !open()) return false
         return try {
             dir.mkdirs()
             val target = file(name)
@@ -81,14 +91,22 @@ class Kept(private val dir: File, private val maxEntries: Int = 32, private val 
     companion object {
         private const val EXT = ".txt"
         @Volatile private var root: File? = null
+        /** One per directory, so that a write and a [clear] of the same directory take turns. */
+        private val made = HashMap<String, Kept>()
 
         /** [noBackupDir]: `Context.getNoBackupFilesDir()`. Called by [Online.init]. */
         fun init(noBackupDir: File) { root = noBackupDir }
 
-        private fun under(path: String) = Kept(File(root ?: error("Kept.init has not run"), path))
+        private fun under(path: String, open: () -> Boolean = { true }): Kept {
+            val dir = File(root ?: error("Kept.init has not run"), path)
+            return synchronized(made) { made.getOrPut(dir.path) { Kept(dir, open = open) } }
+        }
 
-        /** What a service sent, kept for a restart: emptied when that service is switched off. */
-        fun fetched(service: Online.Service): Kept = under("fetched/" + service.id)
+        /**
+         * What a service sent, kept for a restart. Emptied when that service is switched off, and
+         * nothing is written while it is off: an answer that was on its way then is not kept.
+         */
+        fun fetched(service: Online.Service): Kept = under("fetched/" + service.id) { Online.on(service) }
 
         /** A feature's own notes by [name] (which flight an item follows): only the feature empties it. */
         fun own(name: String): Kept = under("kept/" + safe(name))

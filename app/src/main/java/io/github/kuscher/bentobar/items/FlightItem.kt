@@ -6,7 +6,7 @@ import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Online
 import io.github.kuscher.bentobar.ui.MenuCard
-import io.github.kuscher.bentobar.ui.OnlineWords
+import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.util.Sym
 
 /**
@@ -28,11 +28,12 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     override val trigger = Trigger(R.string.trigger_flight, R.string.trigger_flight_short, before)
 
     // One plane while idle (it looks the same filled and outlined, so there is no "off" look).
-    override fun state(item: ItemConfig) = ItemState(icon = Sym.FLIGHT, desc = Env.str(R.string.flight_not_set_up))
+    override fun state(item: ItemConfig) = ItemState(icon = Sym.FLIGHT,
+        desc = Env.str(R.string.item_flight_title) + ": " + Env.str(R.string.common_not_set_up))
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, _ ->
-        MenuCard(Sym.FLIGHT, stringResource(R.string.item_flight_title), stringResource(R.string.flight_not_set_up)) {
-            OnlineWords(Online.Service.AIRLABS)
+        MenuCard(Sym.FLIGHT, stringResource(R.string.item_flight_title), stringResource(R.string.common_not_set_up)) {
+            MenuNote(stringResource(R.string.flight_consent))
         }
     }
 }

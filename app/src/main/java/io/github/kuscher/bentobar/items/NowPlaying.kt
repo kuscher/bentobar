@@ -145,7 +145,8 @@ object NowPlaying {
     fun init(context: Context) { app = context.applicationContext }
 
     private val sessionsChanged = MediaSessionManager.OnActiveSessionsChangedListener { list -> adopt(list.orEmpty()) }
-    private val rebuild = Runnable { publish() }
+    /** After a player's callback: the new value, and the item drawn from it at once (a pause shows when it is pressed, not a tick later). */
+    private val rebuild = Runnable { publish(); Ticker.refresh(MediaItem.type) }
 
     // ---- life cycle (the item type's onLive, onIdle and sample)
 

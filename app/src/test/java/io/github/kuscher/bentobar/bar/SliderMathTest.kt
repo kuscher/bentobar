@@ -1,6 +1,7 @@
 package io.github.kuscher.bentobar.bar
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 import io.github.kuscher.bentobar.data.Pill
 import io.github.kuscher.bentobar.data.TextSize
@@ -71,34 +72,78 @@ class SliderMathTest {
         assertEquals(0f, SliderMath.snap(Float.NaN, 15), 0f)
     }
 
-    @Test fun theFilledPartIsTheLevelsShareOfTheTrack() {
-        assertEquals(0f, SliderMath.filled(0f, 64f), 0f)
-        assertEquals(39.68f, SliderMath.filled(0.62f, 64f), 1e-4f)
-        assertEquals(64f, SliderMath.filled(1.5f, 64f), 0f)
-        assertEquals(0f, SliderMath.filled(Float.NaN, 64f), 0f)
+    @Test fun aClickNeverSetsNothingButADragCan() {
+        // The level under a click is one step at the least; what a drag reports is the level as it is.
+        assertEquals(1 / 15f, SliderMath.atLeastOneStep(at(10f, steps = 15), 15), 1e-6f)
+        assertEquals(1 / 15f, SliderMath.atLeastOneStep(0f, 15), 1e-6f)
+        assertEquals(8 / 15f, SliderMath.atLeastOneStep(at(42f, steps = 15), 15), 1e-6f)
+        assertEquals(1f, SliderMath.atLeastOneStep(1f, 15), 0f)
+        assertEquals(0f, at(10f, steps = 15), 0f)
+        // Without steps the least is one dp of the 64 dp track.
+        assertEquals(1 / 64f, SliderMath.atLeastOneStep(0f, 0), 1e-6f)
+        assertEquals(0.5f, SliderMath.atLeastOneStep(0.5f, 0), 0f)
+    }
+
+    @Test fun theTrackZoneRunsToTheItemsEndAndThatMeansFull() {
+        // The zone is the 64 px track and 6 px after it: a press in those last 6 is the highest step.
+        assertEquals(1f, SliderMath.level(66f, left = 0f, width = 64f, steps = 15), 0f)
+        assertEquals(1f, SliderMath.level(70f, left = 0f, width = 64f, steps = 15), 0f)
+        // Right to left the zone starts with those 6 px, and the track's own start is its right end.
+        assertEquals(1f, SliderMath.level(2f, left = 6f, width = 64f, steps = 15, rtl = true), 0f)
+        assertEquals(0f, SliderMath.level(70f, left = 6f, width = 64f, steps = 15, rtl = true), 0f)
+    }
+
+    @Test fun anyLevelAboveNothingShowsAtLeastADot() {
+        assertEquals(0f, SliderMath.fillWidth(0f, 64f, min = 4f), 0f)
+        assertEquals(4f, SliderMath.fillWidth(1 / 100f, 64f, min = 4f), 0f)
+        assertEquals(4.2666f, SliderMath.fillWidth(1 / 15f, 64f, min = 4f), 1e-3f)
+        assertEquals(39.68f, SliderMath.fillWidth(0.62f, 64f, min = 4f), 1e-4f)
+        assertEquals(64f, SliderMath.fillWidth(1.5f, 64f, min = 4f), 0f)
+        assertEquals(0f, SliderMath.fillWidth(Float.NaN, 64f, min = 4f), 0f)
+        assertEquals(0f, SliderMath.fillWidth(0.5f, 0f, min = 4f), 0f)
+    }
+
+    @Test fun theHandleStandsOnTheLevelButNeverHangsOverAnEnd() {
+        assertEquals(2f, SliderMath.handleCenter(0f, 64f, edge = 2f), 0f)
+        assertEquals(32f, SliderMath.handleCenter(0.5f, 64f, edge = 2f), 0f)
+        assertEquals(62f, SliderMath.handleCenter(1f, 64f, edge = 2f), 0f)
+        assertEquals(1.5f, SliderMath.handleCenter(0.9f, 3f, edge = 2f), 0f) // a track too short for it: the middle
+    }
+
+    @Test fun theTrackIsDrawnAsTheDesignSaysOnBlackAndOnWhite() {
+        val dark = StripLook(Color.White, true, TextSize.DEFAULT, 12.dp, Pill.NONE)
+        assertEquals(0.38f, dark.sliderTrackAlpha, 0f)
+        assertEquals(3.4f, Contrast.ratio(dark.sliderTrack.compositeOver(Color.Black), Color.Black), 0.1f)
+        val light = StripLook(Contrast.DARK_TEXT, false, TextSize.DEFAULT, 12.dp, Pill.NONE)
+        assertEquals(0.50f, light.sliderTrackAlpha, 0f)
+        assertEquals(3.2f, Contrast.ratio(light.sliderTrack.compositeOver(Color.White), Color.White), 0.1f)
+        // Muted, the kept level is between the two: told from the track and from a full fill.
+        assertEquals(0.62f, dark.sliderMuted.alpha, 0.01f)
+        assertEquals(0.74f, light.sliderMuted.alpha, 0.01f)
     }
 
     @Test fun trackAndFillStandOutFromEveryBar() {
-        // The spec's 3:1 for the parts of a control, on every gray an opaque bar can be and on a grid of colors.
+        // The 3:1 the parts of a control need, on every gray an opaque bar can be and on a grid of colors: where the
+        // usual strength is too faint on a bar of another color, the track is drawn stronger, up to 0.7 of the text
+        // color. Past that it would no longer be told from the fill, so the few mid-tone bars where the text itself
+        // only just reaches 4.5:1 get a track a little under 3:1, and never under 2.75:1.
         val bars = (0..255 step 3).map { Color(it, it, it) } +
             (0..255 step 51).flatMap { r -> (0..255 step 51).flatMap { g -> (0..255 step 51).map { b -> Color(r, g, b) } } }
+        var short = 0
         for (bar in bars) {
             val live = Contrast.resolve(Contrast.readableOn(bar), bar)
             val look = StripLook(live.fg, live.barDark, TextSize.DEFAULT, 12.dp, Pill.NONE, live.background)
-            assertTrue("track on $bar", Contrast.ratio(look.sliderTrack, bar) >= 3f)
-            assertTrue("fill on $bar", Contrast.ratio(look.fg, bar) >= 3f)
-            assertTrue("muted fill on $bar", Contrast.ratio(look.sliderDimmed, bar) >= 3f)
-            // Muted, the kept level is still told from the track, and both from the full fill, wherever a thinner track exists.
-            if (look.sliderTrack != look.fg) assertTrue("three different on $bar", look.sliderDimmed != look.sliderTrack && look.sliderDimmed != look.fg)
+            val alpha = look.sliderTrackAlpha
+            val track = Contrast.ratio(look.sliderTrack.compositeOver(bar), bar)
+            assertTrue("the track's strength on $bar", alpha >= (if (look.lightText) 0.38f else 0.50f) && alpha <= 0.7f + 1e-6f)
+            if (alpha < 0.7f - 1e-6f) assertTrue("track on $bar", track >= 3f)
+            assertTrue("track at its strongest on $bar: $track", track >= 2.75f)
+            if (track < 3f) short++
+            assertTrue("fill on $bar", Contrast.ratio(look.fg, bar) >= 4.5f)
+            assertTrue("muted fill on $bar", Contrast.ratio(look.sliderMuted.compositeOver(bar), bar) >= 3f)
+            assertTrue("muted fill and track differ on $bar", look.sliderMuted.alpha >= alpha + 0.2f)
         }
-    }
-
-    @Test fun onASeeThroughBarTheTrackIsTheThinnestThatStillShows() {
-        // White text over a dark wallpaper: the track is the faintest of the three choices.
-        val dark = StripLook(Color.White, true, TextSize.DEFAULT, 12.dp, Pill.NONE)
-        assertEquals(0.45f, dark.sliderTrack.red, 0.01f) // white at 45% over black
-        assertTrue(Contrast.ratio(dark.sliderTrack, Color.Black) >= 3f)
-        val light = StripLook(Contrast.DARK_TEXT, false, TextSize.DEFAULT, 12.dp, Pill.NONE)
-        assertTrue(Contrast.ratio(light.sliderTrack, Color.White) >= 3f)
+        // Four of the 302 today (a mid gray, a green, a magenta, a pink). More would mean the rule changed.
+        assertTrue("$short bars with a track under 3:1", short <= 4)
     }
 }

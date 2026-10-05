@@ -103,8 +103,8 @@ fun AddPage(onAdded: (String) -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp)) {
         groups.forEach { (group, types, caption) ->
             SectionLabel(stringResource(group))
-            if (caption != null) Text(stringResource(caption), style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 10.dp))
+            if (caption != null) Text(stringResource(caption), style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 types.mapNotNull { Items.of(it) }.forEach { type ->
                     val count = cfg.items.count { it.type == type.type }
@@ -306,12 +306,16 @@ fun SetupPage(activity: Activity, setup: SetupState, onTurnOn: () -> Unit) {
             if (setup.usageAccess) StepLink(stringResource(R.string.setup_open_setting)) { Usage.openSettings(activity) }
             else StepAction(stringResource(R.string.setup_turn_on)) { Usage.openSettings(activity) }
         }
-        Step(7, stringResource(R.string.setup_media_title), setup.mediaAccess, optional = true) {
-            Body(stringResource(R.string.setup_media_text))
-            // Installed from a download, Android guards this switch like the accessibility one.
-            if (!setup.mediaAccess && setup.sideloaded) { Spacer(Modifier.height(4.dp)); Body(stringResource(R.string.media_access_restricted)) }
+        Step(7, stringResource(R.string.setup_listener_title), setup.mediaAccess, optional = true) {
+            Body(stringResource(R.string.setup_listener_text))
+            // Installed from a download, Android guards this switch like the accessibility one: say how, and offer App info.
+            val guarded = !setup.mediaAccess && setup.sideloaded
+            if (guarded) { Spacer(Modifier.height(4.dp)); Body(stringResource(R.string.media_access_restricted)) }
             if (setup.mediaAccess) StepLink(stringResource(R.string.setup_open_setting)) { MediaAccess.openSettings(activity) }
-            else StepAction(stringResource(R.string.setup_turn_on)) { MediaAccess.openSettings(activity) }
+            else Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
+                StepAction(stringResource(R.string.setup_turn_on)) { MediaAccess.openSettings(activity) }
+                if (guarded) TextButton(onClick = { MainActivity.openAppInfo(activity) }) { Text(stringResource(R.string.setup_app_info)) }
+            }
         }
         // Observed where it is kept: an item's menu can change it while this page is open.
         val online by Online.state.collectAsState()
@@ -424,6 +428,13 @@ fun AboutPage() {
         }
         PageLabel(stringResource(R.string.about_privacy))
         Body(stringResource(R.string.about_privacy_text))
+        Spacer(Modifier.height(4.dp))
+        Bullet(stringResource(R.string.about_privacy_weather))
+        Bullet(stringResource(R.string.about_privacy_flight))
+        Bullet(stringResource(R.string.about_privacy_media))
+        Bullet(stringResource(R.string.about_privacy_others))
+        Spacer(Modifier.height(8.dp))
+        Body(stringResource(R.string.about_privacy_backup))
         // Google Play asks for the privacy policy to be reachable from inside the app.
         TextButton(onClick = { Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL))) }, modifier = Modifier.offset(x = (-12).dp)) {
             Text(stringResource(R.string.about_privacy_policy))
@@ -436,11 +447,11 @@ fun AboutPage() {
         Bullet(stringResource(R.string.about_credit_symbols))
         Bullet(stringResource(R.string.about_credit_compose))
         Bullet(stringResource(R.string.about_credit_kotlin))
-        Bullet(stringResource(R.string.about_credit_open_meteo))
+        Bullet(stringResource(R.string.about_credit_openmeteo))
         Bullet(stringResource(R.string.about_credit_airlabs))
         // Open-Meteo's licence asks for the credit and a link to it.
         TextButton(onClick = { Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse(OPEN_METEO_URL))) }, modifier = Modifier.offset(x = (-12).dp)) {
-            Text(stringResource(R.string.about_open_meteo_link))
+            Text(stringResource(R.string.weather_open_site))
         }
         PageLabel(stringResource(R.string.about_who))
         Body(stringResource(R.string.about_who_text))

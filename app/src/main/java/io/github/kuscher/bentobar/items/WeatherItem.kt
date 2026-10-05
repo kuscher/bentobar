@@ -6,7 +6,7 @@ import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Online
 import io.github.kuscher.bentobar.ui.MenuCard
-import io.github.kuscher.bentobar.ui.OnlineWords
+import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.util.Sym
 
 /**
@@ -28,11 +28,12 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     override val trigger = Trigger(R.string.trigger_weather, R.string.trigger_weather_short, within)
 
     // Outlined cloud: not set up.
-    override fun state(item: ItemConfig) = ItemState(icon = Sym.CLOUD, filled = false, desc = Env.str(R.string.weather_not_set_up))
+    override fun state(item: ItemConfig) = ItemState(icon = Sym.CLOUD, filled = false,
+        desc = Env.str(R.string.item_weather_title) + ": " + Env.str(R.string.common_not_set_up))
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, _ ->
-        MenuCard(Sym.CLOUD, stringResource(R.string.item_weather_title), stringResource(R.string.weather_not_set_up)) {
-            OnlineWords(Online.Service.OPEN_METEO)
+        MenuCard(Sym.CLOUD, stringResource(R.string.item_weather_title), stringResource(R.string.common_not_set_up)) {
+            MenuNote(stringResource(R.string.weather_consent))
         }
     }
 }

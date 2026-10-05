@@ -15,11 +15,11 @@ enum class Tone { NORMAL, ACCENT, WARN, ALERT }
  */
 @androidx.compose.runtime.Immutable
 data class BarSlider(
-    /** How full, 0 to 1. */
+    /** How full, 0 to 1. Muted, it is the level that was kept (the system reports 0 then). */
     val level: Float,
     /** How many steps the whole range has (15 for a volume of 0 to 15), so a drag moves in real steps; 0: any level. */
     val steps: Int = 0,
-    /** Muted: the level is kept and drawn dimmed. */
+    /** Muted: the kept level is drawn dimmed. */
     val dimmed: Boolean = false,
 )
 
@@ -53,8 +53,14 @@ data class ItemState(
     val widthKey: String? = null,
     /** A slider in the bar instead of [text]; the text stays what menus list and what [desc] says. Null: none. */
     val slider: BarSlider? = null,
-    /** The tooltip, instead of the type's name: a track's whole title, a flight's sentence. */
-    val tip: String? = null,
+    /** The tooltip, instead of the type's name: a track's whole title and artist, which flight this is. */
+    val tooltip: String? = null,
+    /**
+     * The most characters [text] has by the item's own rule (20 for the newer items, a title's chosen
+     * length): the bar then never draws it wider than 8.5 dp a character, which a count alone can't
+     * promise for wide scripts. 0: drawn as wide as it is.
+     */
+    val textLimit: Int = 0,
 )
 
 /** Things a menu can do besides its own content. */
@@ -169,6 +175,9 @@ abstract class ItemType(
 
     /** Type-specific settings, shown in BentoBar's settings. */
     open val options: (@Composable (item: ItemConfig, set: (ItemConfig) -> Unit) -> Unit)? = null
+
+    /** The heading over [options] in settings: "Options", unless the first thing there has a name of its own (the flight item's key). */
+    @get:StringRes open val optionsTitle: Int get() = io.github.kuscher.bentobar.R.string.detail_options
 
     open fun defaultOptions(): Map<String, String> = emptyMap()
 }

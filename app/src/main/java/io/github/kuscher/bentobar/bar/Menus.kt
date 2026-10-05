@@ -103,7 +103,7 @@ fun ItemContextMenu(itemId: String, host: MenuHost, openMenu: () -> Unit) {
         SectionLabel(stringResource(R.string.display_show_as))
         val displays = listOf(Display.ICON_AND_TEXT to stringResource(R.string.display_icon_and_text), Display.TEXT to stringResource(R.string.display_text),
             Display.ICON to stringResource(R.string.display_icon))
-        ChipRow(displays.map { (d, l) -> if (d == item.display) "✓ $l" else l }) { i ->
+        ChipRow(displays.map { it.second }, selected = displays.indexOfFirst { it.first == item.display }) { i ->
             Store.updateItem(item.id) { it.copy(display = displays[i].first) }
             Ticker.refresh()
         }

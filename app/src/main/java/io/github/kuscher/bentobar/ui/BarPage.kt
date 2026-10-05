@@ -211,7 +211,8 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
         override fun click(item: ItemConfig, at: Rect) = onSelect(item.id)
         override fun context(item: ItemConfig, at: Rect) = onSelect(item.id)
         override fun scroll(item: ItemConfig, steps: Int) { Items.of(item.type)?.onScroll(item, steps); Ticker.refresh() }
-        override fun slide(item: ItemConfig, level: Float, done: Boolean) { Items.of(item.type)?.onSlide(item, level, done); Ticker.refresh(item) }
+        // A slider is only drawn here: a click on it selects the item, like a click anywhere on an item.
+        override val slidable: Boolean get() = false
         override fun chevron(at: Rect) { expanded = !expanded }
         override fun chevronContext(at: Rect) { expanded = !expanded }
         override fun hover(inside: Boolean) {}
@@ -483,12 +484,14 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
             // The same for notification access (Now playing): the words, then the way to Android's switch.
             if (type.notificationAccess && !setup.mediaAccess) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer), modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(stringResource(R.string.media_access_words), style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer)
-                        if (setup.sideloaded) Text(stringResource(R.string.media_access_restricted), style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.padding(top = 6.dp))
-                        Spacer(Modifier.height(8.dp))
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.media_access_explain), style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer)
+                            if (setup.sideloaded) Text(stringResource(R.string.media_access_restricted), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.padding(top = 4.dp))
+                        }
+                        Spacer(Modifier.width(12.dp))
                         FilledTonalButton(onClick = { io.github.kuscher.bentobar.items.MediaAccess.openSettings(context) }) {
                             Text(stringResource(R.string.media_access_allow))
                         }
@@ -508,7 +511,7 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
             }
             type.options?.let { opts ->
                 Spacer(Modifier.height(4.dp))
-                SectionLabel(stringResource(R.string.detail_options))
+                SectionLabel(stringResource(type.optionsTitle))
                 opts(item) { changed -> Store.updateItem(item.id) { changed }; Ticker.refresh() }
             }
             Spacer(Modifier.height(12.dp))

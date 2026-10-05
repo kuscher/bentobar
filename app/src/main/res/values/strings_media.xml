@@ -5,9 +5,11 @@
     <string name="item_media_desc">What\'s playing, with pause and skip; shows while something plays</string>
     <string name="trigger_media">Show while something is playing, and for %1$s after it pauses</string>
     <string name="trigger_media_short">shows while playing</string>
-    <string name="media_playing">Playing</string>
     <string name="media_nothing">Nothing playing</string>
-    <string name="media_access_words">Android shares the title, artist and artwork only with apps that have notification access. BentoBar asks Android for no notifications at all, reads only what your media players say is playing, and keeps it on this device.</string>
-    <string name="media_access_allow">Allow notification access</string>
+    <string name="media_playing">Playing</string>
+    <!-- The next four are also what the item's settings card and Setup's "Notification access" step say: keep their names. -->
+    <string name="media_access_lead">See what\'s playing</string>
+    <string name="media_access_explain">Android shares the title, artist and artwork only with apps that have notification access. BentoBar tells Android to send it no notifications at all; it reads only what your media players say is playing, and keeps that on this device.</string>
     <string name="media_access_restricted">Switch grayed out? Tap it, tap OK, then turn on Allow restricted settings in App info.</string>
+    <string name="media_access_allow">Allow notification access</string>
 </resources>

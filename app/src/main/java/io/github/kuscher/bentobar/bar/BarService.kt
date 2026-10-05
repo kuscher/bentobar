@@ -748,14 +748,14 @@ class BarController(private val service: AccessibilityService) {
 
     /**
      * The item's name below it, after a short hover: icon-only items otherwise give a mouse user
-     * nothing to go on. An item whose state has a tip of its own (a track's whole title, a flight's
-     * sentence) shows that instead. A no-touch window, so it never takes a click.
+     * nothing to go on. An item whose state has a tooltip of its own (a track's whole title and
+     * artist, which flight this is) shows that instead. A no-touch window, so it never takes a click.
      */
     private fun showTooltip(item: ItemConfig, anchor: Rect) {
         hideTip()
         val s = snap ?: return
         if (menu != null || !strip.shown) return
-        val label = Ticker.states.value[item.id]?.tip?.takeIf { it.isNotBlank() } ?: Items.of(item.type)?.title ?: return
+        val label = Ticker.states.value[item.id]?.tooltip?.takeIf { it.isNotBlank() } ?: Items.of(item.type)?.title ?: return
         val loc = strip.locationOnScreen()
         val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
         val paint = android.text.TextPaint().apply { textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 13f, service.resources.displayMetrics) }
@@ -854,7 +854,7 @@ class BarController(private val service: AccessibilityService) {
 
     companion object {
         const val SYSTEMUI = "com.android.systemui"
-        private const val TOOLTIP_MAX_DP = 420
+        private const val TOOLTIP_MAX_DP = 360
         private const val RELEVANT = AccessibilityEvent.WINDOWS_CHANGE_ADDED or AccessibilityEvent.WINDOWS_CHANGE_REMOVED or
             AccessibilityEvent.WINDOWS_CHANGE_BOUNDS
     }

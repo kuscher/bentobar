@@ -97,6 +97,18 @@ class HttpTransportTest {
         }
     }
 
+    @Test fun anAnswerThatTricklesInIsGivenUpAfterAWhile() {
+        // Every single read is quick enough, yet the whole would take its time: a request has a limit of its own,
+        // so that a load can never hang on one answer.
+        TinyServer { TinyServer.Answer(body = "x".repeat(1_000).toByteArray(), tricklesMs = 400) }.use { server ->
+            val started = System.nanoTime()
+            // Ten parts, 400 ms apart: four seconds in all, each read well within its two.
+            val reply = server.transport(readMs = 2_000, totalMs = 300).get(forecast)
+            assertTrue(reply is Reply.Failed && reply.why == Why.TIMEOUT)
+            assertTrue("given up early, not read to the end", (System.nanoTime() - started) / 1_000_000 < 3_000)
+        }
+    }
+
     @Test fun nobodyListeningIsNoConnection() {
         // A port that was free a moment ago: nothing answers there.
         val port = ServerSocket(0).use { it.localPort }

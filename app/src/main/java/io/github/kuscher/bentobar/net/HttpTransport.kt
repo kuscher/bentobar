@@ -26,10 +26,12 @@ class HttpTransport(
     private val connectMs: Int = Http.CONNECT_MS,
     private val readMs: Int = Http.READ_MS,
     private val maxBytes: Int = Http.MAX_BYTES,
+    private val totalMs: Int = Http.TOTAL_MS,
 ) : Transport {
 
     override fun get(request: Request): Reply {
         val address = address(request) ?: return Reply.Failed(Why.UNREADABLE)
+        val deadline = System.nanoTime() + totalMs * 1_000_000L
         var connection: HttpURLConnection? = null
         return try {
             val c = open(address).also { connection = it }
@@ -46,7 +48,7 @@ class HttpTransport(
             val status = c.responseCode
             if (status !in 200..299) return Reply.Failed(Why.STATUS, status, retryAfter(c))
             val packed = c.contentEncoding.orEmpty().trim().equals("gzip", ignoreCase = true)
-            val bytes = c.inputStream.let { if (packed) GZIPInputStream(it) else it }.use { read(it) }
+            val bytes = c.inputStream.let { if (packed) GZIPInputStream(it) else it }.use { read(it, deadline) }
                 ?: return Reply.Failed(Why.TOO_LARGE, status)
             Reply.Ok(String(bytes, Charsets.UTF_8))
         } catch (t: Throwable) {
@@ -56,8 +58,12 @@ class HttpTransport(
         }
     }
 
-    /** At most [maxBytes], or null if there is more: a reply that large is nobody's forecast. */
-    private fun read(stream: InputStream): ByteArray? {
+    /**
+     * At most [maxBytes], or null if there is more: a reply that large is nobody's forecast. Each
+     * read has its own time limit, and so has the whole: past [deadline] (System.nanoTime) an answer
+     * that still trickles in is given up as a timeout.
+     */
+    private fun read(stream: InputStream, deadline: Long): ByteArray? {
         val out = java.io.ByteArrayOutputStream()
         val buffer = ByteArray(8 * 1024)
         while (true) {
@@ -65,6 +71,7 @@ class HttpTransport(
             if (n < 0) return out.toByteArray()
             if (out.size() + n > maxBytes) return null
             out.write(buffer, 0, n)
+            if (System.nanoTime() - deadline > 0) throw SocketTimeoutException()
         }
     }
 

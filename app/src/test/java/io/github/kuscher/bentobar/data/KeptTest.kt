@@ -82,13 +82,45 @@ class KeptTest {
     }
 
     @Test fun whatAServiceSentAndWhatAFeatureKeepsLiveApart() {
+        Online.init(dir)
+        try {
+            Online.turnOn(Online.Service.OPEN_METEO)
+            Online.saveKey(Online.Service.AIRLABS, "test-key")
+            assertTrue(Kept.fetched(Online.Service.OPEN_METEO).write("zurich", "a reading", 1))
+            assertTrue(Kept.fetched(Online.Service.AIRLABS).write("item1", "an answer", 1))
+            assertTrue(Kept.own("flight").write("item1", "LH455", 1))
+            Kept.fetched(Online.Service.OPEN_METEO).clear()
+            assertNull(Kept.fetched(Online.Service.OPEN_METEO).read("zurich"))
+            assertEquals("an answer", Kept.fetched(Online.Service.AIRLABS).read("item1")!!.text)
+            assertEquals("LH455", Kept.own("flight").read("item1")!!.text)
+        } finally {
+            Online.init(File(dir, "empty"))
+        }
+    }
+
+    @Test fun nothingAServiceSentIsKeptWhileItIsOff() {
+        // A load that was on its way when the switch went off comes back with an answer: it is not written.
+        Online.init(dir)
+        try {
+            val fetched = Kept.fetched(Online.Service.OPEN_METEO)
+            assertFalse(fetched.write("zurich", "a reading", 1))
+            Online.turnOn(Online.Service.OPEN_METEO)
+            assertTrue(fetched.write("zurich", "a reading", 1))
+            Online.turnOff(Online.Service.OPEN_METEO)
+            assertFalse(fetched.write("zurich", "the answer that was on its way", 2))
+            assertEquals(emptySet<String>(), fetched.names())
+            // What a feature keeps for itself has no such switch.
+            assertTrue(Kept.own("flight").write("item1", "LH455", 1))
+        } finally {
+            Online.init(File(dir, "empty"))
+        }
+    }
+
+    @Test fun oneStoreForOneDirectory() {
+        // The same object each time, so a write and a clear of one directory can never cross.
         Kept.init(dir)
-        Kept.fetched(Online.Service.OPEN_METEO).write("zurich", "a reading", 1)
-        Kept.fetched(Online.Service.AIRLABS).write("item1", "an answer", 1)
-        Kept.own("flight").write("item1", "LH455", 1)
-        Kept.fetched(Online.Service.OPEN_METEO).clear()
-        assertNull(Kept.fetched(Online.Service.OPEN_METEO).read("zurich"))
-        assertEquals("an answer", Kept.fetched(Online.Service.AIRLABS).read("item1")!!.text)
-        assertEquals("LH455", Kept.own("flight").read("item1")!!.text)
+        assertTrue(Kept.fetched(Online.Service.AIRLABS) === Kept.fetched(Online.Service.AIRLABS))
+        assertTrue(Kept.own("flight") === Kept.own("flight"))
+        assertFalse(Kept.own("flight") === Kept.own("weather"))
     }
 }

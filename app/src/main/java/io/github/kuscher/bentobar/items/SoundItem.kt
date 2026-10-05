@@ -36,6 +36,7 @@ import io.github.kuscher.bentobar.ui.SwitchRow
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
+import kotlin.math.roundToInt
 
 /**
  * The Sound item: the media volume as an icon and a number, with the volume and the media keys in
@@ -141,7 +142,8 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
             val actual = am.getStreamVolume(STREAM).toFloat()
             var dragging by remember { mutableStateOf(false) }
             var v by remember { mutableFloatStateOf(actual) }
-            LaunchedEffect(actual) { if (!dragging) v = actual }
+            // Also when the drag ends: a level Android refused (its hearing-safety limit) is then drawn as it is.
+            LaunchedEffect(actual, dragging) { if (!dragging) v = actual }
             val muted = am.isStreamMute(STREAM)
             val volumeLabel = stringResource(R.string.sound_media_volume)
             MenuCard(Sym.VOLUME_UP, stringResource(R.string.item_sound_title),
@@ -153,8 +155,10 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
                     Spacer(Modifier.width(8.dp))
                     Slider(value = v, onValueChange = {
                         dragging = true
-                        v = it
-                        am.setStreamVolume(STREAM, it.toInt(), 0)
+                        // A stop can come in a hair under its number (6.9999995 for 7): the nearest volume, not the one below it.
+                        val step = it.roundToInt()
+                        v = step.toFloat()
+                        am.setStreamVolume(STREAM, step, 0)
                     }, onValueChangeFinished = { dragging = false }, valueRange = 0f..max.toFloat(), steps = (max - 1).coerceAtLeast(0),
                         modifier = Modifier.weight(1f).semantics { contentDescription = volumeLabel })
                 }

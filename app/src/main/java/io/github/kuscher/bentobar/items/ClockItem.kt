@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -157,6 +158,7 @@ private fun WorldClockMenu(item: ItemConfig, host: MenuHost) {
     // A plan lives as long as the menu is open: opening it again is the present.
     var plan by remember { mutableStateOf<PlanATime.Plan?>(null) }
     var editing by remember { mutableStateOf(false) }
+    val edit = remember { FocusRequester() }
     // With the last city gone there is no "Done" left to end editing with.
     LaunchedEffect(cfg.cities.isEmpty()) { if (cfg.cities.isEmpty()) editing = false }
     val here = Instant.ofEpochMilli(now).atZone(local)
@@ -176,8 +178,9 @@ private fun WorldClockMenu(item: ItemConfig, host: MenuHost) {
             Env.launch(Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, at))
         }
         MenuDivider()
-        AddCity(cfg.cities, places, now)
-        if (cfg.cities.isNotEmpty()) MenuEntry(if (editing) Sym.CHECK else Sym.EDIT, stringResource(if (editing) R.string.common_done else R.string.clock_edit_cities)) { editing = !editing }
+        AddCity(cfg.cities, places, now, next = edit)
+        if (cfg.cities.isNotEmpty()) MenuEntry(if (editing) Sym.CHECK else Sym.EDIT, stringResource(if (editing) R.string.common_done else R.string.clock_edit_cities),
+            modifier = Modifier.focusRequester(edit)) { editing = !editing }
         MenuEntry(Sym.ALARM, stringResource(R.string.clock_alarms)) { host.close(); Env.launch(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
         MenuEntry(Sym.SETTINGS, stringResource(R.string.clock_date_settings)) { host.close(); Env.launch(Intent(Settings.ACTION_DATE_SETTINGS)) }
     }
@@ -196,7 +199,8 @@ private fun PlaceRow(row: WorldClock.Row, planned: Boolean, editing: Boolean, on
     val focus = LocalFocusManager.current
     // Whether the keyboard's focus is on this row's button.
     val held = remember { BooleanArray(1) }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    // As high as the box that editing adds, also with the smallest font: the rows must not grow when "Edit cities" is clicked.
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).padding(vertical = 6.dp).clearAndSetSemantics { contentDescription = spoken }, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(end = 8.dp)) {
                 Text(row.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -230,11 +234,11 @@ private fun PlaceRow(row: WorldClock.Row, planned: Boolean, editing: Boolean, on
  * so that a place that has one reads "added".
  */
 @Composable
-private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now: Long) {
+private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now: Long, next: FocusRequester) {
     var adding by remember { mutableStateOf(false) }
     // The field and its results go away when a city is taken or the search is closed. If one of them held the keyboard's
-    // focus, it goes to the entry that comes back (the next city is one more Enter away); dropped, it would start again
-    // at the top of the menu.
+    // focus, it goes to the entry that comes back (the next city is one more Enter away), or with the list now full
+    // to the entry after it ([next], "Edit cities"); dropped, it would start again at the top of the menu.
     var refocus by remember { mutableStateOf(false) }
     val entry = remember { FocusRequester() }
     val full = WorldClock.full(cities)
@@ -243,7 +247,7 @@ private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now
         MenuEntry(Sym.ADD, stringResource(R.string.clock_add_city), enabled = !full, modifier = Modifier.focusRequester(entry)) { adding = true }
         // Said without a click, so that the dimmed entry is no dead end.
         if (full) MenuNote(stringResource(R.string.clock_full))
-        LaunchedEffect(Unit) { if (refocus) { refocus = false; runCatching { entry.requestFocus() } } }
+        LaunchedEffect(Unit) { if (refocus) { refocus = false; runCatching { (if (full) next else entry).requestFocus() } } }
         return
     }
     var query by remember { mutableStateOf("") }
@@ -253,8 +257,10 @@ private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now
     val focus = LocalFocusManager.current
     val field = remember { FocusRequester() }
     val first = remember { FocusRequester() }
-    // Whether the keyboard's focus is in the field (or on its ×), and whether it is on a result.
+    // Whether the keyboard's focus is in the field or on the × inside it, whether it is on the field itself, and
+    // whether it is on a result.
     val inField = remember { BooleanArray(1) }
+    val onField = remember { BooleanArray(1) }
     val inResults = remember { BooleanArray(1) }
     fun close(focused: Boolean) { refocus = focused; adding = false }
     fun take(hit: WorldClock.Hit?, focused: Boolean) {
@@ -264,11 +270,14 @@ private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now
     }
     // The arrows walk the menu from the field as from any other control: Down to the first result that can be taken
     // (and Up from there back to the field), else on to whatever is under the field; Up to what is above it.
-    Box(Modifier.onFocusChanged { inField[0] = it.hasFocus }.onPreviewKeyEvent { e ->
+    Box(Modifier.onFocusChanged { inField[0] = it.hasFocus; onField[0] = it.isFocused }.onPreviewKeyEvent { e ->
         val down = e.type == KeyEventType.KeyDown
         when (e.key) {
             Key.DirectionDown -> { if (down) { if (free != null) runCatching { first.requestFocus() } else focus.moveFocus(FocusDirection.Down) }; true }
             Key.DirectionUp -> { if (down) focus.moveFocus(FocusDirection.Up); true }
+            // Enter on the × inside the field closes the search, as a click on it does. The field sees the keys of what is
+            // inside it before the × does and takes Enter for its own, which would add the first result instead.
+            Key.Enter, Key.NumPadEnter -> if (inField[0] && !onField[0]) { if (down) close(focused = true); true } else false
             else -> false
         }
     }) {

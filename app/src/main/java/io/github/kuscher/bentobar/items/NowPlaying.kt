@@ -124,6 +124,8 @@ object NowPlaying {
     private var accessReadAt = 0L
     private var audible = false
     private var staged: Playing? = null
+    /** How far a test's staged clock ran ahead when the players' positions were last stamped by it ([publish]); 0 in every release. */
+    private var aheadThen = 0L
     private val players = ArrayList<Player>()
     private val labels = HashMap<String, String>()
 
@@ -186,7 +188,8 @@ object NowPlaying {
         }
         // The listener was asked for and hasn't come: stop saying "Starting…" and go on without the titles.
         if (askedToBind && !listening && !refused && NowPlayingRules.due(Now.elapsed(), startingSince, STARTING_MS, slackMs = 0)) { refused = true; publish() }
-        if (was != audible || before != accessOn) publish()
+        // A test moved the staged clock (debug builds): positions stamped by the old one would be off by as much until a player spoke again.
+        if (was != audible || before != accessOn || Now.ahead != aheadThen) publish()
     }
 
     // ---- access
@@ -301,6 +304,7 @@ object NowPlaying {
     }
 
     private fun publish() {
+        aheadThen = Now.ahead
         staged?.let { current.value = it; return }
         if (!started) { current.value = Playing(); return }
         val readable = accessOn && listening

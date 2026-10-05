@@ -340,7 +340,9 @@ object FlightText {
 
     /**
      * The flight as one line for the clipboard, with absolute times and whatever is not known left out:
-     * "LH 455 SFO → FRA · Leaves 3:05 PM · Delayed 25 min · Gate G13 · Lands Sat 10:50 AM".
+     * "LH 455 SFO → FRA · Leaves 3:05 PM · Delayed 25 min · Gate G13 · Lands Sat 10:50 AM". Of a flight
+     * past its time to leave, with no word that it left, the line says what the card's [headline] says
+     * ("Leaves in 1 min", then "No update"), so the two cannot disagree about a time that is over.
      */
     private fun copied(l: Look, headline: String, badge: String?): String {
         val v = l.v
@@ -350,7 +352,10 @@ object FlightText {
         val lands = f.to.time?.let { v.say(Word.FLIGHT_COPY_LANDS, l.at(it)) }
         val parts = when (l.row.phase) {
             Phase.CANCELED, Phase.DIVERTED, Phase.TIMETABLE -> listOf(head, headline)
-            Phase.AHEAD, Phase.SOON -> if (l.silent) listOf(head, headline) else listOfNotNull(head, f.from.time?.let { v.say(Word.FLIGHT_LEAVES_AT, l.at(it)) }, badge, l.where.gate?.let { v.say(Word.FLIGHT_BAR_GATE, it) }, lands)
+            // Past its time with no word that it left, the line says what the headline says: "Leaves in 1 min", then "No update".
+            Phase.AHEAD, Phase.SOON -> if (l.silent) listOf(head, headline) else listOfNotNull(head,
+                if (FlightRules.overdue(f, l.now)) headline else f.from.time?.let { v.say(Word.FLIGHT_LEAVES_AT, l.at(it)) },
+                badge, l.where.gate?.let { v.say(Word.FLIGHT_BAR_GATE, it) }, lands)
             Phase.IN_AIR -> listOfNotNull(head, left, badge, lands)
             Phase.LANDED -> listOfNotNull(head, left, f.to.time?.let { v.say(Word.FLIGHT_BAR_LANDED_AT, l.at(it)) } ?: v.say(Word.FLIGHT_LANDED), badge, l.where.belt?.let { v.say(Word.FLIGHT_BELT, it) })
         }

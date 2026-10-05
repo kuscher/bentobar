@@ -83,6 +83,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.bar.Strip
@@ -219,6 +220,9 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
         override fun placed(id: String, at: Rect) {}
     }
     val maxPx = with(LocalDensity.current) { 900.dp.roundToPx() }
+    // The preview is narrower than a status bar: what it has no room for is said under it, or an item
+    // that is in the list and not in the picture looks lost.
+    var dropped by remember { mutableStateOf(emptySet<String>()) }
     Column {
         Box(
             Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(18.dp))
@@ -233,7 +237,8 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 if (cfg.position == Position.LEFT) Spacer(Modifier.width(16.dp)) else Spacer(Modifier.weight(1f))
                 Strip(entries(visible), if (expanded) entries(hidden) else emptyList(), hidden.isNotEmpty(),
                     chevronAlways = hidden.isNotEmpty(), chevronReservePx = 0, expanded = expanded,
-                    chevronOnLeft = cfg.position != Position.LEFT, look = look, maxWidthPx = maxPx, heightDp = 52.dp, events = events)
+                    chevronOnLeft = cfg.position != Position.LEFT, look = look, maxWidthPx = maxPx, heightDp = 52.dp, events = events,
+                    onOverflow = { dropped = it })
                 if (cfg.position == Position.LEFT) Spacer(Modifier.weight(1f)) else if (cfg.position == Position.CENTER) Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -244,7 +249,8 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 }
             }
         }
-        Text(stringResource(if (hidden.isNotEmpty()) R.string.bar_preview_hint_hidden else R.string.bar_preview_hint),
+        val hint = stringResource(if (hidden.isNotEmpty()) R.string.bar_preview_hint_hidden else R.string.bar_preview_hint)
+        Text(if (dropped.isEmpty()) hint else hint + " " + pluralStringResource(R.plurals.bar_preview_more, dropped.size, dropped.size),
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 6.dp, top = 6.dp))
     }

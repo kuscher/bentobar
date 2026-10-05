@@ -405,6 +405,10 @@
     <string name="bar_placeholder_text">Or right-click an item in the status bar.</string>
     <string name="bar_preview_hint">Preview. Click an item to edit it.</string>
     <string name="bar_preview_hint_hidden">Preview. Click an item to edit it, and ‹ to show hidden items.</string>
+    <plurals name="bar_preview_more">
+        <item quantity="one">%1$d more item doesn\'t fit in this preview.</item>
+        <item quantity="other">%1$d more items don\'t fit in this preview.</item>
+    </plurals>
     <string name="section_shown">In the bar</string>
     <string name="section_shown_help">Left to right, as they appear</string>
     <string name="section_hidden_reveal_both">Click ‹ or hover over BentoBar to see them.</string>
@@ -531,7 +535,7 @@
     <string name="setup_online_text">Two items go online, and only after you set them up: Weather asks Open-Meteo, Flight asks AirLabs with your own key. Everything else stays offline.</string>
     <string name="setup_online_weather">Weather (Open-Meteo)</string>
     <string name="setup_online_flights">Flights (AirLabs)</string>
-    <string name="setup_online_weather_first">Set up a Weather item first</string>
+    <string name="setup_online_weather_first">Search for a city in a Weather item first</string>
     <string name="setup_online_flights_first">Save an AirLabs key in a Flight item first</string>
     <string name="setup_online_off_note">Off stops requests at once and deletes what was fetched.</string>
     <string name="about_version">BentoBar %1$s</string>

@@ -186,8 +186,9 @@ object NowPlaying {
             // Android has let the listener go with the access; given again, it is asked for afresh.
             if (askedToBind) { askedToBind = false; MediaAccess.release() }
         }
-        // The listener was asked for and hasn't come: stop saying "Starting…" and go on without the titles.
-        if (askedToBind && !listening && !refused && NowPlayingRules.due(Now.elapsed(), startingSince, STARTING_MS, slackMs = 0)) { refused = true; publish() }
+        // "Starting…" has stood for three seconds: the listener that was asked for hasn't brought the players, so go on without
+        // the titles. The published value is what counts, not the steps that led to it: none of them can leave it standing.
+        if (staged == null && current.value.starting && NowPlayingRules.due(Now.elapsed(), startingSince, STARTING_MS, slackMs = 0)) { refused = !listening; publish() }
         // A test moved the staged clock (debug builds): positions stamped by the old one would be off by as much until a player spoke again.
         if (was != audible || before != accessOn || Now.ahead != aheadThen) publish()
     }
@@ -210,8 +211,12 @@ object NowPlaying {
     /** The listener would be of use right now: [MediaAccess] leaves again at once when it isn't. */
     internal fun wantsListener(): Boolean = started && askedToBind
 
-    /** The bound listener reports in: try the sessions again. Any thread. */
-    internal fun listenerConnected() { main.post { if (started && accessOn && !listening) { refused = false; listen() } } }
+    /**
+     * The bound listener reports in: try the sessions again, and publish what came of it. A device may
+     * refuse the list to the running listener too: without a new value then, "Starting…" would stand
+     * until something else changed. Any thread.
+     */
+    internal fun listenerConnected() { main.post { if (started && accessOn && !listening) { refused = false; listen(); publish() } } }
 
     // ---- the sessions
 
@@ -284,12 +289,16 @@ object NowPlaying {
             }
             p.callback = cb
             runCatching { c.registerCallback(cb, main) }
+            // Whether it plays is asked here and now (a short question to Android itself), so the first value published
+            // holds every player's state. Asked in the background, each answer came in a post of its own: for some frames
+            // after the bar came back nothing was "playing", and of two playing players the one answered last counted as
+            // the one that started last. Now they are all first seen at one moment, and the system's order stands.
+            p.playback = runCatching { c.playbackState }.getOrNull()
             players += p
-            // What it plays right now is asked off the main thread (metadata can carry a large picture).
+            // What it plays is asked off the main thread: metadata can carry a large picture.
             work.execute {
-                val playback = runCatching { c.playbackState }.getOrNull()
                 val metadata = runCatching { c.metadata }.getOrNull()
-                main.post { if (p in players) { if (p.playback == null) p.playback = playback; if (p.metadata == null) p.metadata = metadata; changed() } }
+                main.post { if (p in players) { if (p.metadata == null) p.metadata = metadata; changed() } }
             }
         }
         // Keep the system's order (the most important player first) as the tie-break.

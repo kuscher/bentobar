@@ -181,6 +181,23 @@ class WeatherReplyTest {
         assertNull(WeatherRules.read("[".repeat(20_000), zurichPlace, fetched))
     }
 
+    @Test fun theLargestReplyTheRequestHelperLetsThroughIsReadOrRefusedNeverACrash() {
+        // 256 KB at most arrive. Nested as deep as that allows, or as wide: no forecast, and no crash.
+        val max = 256 * 1024
+        assertNull(WeatherRules.read("[".repeat(max), zurichPlace, fetched))
+        assertNull(WeatherRules.read("{\"current\":".repeat(max / 11), zurichPlace, fetched))
+        assertNull(WeatherRules.cities("{\"results\":[".repeat(max / 12)))
+        assertNull(WeatherRules.cities("[".repeat(max)))
+        val wide = "{\"current\":{\"temperature_2m\":3,\"weather_code\":" + "9".repeat(max - 100) + "},\"hourly\":{\"time\":[" + "1,".repeat(1000) + "1]}}"
+        val r = WeatherRules.read(wide, zurichPlace, fetched)!!
+        assertNull(r.current!!.code) // a number of a quarter of a million digits is no weather code
+        assertEquals(3.0, r.current!!.temp!!, 1e-9)
+        assertTrue(r.hours.size <= WeatherRules.MAX_HOURS)
+        val long = "x".repeat(max - 200)
+        val places = WeatherRules.cities("{\"results\":[{\"name\":\"$long\",\"latitude\":1,\"longitude\":2,\"admin1\":\"$long\"}]}")!!
+        assertEquals(WeatherRules.NAME_CHARS, places.single().name.length)
+    }
+
     @Test fun aReplyOfTheRightShapeWithLittleInItIsStillAReading() {
         val r = WeatherRules.read("{\"current\":{\"time\":1791191700,\"temperature_2m\":3},\"hourly\":\"none\",\"daily\":{\"time\":7}}", zurichPlace, fetched)!!
         assertEquals(3.0, r.current!!.temp!!, 1e-9)

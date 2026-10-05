@@ -270,7 +270,9 @@ object WeatherRules {
 
     /**
      * [text] as one line of at most [max] characters: line breaks, tabs and other control characters
-     * become single spaces. Never more work than a few times what can stay, whatever comes in.
+     * become single spaces, and the characters that override the direction of the text after them
+     * are taken out (a label must not turn the bar's own numbers around). What a script needs to
+     * join or part its letters stays. Never more work than a few times what can stay, whatever comes in.
      */
     fun oneLine(text: String, max: Int): String {
         var head = if (text.length > max * 32) text.substring(0, max * 32) else text
@@ -278,8 +280,12 @@ object WeatherRules {
         val flat = StringBuilder(head.length)
         var gap = false
         for (c in head) {
-            if (c.isWhitespace() || c.isISOControl() || c.code == 0x2028 || c.code == 0x2029) gap = flat.isNotEmpty()
-            else { if (gap) flat.append(' '); flat.append(c); gap = false }
+            when {
+                // Embeddings, overrides and isolates, with their ends.
+                c.code in 0x202A..0x202E || c.code in 0x2066..0x2069 -> {}
+                c.isWhitespace() || c.isISOControl() || c.code == 0x2028 || c.code == 0x2029 -> gap = flat.isNotEmpty()
+                else -> { if (gap) flat.append(' '); flat.append(c); gap = false }
+            }
         }
         return first(flat.toString(), max).trimEnd()
     }

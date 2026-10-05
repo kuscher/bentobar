@@ -561,6 +561,22 @@ class WeatherRulesTest {
         assertNull(WeatherRules.look(item("label" to " \n "), true, true, 2).label)
     }
 
+    @Test fun textFromOutsideCannotTurnTheBarsTextAround() {
+        // The characters that override the direction of what follows them are taken out of a label and of a name, from a
+        // layout or from the service. What a script needs to join or part its letters stays.
+        val overrides = listOf(0x202A, 0x202B, 0x202C, 0x202D, 0x202E, 0x2066, 0x2067, 0x2068, 0x2069).joinToString("") { String(Character.toChars(it)) }
+        assertEquals("SF", WeatherRules.label(overrides.take(5) + "S" + overrides + "F"))
+        assertEquals("", WeatherRules.label(overrides))
+        val l = WeatherRules.look(item("city" to String(Character.toChars(0x202E)) + "Zurich", "label" to String(Character.toChars(0x2067)) + "ZRH"), true, true, 2)
+        assertEquals("Zurich", l.city)
+        assertEquals("ZRH", l.label)
+        val joiner = String(Character.toChars(0x200C))
+        assertEquals("a${joiner}b", WeatherRules.label("a${joiner}b"))
+        // A name in a script written from the right is a name like any other.
+        assertEquals("تهران", WeatherRules.oneLine(" تهران ", 80))
+        assertEquals("72° · Rain", bar(reading(code = 63), look(label = WeatherRules.label(overrides + "Lake Tahoe West"))).text)
+    }
+
     @Test fun aLabelIsCutBetweenCharactersNeverInsideOne() {
         assertEquals("SF", WeatherRules.label("SF"))
         assertEquals("", WeatherRules.label("   "))

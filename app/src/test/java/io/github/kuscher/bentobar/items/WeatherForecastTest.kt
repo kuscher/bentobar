@@ -245,6 +245,35 @@ class WeatherForecastTest {
         assertEquals("High 78° · Low 61°", m.highLow)
     }
 
+    @Test fun onTheNightTheClocksChangeTheDaysAndHoursStayRight() {
+        // Zurich, Sunday 25 October 2026: at 3:00 the clocks go back to 2:00, so the day has 25 hours and 2 AM comes twice.
+        val zurich = ZoneId.of("Europe/Zurich")
+        fun day(d: Int) = ZonedDateTime.of(2026, 10, d, 0, 0, 0, 0, zurich).toEpochSecond()
+        val midnight = day(25)
+        assertEquals(25 * 3600L, day(26) - midnight)
+        val r = Reading(place = "47.37,8.55", fetchedAt = midnight * 1000, zone = "Europe/Zurich", offsetSec = 7200,
+            current = Current(midnight, 10.0, 9.0, 3, false, 5.0),
+            hours = (0 until 24).map { Hour(midnight + it * 3600L, 10.0, 0, 3, false) },
+            days = (24..30).map { d -> Day(day(d), 3, 10.0 + d, d.toDouble(), 0, day(d) + 8 * 3600, day(d) + 17 * 3600) })
+        val here = WeatherFileWords.times(zurich)
+        val metric = look(fahrenheit = false)
+        // 0:30: an hour and a half before the change.
+        val before = WeatherRules.menu(r, metric, (midnight + 1800) * 1000, w, here)
+        assertEquals("High 35° · Low 25°", before.highLow)
+        assertEquals(listOf("Mon", "Tue", "Wed", "Thu", "Fri"), before.days.map { it.day })
+        assertEquals(listOf("1 AM", "2 AM", "2 AM", "3 AM", "4 AM", "5 AM"), before.hours.map { it.time })
+        // 2:30 for the second time, and the last minute of the long day: still Sunday, the same today and the same tomorrow.
+        for (later in listOf(3 * 3600L + 1800, 25 * 3600L - 60)) {
+            val m = WeatherRules.menu(r.copy(fetchedAt = (midnight + later) * 1000), metric, (midnight + later) * 1000, w, here)
+            assertEquals("High 35° · Low 25°", m.highLow)
+            assertEquals("Mon", m.days.first().day)
+        }
+        // And the first minute of Monday.
+        val monday = WeatherRules.menu(r, metric, day(26) * 1000 + 60_000, w, here)
+        assertEquals("High 36° · Low 26°", monday.highLow)
+        assertEquals("Tue", monday.days.first().day)
+    }
+
     @Test fun fewerHoursThanSixAreFewerCellsAndNeverPastOnes() {
         val late = menu(at = at(17, 30)) // read at 2:40 PM, looked at 5:30 PM: 6, 7, 8 and 9 PM are left
         assertEquals(listOf("6 PM", "7 PM", "8 PM", "9 PM"), late.hours.map { it.time })

@@ -27,10 +27,16 @@ object Units {
      * Android's answer: the user's regional preference (Android 14 and later: Settings › System ›
      * Languages › Regional preferences), else the locale's own unit.
      */
-    fun systemFahrenheit(): Boolean = fahrenheit(
-        runCatching { LocalePreferences.getTemperatureUnit() }.getOrNull(),
-        Locale.getDefault().country,
-    )
+    fun systemFahrenheit(): Boolean {
+        // Asked once a second by an item that shows a temperature, and the library builds a number
+        // formatter each time: the answer is kept per locale. A changed regional preference is a
+        // changed default locale (its unit rides in the locale's extension), so it is asked again then.
+        val locale = Locale.getDefault(Locale.Category.FORMAT)
+        system?.let { (asked, answer) -> if (asked == locale) return answer }
+        return fahrenheit(runCatching { LocalePreferences.getTemperatureUnit() }.getOrNull(), locale.country).also { system = locale to it }
+    }
+
+    @Volatile private var system: Pair<Locale, Boolean>? = null
 
     /** [unit]: what Android said ("celsius", "fahrenhe", "kelvin", or nothing); [country]: the locale's, for when it said nothing. */
     fun fahrenheit(unit: String?, country: String): Boolean = when (unit) {

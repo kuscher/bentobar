@@ -79,10 +79,13 @@ object CpuItem : ItemType("cpu", R.string.item_cpu_title, Sym.MEMORY, R.string.i
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { _, host ->
         rememberTick()
         val c = Env.cpu
-        androidx.compose.runtime.DisposableEffect(Unit) { c.detail++; menus++; onDispose { c.detail--; menus-- } }
-        // The battery's sampler reads the thermal status for this menu from the next tick on. One reading now,
-        // so that the "Heat" row doesn't open on a status from the last time anything looked.
-        androidx.compose.runtime.remember { Heat.look() }
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            c.detail++; menus++
+            // The battery's sampler reads the thermal status for this menu from the next tick on. One reading now, and the
+            // menu drawn again with it, so that the "Heat" row doesn't stand on a status from the last time anything looked.
+            Heat.look(); Ticker.refresh(type)
+            onDispose { c.detail--; menus-- }
+        }
         MenuCard(Sym.MEMORY, stringResource(R.string.cpu_menu_title),
             if (c.available) pluralStringResource(R.plurals.cpu_menu_subtitle, c.perCore.size, Fmt.percent(c.total), c.perCore.size)
             else stringResource(R.string.cpu_menu_unavailable)) {

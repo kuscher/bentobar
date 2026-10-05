@@ -15,9 +15,9 @@ class DevicesRulesTest {
     private val text = HeatDevicesStrings("strings_devices.xml", "strings.xml")
     private val words = DevicesRules.Words(
         none = { text["devices_none"] },
-        level = { name, percent -> text.format("devices_desc", name, percent) },
-        low = { name, percent -> text.format("devices_desc_low", name, percent) },
-        charging = { name, percent -> text.format("devices_desc_charging", name, percent) },
+        level = { name, percent -> text.plural("devices_desc", percent, name, percent) },
+        low = { name, percent -> text.plural("devices_desc_low", percent, name, percent) },
+        charging = { name, percent -> text.plural("devices_desc_charging", percent, name, percent) },
         unknown = { name -> text.format("devices_desc_unknown", name) },
         unnamed = { text["common_unknown"] },
     )
@@ -462,15 +462,26 @@ class DevicesRulesTest {
             "devices_note" to "Mice, keyboards, styluses and game controllers that tell Android their battery level. Headphones aren't included: " +
                 "reading their level would take Bluetooth access, which BentoBar doesn't ask for.",
             "devices_bluetooth_settings" to "Bluetooth settings",
+            "devices_desc_unknown" to "%1\$s, battery level unknown",
+        )
+        // Sentences with a number in them are plurals, as everywhere in the app; in English both forms read alike.
+        val counted = mapOf(
             "devices_desc" to "%1\$s battery %2\$d percent",
             "devices_desc_low" to "%1\$s battery %2\$d percent, low",
             "devices_desc_charging" to "%1\$s battery %2\$d percent, charging",
-            "devices_desc_unknown" to "%1\$s, battery level unknown",
         )
         val own = HeatDevicesStrings("strings_devices.xml")
         for ((name, words) in deck) assertEquals(name, words, own[name])
+        for ((name, words) in counted) assertEquals(name, words to words, own.forms(name))
         assertEquals("%1\$d device" to "%1\$d devices", own.forms("devices_count"))
-        assertEquals("the file holds the copy deck's strings and no other", deck.keys + "devices_count", own.names)
+        assertEquals("the file holds the copy deck's strings and no other", deck.keys + counted.keys + "devices_count", own.names)
+    }
+
+    @Test fun aLevelOfOnePercentReadsAsTheOthersDo() {
+        assertEquals("MX Master 3S battery 1 percent, low", DevicesRules.desc(mouse(1), words))
+        assertEquals("MX Master 3S battery 1 percent, charging", DevicesRules.desc(mouse(1, charging = true), words))
+        assertEquals("MX Master 3S battery 0 percent, low", DevicesRules.desc(mouse(0), words))
+        assertEquals("MX Master 3S battery 100 percent", DevicesRules.desc(mouse(100), words))
     }
 
     @Test fun theMenusWords() {

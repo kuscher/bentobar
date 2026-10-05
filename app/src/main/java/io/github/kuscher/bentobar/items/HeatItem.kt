@@ -54,7 +54,7 @@ object HeatItem : ItemType("heat", R.string.item_heat_title, Sym.DEVICE_THERMOST
         thermal = { step -> Env.str(Heat.words(step)) },
         tempWord = { temp, word -> Env.str(R.string.heat_bar_temp_word, temp, word) },
         desc = { thermal -> Env.str(R.string.heat_desc, thermal) },
-        descTemp = { thermal, degrees -> Env.str(R.string.heat_desc_temp, thermal, degrees) },
+        descTemp = { thermal, degrees -> Env.plural(R.plurals.heat_desc_temp, degrees, thermal, degrees) },
     )
 
     override fun onIdle() = Heat.idle()

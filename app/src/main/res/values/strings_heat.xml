@@ -25,7 +25,12 @@
     <string name="heat_temp_f">%1$s °F</string>
     <string name="heat_cpu_load">CPU load</string>
     <string name="heat_show_state">State</string>
-    <!-- Spoken: %1$s is the state in words ("Hot, slowing a little"), %2$d the battery's temperature in the user's unit. -->
+    <!-- Spoken: %1$s is the state in words ("Hot, slowing a little"). -->
     <string name="heat_desc">Heat: %1$s</string>
-    <string name="heat_desc_temp">Heat: %1$s, battery %2$d degrees</string>
+
+    <!-- Spoken with the temperature shown: %2$d is the battery's temperature in the user's unit (and the count). -->
+    <plurals name="heat_desc_temp">
+        <item quantity="one">Heat: %1$s, battery %2$d degree</item>
+        <item quantity="other">Heat: %1$s, battery %2$d degrees</item>
+    </plurals>
 </resources>

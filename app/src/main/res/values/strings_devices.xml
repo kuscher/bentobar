@@ -11,14 +11,24 @@
     <string name="devices_level_charging">%1$s · Charging</string>
     <string name="devices_unknown">Level unknown</string>
     <string name="devices_bluetooth_settings">Bluetooth settings</string>
-    <!-- Spoken, for the bar and for each row: %1$s is the device's name, %2$d its level. -->
-    <string name="devices_desc">%1$s battery %2$d percent</string>
-    <string name="devices_desc_low">%1$s battery %2$d percent, low</string>
-    <string name="devices_desc_charging">%1$s battery %2$d percent, charging</string>
+    <!-- Spoken, for the bar and for a row, where a battery doesn't say its level: %1$s is the device's name. -->
     <string name="devices_desc_unknown">%1$s, battery level unknown</string>
 
     <plurals name="devices_count">
         <item quantity="one">%1$d device</item>
         <item quantity="other">%1$d devices</item>
+    </plurals>
+    <!-- Spoken, for the bar and for each row: %1$s is the device's name, %2$d its level (which is the count). -->
+    <plurals name="devices_desc">
+        <item quantity="one">%1$s battery %2$d percent</item>
+        <item quantity="other">%1$s battery %2$d percent</item>
+    </plurals>
+    <plurals name="devices_desc_low">
+        <item quantity="one">%1$s battery %2$d percent, low</item>
+        <item quantity="other">%1$s battery %2$d percent, low</item>
+    </plurals>
+    <plurals name="devices_desc_charging">
+        <item quantity="one">%1$s battery %2$d percent, charging</item>
+        <item quantity="other">%1$s battery %2$d percent, charging</item>
     </plurals>
 </resources>

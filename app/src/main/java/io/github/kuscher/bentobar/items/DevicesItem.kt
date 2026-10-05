@@ -62,9 +62,9 @@ object DevicesItem : ItemType("devices", R.string.item_devices_title, Sym.MOUSE,
 
     private val words = DevicesRules.Words(
         none = { Env.str(R.string.devices_none) },
-        level = { name, percent -> Env.str(R.string.devices_desc, name, percent) },
-        low = { name, percent -> Env.str(R.string.devices_desc_low, name, percent) },
-        charging = { name, percent -> Env.str(R.string.devices_desc_charging, name, percent) },
+        level = { name, percent -> Env.plural(R.plurals.devices_desc, percent, name, percent) },
+        low = { name, percent -> Env.plural(R.plurals.devices_desc_low, percent, name, percent) },
+        charging = { name, percent -> Env.plural(R.plurals.devices_desc_charging, percent, name, percent) },
         unknown = { name -> Env.str(R.string.devices_desc_unknown, name) },
         unnamed = { Env.str(R.string.common_unknown) },
     )

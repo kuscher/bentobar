@@ -19,7 +19,7 @@ class HeatRulesTest {
         thermal = { step -> text[thermalWords[step]] },
         tempWord = { temp, word -> text.format("heat_bar_temp_word", temp, word) },
         desc = { thermal -> text.format("heat_desc", thermal) },
-        descTemp = { thermal, degrees -> text.format("heat_desc_temp", thermal, degrees) },
+        descTemp = { thermal, degrees -> text.plural("heat_desc_temp", degrees, thermal, degrees) },
     )
 
     private val none = 0
@@ -151,6 +151,12 @@ class HeatRulesTest {
         assertEquals("Heat: Normal, battery 34 degrees", temp(none, 34.0).desc)
         assertEquals("Heat: Normal, battery 93 degrees", temp(none, 34.0, fahrenheit = true).desc)
         assertEquals("Heat: Hot, slowing a little, battery 41 degrees", temp(moderate, 41.3).desc)
+    }
+
+    @Test fun oneDegreeIsNotOneDegrees() {
+        assertEquals("Heat: Normal, battery 1 degree", temp(none, 1.0).desc)
+        assertEquals("Heat: Normal, battery 2 degrees", temp(none, 2.0).desc)
+        assertEquals("Heat: Normal, battery 34 degrees", temp(none, 1.0, fahrenheit = true).desc) // 33.8 °F
     }
 
     @Test fun theTooltipIsTheMenusSubtitle() {
@@ -469,7 +475,6 @@ class HeatRulesTest {
             "heat_note_no_level" to "Android doesn't share CPU temperature or fan speed with apps.",
             "heat_show_state" to "State",
             "heat_desc" to "Heat: %1\$s",
-            "heat_desc_temp" to "Heat: %1\$s, battery %2\$d degrees",
         )
         val cpu = mapOf(
             "cpu_also_hot" to "Also show when the device runs hot",
@@ -483,7 +488,9 @@ class HeatRulesTest {
         val ownCpu = HeatDevicesStrings("strings_cpu.xml")
         for ((name, words) in heat) assertEquals(name, words, ownHeat[name])
         for ((name, words) in cpu) assertEquals(name, words, ownCpu[name])
-        assertEquals("strings_heat.xml holds the copy deck's strings and no other", heat.keys, ownHeat.names)
+        // The copy deck's sentence, as a plural: a battery at one degree is not at "1 degrees".
+        assertEquals("Heat: %1\$s, battery %2\$d degree" to "Heat: %1\$s, battery %2\$d degrees", ownHeat.forms("heat_desc_temp"))
+        assertEquals("strings_heat.xml holds the copy deck's strings and no other", heat.keys + "heat_desc_temp", ownHeat.names)
         assertEquals("strings_cpu.xml holds the copy deck's strings and no other", cpu.keys, ownCpu.names)
     }
 

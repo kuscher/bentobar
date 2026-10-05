@@ -75,7 +75,9 @@ object DevicesItem : ItemType("devices", R.string.item_devices_title, Sym.MOUSE,
      * it is the loader's background thread that asks.
      */
     private val readings = Background.refresher<Unit, List<Device>>(type, every = { _, _ -> DevicesRules.EVERY_MS }, load = { _, _ -> read() })
-    private val watch = DevicesWatch { readings.refresh(Unit, floorMs = DevicesRules.FLOOR_MS, afterRunning = true) }
+    // At most one reading a second, however often Android reports: one that can't be taken now (another is under
+    // way, or the last is under a second old) is asked for again on the next tick, never queued behind the other.
+    private val watch = DevicesWatch { !readings.loading(Unit) && readings.refresh(Unit, floorMs = DevicesRules.FLOOR_MS) }
     private val main = Handler(Looper.getMainLooper())
     private val listener = object : InputManager.InputDeviceListener {
         override fun onInputDeviceAdded(deviceId: Int) = changed()
@@ -161,13 +163,15 @@ object DevicesItem : ItemType("devices", R.string.item_devices_title, Sym.MOUSE,
 
     /**
      * The test hook (debug builds): `stage mouse=15 keyboard=85c stylus=?` shows these devices instead
-     * of the real ones (c: charging; ?: a battery without a level; `mouse:MX_Master_3S=8` to name one),
-     * `stage none` no device at all, `off` the real ones again. Without a word: what is shown now.
+     * of the real ones (c: charging; ? or `unknown`: a battery without a level; `mouse:MX_Master_3S=8`
+     * to name one), `stage none` no device at all, `off` the real ones again. Without a word: what is
+     * shown now.
      */
     override fun debug(args: List<String>): String? {
         when (args.firstOrNull()) {
             null -> return line()
-            "stage" -> staged = DevicesRules.staged(args.drop(1)) ?: return "devices stage none | KIND[:NAME]=LEVEL[c] …, for example mouse=15 keyboard:Keychron_K3=85c stylus=?"
+            "stage" -> staged = DevicesRules.staged(args.drop(1))
+                ?: return "devices stage none | KIND[:NAME]=LEVEL[c] …, for example mouse=15 keyboard:Keychron_K3=85c stylus=unknown"
             "off" -> { staged = null; changed() }
             else -> return null
         }

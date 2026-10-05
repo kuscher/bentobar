@@ -170,8 +170,9 @@ object DevicesRules {
 
     /**
      * The test hook's devices, from its words: `mouse=15 keyboard=85c stylus=?` (c: charging; ?: a
-     * battery without a level), with a name of its own after a colon where one is wanted, underscores
-     * for its spaces (`mouse:MX_Master_3S=8`). `none`: no device at all. Null: not understood.
+     * battery without a level, also written `unknown`, which no shell takes for a pattern), with a
+     * name of its own after a colon where one is wanted, underscores for its spaces
+     * (`mouse:MX_Master_3S=8`). `none`: no device at all. Null: not understood.
      */
     fun staged(tokens: List<String>): List<Device>? {
         if (tokens == listOf("none")) return emptyList()
@@ -181,7 +182,7 @@ object DevicesRules {
             val level = token.substringAfter('=', "")
             val kind = STAGED_KINDS[what.substringBefore(':').lowercase()] ?: return null
             val percent = when (val number = level.removeSuffix("c")) {
-                "?" -> null
+                "?", "unknown" -> null
                 else -> number.toIntOrNull()?.takeIf { it in 0..100 } ?: return null
             }
             val name = NowPlayingRules.oneLine(what.substringAfter(':', "").replace('_', ' '), NAME_MAX)

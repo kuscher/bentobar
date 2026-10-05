@@ -427,6 +427,14 @@ class DevicesRulesTest {
             Device("staged:2", "Pad", Kind.GAMEPAD, null, false)), staged)
     }
 
+    @Test fun aStagedBatteryWithoutALevelCanBeWrittenWithoutAQuestionMark() {
+        // A question mark is a pattern to the shell the hook is typed into.
+        val staged = DevicesRules.staged(listOf("stylus=unknown", "mouse=unknownc"))
+        assertEquals(listOf(Device("staged:1", "Mouse", Kind.MOUSE, null, true), Device("staged:0", "Stylus", Kind.STYLUS, null, false)), staged)
+        assertEquals(listOf(Device("staged:0", "Stylus", Kind.STYLUS, null, false)), DevicesRules.staged(listOf("stylus=?")))
+        assertEquals(DevicesRules.staged(listOf("stylus=?")), DevicesRules.staged(listOf("stylus=unknown")))
+    }
+
     @Test fun stagedDevicesComeInTheMenusOrder() {
         assertEquals(listOf(8, 85, null), DevicesRules.staged(listOf("stylus=?", "keyboard=85", "mouse=8"))?.map { it.percent })
     }
@@ -446,6 +454,14 @@ class DevicesRulesTest {
         assertNull(DevicesRules.staged(listOf("mouse=-5")))
         assertNull(DevicesRules.staged(listOf("mouse=fifteen")))
         assertNull(DevicesRules.staged(listOf("mouse=15", "none")))
+    }
+
+    @Test fun theCodeThatReadsDeviceNamesWritesNoLogLines() {
+        // A device's name can be a person's ("Alex's mouse"): it is shown, and written nowhere.
+        for (file in listOf("DevicesItem.kt", "DevicesRules.kt")) {
+            val code = java.io.File("src/main/java/io/github/kuscher/bentobar/items", file).readText()
+            for (way in listOf("Log.", "println(", "printStackTrace", "System.out", "System.err")) assertFalse("$file has $way", way in code)
+        }
     }
 
     // ---- the words, as the copy deck has them

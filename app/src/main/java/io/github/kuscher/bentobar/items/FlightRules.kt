@@ -539,6 +539,19 @@ object FlightRules {
     /** How long after an ask the next one by hand has to wait: two minutes, or ten seconds after a try that reached nobody. */
     fun byHand(t: Tracked): Long = AirLabs.keep(t.failure).toMillis()
 
+    /**
+     * Whether a new key is what [t] waits for. The old one was refused or used up, which the menu says
+     * until the service is asked again; or it had so few lookups left that a flight which had its turn
+     * was not asked about. Saving a key asks about such a flight at once. One that is followed as
+     * planned keeps its turn, new key or not, and one that is over is left alone: a key is no reason
+     * to ask.
+     */
+    fun waitsForKey(t: Tracked, now: Instant): Boolean = when {
+        !t.following || t.ended -> false
+        t.failure == AirLabs.Failure.REFUSED || t.failure == AirLabs.Failure.USED_UP -> true
+        else -> t.left != null && t.left < FEW && every(t.copy(left = null), now) != null
+    }
+
     /** When [f] is put away: [CLEARED] after it landed or was to land; for a flight nobody names a landing for, after it left or was to leave. */
     private fun clearedAt(f: Flight): Instant? = (f.to.time?.let(f.to::moment) ?: f.from.time?.let(f.from::moment))?.plus(CLEARED)
 

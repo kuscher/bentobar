@@ -278,11 +278,19 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         Ticker.refresh()
     }
 
-    /** Saves the user's key (which turns the service on), and asks at once about whatever is followed: a key that was refused is put right by a new one. */
+    /**
+     * Saves the user's key, which turns the service on. A flight that waited for one (the old key was
+     * refused or used up, or had too few lookups left) is asked about at once, if its item is in the
+     * bar; every other flight keeps its turn: a new key is no reason to ask.
+     */
     internal fun saveKey(key: String): Boolean {
         if (!Online.saveKey(online, key)) return false
         FlightLoad.newKey()
-        ids().forEach { tracker.refresh(it, afterRunning = true) }
+        val now = Instant.ofEpochMilli(Now.wall())
+        for (item in Store.config.value.items) {
+            if (item.type != type || item.section == Section.OFF) continue
+            if (tracker.peek(item.id)?.let { FlightRules.waitsForKey(it, now) } == true) tracker.refresh(item.id, afterRunning = true)
+        }
         Ticker.refresh()
         return true
     }

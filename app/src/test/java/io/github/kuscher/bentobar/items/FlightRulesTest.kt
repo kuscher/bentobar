@@ -399,6 +399,29 @@ class FlightRulesTest {
         assertEquals(30 * min, every(tracked(air, "2026-10-02T02:00:00Z", left = null), "2026-10-02T02:00:00Z"))
     }
 
+    @Test fun aNewKeyAsksAtOnceOnlyAboutAFlightThatWaitedForOne() {
+        val now = at("2026-10-02T02:00:00Z")
+        val t = tracked(flight("flight-LH455-in-the-air"), "2026-10-02T02:00:00Z")
+        // Followed as planned, it keeps its turn, new key or not. So does one that only found no connection.
+        assertFalse(FlightRules.waitsForKey(t, now))
+        assertFalse(FlightRules.waitsForKey(t.copy(left = 20), now))
+        assertFalse(FlightRules.waitsForKey(t.copy(left = null), now))
+        assertFalse(FlightRules.waitsForKey(t.copy(failure = Failure.OFFLINE, failures = 3), now))
+        // The old key was refused or used up: the menu says so until the service is asked again.
+        assertTrue(FlightRules.waitsForKey(t.copy(failure = Failure.REFUSED), now))
+        assertTrue(FlightRules.waitsForKey(t.copy(failure = Failure.USED_UP), now))
+        assertTrue(FlightRules.waitsForKey(t.copy(flight = null, failure = Failure.REFUSED), now))
+        // Or it had too few lookups left to ask unasked, where there was something to ask.
+        assertTrue(FlightRules.waitsForKey(t.copy(left = 19), now))
+        assertTrue(FlightRules.waitsForKey(t.copy(left = 19, failure = Failure.NO_ANSWER, failures = 2), now))
+        assertTrue(FlightRules.waitsForKey(t.copy(flight = null, left = 0, failure = Failure.OFFLINE, failures = 1), now))
+        assertFalse(FlightRules.waitsForKey(tracked(flight("flight-LH96-landed"), "2026-10-02T07:29:00Z", left = 19), at("2026-10-02T07:30:00Z")))
+        // No key brings back a flight the service has gone on from, and an item that follows nothing has nothing to ask.
+        assertFalse(FlightRules.waitsForKey(t.copy(left = 19, ended = true), now))
+        assertFalse(FlightRules.waitsForKey(t.copy(failure = Failure.REFUSED, ended = true), now))
+        assertFalse(FlightRules.waitsForKey(Tracked(), now))
+    }
+
     @Test fun inTheLastHourBeforeItLeavesAndTheLastHalfHourBeforeItLandsEveryTenMinutes() {
         val planned = flight("flight-LH454-planned")                              // leaves 08:25 UTC
         val t = tracked(planned, "2026-10-02T07:00:00Z")

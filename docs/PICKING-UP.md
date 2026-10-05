@@ -21,6 +21,8 @@ commit at every milestone.
 
 ## 0.9 (2026-10-05): six new things for the bar, and the internet permission for two of them
 Merged as pull request #17 and released as 0.9 (version code 10) from the tag `v0.9`; the next release needs a new version.
+Sent to Google Play the same day, for closed testing and production, with the new Data safety answers and a new
+declaration video (`store-submission/forms/data-safety.md` has what was declared).
 Five new items and three additions to old ones: Now playing, Device batteries, Heat (and a CPU rule),
 Weather, Flight; more cities and "Plan a time" in World clock; a volume slider in the bar. Two of them
 go online (Weather: Open-Meteo; Flight: AirLabs with the user's own key), each only after its item was

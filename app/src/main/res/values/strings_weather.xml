@@ -83,6 +83,8 @@
     <string name="weather_desc_short">%1$s: %2$s.</string>
     <string name="weather_desc_soon">%1$s likely at %2$s.</string>
     <string name="weather_desc_now">%1$s now.</string>
+    <!-- While the hour that is running is the likely one: the bar then says what is likely and no time. -->
+    <string name="weather_likely_now_desc">%1$s likely this hour.</string>
     <string name="weather_desc_not_set_up">Weather: not set up</string>
     <string name="weather_desc_loading">Weather: loading</string>
     <string name="weather_desc_off">Weather: off</string>

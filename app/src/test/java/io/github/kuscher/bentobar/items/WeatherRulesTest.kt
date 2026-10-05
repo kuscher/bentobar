@@ -103,18 +103,81 @@ class WeatherRulesTest {
         assertEquals("72° · Rain 2 PM", b.text)
         assertEquals("San Francisco: 72 degrees. Partly cloudy. Rain likely at 2 PM.", b.desc)
         assertTrue(b.active)
-        assertEquals(at(14) / 1000, WeatherRules.begins(WeatherRules.coming(r, at(13, 30), 2)!!))
-        // At 2:10 PM that hour is running. It is the present, which the sky of this minute speaks for: no time is announced for it.
-        val running = bar(r, now = at(14, 10))
-        assertEquals("72°", running.text)
-        assertFalse(running.active)
-        assertEquals("San Francisco: 72 degrees. Partly cloudy.", running.desc)
-        assertNull(WeatherRules.coming(r, at(14, 0), 2))
+        assertEquals(at(14) / 1000, WeatherRules.begins(WeatherRules.likely(r, at(13, 30), 2)!!))
         // The rule's two hours are counted to where the wet hour begins: at noon that is two hours off, a minute earlier it is more.
         val early = r.copy(fetchedAt = at(11, 50))
         assertTrue(bar(early, now = at(12, 0)).active)
         assertEquals("72° · Rain 2 PM", bar(early, now = at(12, 0)).text)
         assertFalse(bar(early, now = at(11, 59)).active)
+    }
+
+    @Test fun aLikelyHourThatIsRunningKeepsTheItemOutAndIsSaidWithoutATime() {
+        // 80% in the entry of 3 PM: rain is likely between 2 and 3, and nothing else is coming.
+        val r = reading().let { it.copy(hours = it.hours.map { h -> if (h.at == at(15) / 1000) h.copy(chance = 80, code = 61) else h }) }
+        // 1:30 PM: it is coming, and has its time.
+        assertEquals("72° · Rain 2 PM", bar(r, now = at(13, 30)).text)
+        assertEquals("72° · Rain 2 PM", bar(r, now = at(13, 59)).text)
+        // From 2:00 to 3:00 the hour is running. The warning does not go at the moment rain is nearest: the item stays
+        // out, says what is likely and no time, and says so aloud.
+        for (now in listOf(at(14, 0), at(14, 10), at(14, 59))) {
+            val b = bar(r, now = now)
+            assertEquals("72° · Rain", b.text)
+            assertEquals("San Francisco: 72 degrees. Partly cloudy. Rain likely this hour.", b.desc)
+            assertTrue(b.active)
+            assertEquals(Tone.ACCENT, b.tone)
+            assertEquals(Sym.RAINY, b.icon)
+            assertEquals(at(14) / 1000, WeatherRules.begins(WeatherRules.likely(r, now, 2)!!))
+        }
+        // After 3:00 it is over.
+        for (now in listOf(at(15, 0), at(15, 1), at(15, 30))) {
+            val b = bar(r, now = now)
+            assertEquals("72°", b.text)
+            assertEquals("San Francisco: 72 degrees. Partly cloudy.", b.desc)
+            assertFalse(b.active)
+            assertEquals(Tone.NORMAL, b.tone)
+            assertEquals(Sym.PARTLY_CLOUDY_DAY, b.icon)
+            assertNull(WeatherRules.likely(r, now, 2))
+        }
+    }
+
+    @Test fun theHourThatIsRunningBesideTheOtherRules() {
+        // Likely between 1 and 2 PM, and it is 1:30: "likely within N hours" includes this hour, whatever N is.
+        val r = reading(hours = listOf(Triple(13, 80, 61)))
+        for (hours in listOf(1, 2, 12)) {
+            val b = bar(r, look(rainHours = hours))
+            assertEquals("72° · Rain", b.text)
+            assertTrue(b.active)
+            assertEquals(Tone.ACCENT, b.tone)
+        }
+        // Under fifty percent it is not likely.
+        assertFalse(bar(reading(hours = listOf(Triple(13, 49, 61)))).active)
+        assertEquals("72°", bar(reading(hours = listOf(Triple(13, 49, 61)))).text)
+        // Snow; and a storm, which warns as a storm does.
+        val snow = bar(reading(hours = listOf(Triple(13, 70, 73))))
+        assertEquals("72° · Snow", snow.text)
+        assertEquals("San Francisco: 72 degrees. Partly cloudy. Snow likely this hour.", snow.desc)
+        assertEquals(Sym.WEATHER_SNOWY, snow.icon)
+        val storm = bar(reading(hours = listOf(Triple(13, 70, 95))))
+        assertEquals("72° · Storm", storm.text)
+        assertEquals("San Francisco: 72 degrees. Partly cloudy. Storm likely this hour.", storm.desc)
+        assertEquals(Tone.WARN, storm.tone)
+        // The hour after it is likely too: the first is the one that is running, so there is still no time.
+        assertEquals("72° · Rain", bar(reading(hours = listOf(Triple(13, 80, 61), Triple(14, 90, 95)))).text)
+        // This hour dry and the next one wet: that one is coming, with its time.
+        assertEquals("72° · Rain 2 PM", bar(reading(hours = listOf(Triple(13, 49, 61), Triple(14, 80, 61)))).text)
+        // When the sky of this minute is already wet, it speaks: "now", not "likely".
+        val wet = bar(reading(code = 63, hours = listOf(Triple(13, 80, 61))))
+        assertEquals("72° · Rain", wet.text)
+        assertEquals("San Francisco: 72 degrees. Rain. Rain now.", wet.desc)
+        // A label leads while there is room, the number is the one Show leads with, and without one the word stands alone.
+        assertEquals("SF 72° · Rain", bar(r, look(label = "SF")).text)
+        assertEquals("72° · Rain", bar(r, look(label = "Lake Tahoe")).text)
+        assertEquals("68° · Rain", bar(r, look(show = WeatherRules.SHOW_FEELS)).text)
+        assertEquals("72° · Rain", bar(r, look(show = WeatherRules.SHOW_HIGH_LOW)).text)
+        assertEquals("Rain", bar(reading(temp = null, feels = null, hours = listOf(Triple(13, 80, 61)))).text)
+        // A likely hour whose code names nothing that falls is rain, or snow when it freezes.
+        assertEquals("72° · Rain", bar(reading(hours = listOf(Triple(13, 60, 3)))).text)
+        assertEquals("−4° · Snow", bar(reading(temp = -20.0, hours = listOf(Triple(13, 60, null)), hourTemp = -6.0)).text)
     }
 
     @Test fun withA24HourClockTheHourIsWrittenThatWay() {
@@ -339,8 +402,8 @@ class WeatherRulesTest {
     // ---- the rain rule ------------------------------------------------------------------------
 
     @Test fun likelyMeansFiftyPercentOrMoreInAnyHourOfTheSpan() {
-        assertNull(WeatherRules.coming(reading(hours = listOf(Triple(15, 49, 61))), at(13, 30), 2))
-        assertEquals(at(15) / 1000, WeatherRules.begins(WeatherRules.coming(reading(hours = listOf(Triple(15, 50, 61))), at(13, 30), 2)!!))
+        assertNull(WeatherRules.likely(reading(hours = listOf(Triple(15, 49, 61))), at(13, 30), 2))
+        assertEquals(at(15) / 1000, WeatherRules.begins(WeatherRules.likely(reading(hours = listOf(Triple(15, 50, 61))), at(13, 30), 2)!!))
         assertEquals("72°", bar(reading(hours = listOf(Triple(15, 49, 61)))).text)
         assertFalse(bar(reading(hours = listOf(Triple(15, 49, 61)))).active)
         assertEquals("72° · Rain 3 PM", bar(reading(hours = listOf(Triple(15, 50, 61)))).text)
@@ -369,19 +432,21 @@ class WeatherRulesTest {
         assertFalse(bar(r, look(rainHours = 1), now = at(13, 59)).active)
     }
 
-    @Test fun anHourThatHasBegunIsNotComingAnyMore() {
-        // At 3:10 PM the 3 PM hour is the present: the sky of this minute speaks for it.
+    @Test fun anHourThatHasBegunLosesItsTimeAndOneThatIsOverIsGone() {
+        // Likely between 3 and 4 PM.
         val r = reading(hours = listOf(Triple(15, 80, 61)))
-        assertFalse(bar(r, now = at(15, 10)).active)
-        assertEquals("72°", bar(r, now = at(15, 10)).text)
-        assertTrue(bar(r, now = at(14, 59)).active)
+        assertEquals("72° · Rain 3 PM", bar(r, now = at(14, 59)).text)
+        assertEquals("72° · Rain", bar(r, now = at(15, 10)).text)
+        assertTrue(bar(r, now = at(15, 10)).active)
+        assertEquals("72°", bar(r, now = at(16, 0)).text)
+        assertFalse(bar(r, now = at(16, 0)).active)
     }
 
     @Test fun anHourIsFoundByItsTimeNotByItsPlaceInTheReply() {
         val r = reading(hours = listOf(Triple(15, 80, 61), Triple(21, 90, 73)))
         val shuffled = r.copy(hours = r.hours.reversed())
         assertEquals("72° · Rain 3 PM", bar(shuffled).text)
-        assertEquals(at(15) / 1000, WeatherRules.begins(WeatherRules.coming(shuffled, at(13, 30), 2)!!))
+        assertEquals(at(15) / 1000, WeatherRules.begins(WeatherRules.likely(shuffled, at(13, 30), 2)!!))
         // The reply's first place holds the hour it was read in; a later look still finds the right one.
         val evening = shuffled.copy(fetchedAt = at(19, 0))
         assertEquals("72° · Snow 9 PM", bar(evening, now = at(20, 30)).text)

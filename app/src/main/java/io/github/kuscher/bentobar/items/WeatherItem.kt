@@ -241,6 +241,7 @@ fun weatherRes(word: W): Int = when (word) {
     W.DESC_SHORT -> R.string.weather_desc_short
     W.DESC_SOON -> R.string.weather_desc_soon
     W.DESC_NOW -> R.string.weather_desc_now
+    W.DESC_THIS_HOUR -> R.string.weather_likely_now_desc
     W.DESC_NOT_SET_UP -> R.string.weather_desc_not_set_up
     W.DESC_LOADING -> R.string.weather_desc_loading
     W.DESC_OFF -> R.string.weather_desc_off

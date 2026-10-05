@@ -68,6 +68,22 @@ class WeatherSamplesTest {
         }
     }
 
+    @Test fun rainThisHourIsLikelyInTheHourThatIsRunning() {
+        val b = bar("rain-this-hour")
+        assertEquals("72° · Rain", b.text)
+        assertEquals("San Francisco: 72 degrees. Partly cloudy. Rain likely this hour.", b.desc)
+        assertEquals(Tone.ACCENT, b.tone)
+        assertTrue(b.active)
+        assertEquals(Sym.RAINY, b.icon)
+        // Staged at 1:30 PM, the hour is the one from 1 to 2: at 2 PM it is over.
+        assertEquals("72° · Rain", bar("rain-this-hour", seen = now + 29 * 60_000L).text)
+        assertEquals("72°", bar("rain-this-hour", seen = now + 30 * 60_000L).text)
+        // And rain-soon, left staged, becomes it: at 3 PM its hour begins and its time goes.
+        assertEquals("72° · Rain 3 PM", bar("rain-soon", seen = now + 89 * 60_000L).text)
+        assertEquals("72° · Rain", bar("rain-soon", seen = now + 90 * 60_000L).text)
+        assertEquals("72°", bar("rain-soon", seen = now + 150 * 60_000L).text)
+    }
+
     @Test fun rainLaterLeavesTheItemHidden() {
         val b = bar("rain-later")
         assertEquals("72°", b.text)

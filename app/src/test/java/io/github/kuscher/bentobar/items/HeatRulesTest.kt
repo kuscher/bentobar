@@ -293,11 +293,30 @@ class HeatRulesTest {
         level.took(0.5f, 100_000)
         assertFalse(level.due(100_000))
         assertFalse(level.due(101_000))
-        assertFalse(level.due(104_999))
+        assertFalse(level.due(104_000))
+        assertFalse(level.due(104_499))
         assertTrue(level.due(105_000))
         var asked = 0
         for (now in 105_000L..165_000L step 1_000) if (level.due(now)) { level.took(0.5f, now); asked++ }
         assertEquals(13, asked) // one a second would have been 61
+    }
+
+    @Test fun aTickThatComesAMomentEarlyIsStillTheFifth() {
+        // The ticker's seconds are a few milliseconds long or short. The fifth one counts, not the sixth:
+        // a chart of sixty points is then five minutes, not six.
+        val level = HeatLevel()
+        level.took(0.5f, 100_000)
+        assertTrue(level.due(104_998))
+        assertTrue(level.due(104_500))
+        val jitter = longArrayOf(-3, 4, -2, 0, 5)
+        val askedAt = ArrayList<Long>()
+        for (tick in 1..60) {
+            val now = 100_000L + tick * 1_000 + jitter[tick % jitter.size]
+            if (level.due(now)) { level.took(0.5f, now); askedAt += now }
+        }
+        assertEquals(12, askedAt.size)
+        // And never close to Android's own limit of half a second between two calls.
+        assertTrue(askedAt.zipWithNext { a, b -> b - a }.all { it >= 4_500 })
     }
 
     @Test fun aDeviceThatReportsNoLevelHasNone() {

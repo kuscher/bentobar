@@ -140,8 +140,13 @@ class HeatLevel(private val everyMs: Long = HeatRules.LEVEL_EVERY_MS) {
     private var askedAt = NEVER
     private var misses = 0
 
-    /** Whether Android may be asked at [now]: never within five seconds of the last time. */
-    fun due(now: Long): Boolean = askedAt == NEVER || now - askedAt !in 0 until everyMs
+    /**
+     * Whether Android may be asked at [now]: on every fifth of the ticker's seconds. Those are a few
+     * milliseconds long or short, so a tick that comes up to half a second early is taken: held to
+     * the full five seconds, every other reading would wait for the sixth, and the chart's sixty
+     * points would span six minutes. Still nine times Android's own limit of half a second.
+     */
+    fun due(now: Long): Boolean = askedAt == NEVER || now - askedAt !in 0 until everyMs - EARLY_MS
 
     /** Android was asked at [now] and answered [reading]. */
     fun took(reading: Float, now: Long) {
@@ -177,6 +182,7 @@ class HeatLevel(private val everyMs: Long = HeatRules.LEVEL_EVERY_MS) {
         const val NEVER = Long.MIN_VALUE
         const val POINTS = 60
         const val KEEP_OVER = 2
+        const val EARLY_MS = 500L
     }
 }
 

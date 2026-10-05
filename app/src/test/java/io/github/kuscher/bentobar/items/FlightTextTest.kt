@@ -57,6 +57,16 @@ class FlightTextTest {
         }
     }
 
+    @Test fun aFlightThatIsFollowedAndNotHeardOfYetIsThePlaneAloneToo() {
+        // The service was switched off and on again, and the lookup after that found no connection.
+        val waiting = Tracked("LH455", "2026-10-02", null, failure = Failure.OFFLINE, failures = 1)
+        val b = FlightText.bar(waiting, null, at(morning), 24, us)
+        assertEquals(FlightText.Bar(Sym.FLIGHT, null, Tone.NORMAL, false, "LH 455: no update", null), b)
+        assertNull(FlightText.card(waiting, at(morning), us))
+        // While it is asked for again, the bar says so.
+        assertEquals("LH 455 …", FlightText.bar(waiting, "LH 455", at(morning), 24, us).text)
+    }
+
     @Test fun lookingUpShowsTheNumber() {
         val b = FlightText.bar(Tracked(), "LH 455", at(morning), 24, us)
         assertEquals("LH 455 …", b.text)

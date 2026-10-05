@@ -138,9 +138,11 @@ object FlightText {
      */
     fun bar(t: Tracked?, looking: String?, now: Instant, beforeHours: Int, v: Voice): Bar {
         val heard = if (t == null || FlightRules.cleared(t, now)) null else t.flight
-        if (t == null || heard == null) {
-            return if (looking == null) Bar(Sym.FLIGHT, desc = v.say(Word.FLIGHT_NONE))
-            else Bar(Sym.FLIGHT, v.say(Word.FLIGHT_BAR_LOOKING, looking), desc = v.say(Word.FLIGHT_DESC_LOOKING, looking))
+        if (t == null || heard == null) return when {
+            looking != null -> Bar(Sym.FLIGHT, v.say(Word.FLIGHT_BAR_LOOKING, looking), desc = v.say(Word.FLIGHT_DESC_LOOKING, looking))
+            // Followed, and nothing heard of it yet (it was asked for and the ask came to nothing): the plane alone, and the menu says why.
+            t != null && t.following && t.flight == null -> Bar(Sym.FLIGHT, desc = v.say(Word.FLIGHT_DESC_NO_UPDATE, FlightNumber.shown(t.number)))
+            else -> Bar(Sym.FLIGHT, desc = v.say(Word.FLIGHT_NONE))
         }
         val l = Look(t, heard, now, v)
         return when (l.row.phase) {

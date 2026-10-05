@@ -194,7 +194,7 @@ object Ticker {
         for (item in live) {
             val type = Items.of(item.type) ?: continue
             val last = lastRun[item.id] ?: 0L
-            if (item.id in next && now - last < type.refreshMs) continue
+            if (item.id in next && !TickRules.due(now, last, type.refreshMs)) continue
             next[item.id] = compute(type, item)
             lastRun[item.id] = now
         }

@@ -755,6 +755,32 @@ class FlightLoadTest {
         }
     }
 
+    @Test fun pastATimeToLeaveThatCameWithNoWordItIsAskedEveryTenMinutesForAnHour() {
+        online { net ->
+            // The service goes on calling LH 454 planned after its time to leave, 08:25 UTC, and says with every reply that plenty of lookups are left.
+            net.answer = { Reply.Ok(withRequest(reply("flight-LH454-planned"), left = 900)) }
+            start = ms("2026-10-02T07:55:00Z")
+            FlightLoad.take(item, found(FlightLoad.track(question("LH454"), wall())), wall())
+            val r = tracker()
+            // Every ten minutes up to its time, as before.
+            assertEquals(listOf("02 08:05", "02 08:15", "02 08:25"), watch(r, "2026-10-02T08:29:50Z"))
+            // And through the hour after it, while it stays "planned": six asks, where the usual pace had two.
+            val past = watch(r, "2026-10-02T09:29:50Z")
+            assertEquals(listOf("02 08:35", "02 08:45", "02 08:55", "02 09:05", "02 09:15", "02 09:25"), past)
+            assertEquals(FlightState.PLANNED, r.peek(item)!!.flight!!.state)
+            // After that hour, the usual half hour again.
+            assertEquals(listOf("02 09:55", "02 10:25", "02 10:55"), watch(r, "2026-10-02T11:00:00Z"))
+            assertEquals(1 + 3 + 6 + 3, sent())
+            // An answer that puts the time ahead again ends it sooner: here the service says from 08:40 on that it will leave at 10:40.
+            net.answer = { Reply.Ok(withRequest(if (wall() < ms("2026-10-02T08:40:00Z")) reply("flight-LH454-planned")
+                else reply("flight-LH454-planned").replace("\"dep_estimated\": null", "\"dep_estimated\": \"2026-10-02 12:40\""), left = 900)) }
+            start = ms("2026-10-02T07:55:00Z"); elapsed = 0
+            FlightLoad.take(item, found(FlightLoad.track(question("LH454"), wall())), wall())
+            // Two asks past the old time, the second of which brings the new one; then the usual half hour, until the last hour before that.
+            assertEquals(listOf("02 08:05", "02 08:15", "02 08:25", "02 08:35", "02 08:45", "02 09:15", "02 09:40", "02 09:50"), watch(tracker(), "2026-10-02T09:55:00Z"))
+        }
+    }
+
     @Test fun refreshByHandIsHeldToTwoMinutesAndATryThatReachedNobodyToTenSeconds() {
         online { net ->
             start = asked

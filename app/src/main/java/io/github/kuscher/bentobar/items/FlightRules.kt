@@ -486,6 +486,8 @@ object FlightRules {
     val QUICK: Duration = Duration.ofMinutes(10)
     private val QUICK_BEFORE_LEAVING: Duration = Duration.ofHours(1)
     private val QUICK_BEFORE_LANDING: Duration = Duration.ofMinutes(30)
+    /** And for this long past either time, while nobody says that it happened. */
+    private val QUICK_PAST: Duration = Duration.ofHours(1)
     /** A flight is put away this long after it landed, or was to land. */
     val CLEARED: Duration = Duration.ofHours(24)
     /** For this long after it landed a flight is in the bar; then the plain plane again, while the menu keeps the flight. */
@@ -500,20 +502,24 @@ object FlightRules {
 
     /**
      * [pace], and quicker around the two moments that matter: every ten minutes in the last hour before
-     * the flight leaves and in the last half hour before it lands. Only for a flight the service knows
-     * (a timetable's times are nobody's word), and only while the key has lookups to spare ([left],
-     * where the reply said so). A time that has passed with no word is back at the usual pace.
+     * the flight leaves and in the last half hour before it lands. And for an hour past such a time
+     * that came with no word (still "planned" after its time to leave, still in the air after its
+     * time to land): that is when someone watches most, and the bar stands at its last minute until
+     * an answer comes. An answer with a new estimate puts the time ahead again; after the hour it is
+     * the usual pace. Only for a flight the service knows, with clocks that can be read (a timetable's
+     * times are nobody's word), and only while the key has lookups to spare ([left], where the reply
+     * said so).
      */
     fun pace(f: Flight, now: Instant, left: Int?): Duration? {
         val usual = pace(f, now) ?: return null
-        if (f.timetable || usual != NEAR || left == null || left <= PLENTY) return usual
+        if (f.timetable || f.loose || usual != NEAR || left == null || left <= PLENTY) return usual
         val (end, window) = when (standing(f, now).stage) {
             Stage.BEFORE -> f.from to QUICK_BEFORE_LEAVING
             Stage.IN_AIR -> f.to to QUICK_BEFORE_LANDING
             else -> return usual
         }
         val toGo = end.time?.let { Duration.between(now, end.moment(it)) } ?: return usual
-        return if (!toGo.isNegative && toGo <= window) QUICK else usual
+        return if (toGo <= window && toGo >= QUICK_PAST.negated()) QUICK else usual
     }
 
     /**

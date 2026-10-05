@@ -28,6 +28,8 @@ class FlightTextTest {
     private fun at(text: String): Instant = Instant.parse(text)
     private fun time(text: String): LocalDateTime = LocalDateTime.parse(text)
     private fun ms(text: String) = at(text).toEpochMilli()
+    /** The space before a unit in a headline ("1 min"); the copied line has a plain one there. */
+    private val NBSP = Char(0xA0)
 
     private fun sfo(planned: String? = "2026-10-02T14:40", expected: String? = null, actual: String? = null, gate: String? = "G13", terminal: String? = "1") =
         FlightEnd("SFO", "San Francisco", planned?.let(::time), expected?.let(::time), actual?.let(::time), -420, terminal, gate)
@@ -163,6 +165,15 @@ class FlightTextTest {
         val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
         assertEquals("1m · +25m · Gate G13", bar(late, "2026-10-02T21:45:00Z", heard).text)
         assertEquals("Delayed 25\u00A0min", card(late, "2026-10-02T21:45:00Z", heard).badge)
+        // Copied, the line says what the headline says in that state, to the character: never "Leaves 2:40 PM" about a time that has passed.
+        assertEquals("LH 455 SFO → FRA · Leaves 2:40 PM · On time · Gate G13 · Lands Sat 10:25 AM", card(f, "2026-10-02T21:39:30Z", heard).copy)
+        assertEquals("LH 455 SFO → FRA · Leaves in 1 min · Gate G13 · Lands Sat 10:25 AM", card(f, "2026-10-02T21:45:00Z", heard).copy)
+        assertEquals("LH 455 SFO → FRA · Leaves in 1 min · Delayed 25 min · Gate G13 · Lands Sat 10:25 AM", card(late, "2026-10-02T21:45:00Z", heard).copy)
+        assertEquals("LH 455 SFO → FRA · No update", card(late, "2026-10-02T22:21:00Z", heard).copy)
+        for (now in listOf("2026-10-02T21:45:00Z", "2026-10-02T22:21:00Z")) for (of in listOf(f, late)) {
+            val c = card(of, now, heard)
+            assertTrue(now, c.copy.contains(" · " + c.headline.replace(NBSP, ' ')))
+        }
         // With no gate to name the minute stands alone: a time that has passed is not said beside it.
         assertEquals("1m · 2:40 PM", bar(lh455(sfo(gate = null)), "2026-10-02T21:39:30Z", heard).text)
         assertEquals("1m", bar(lh455(sfo(gate = null)), "2026-10-02T21:45:00Z", heard).text)

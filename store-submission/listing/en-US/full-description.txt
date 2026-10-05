@@ -3,6 +3,8 @@ BentoBar puts your own items into the empty part of the status bar, right next t
 Items
 CPU load, network speed, memory, battery details, storage, the date with a month view of your calendar, your next meeting with a countdown, a second clock and world clocks, timers (countdown, stopwatch or Pomodoro), a countdown to a date, keep awake, sound, a Tools menu (screenshot, lock, overview, all apps, power), app folders and shortcuts, text, emoji and spacers.
 
+New: Now playing with its controls, the batteries of your mouse, keyboard and stylus, a Heat item that appears when Android slows a hot device, Weather for a city you pick, and a Flight tracker that counts down to departure with the gate. World clock takes more cities and has Plan a time: a slider that shows any time of day in every city. Sound can draw a volume slider right in the bar.
+
 Show when active
 A hidden item can pop out on its own while it has something to say, such as a running timer, a meeting about to start or a busy CPU, and disappear again after.
 
@@ -19,7 +21,7 @@ Why BentoBar uses an accessibility service
 Android lets an app draw on the status bar only through an accessibility service. BentoBar uses it to draw its items there, and to run the Tools menu's actions when you pick them. It listens only for windows appearing, going or moving, not their content; it reads the status bar's layout and the color of its clock, and no other window; and it doesn't watch your keyboard, mouse or touches. Before you turn it on, BentoBar shows what the service does and asks whether you agree.
 
 Private
-No internet permission, no accounts, no ads, no analytics. Your layout, your calendar and everything BentoBar measures stay on your device.
+BentoBar goes online for two items only, and only after you set them up: Weather asks Open-Meteo about the city you search for, and Flight asks AirLabs about the flight you enter, with a free key of your own. BentoBar sends nothing else anywhere: not your layout, your calendar, what's playing or anything it measures. No accounts of its own, no ads, no analytics, no location permission. Now playing needs notification access for the title only, and BentoBar tells Android to send it no notifications.
 
 Made for Android laptops with Android 17. Other devices with a status bar may work, but haven't been tested. The system's own icons stay where Android puts them: BentoBar organises its items next to them.
 

@@ -155,6 +155,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         Word.FLIGHT_CANCELED -> R.string.flight_canceled
         Word.FLIGHT_DIVERTED -> R.string.flight_diverted
         Word.FLIGHT_TIMETABLE -> R.string.flight_timetable
+        Word.FLIGHT_NO_UPDATE -> R.string.flight_no_update
         Word.FLIGHT_BADGE_PLANNED -> R.string.flight_badge_planned
         Word.FLIGHT_BADGE_ON_TIME -> R.string.flight_badge_on_time
         Word.FLIGHT_BADGE_DELAYED -> R.string.flight_badge_delayed

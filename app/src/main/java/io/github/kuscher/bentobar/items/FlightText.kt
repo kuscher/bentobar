@@ -34,7 +34,7 @@ object FlightText {
         FLIGHT_BAR_LOOKING, FLIGHT_BAR_PLAN, FLIGHT_BAR_GATE, FLIGHT_BAR_LANDED_BELT, FLIGHT_BAR_LANDED_AT, FLIGHT_BAR_CANCELED, FLIGHT_BAR_DIVERTED,
         FLIGHT_BAR_NO_UPDATE, FLIGHT_BAR_NOT_LIVE, FLIGHT_BAR_LATE, FLIGHT_BAR_EARLY, FLIGHT_TOOLTIP, FLIGHT_NONE, FLIGHT_LOOKING_UP, FLIGHT_ANOTHER_SUBTITLE,
         FLIGHT_HEADER, FLIGHT_ROUTE, FLIGHT_LEAVES_AT, FLIGHT_LEAVES_IN, FLIGHT_LANDS_IN, FLIGHT_IN_AIR, FLIGHT_JUST_LANDED, FLIGHT_LANDED_AGO, FLIGHT_LANDED,
-        FLIGHT_CANCELED, FLIGHT_DIVERTED, FLIGHT_TIMETABLE, FLIGHT_BADGE_PLANNED, FLIGHT_BADGE_ON_TIME, FLIGHT_BADGE_DELAYED, FLIGHT_BADGE_LATE, FLIGHT_BADGE_EARLY,
+        FLIGHT_CANCELED, FLIGHT_DIVERTED, FLIGHT_TIMETABLE, FLIGHT_NO_UPDATE, FLIGHT_BADGE_PLANNED, FLIGHT_BADGE_ON_TIME, FLIGHT_BADGE_DELAYED, FLIGHT_BADGE_LATE, FLIGHT_BADGE_EARLY,
         FLIGHT_TERMINAL, FLIGHT_BELT, FLIGHT_OPERATED_AS, FLIGHT_NOTE, FLIGHT_STATUS_REFUSED, FLIGHT_STATUS_USED_UP, FLIGHT_STATUS_FEW,
         FLIGHT_COPY_HEAD, FLIGHT_COPY_LEFT, FLIGHT_COPY_LANDS,
         FLIGHT_ERR_NOT_FOUND, FLIGHT_ERR_NOT_THAT_DAY, FLIGHT_ERR_REFUSED, FLIGHT_ERR_USED_UP, FLIGHT_ERR_NO_ANSWER,
@@ -103,6 +103,8 @@ object FlightText {
         val where = FlightRules.where(f)
         /** Within three hours of leaving or in the air, an answer over an hour old is not live: what it says of late, early and the gate may be wrong by now. */
         val stale = FlightRules.stale(t, now)
+        /** Still called planned, its time to leave passed, and no answer for over an hour: nobody knows what became of it. */
+        val silent = FlightRules.silent(t, now)
         val tooltip = v.say(Word.FLIGHT_TOOLTIP, number, f.from.place, f.to.place)
 
         /** Two parts as the bar joins them: "a · b". */
@@ -151,16 +153,19 @@ object FlightText {
                 alert(l), active = true, desc = v.say(Word.FLIGHT_DESC_CANCELED, l.number), tooltip = l.tooltip)
             Phase.DIVERTED -> Bar(Sym.FLIGHT, fit(v.say(Word.FLIGHT_BAR_DIVERTED, l.number), v.say(Word.FLIGHT_BAR_DIVERTED, l.f.number)),
                 alert(l), active = true, desc = v.say(Word.FLIGHT_DESC_DIVERTED, l.number), tooltip = l.tooltip)
-            Phase.TIMETABLE -> Bar(Sym.FLIGHT, fit(v.say(Word.FLIGHT_BAR_NO_UPDATE, l.number), v.say(Word.FLIGHT_BAR_NO_UPDATE, l.f.number), l.number),
-                active = true, desc = v.say(Word.FLIGHT_DESC_NO_UPDATE, l.number), tooltip = l.tooltip)
+            Phase.TIMETABLE -> noUpdate(l)
             Phase.AHEAD -> ahead(l, beforeHours)
-            Phase.SOON -> soon(l)
+            Phase.SOON -> if (l.silent) noUpdate(l) else soon(l)
             Phase.IN_AIR -> air(l)
             Phase.LANDED -> landed(l)
         }
     }
 
     private fun alert(l: Look) = if (FlightRules.alert(l.t, l.now)) Tone.ALERT else Tone.NORMAL
+
+    /** A plan whose time passed with no word: the plain plane and "no update", until the flight is cleared or the service speaks. */
+    private fun noUpdate(l: Look): Bar = Bar(Sym.FLIGHT, fit(l.v.say(Word.FLIGHT_BAR_NO_UPDATE, l.number), l.v.say(Word.FLIGHT_BAR_NO_UPDATE, l.f.number), l.number),
+        active = true, desc = l.v.say(Word.FLIGHT_DESC_NO_UPDATE, l.number), tooltip = l.tooltip)
 
     /** More than three hours before it leaves: the number, and the day and time. Too long: the number loses its space; then the time goes. */
     private fun ahead(l: Look, beforeHours: Int): Bar {
@@ -302,9 +307,10 @@ object FlightText {
         val l = Look(t, heard, now, v)
         val f = l.f
         val row = l.row
-        val headline = headline(l, aloud = false)
-        val badge = badge(l, aloud = false)
-        val spoken = badge(l, aloud = true)?.let { v.say(Word.FLIGHT_DESC_HEADLINE_BADGE, headline(l, aloud = true), it) } ?: headline(l, aloud = true)
+        // No word of a flight past its time: that is the headline, with no badge and no plane, whatever was last said of it.
+        val headline = if (l.silent) v.say(Word.FLIGHT_NO_UPDATE) else headline(l, aloud = false)
+        val badge = if (l.silent) null else badge(l, aloud = false)
+        val spoken = if (l.silent) headline else badge(l, aloud = true)?.let { v.say(Word.FLIGHT_DESC_HEADLINE_BADGE, headline(l, aloud = true), it) } ?: headline(l, aloud = true)
         val before = row.phase == Phase.AHEAD || row.phase == Phase.SOON
         // Before it leaves the far end has its terminal too, where one is named: whoever meets the flight looks for it there.
         val far = if (before) row.to.copy(terminal = f.to.terminal) else row.to
@@ -322,7 +328,7 @@ object FlightText {
             route = v.say(Word.FLIGHT_ROUTE, f.from.place, f.to.place),
             headline = headline, gone = row.phase == Phase.CANCELED || row.phase == Phase.DIVERTED,
             badge = badge, kind = row.badge?.kind ?: Kind.PLAIN, spoken = spoken,
-            share = row.share,
+            share = row.share.takeUnless { l.silent },
             from = end(l, row.from, f.from.city, from = true), to = end(l, far, f.to.city, from = false),
             operatedAs = f.flownAs?.let { v.say(Word.FLIGHT_OPERATED_AS, FlightNumber.shown(it)) },
             loose = f.loose && before, note = v.say(Word.FLIGHT_NOTE, status),
@@ -343,7 +349,7 @@ object FlightText {
         val lands = f.to.time?.let { v.say(Word.FLIGHT_COPY_LANDS, l.at(it)) }
         val parts = when (l.row.phase) {
             Phase.CANCELED, Phase.DIVERTED, Phase.TIMETABLE -> listOf(head, headline)
-            Phase.AHEAD, Phase.SOON -> listOfNotNull(head, f.from.time?.let { v.say(Word.FLIGHT_LEAVES_AT, l.at(it)) }, badge, l.where.gate?.let { v.say(Word.FLIGHT_BAR_GATE, it) }, lands)
+            Phase.AHEAD, Phase.SOON -> if (l.silent) listOf(head, headline) else listOfNotNull(head, f.from.time?.let { v.say(Word.FLIGHT_LEAVES_AT, l.at(it)) }, badge, l.where.gate?.let { v.say(Word.FLIGHT_BAR_GATE, it) }, lands)
             Phase.IN_AIR -> listOfNotNull(head, left, badge, lands)
             Phase.LANDED -> listOfNotNull(head, left, f.to.time?.let { v.say(Word.FLIGHT_BAR_LANDED_AT, l.at(it)) } ?: v.say(Word.FLIGHT_LANDED), badge, l.where.belt?.let { v.say(Word.FLIGHT_BELT, it) })
         }

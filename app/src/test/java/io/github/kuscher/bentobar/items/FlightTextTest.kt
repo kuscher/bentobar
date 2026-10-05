@@ -134,6 +134,39 @@ class FlightTextTest {
         assertEquals("1m · Gate G13", bar(lh455(), "2026-10-02T21:39:30Z").text)
     }
 
+    @Test fun pastItsTimeWithNoWordItStaysAtOneMinuteAndAfterAnHourSaysNoUpdate() {
+        // LH 455 leaves 2:40 PM; the last answer, at 2:20, called it planned and on time.
+        val f = lh455(sfo(expected = "2026-10-02T14:40"))
+        val heard = "2026-10-02T21:20:00Z"
+        assertEquals("1m · Gate G13", bar(f, "2026-10-02T21:39:30Z", heard).text)
+        // From 2:40 on it is still a minute: never a plan for a time that has passed.
+        for (now in listOf("2026-10-02T21:40:00Z", "2026-10-02T21:55:00Z", "2026-10-02T22:20:00Z")) {
+            assertEquals(now, "1m · Gate G13", bar(f, now, heard).text)
+            assertEquals(now, Sym.FLIGHT_TAKEOFF, bar(f, now, heard).icon)
+            assertEquals(now, "Leaves in 1\u00A0min", card(f, now, heard).headline)
+            // "On time" is nobody's to say about a time that is over.
+            assertNull(now, card(f, now, heard).badge)
+        }
+        // The last answer is over an hour old: nobody knows what became of it.
+        val silent = bar(f, "2026-10-02T22:21:00Z", heard)
+        assertEquals("LH 455 · no update", silent.text)
+        assertEquals(Sym.FLIGHT, silent.icon)
+        assertEquals(Tone.NORMAL, silent.tone)
+        assertTrue(silent.active)
+        assertEquals("LH 455: no update", silent.desc)
+        val c = card(f, "2026-10-02T22:21:00Z", heard)
+        assertEquals("No update", c.headline)
+        assertNull(c.badge)
+        assertNull(c.share)                                                        // no plane on the line: nobody knows where it is
+        assertEquals("LH 455 SFO → FRA · No update", c.copy)
+        // A delay that was known is still true once its time has passed.
+        val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
+        assertEquals("1m · +25m · Gate G13", bar(late, "2026-10-02T21:45:00Z", heard).text)
+        assertEquals("Delayed 25\u00A0min", card(late, "2026-10-02T21:45:00Z", heard).badge)
+        // An old answer about a flight whose time is still to come is "not live", as before.
+        assertEquals("10m · not live", bar(f, "2026-10-02T21:30:00Z", "2026-10-02T20:29:00Z").text)
+    }
+
     @Test fun lateBeforeItLeavesSaysByHowMuchAndTurnsToAWarning() {
         val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
         val b = bar(late, near)

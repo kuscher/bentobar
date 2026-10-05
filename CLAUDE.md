@@ -18,6 +18,8 @@ private projects and paths into their repos, and where signing keys are backed u
     menus, keep awake (a flag on the strip window) and colour sampling, and has adb `debug()` hooks.
   - `bar/StatusBarScan.kt`: finds the status bar window (TYPE_SYSTEM at y=0) and the free area
     (the `DesktopStatusBarSpacer` node on Googlebook OS, else the widest gap).
+  - `bar/BarPixels.kt`: the status bar's text and background color from the pixels around its clock
+    (pure, unit-tested); `bar/Contrast.kt` then holds every strip color to 4.5:1.
   - `bar/Overlay.kt`: a Compose host in a TYPE_ACCESSIBILITY_OVERLAY window (outside-touch and
     key callbacks for menus).
   - `bar/BarUi.kt`: the strip (chevron, FitRow, items, clicks/right-clicks/wheel).
@@ -30,8 +32,9 @@ private projects and paths into their repos, and where signing keys are backed u
     SharedPreferences, a process-wide StateFlow shared by the service and settings).
   - `ui/`: `MainActivity` (nav rail), `BarPage` (preview, sections, item detail), `Reorder` (drag
     and drop across the section cards: the gesture sits on the container, a copy of the row floats
-    above the cards, the Store changes once on the drop), `Pages` (Add, Look, Setup, About), `Theme`,
-    `MenuKit` and `Controls` (shared UI pieces).
+    above the cards, the Store changes once on the drop), `Pages` (Add, Look, Setup, About),
+    `Disclosure` (the accessibility disclosure and consent Google Play requires, and the one list of
+    what the service does that Setup shows too), `Theme`, `MenuKit` and `Controls` (shared UI pieces).
   - "Show when…": a type's `trigger` (in `ItemType.kt`) words its pop-out rule, and its `Threshold`
     is the one source of the option key and default for both `state()` and the settings slider.
   - `tile/Tiles.kt`: the BentoBar, Keep awake and Timer tiles.
@@ -87,6 +90,24 @@ private projects and paths into their repos, and where signing keys are backed u
   strip colour to 4.5:1, with pure black as the last fallback for mid grays where neither white nor
   near-black reaches it (`ContrastTest.everyOpaqueBarReaches45` sweeps every gray and a color grid).
   Re-check on any new device: `look fg=… bg=… contrast=…` in the log.
+- **The bar changes its look without telling anyone.** On two Googlebooks the status bar is solid
+  black while a window is maximized and see-through otherwise, in the same window, with no event. So
+  `check()` notes which app windows sit against the bar's lower edge and asks for a color reading
+  when that changes (two screenshots of the bar window: one at once, one when the fade has settled).
+  The text color is the glyphs' cores, not the average of everything that stands out: blended edges
+  made it #EFEFEF beside the system's white. A reading with nothing opaque (the bar caught fading)
+  keeps the last colors and is retried.
+- **Name the weight in every text style that uses `Fonts.bar`.** Compose asks the typeface for the
+  style's weight, 400 when it names none, whatever weight the typeface was created with: the strip
+  drew regular text beside the system's semibold clock. The status bar's style is the family
+  `variable-label-large-emphasized` (Google Sans Flex, weight 600); `Fonts.barWeight` carries it.
+- **Google Play wants a prominent disclosure with consent** before an app that isn't an
+  accessibility tool sends anyone to turn its service on: in the app's normal use, saying what the
+  API is used for and what happens to what it reads, with two buttons (agree and decline); a single
+  button, a switch or closing the dialog don't count. `ui/Disclosure.kt` is that screen. It comes up
+  on first opening and from Setup › Turn on until the answer is Agree (`Store.consent`, kept outside
+  the layout so Copy settings can't carry it). The video in Play's Accessibility declaration has to
+  show it.
 - **Settings state is observed, not read while drawing** (`ui/SetupState.kt`, `bar/BarStatus.kt`).
   In desktop windowing, Settings opens in its own window and BentoBar's stays resumed, so onResume
   alone misses changes; and with strong skipping (Kotlin 2.x) a composable reading Android state

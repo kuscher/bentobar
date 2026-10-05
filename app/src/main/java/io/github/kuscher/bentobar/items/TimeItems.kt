@@ -234,6 +234,13 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
     val lead = ((month.atDay(1).dayOfWeek.value - firstDow.value) + 7) % 7
     val allowed = Calendar.allowed()
     if (allowed) Calendar.refresh()
+    // A month beyond the days always kept loaded: its events are loaded while the menu shows it (a
+    // week before and two after, for the grid's dots and the agenda's week from a picked day).
+    androidx.compose.runtime.DisposableEffect(month) {
+        Calendar.view(month.atDay(1).minusDays(7).atStartOfDay(zone).toInstant().toEpochMilli(),
+            month.atEndOfMonth().plusDays(14).atStartOfDay(zone).toInstant().toEpochMilli())
+        onDispose { Calendar.view(null, null) }
+    }
     fun eventsOn(d: LocalDate): List<Calendar.Event> {
         val s = d.atStartOfDay(zone).toInstant().toEpochMilli()
         val e = d.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()

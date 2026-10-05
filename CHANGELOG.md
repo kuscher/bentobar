@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+- **BentoBar asks before it uses its accessibility service.** The first time you open it, and
+  whenever you press Turn on in Setup, BentoBar says what its accessibility service does (draws your
+  items, reads the status bar's layout and its clock's color, runs the Tools actions you pick) and
+  what it doesn't, with two answers: Agree, which opens Android's Accessibility settings, and No
+  thanks. Closing it any other way is no answer. Google Play requires this disclosure and consent
+  of apps that use the AccessibilityService API. About › Privacy links the privacy policy.
+- **Colors follow the bar.** On Googlebooks whose status bar turns solid black while a window is
+  maximized and see-through otherwise, BentoBar read the bar's colors only once and kept them. It
+  now reads them again when a window settles against the bar or leaves it. On a solid bar the text
+  is the system's exact color (it came out a shade grayer, #EFEFEF beside white). A reading taken
+  while the bar is fading keeps the colors BentoBar has and tries again, instead of falling back to
+  a guess.
+- **Text as bold as the system's.** The bar's text was drawn in regular weight next to the status
+  bar's semibold clock. It now uses the status bar's own text style.
+- **Timers.** A timer that ends while the bar is hidden or the Googlebook sleeps rings even if the
+  clock was corrected by a second or so in the meantime (it could stay silent until the bar next
+  showed).
+- **Calendar.** A month beyond the next 40 days shows its events when you page to it. After you
+  allow calendar access, events appear at once, not up to a minute later. Allow in an item's settings
+  also switches Calendar back on in Setup, so it works after Calendar was switched off there. The
+  meeting chip comes up for the next day's first meeting on its own, and catches up when the
+  Googlebook wakes.
+- **Settings.** Paste settings keeps what belongs to this install: what you switched off in Setup
+  and whether the bar is shown (a pasted layout could switch calendar reading back on). Under Show
+  everything, the ‹ menu no longer lists an item that is in the bar as hidden. A link in a Text
+  item that Android refuses to open (file://…) shows a message instead of stopping BentoBar. A drag
+  cut short by the bar hiding (an app going full screen) no longer leaves the previewed order on
+  screen.
+- Smaller things: with the service off, Setup's header points at step 1 instead of at Setup; Turn
+  off has its own icon in an item's menu; headings in Look and About have room above them; a
+  completely full status bar no longer makes BentoBar re-read it every two seconds.
+
 ## 0.7 (2026-10-01)
 
 - The CPU menu says "Core 0" for a core listed on its own (each one, on some Intel chips), not

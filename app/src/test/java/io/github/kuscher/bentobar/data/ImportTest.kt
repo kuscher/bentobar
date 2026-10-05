@@ -30,6 +30,19 @@ class ImportTest {
         assertEquals(listOf(clock, timer), Store.parseLayout(json.encodeToString(BarConfig.serializer(), c))!!.items)
     }
 
+    @Test fun aPastedLayoutKeepsThisInstallsSwitches() {
+        // Calendar was switched off here; the pasted layout comes from an install where it was on.
+        val here = BarConfig(items = listOf(clock), turnedOff = setOf(Uses.CALENDAR), enabled = false, onboarded = true)
+        val pasted = BarConfig(items = listOf(timer), position = Position.LEFT, presenting = true)
+        val c = pasted.keepingLocal(here)
+        assertEquals(listOf(timer), c.items)
+        assertEquals(Position.LEFT, c.position)
+        assertEquals(setOf(Uses.CALENDAR), c.turnedOff)
+        assertEquals(false, c.enabled)
+        assertEquals(false, c.presenting)
+        assertEquals(true, c.onboarded)
+    }
+
     @Test fun anOlderLayoutIsMigrated() {
         val old = """{"version":2,"chevron":false,"items":[{"id":"m","type":"memory","section":"HIDDEN"}]}"""
         val c = Store.parseLayout(old)

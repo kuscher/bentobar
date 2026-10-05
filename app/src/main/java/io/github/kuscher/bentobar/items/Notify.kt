@@ -149,8 +149,10 @@ object Chips {
             // Keep the calendar current while the strip (which otherwise asks for it) may be away; a
             // load that finds changes calls update() again.
             Calendar.refresh()
+            // From every loaded meeting, not only today's (Calendar.meetings stops at 03:00): after the
+            // day's last one, nothing else would bring the chip up for tomorrow morning's.
             val now = System.currentTimeMillis()
-            nextChange(Calendar.meetings(now), now)?.let { main.postDelayed(boundary, it - now + 1_000) }
+            nextChange(Calendar.upcomingMeetings(now), now)?.let { main.postDelayed(boundary, it - now + 1_000) }
         }
     }
 

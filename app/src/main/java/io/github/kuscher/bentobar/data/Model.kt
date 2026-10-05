@@ -96,6 +96,10 @@ data class BarConfig(
     val onboarded: Boolean = false,
 )
 
+/** This config with the settings that belong to one install taken from [local] (see [Store.import]). */
+fun BarConfig.keepingLocal(local: BarConfig): BarConfig = copy(enabled = local.enabled, turnedOff = local.turnedOff,
+    presenting = local.presenting, pinnedOpen = local.pinnedOpen, onboarded = local.onboarded)
+
 /**
  * What BentoBar uses, as switched in Setup: a permission counts only if Android granted it and the
  * user hasn't switched it off here.
@@ -133,6 +137,20 @@ fun BarConfig.shows(item: ItemConfig, active: Boolean): Boolean = when (item.sec
     Section.HIDDEN -> if (hiddenMode == HiddenMode.SHOW_ALL) !item.whenActive || active else item.whenActive && active
     Section.OFF -> false
 }
+
+/**
+ * The items waiting behind ‹ (the click and hover modes; Show everything has no ‹ for them): hidden
+ * ones that aren't out on their own. The strip, the settings preview and the controller all ask here.
+ */
+fun BarConfig.behindChevron(active: (ItemConfig) -> Boolean): List<ItemConfig> =
+    if (hiddenMode == HiddenMode.SHOW_ALL) emptyList() else items.filter { it.section == Section.HIDDEN && !shows(it, active(it)) }
+
+/**
+ * The items the ‹ menu lists as hidden: in the layout but not drawn right now. Under Show everything
+ * that's a rule item waiting for its rule, never a hidden item that is drawn.
+ */
+fun BarConfig.notDrawn(active: (ItemConfig) -> Boolean): List<ItemConfig> =
+    items.filter { it.section != Section.OFF && !shows(it, active(it)) }
 
 /** Whether [shows] can be true for [item] once its "Show when" rule applies: the items worth sampling. */
 fun BarConfig.couldShow(item: ItemConfig): Boolean = shows(item, active = true)

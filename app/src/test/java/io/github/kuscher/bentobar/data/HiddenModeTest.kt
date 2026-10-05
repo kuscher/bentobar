@@ -53,6 +53,19 @@ class HiddenModeTest {
         assertFalse(BarConfig(hiddenMode = HiddenMode.CLICK).couldShow(memory))
     }
 
+    @Test fun theChevronMenuNeverListsAnItemThatIsDrawn() {
+        val on = { _: ItemConfig -> false }
+        // Show everything: the hidden item without a rule is in the bar, so only the waiting rule item is listed.
+        val all = BarConfig(hiddenMode = HiddenMode.SHOW_ALL, items = listOf(timer, memory, clock))
+        assertEquals(listOf(timer), all.notDrawn(on))
+        assertEquals(emptyList<ItemConfig>(), all.behindChevron(on))
+        // Click mode: both wait behind ‹, until the timer runs and comes out on its own.
+        val click = all.copy(hiddenMode = HiddenMode.CLICK)
+        assertEquals(listOf(timer, memory), click.behindChevron(on))
+        assertEquals(listOf(memory), click.behindChevron { it.id == "t" })
+        assertEquals(click.behindChevron(on), click.notDrawn(on))
+    }
+
     @Test fun alreadyV3IsUntouched() {
         val c = BarConfig(hiddenMode = HiddenMode.HOVER)
         assertEquals(c, c.migrateToV3())

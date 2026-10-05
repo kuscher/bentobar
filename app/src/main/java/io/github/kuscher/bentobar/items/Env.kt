@@ -70,8 +70,11 @@ object Env {
         Log.w(TAG, "no activity for $intent")
         if (!quiet) Toast.makeText(app, app.getString(R.string.toast_nothing_can_open), Toast.LENGTH_SHORT).show()
         false
-    } catch (e: SecurityException) {
-        Log.w(TAG, "not allowed: $intent", e)
+    } catch (e: Exception) {
+        // Not allowed (SecurityException), or a link Android refuses to hand over, such as a file://
+        // one typed into a Text item (FileUriExposedException): a click must never take the bar down.
+        Log.w(TAG, "can't open $intent", e)
+        if (!quiet) Toast.makeText(app, app.getString(R.string.toast_nothing_can_open), Toast.LENGTH_SHORT).show()
         false
     }
 

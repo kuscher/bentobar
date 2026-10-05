@@ -77,6 +77,13 @@ private fun Page(content: @Composable () -> Unit) {
     }
 }
 
+/** A section heading on a page, with room above it: it belongs to what follows, not to the text before. */
+@Composable
+private fun PageLabel(text: String) {
+    Spacer(Modifier.height(14.dp))
+    SectionLabel(text)
+}
+
 // ---- Add -----------------------------------------------------------------------------------
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -145,7 +152,7 @@ fun LookPage() {
         SwitchRow(stringResource(R.string.look_presenting), cfg.presenting, help = stringResource(R.string.look_presenting_help)) { on ->
             Store.update { it.copy(presenting = on) }
         }
-        SectionLabel(stringResource(R.string.look_look))
+        PageLabel(stringResource(R.string.look_look))
         ChoiceRow(stringResource(R.string.look_text_size), listOf(TextSize.SMALL to stringResource(R.string.look_text_small),
             TextSize.DEFAULT to stringResource(R.string.option_like_system), TextSize.LARGE to stringResource(R.string.look_text_large)), cfg.textSize) { v ->
             Store.update { it.copy(textSize = v) }
@@ -157,7 +164,7 @@ fun LookPage() {
             Pill.SUBTLE to stringResource(R.string.look_pill_subtle), Pill.SOLID to stringResource(R.string.look_pill_solid)), cfg.pill) { v ->
             Store.update { it.copy(pill = v) }
         }
-        SectionLabel(stringResource(R.string.barmenu_hidden_items))
+        PageLabel(stringResource(R.string.barmenu_hidden_items))
         ChoiceRow(stringResource(R.string.look_hidden_mode), listOf(HiddenMode.SHOW_ALL to stringResource(R.string.look_hidden_show_all),
             HiddenMode.CLICK to stringResource(R.string.look_hidden_click), HiddenMode.HOVER to stringResource(R.string.look_hidden_hover)),
             cfg.hiddenMode, help = stringResource(R.string.look_hidden_mode_help)) { v -> Store.update { it.copy(hiddenMode = v) } }
@@ -166,13 +173,13 @@ fun LookPage() {
             5 to pluralStringResource(R.plurals.look_collapse_after, 5, 5), 10 to pluralStringResource(R.plurals.look_collapse_after, 10, 10),
             30 to pluralStringResource(R.plurals.look_collapse_after, 30, 30)),
             if (cfg.autoCollapseSec in listOf(0, 5, 10, 30)) cfg.autoCollapseSec else 0) { v -> Store.update { it.copy(autoCollapseSec = v) } }
-        SectionLabel(stringResource(R.string.channel_live))
+        PageLabel(stringResource(R.string.channel_live))
         ChoiceRow(stringResource(R.string.look_chip), listOf(ChipMode.OFF to stringResource(R.string.common_off),
             ChipMode.FALLBACK to stringResource(R.string.look_chip_fallback), ChipMode.ALWAYS to stringResource(R.string.look_chip_always)),
             cfg.chipMode, help = stringResource(R.string.look_chip_help)) { v ->
             Store.update { it.copy(chipMode = v) }
         }
-        SectionLabel(stringResource(R.string.look_backup))
+        PageLabel(stringResource(R.string.look_backup))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             OutlinedButton(onClick = {
                 context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(res.getString(R.string.look_clip_label), Store.export()))
@@ -213,24 +220,13 @@ private fun Step(n: Int, title: String, done: Boolean, optional: Boolean = false
     }
 }
 
-@Composable
-private fun Body(text: String) = Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-
-@Composable
-private fun Bullet(text: String) = Row(Modifier.padding(start = 4.dp, top = 4.dp)) {
-    // Same size and color as the paragraphs around it, so a list reads as part of the text.
-    Text("•", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Spacer(Modifier.width(8.dp))
-    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}
-
 /**
  * Setup's steps, from [setup] (observed, so they flip to done the moment something changes). One
  * rule for buttons: a step that isn't done has a filled action button; a done step only offers a
  * plain link to manage it.
  */
 @Composable
-fun SetupPage(activity: Activity, setup: SetupState) {
+fun SetupPage(activity: Activity, setup: SetupState, onTurnOn: () -> Unit) {
     val running = setup.serviceOn
     Page {
         if (setup.advancedProtection) {
@@ -245,15 +241,12 @@ fun SetupPage(activity: Activity, setup: SetupState) {
         Step(1, stringResource(R.string.setup_turn_on_title), running) {
             Body(stringResource(R.string.setup_turn_on_text))
             Spacer(Modifier.height(6.dp))
-            Bullet(stringResource(R.string.setup_turn_on_reads))
-            Bullet(stringResource(R.string.setup_turn_on_copies))
-            Bullet(stringResource(R.string.setup_turn_on_runs))
-            Spacer(Modifier.height(6.dp))
-            Body(stringResource(R.string.setup_turn_on_doesnt))
+            AccessibilityUses()
             Spacer(Modifier.height(10.dp))
             Row(Modifier.offset(x = if (running) (-12).dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (running) TextButton(onClick = { MainActivity.openAccessibility(activity) }) { Text(stringResource(R.string.setup_accessibility_settings)) }
-                else FilledTonalButton(onClick = { MainActivity.openAccessibility(activity) }, enabled = !setup.advancedProtection) { Text(stringResource(R.string.setup_turn_on)) }
+                // Turning it on goes through the disclosure and the user's consent first (MainActivity.turnOn).
+                else FilledTonalButton(onClick = onTurnOn, enabled = !setup.advancedProtection) { Text(stringResource(R.string.setup_turn_on)) }
                 TextButton(onClick = { MainActivity.openAppInfo(activity) }) { Text(stringResource(R.string.setup_app_info)) }
             }
             if (!running) {
@@ -358,6 +351,8 @@ private fun StepLink(label: String, onClick: () -> Unit) =
 
 // ---- About ---------------------------------------------------------------------------------
 
+private const val PRIVACY_URL = "https://googlebook.studio/privacy/bentobar"
+
 @Composable
 fun AboutPage() {
     Page {
@@ -376,17 +371,21 @@ fun AboutPage() {
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        SectionLabel(stringResource(R.string.about_privacy))
+        PageLabel(stringResource(R.string.about_privacy))
         Body(stringResource(R.string.about_privacy_text))
-        SectionLabel(stringResource(R.string.about_how))
+        // Google Play asks for the privacy policy to be reachable from inside the app.
+        TextButton(onClick = { Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_URL))) }, modifier = Modifier.offset(x = (-12).dp)) {
+            Text(stringResource(R.string.about_privacy_policy))
+        }
+        PageLabel(stringResource(R.string.about_how))
         Body(stringResource(R.string.about_how_text))
-        SectionLabel(stringResource(R.string.about_open_source))
+        PageLabel(stringResource(R.string.about_open_source))
         Body(stringResource(R.string.about_open_source_text))
         Spacer(Modifier.height(4.dp))
         Bullet(stringResource(R.string.about_credit_symbols))
         Bullet(stringResource(R.string.about_credit_compose))
         Bullet(stringResource(R.string.about_credit_kotlin))
-        SectionLabel(stringResource(R.string.about_who))
+        PageLabel(stringResource(R.string.about_who))
         Body(stringResource(R.string.about_who_text))
         Spacer(Modifier.height(8.dp))
         Body(stringResource(R.string.about_independent_text))

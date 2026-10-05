@@ -21,6 +21,8 @@ data class BarSnapshot(
     val summary: String,
     /** The desktop bar's spacer node: refreshing just this is a cheap "did anything move?" check. */
     val spacerNode: AccessibilityNodeInfo? = null,
+    /** Where [spacerNode] was at the scan. It is [free] unless the spacer had no width left. */
+    val spacer: Rect? = null,
 )
 
 object StatusBarScan {
@@ -71,7 +73,7 @@ object StatusBarScan {
             for (i in n.childCount - 1 downTo 0) n.getChild(i)?.let { stack.add(it to depth + 1) }
         }
         val free = spacer?.takeIf { it.width() > 0 } ?: widestGap(bar, parts)
-        return BarSnapshot(w.id, bar, free, clock, names.toString().trim(), spacerNode)
+        return BarSnapshot(w.id, bar, free, clock, names.toString().trim(), spacerNode, spacer)
     }
 
     /** The widest horizontal stretch of the bar that no item covers. */

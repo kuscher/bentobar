@@ -383,6 +383,7 @@
     <string name="page_look">Look and behavior</string>
     <string name="page_setup">Setup</string>
     <string name="page_about">About BentoBar</string>
+    <string name="status_service_off_setup">BentoBar\'s accessibility service is off. Turn it on in step 1.</string>
     <string name="status_service_off">BentoBar\'s accessibility service is off. Turn it on in Setup.</string>
     <string name="status_hidden">Hidden. Show it again here or with the Quick Settings tile.</string>
     <string name="status_starting">Starting…</string>
@@ -492,10 +493,16 @@
     <string name="setup_aap_text">It allows only assistive accessibility services, so BentoBar can\'t run. The Live Update chip and Quick Settings tiles still work.</string>
     <string name="setup_turn_on_title">Turn on BentoBar</string>
     <string name="setup_turn_on_text">Apps can draw on the status bar only through an accessibility service, which Android says can \"view and control your screen\". With it on, BentoBar:</string>
+    <string name="setup_turn_on_draws">draws your items in the status bar\'s free space</string>
     <string name="setup_turn_on_reads">reads only the status bar\'s layout, to find free space for your items</string>
     <string name="setup_turn_on_copies">reads the color of the status bar clock, so your items match it</string>
     <string name="setup_turn_on_runs">runs the system actions you pick in the Tools menu, such as screenshot or lock</string>
     <string name="setup_turn_on_doesnt">It doesn\'t read other apps\' windows or watch your keyboard, mouse or touches. What it reads stays on your Googlebook: BentoBar never collects or shares it.</string>
+    <string name="disclosure_title">BentoBar uses the Accessibility API</string>
+    <string name="disclosure_intro">Android lets an app draw on the status bar only through an accessibility service (the AccessibilityService API). With its service on, BentoBar:</string>
+    <string name="disclosure_next">Agree opens Android\'s Accessibility settings, where you turn BentoBar on. You can turn it off there at any time.</string>
+    <string name="disclosure_agree">Agree</string>
+    <string name="disclosure_decline">No thanks</string>
     <string name="setup_accessibility_settings">Accessibility settings</string>
     <string name="setup_turn_on">Turn on</string>
     <string name="setup_app_info">App info</string>
@@ -519,6 +526,7 @@
     <string name="about_formerly">Called DiscoBar until version 0.4.1.</string>
     <string name="about_privacy">Privacy</string>
     <string name="about_privacy_text">BentoBar has no internet permission: your settings, calendar events and everything it measures stay on your Googlebook. Its accessibility service reads only the status bar (its layout and its clock\'s color), never other apps. With Usage access on, it also reads how much data and storage each app uses, for the Network and Storage menus, and nothing else.</string>
+    <string name="about_privacy_policy">Privacy policy</string>
     <string name="about_how">How it works</string>
     <string name="about_how_text">Apps can\'t change Android\'s own status bar icons, so BentoBar draws its items in its own windows over the status bar\'s free space. It moves them aside when the system icons change and hides them when an app goes full screen. A running timer or meeting can also appear as a Live Update chip.</string>
     <string name="about_open_source">Open source</string>

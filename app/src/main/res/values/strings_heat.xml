@@ -21,8 +21,8 @@
     <string name="heat_bar_temp_word">%1$s · %2$s</string>
     <string name="heat_level">Heat level</string>
     <string name="heat_battery_temp">Battery temperature</string>
-    <string name="heat_temp_c">%1$s °C</string>
-    <string name="heat_temp_f">%1$s °F</string>
+    <string name="heat_temp_c">%1$s\u00A0°C</string>
+    <string name="heat_temp_f">%1$s\u00A0°F</string>
     <string name="heat_cpu_load">CPU load</string>
     <string name="heat_show_state">State</string>
     <!-- Spoken: %1$s is the state in words ("Hot, slowing a little"). -->

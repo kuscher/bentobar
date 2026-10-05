@@ -392,8 +392,8 @@ class HeatRulesTest {
         assertEquals("41.3", HeatRules.oneDecimal(41.3, fahrenheit = false))
         assertEquals("106.3", HeatRules.oneDecimal(41.3, fahrenheit = true))
         assertEquals("34.0", HeatRules.oneDecimal(34.0, fahrenheit = false))
-        assertEquals("41.3 °C", text.format("heat_temp_c", HeatRules.oneDecimal(41.3, fahrenheit = false)))
-        assertEquals("106.3 °F", text.format("heat_temp_f", HeatRules.oneDecimal(41.3, fahrenheit = true)))
+        assertEquals("41.3\u00A0°C", text.format("heat_temp_c", HeatRules.oneDecimal(41.3, fahrenheit = false)))
+        assertEquals("106.3\u00A0°F", text.format("heat_temp_f", HeatRules.oneDecimal(41.3, fahrenheit = true)))
     }
 
     // ---- the CPU item's rule
@@ -486,8 +486,8 @@ class HeatRulesTest {
             "heat_bar_temp_word" to "%1\$s · %2\$s",
             "heat_level" to "Heat level",
             "heat_battery_temp" to "Battery temperature",
-            "heat_temp_c" to "%1\$s °C",
-            "heat_temp_f" to "%1\$s °F",
+            "heat_temp_c" to "%1\$s\u00A0°C",
+            "heat_temp_f" to "%1\$s\u00A0°F",
             "heat_cpu_load" to "CPU load",
             "heat_note" to "At 100% Android slows the device down noticeably to cool it; a little slowing can start sooner. " +
                 "Android doesn't share CPU temperature or fan speed with apps.",

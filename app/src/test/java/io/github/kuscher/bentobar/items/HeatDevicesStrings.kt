@@ -34,7 +34,7 @@ internal class HeatDevicesStrings(vararg files: String) {
         }
     }
 
-    /** What Android makes of a resource's text: `\'` is an apostrophe, ` ` the character it names. */
+    /** What Android makes of a resource's text: `\'` is an apostrophe, `\u00A0` the character it names. */
     private fun shown(raw: String): String {
         val out = StringBuilder()
         var i = 0

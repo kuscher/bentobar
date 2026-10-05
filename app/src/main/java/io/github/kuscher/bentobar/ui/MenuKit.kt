@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -273,6 +274,8 @@ fun SearchField(label: String, placeholder: String = "", initial: String = "", s
     var field by remember { mutableStateOf(TextFieldValue(initial, if (selectAll) TextRange(0, initial.length) else TextRange(initial.length))) }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     fun enter() { if (canSubmit) onEnter(field.text) }
+    // The field itself has the focus, not the × inside it: Enter on the × is the ×'s.
+    var own by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
@@ -285,10 +288,10 @@ fun SearchField(label: String, placeholder: String = "", initial: String = "", s
                 isError = error != null,
                 keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = if (submit != null) ImeAction.Search else ImeAction.Done),
                 keyboardActions = KeyboardActions(onGo = { enter() }, onDone = { enter() }, onSearch = { enter() }),
-                modifier = Modifier.weight(1f).focusRequester(focus).onPreviewKeyEvent { e ->
+                modifier = Modifier.weight(1f).focusRequester(focus).onFocusChanged { own = it.isFocused }.onPreviewKeyEvent { e ->
                     // A hardware keyboard's Enter doesn't always arrive as the keyboard's action. Down acts and
                     // up is swallowed, so that action can't act a second time.
-                    if (e.key == Key.Enter || e.key == Key.NumPadEnter) { if (e.type == KeyEventType.KeyDown) enter(); true } else false
+                    if (own && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { if (e.type == KeyEventType.KeyDown) enter(); true } else false
                 },
             )
             if (submit != null) FilledTonalButton(onClick = { enter() }, enabled = canSubmit) { Text(submit, maxLines = 1) }

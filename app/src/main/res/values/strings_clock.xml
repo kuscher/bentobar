@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- World clock: more cities, the Clock item's rule, Plan a time. Every name here starts with clock_ or trigger_clock. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="trigger_clock">Show when this clock differs from local time</string>
+    <string name="trigger_clock_short">shows when away</string>
+
+    <!-- the menu -->
+    <string name="clock_same_time">Same time</string>
+    <string name="clock_night">Night there</string>
+    <string name="clock_add_city">Add a city</string>
+    <string name="clock_search_label">City or time zone</string>
+    <string name="clock_search_none">No city or zone matches</string>
+    <string name="clock_search_added">added</string>
+    <string name="clock_search_region">%1$s (%2$s)</string>
+    <string name="clock_full">The list holds 8 cities. Remove one to add another.</string>
+    <string name="clock_edit_cities">Edit cities</string>
+    <string name="clock_remove_city">Remove %1$s</string>
+
+    <!-- Plan a time -->
+    <string name="clock_plan">Plan a time</string>
+    <string name="clock_plan_now">Now</string>
+    <string name="clock_plan_slider">Time of day</string>
+    <string name="clock_plan_state">%1$s, %2$s</string>
+    <string name="clock_plan_previous_day">Previous day</string>
+    <string name="clock_plan_next_day">Next day</string>
+    <string name="clock_plan_subtitle">%1$s · %2$s</string>
+    <string name="clock_plan_copy">Copy times</string>
+    <string name="clock_plan_new_event">New event at %1$s</string>
+
+    <!-- the Clock item's settings -->
+    <string name="clock_cities_section">World clock cities</string>
+    <string name="clock_cities_help">One list for the whole bar. Add cities in the World clock menu.</string>
+    <string name="clock_cities_empty">No cities added yet. Add one in the World clock menu.</string>
+    <string name="clock_city_name">Name</string>
+    <string name="clock_city_remove">Remove</string>
+</resources>

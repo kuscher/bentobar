@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sound: the volume slider in the bar. Every name here starts with sound_. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="sound_slider">Slider in the bar</string>
+    <string name="sound_slider_help">Click or drag it to set the volume.</string>
+    <string name="sound_slider_fixed">This output\'s volume is fixed, so the bar shows the number.</string>
+    <string name="sound_tooltip">Volume %1$d%%</string>
+</resources>

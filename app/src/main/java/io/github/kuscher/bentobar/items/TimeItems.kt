@@ -11,7 +11,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.FocusRequester
@@ -48,7 +47,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerIcon
@@ -72,6 +70,7 @@ import io.github.kuscher.bentobar.ui.MenuEntry
 import io.github.kuscher.bentobar.ui.Meter
 import io.github.kuscher.bentobar.ui.SectionLabel
 import io.github.kuscher.bentobar.ui.SliderRow
+import io.github.kuscher.bentobar.ui.SmallIconButton
 import io.github.kuscher.bentobar.ui.SwitchRow
 import io.github.kuscher.bentobar.ui.TextRow
 import io.github.kuscher.bentobar.ui.rememberTick
@@ -241,17 +240,6 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
         }
         MenuEntry(Sym.OPEN_IN_NEW, stringResource(R.string.calendar_open)) {
             host.close(); Calendar.openDay(picked.atTime(9, 0).atZone(zone).toInstant().toEpochMilli())
-        }
-    }
-}
-
-@Composable
-private fun SmallIconButton(sym: String, label: String, color: Color = LocalContentColor.current, onClick: () -> Unit) {
-    // Looks 28 dp, but takes clicks and focus over the 48 dp minimum.
-    Box(Modifier.minimumInteractiveComponentSize().clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand),
-        contentAlignment = Alignment.Center) {
-        Box(Modifier.size(28.dp).clip(CircleShape), contentAlignment = Alignment.Center) {
-            SymIcon(sym, size = 18.sp, contentDescription = label, color = color)
         }
     }
 }

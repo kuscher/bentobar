@@ -1,0 +1,104 @@
+package io.github.kuscher.bentobar.net
+
+import java.io.InputStream
+import java.net.ConnectException
+import java.net.HttpURLConnection
+import java.net.NoRouteToHostException
+import java.net.SocketException
+import java.net.SocketTimeoutException
+import java.net.URL
+import java.net.URLEncoder
+import java.net.UnknownHostException
+import java.util.zip.GZIPInputStream
+import javax.net.ssl.SSLException
+
+/**
+ * A request over HTTPS with the platform's own HttpURLConnection. The address is put together here
+ * and nowhere else: `https://`, the [Host]'s domain, a path of plain characters, the encoded query.
+ * A redirect is an answer (a status), never followed, so nothing can lead to a fourth host.
+ *
+ * Whatever goes wrong becomes a [Reply.Failed]. No exception leaves this class and none is logged:
+ * the platform puts the address into exception messages, and an address can hold a key.
+ */
+class HttpTransport(
+    /** Opens the connection for an address. Only tests pass one (to reach a server on this machine). */
+    private val open: (String) -> HttpURLConnection = ::openChecked,
+    private val connectMs: Int = Http.CONNECT_MS,
+    private val readMs: Int = Http.READ_MS,
+    private val maxBytes: Int = Http.MAX_BYTES,
+) : Transport {
+
+    override fun get(request: Request): Reply {
+        val address = address(request) ?: return Reply.Failed(Why.UNREADABLE)
+        var connection: HttpURLConnection? = null
+        return try {
+            val c = open(address).also { connection = it }
+            c.connectTimeout = connectMs
+            c.readTimeout = readMs
+            c.instanceFollowRedirects = false
+            c.useCaches = false
+            c.requestMethod = "GET"
+            // Not the platform's default, which names the device model and the Android build.
+            c.setRequestProperty("User-Agent", Http.USER_AGENT)
+            c.setRequestProperty("Accept", "application/json")
+            // Asked for by name and unpacked below, so Android and the JVM (the unit tests) behave alike.
+            c.setRequestProperty("Accept-Encoding", "gzip")
+            val status = c.responseCode
+            if (status !in 200..299) return Reply.Failed(Why.STATUS, status, retryAfter(c))
+            val packed = c.contentEncoding.orEmpty().trim().equals("gzip", ignoreCase = true)
+            val bytes = c.inputStream.let { if (packed) GZIPInputStream(it) else it }.use { read(it) }
+                ?: return Reply.Failed(Why.TOO_LARGE, status)
+            Reply.Ok(String(bytes, Charsets.UTF_8))
+        } catch (t: Throwable) {
+            Reply.Failed(why(t))
+        } finally {
+            try { connection?.disconnect() } catch (_: Throwable) {}
+        }
+    }
+
+    /** At most [maxBytes], or null if there is more: a reply that large is nobody's forecast. */
+    private fun read(stream: InputStream): ByteArray? {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(8 * 1024)
+        while (true) {
+            val n = stream.read(buffer)
+            if (n < 0) return out.toByteArray()
+            if (out.size() + n > maxBytes) return null
+            out.write(buffer, 0, n)
+        }
+    }
+
+    private fun retryAfter(c: HttpURLConnection): Long? =
+        c.getHeaderField("Retry-After")?.trim()?.toLongOrNull()?.takeIf { it in 0..86_400 }
+
+    companion object {
+        private val PATH = Regex("(/[A-Za-z0-9._~-]+)+")
+
+        /**
+         * The address of [request], or null if its path isn't a plain one: it must start with "/"
+         * and hold only letters, digits and `. _ ~ -` between slashes (so no `//`, `@`, `?`, `#`,
+         * backslash or space), and no `..`.
+         */
+        fun address(request: Request): String? {
+            if (!PATH.matches(request.path) || request.path.contains("..")) return null
+            val query = request.query.joinToString("&") { (name, value) -> encode(name) + "=" + encode(value) }
+            return "https://" + request.host.domain + request.path + if (query.isEmpty()) "" else "?$query"
+        }
+
+        private fun encode(text: String): String = URLEncoder.encode(text, "UTF-8")
+
+        /** The real opener: once more, only HTTPS and only the three hosts. Nothing is connected yet when it returns. */
+        internal fun openChecked(address: String): HttpURLConnection {
+            val url = URL(address)
+            check(url.protocol == "https" && Host.entries.any { it.domain == url.host }) { "not one of BentoBar's hosts" }
+            return url.openConnection() as HttpURLConnection
+        }
+
+        /** What went wrong, as one of a few kinds. The exception itself is dropped here. */
+        internal fun why(t: Throwable): Why = when (t) {
+            is SocketTimeoutException -> Why.TIMEOUT
+            is UnknownHostException, is ConnectException, is NoRouteToHostException, is SocketException, is SSLException -> Why.OFFLINE
+            else -> Why.UNREADABLE
+        }
+    }
+}

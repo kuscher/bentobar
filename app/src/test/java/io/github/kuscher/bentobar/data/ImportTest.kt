@@ -43,6 +43,23 @@ class ImportTest {
         assertEquals(true, c.onboarded)
     }
 
+    @Test fun worldClockCitiesTravelWithTheLayout() {
+        val c = BarConfig(items = listOf(clock), cities = listOf(WorldCity("Asia/Tokyo"), WorldCity("Europe/Berlin", "Munich")))
+        assertEquals(c, Store.parseLayout(json.encodeToString(BarConfig.serializer(), c)))
+        // A layout from before there were cities has none.
+        assertEquals(emptyList<WorldCity>(), Store.parseLayout("""{"version":3,"items":[]}""")!!.cities)
+    }
+
+    @Test fun aLayoutHasNoPlaceForAKeyOrAnOnlineSwitch() {
+        // What Copy settings puts on the clipboard, and what a backup carries: these fields and no others. A key and
+        // the two online switches are kept elsewhere (Online); a new field here should be a decision, so it is listed.
+        val fields = (0 until BarConfig.serializer().descriptor.elementsCount).map { BarConfig.serializer().descriptor.getElementName(it) }.toSet()
+        assertEquals(setOf("version", "enabled", "items", "position", "hiddenMode", "chevron", "revealOnHover", "autoCollapseSec", "pinnedOpen",
+            "presenting", "turnedOff", "textSize", "pill", "color", "spacing", "chipMode", "onboarded", "cities"), fields)
+        val item = (0 until ItemConfig.serializer().descriptor.elementsCount).map { ItemConfig.serializer().descriptor.getElementName(it) }.toSet()
+        assertEquals(setOf("id", "type", "section", "whenActive", "display", "options"), item)
+    }
+
     @Test fun anOlderLayoutIsMigrated() {
         val old = """{"version":2,"chevron":false,"items":[{"id":"m","type":"memory","section":"HIDDEN"}]}"""
         val c = Store.parseLayout(old)

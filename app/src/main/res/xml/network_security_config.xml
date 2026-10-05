@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BentoBar talks to three hosts (net/Http.kt), over HTTPS only: nothing is ever sent or read in clear
+  text, to any host. Certificates are checked against the system's own authorities.
+  Debug builds also trust authorities the user installed, so a test can look at the requests through a
+  proxy; release builds never do.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

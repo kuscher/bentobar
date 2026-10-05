@@ -4,6 +4,8 @@ import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -19,8 +21,12 @@ import android.util.Log
 import android.widget.Toast
 import androidx.annotation.PluralsRes
 import androidx.annotation.StringRes
+import io.github.kuscher.bentobar.BuildConfig
 import io.github.kuscher.bentobar.R
+import io.github.kuscher.bentobar.data.Online
+import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
+import io.github.kuscher.bentobar.net.Http
 
 /**
  * Process-wide context for items: the app context, the accessibility service while it runs,
@@ -45,12 +51,45 @@ object Env {
         if (::app.isInitialized) return
         app = context.applicationContext
         Store.init(app)
+        // The switches for the two online services and the user's key: in the no-backup directory, which
+        // Android leaves out of backups and device transfers. Then the rules for going online at all.
+        Online.init(app.noBackupFilesDir)
+        wireOnline()
+        NowPlaying.init(app)
         // Before Timers: a timer that finished while BentoBar wasn't running ends in init, and its
         // chip update asks the calendar.
         Calendar.init(app)
         io.github.kuscher.bentobar.util.Fonts.init(app)
         Timers.init(app)
         Caffeine.init(app)
+    }
+
+    /**
+     * When BentoBar may ask an online service, in one place. A request goes out only if all of this
+     * holds: the service is switched on for this install (the user set its item up here), an item of
+     * a type that uses the service is outside Off, and something that shows items is on screen. And
+     * never from the main thread, and not at all without a network.
+     */
+    private fun wireOnline() {
+        Http.allowed = { host ->
+            val service = Online.serviceOf(host)
+            Online.on(service) && Ticker.running &&
+                Store.config.value.items.any { it.section != Section.OFF && Items.of(it.type)?.online == service }
+        }
+        Http.connected = { runCatching { app.getSystemService(ConnectivityManager::class.java)?.activeNetwork != null }.getOrDefault(true) }
+        Http.onMain = { android.os.Looper.myLooper() == android.os.Looper.getMainLooper() }
+        // The host, the path and what came of it, in debug builds only; never a query (a key, a city) and never a reply.
+        if (BuildConfig.DEBUG) Http.log = { Log.i(TAG, it) }
+        // A service switched off, or its key removed: whatever it sent is dropped, in memory and by the types that kept more.
+        Online.onOff = { service ->
+            Background.onMain {
+                Background.forget(service)
+                Items.all.filter { it.online == service }.forEach { type ->
+                    try { type.forgetFetched() } catch (e: Exception) { Log.w(TAG, "forgetting what ${type.type} fetched failed", e) }
+                }
+                Ticker.refresh()
+            }
+        }
     }
 
     /** Samples only what the configured items use ([types]); menus ask for theirs while open. */
@@ -87,6 +126,21 @@ object Env {
         if (args.isEmpty()) app.resources.getQuantityString(id, count, count) else app.resources.getQuantityString(id, count, *args)
 
     fun global(action: Int): Boolean = service?.performGlobalAction(action) ?: false
+
+    /** Puts [text] on the clipboard (a flight's status, the times of a planned moment). */
+    fun copy(text: String) {
+        runCatching { app.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(app.getString(R.string.app_name), text)) }
+            .onFailure { Log.w(TAG, "can't copy: ${it.javaClass.simpleName}") }
+    }
+
+    /**
+     * Installed from a download rather than from Google Play: Android then guards some switches
+     * (accessibility, notification access) as "restricted settings" until the user allows them in App
+     * info, and the screens that send someone to such a switch say how.
+     */
+    fun sideloaded(): Boolean = runCatching {
+        app.packageManager.getInstallSourceInfo(app.packageName).installingPackageName != "com.android.vending"
+    }.getOrDefault(true)
 
     /**
      * Advanced Protection (Android 17) turns off accessibility services that aren't assistive

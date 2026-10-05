@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What a cloud backup and a transfer to a new device take along: the layout and its settings, as
+  before. What belongs to one install stays behind: whether an online service is switched on, the
+  user's own key for one, and what a service last sent. All of that is kept in Android's no-backup
+  directory (data/Online.kt, data/Kept.kt), which the system leaves out by itself; it is named here
+  as well, so that the rule is written down in the app and not only in the platform.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="no_backup" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="no_backup" />
+    </device-transfer>
+</data-extraction-rules>

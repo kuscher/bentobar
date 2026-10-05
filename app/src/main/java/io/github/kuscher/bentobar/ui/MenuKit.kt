@@ -1,6 +1,8 @@
 package io.github.kuscher.bentobar.ui
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,17 +24,44 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -46,7 +75,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.kuscher.bentobar.R
+import io.github.kuscher.bentobar.data.Online
+import io.github.kuscher.bentobar.items.Env
+import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
+import kotlinx.coroutines.delay
 
 /** The frame every drop-down menu shares: a header with icon and title, then content. */
 @Composable
@@ -57,6 +91,8 @@ fun MenuCard(
     trailing: (@Composable () -> Unit)? = null,
     /** A drawable instead of the [icon] symbol (BentoBar's own mark). */
     iconRes: Int? = null,
+    /** The subtitle's color, where it says something out of the ordinary (a time being planned). */
+    subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
@@ -74,7 +110,7 @@ fun MenuCard(
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    color = subtitleColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             if (trailing != null) trailing()
         }
@@ -141,9 +177,14 @@ fun Sparkline(
     }
 }
 
-/** A full-width row button, like a desktop menu entry. */
+/**
+ * A full-width row button, like a desktop menu entry. [sub]: a second, quieter line under the label
+ * (a player's track). [image]: a picture in the symbol's place (an app's icon). [trailing]: a control
+ * of its own at the row's end (a × to remove a city, a play button), which takes its own clicks.
+ */
 @Composable
-fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Boolean = true, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Boolean = true, modifier: Modifier = Modifier,
+              sub: String? = null, image: Bitmap? = null, trailing: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     val focused by source.collectIsFocusedAsState()
@@ -157,13 +198,119 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val c = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        SymIcon(icon, size = 18.sp, color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else c)
+        if (image != null) Image(remember(image) { image.asImageBitmap() }, null, Modifier.size(20.dp))
+        else SymIcon(icon, size = 18.sp, color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else c)
         Spacer(Modifier.width(10.dp))
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = c, modifier = Modifier.weight(1f),
+        if (sub == null) Text(label, style = MaterialTheme.typography.bodyMedium, color = c, modifier = Modifier.weight(1f),
             maxLines = 1, overflow = TextOverflow.Ellipsis)
+        else Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
         if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (trailing != null) trailing()
     }
+}
+
+/**
+ * A small icon button in a menu: ×, ‹, ›, play. It looks 28 dp, and takes clicks and the keyboard's
+ * focus over the 48 dp minimum. Not [enabled], it is dimmed and takes neither.
+ */
+@Composable
+fun SmallIconButton(sym: String, label: String, color: Color = LocalContentColor.current, enabled: Boolean = true, onClick: () -> Unit) {
+    Box(Modifier.minimumInteractiveComponentSize().clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+        .then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+        contentAlignment = Alignment.Center) {
+        Box(Modifier.size(28.dp).clip(CircleShape), contentAlignment = Alignment.Center) {
+            SymIcon(sym, size = 18.sp, contentDescription = label, color = if (enabled) color else color.copy(alpha = 0.38f))
+        }
+    }
+}
+
+/**
+ * Previous, play or pause, next: the media buttons of the Sound menu and of Now playing. What the
+ * player doesn't offer is dimmed, not hidden, so the three keep their places.
+ */
+@Composable
+fun MediaButtons(playing: Boolean, onPrevious: () -> Unit, onPlayPause: () -> Unit, onNext: () -> Unit,
+                 canPrevious: Boolean = true, canPlayPause: Boolean = true, canNext: Boolean = true) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FilledTonalIconButton(onClick = onPrevious, enabled = canPrevious) {
+            SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = stringResource(R.string.sound_previous))
+        }
+        FilledTonalIconButton(onClick = onPlayPause, enabled = canPlayPause) {
+            SymIcon(if (playing) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp,
+                contentDescription = stringResource(if (playing) R.string.common_pause else R.string.sound_play))
+        }
+        FilledTonalIconButton(onClick = onNext, enabled = canNext) {
+            SymIcon(Sym.SKIP_NEXT, size = 22.sp, contentDescription = stringResource(R.string.sound_next))
+        }
+    }
+}
+
+/**
+ * A text field in a menu. It takes the focus when it appears; Enter, the keyboard's own action and
+ * the button ([action], where there is one) all submit. While [canSubmit] is false the button is
+ * dimmed and Enter does nothing. [selectAll]: the text it starts with is selected, so typing
+ * replaces it. [error] is said under the field, which is marked.
+ */
+@Composable
+fun MenuField(value: String, onValueChange: (String) -> Unit, label: String, onSubmit: () -> Unit, modifier: Modifier = Modifier,
+              placeholder: String = "", action: String? = null, canSubmit: Boolean = true, error: String? = null,
+              selectAll: Boolean = false, keyboard: KeyboardType = KeyboardType.Text) {
+    var field by remember { mutableStateOf(TextFieldValue(value, if (selectAll) TextRange(0, value.length) else TextRange(value.length))) }
+    // The text was changed from outside (cleared after a submit): follow it, with the caret at its end.
+    LaunchedEffect(value) { if (field.text != value) field = TextFieldValue(value, TextRange(value.length)) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    fun submit() { if (canSubmit) onSubmit() }
+    Column(modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+                value = field,
+                onValueChange = { next -> val changed = next.text != field.text; field = next; if (changed) onValueChange(next.text) },
+                label = { Text(label) },
+                placeholder = if (placeholder.isEmpty()) null else { { Text(placeholder) } },
+                singleLine = true,
+                isError = error != null,
+                keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = ImeAction.Go),
+                keyboardActions = KeyboardActions(onGo = { submit() }, onDone = { submit() }, onSearch = { submit() }),
+                modifier = Modifier.weight(1f).focusRequester(focus).onPreviewKeyEvent { e ->
+                    // A hardware keyboard's Enter doesn't always arrive as the keyboard's action. Down and
+                    // up are both taken, so that action can't submit a second time.
+                    if (e.key == Key.Enter || e.key == Key.NumPadEnter) { if (e.type == KeyEventType.KeyDown) submit(); true } else false
+                },
+            )
+            if (action != null) FilledTonalButton(onClick = { submit() }, enabled = canSubmit) { Text(action, maxLines = 1) }
+        }
+        if (error != null) Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(start = 4.dp, top = 2.dp))
+    }
+}
+
+/** An entry that puts [text] on the clipboard and reads "Copied" for two seconds; no toast. */
+@Composable
+fun CopyEntry(label: String, icon: String = Sym.CONTENT_COPY, text: () -> String) {
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) { if (copied) { delay(2_000); copied = false } }
+    MenuEntry(if (copied) Sym.CHECK else icon, if (copied) stringResource(R.string.common_copied) else label) {
+        Env.copy(text())
+        copied = true
+    }
+}
+
+/**
+ * The words shown before an online service is asked for the first time, in the item's menu and in
+ * its settings: who is asked, what is sent, and nothing else.
+ */
+@Composable
+fun OnlineWords(service: Online.Service, modifier: Modifier = Modifier) {
+    Text(stringResource(when (service) {
+        Online.Service.OPEN_METEO -> R.string.weather_words
+        Online.Service.AIRLABS -> R.string.flight_words
+    }), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = modifier.padding(vertical = 2.dp))
 }
 
 /** A square-ish tile with an icon over a label, for grids of actions. */
@@ -199,21 +346,26 @@ fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: 
 fun TileGrid(content: @Composable () -> Unit) =
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
 
-/** Pill buttons in a row (presets such as 5, 10, 25 min). */
+/**
+ * Pill buttons in a row (presets such as 5, 10, 25 min). With [selected], they are a choice: that
+ * one is filled in the primary color and said to be selected (the day a flight is looked up for).
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ChipRow(labels: List<String>, onClick: (Int) -> Unit) {
+fun ChipRow(labels: List<String>, selected: Int? = null, onClick: (Int) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         labels.forEachIndexed { i, l ->
             val source = remember { MutableInteractionSource() }
             val hovered by source.collectIsHoveredAsState()
             val focused by source.collectIsFocusedAsState()
+            val chosen = selected == i
+            val fill = if (chosen) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
             Text(l, style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = if (chosen) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.heightIn(min = 32.dp).focusRing(focused, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
-                    .background(if (hovered) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
-                        else MaterialTheme.colorScheme.secondaryContainer)
+                    .background(if (hovered) fill.copy(alpha = 0.8f) else fill)
                     .hoverable(source)
+                    .then(if (selected != null) Modifier.semantics { this.selected = chosen } else Modifier)
                     .clickable(interactionSource = source, indication = null) { onClick(i) }
                     .pointerHoverIcon(PointerIcon.Hand)
                     .padding(horizontal = 12.dp, vertical = 6.dp))

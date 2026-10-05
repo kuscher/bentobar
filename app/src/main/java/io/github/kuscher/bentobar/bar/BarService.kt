@@ -575,8 +575,8 @@ class BarController(private val service: AccessibilityService) {
             placed[item.id] = at
             val type = Items.of(item.type) ?: return
             if (type.onClick(item)) { Ticker.refresh(); return }
-            val menuUi = type.menu ?: return
-            toggleMenu("item:${item.id}", at, type.menuWidthDp) { host -> menuUi(item, host) }
+            if (type.menu == null) return
+            toggleMenu("item:${item.id}", at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
         }
 
         override fun context(item: ItemConfig, at: Rect) {
@@ -584,8 +584,7 @@ class BarController(private val service: AccessibilityService) {
             toggleMenu("ctx:${item.id}", at, 280) { host ->
                 ItemContextMenu(item.id, host) {
                     val type = Items.of(item.type)
-                    val menuUi = type?.menu
-                    if (menuUi != null) { closeMenu(); menuClosedKey = null; toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> menuUi(item, h) } }
+                    if (type?.menu != null) { closeMenu(); menuClosedKey = null; toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
                 }
             }
         }
@@ -593,6 +592,13 @@ class BarController(private val service: AccessibilityService) {
         override fun scroll(item: ItemConfig, steps: Int) {
             Items.of(item.type)?.onScroll(item, steps)
             Ticker.refresh()
+        }
+
+        /** The slider in the bar: the item sets what it stands for, and only that item is drawn again (no sampler runs for a drag). */
+        override fun slide(item: ItemConfig, level: Float, done: Boolean) {
+            hideTip()
+            Items.of(item.type)?.onSlide(item, level, done)
+            Ticker.refresh(item)
         }
 
         override fun chevron(at: Rect) {
@@ -671,12 +677,11 @@ class BarController(private val service: AccessibilityService) {
     private fun barMenu(at: Rect, everything: Boolean) = toggleMenu("bentobar", at, 290) { host ->
         BentoBarMenu(host, openItem = { item ->
             val type = Items.of(item.type)
-            val menuUi = type?.menu
             closeMenu(); menuClosedKey = null
             // From the list of every item, an item's menu opens under the item itself.
             val anchor = placed[item.id]?.takeIf { everything } ?: at
             if (type != null && type.onClick(item)) Ticker.refresh()
-            else if (menuUi != null) toggleMenu("item:${item.id}", anchor, type.menuWidthDp) { h -> menuUi(item, h) }
+            else if (type?.menu != null) toggleMenu("item:${item.id}", anchor, type.menuWidthDp) { h -> ItemMenu(item.id, h) }
         }, hideBar = { Store.update { it.copy(enabled = false) } }, everything = everything)
     }
 
@@ -743,17 +748,19 @@ class BarController(private val service: AccessibilityService) {
 
     /**
      * The item's name below it, after a short hover: icon-only items otherwise give a mouse user
-     * nothing to go on. A no-touch window, so it never takes a click.
+     * nothing to go on. An item whose state has a tip of its own (a track's whole title, a flight's
+     * sentence) shows that instead. A no-touch window, so it never takes a click.
      */
     private fun showTooltip(item: ItemConfig, anchor: Rect) {
         hideTip()
         val s = snap ?: return
         if (menu != null || !strip.shown) return
-        val label = Items.of(item.type)?.title ?: return
+        val label = Ticker.states.value[item.id]?.tip?.takeIf { it.isNotBlank() } ?: Items.of(item.type)?.title ?: return
         val loc = strip.locationOnScreen()
         val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
         val paint = android.text.TextPaint().apply { textSize = android.util.TypedValue.applyDimension(android.util.TypedValue.COMPLEX_UNIT_SP, 13f, service.resources.displayMetrics) }
-        val w = (paint.measureText(label) + 2 * 10 * density).toInt() + 2
+        // A long tip ends in an ellipsis: the window is never wider than this.
+        val w = ((paint.measureText(label) + 2 * 10 * density).toInt() + 2).coerceAtMost((TOOLTIP_MAX_DP * density).toInt())
         val bounds = wm.currentWindowMetrics.bounds
         val o = Overlay(service, "BentoBar tooltip", touchable = false)
         o.params.gravity = Gravity.TOP or Gravity.LEFT
@@ -847,6 +854,7 @@ class BarController(private val service: AccessibilityService) {
 
     companion object {
         const val SYSTEMUI = "com.android.systemui"
+        private const val TOOLTIP_MAX_DP = 420
         private const val RELEVANT = AccessibilityEvent.WINDOWS_CHANGE_ADDED or AccessibilityEvent.WINDOWS_CHANGE_REMOVED or
             AccessibilityEvent.WINDOWS_CHANGE_BOUNDS
     }

@@ -4,7 +4,6 @@ import android.content.Intent
 import android.media.AudioManager
 import android.provider.Settings
 import android.view.KeyEvent
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ItemConfig
+import io.github.kuscher.bentobar.ui.MediaButtons
 import io.github.kuscher.bentobar.ui.MenuCard
 import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
@@ -88,13 +88,8 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
                         modifier = Modifier.weight(1f).semantics { contentDescription = volumeLabel })
                 }
                 SectionLabel(stringResource(R.string.sound_media))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS) }) { SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = stringResource(R.string.sound_previous)) }
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }) {
-                        SymIcon(if (am.isMusicActive) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp, contentDescription = stringResource(if (am.isMusicActive) R.string.common_pause else R.string.sound_play))
-                    }
-                    FilledTonalIconButton(onClick = { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT) }) { SymIcon(Sym.SKIP_NEXT, size = 22.sp, contentDescription = stringResource(R.string.sound_next)) }
-                }
+                MediaButtons(playing = am.isMusicActive, onPrevious = { mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS) },
+                    onPlayPause = { mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }, onNext = { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT) })
                 MenuDivider()
                 MenuEntry(Sym.TUNE, stringResource(R.string.sound_all_volumes)) { host.close(); Env.launch(Intent(Settings.Panel.ACTION_VOLUME)) }
                 MenuEntry(Sym.SETTINGS, stringResource(R.string.sound_settings)) { host.close(); Env.launch(Intent(Settings.ACTION_SOUND_SETTINGS)) }

@@ -4,9 +4,24 @@ import android.graphics.Bitmap
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import io.github.kuscher.bentobar.data.ItemConfig
+import io.github.kuscher.bentobar.data.Online
 
 /** How an item's text is coloured in the bar. */
 enum class Tone { NORMAL, ACCENT, WARN, ALERT }
+
+/**
+ * A slider drawn in the bar in the text's place (the Sound item's "Slider in the bar"). The strip
+ * draws it and reports where it is dragged ([ItemType.onSlide]); the item says what there is to draw.
+ */
+@androidx.compose.runtime.Immutable
+data class BarSlider(
+    /** How full, 0 to 1. */
+    val level: Float,
+    /** How many steps the whole range has (15 for a volume of 0 to 15), so a drag moves in real steps; 0: any level. */
+    val steps: Int = 0,
+    /** Muted: the level is kept and drawn dimmed. */
+    val dimmed: Boolean = false,
+)
 
 /** What one item shows right now. Immutable (never mutate [image]), so Compose can skip unchanged items. */
 @androidx.compose.runtime.Immutable
@@ -36,6 +51,10 @@ data class ItemState(
      * Null: always the natural width.
      */
     val widthKey: String? = null,
+    /** A slider in the bar instead of [text]; the text stays what menus list and what [desc] says. Null: none. */
+    val slider: BarSlider? = null,
+    /** The tooltip, instead of the type's name: a track's whole title, a flight's sentence. */
+    val tip: String? = null,
 )
 
 /** Things a menu can do besides its own content. */
@@ -79,7 +98,45 @@ abstract class ItemType(
     /** Runtime permissions the type needs to show its data (asked from settings). */
     open val permissions: List<String> = emptyList()
 
+    /**
+     * The online service this type asks, or null: the type never goes online (every type but Weather
+     * and Flight). A request reaches a service only while an item of a type that names it is outside
+     * Off, the service is switched on for this install and something shows items (see `Http.allowed`).
+     */
+    open val online: Online.Service? = null
+
+    /** Shows more with Android's notification access (Now playing): the item's settings offer it. */
+    open val notificationAccess: Boolean = false
+
+    /**
+     * Speaks up now and then (Now playing, Device batteries, Heat): Add puts it in "When active"
+     * with its rule on, and the second button adds it always shown.
+     */
+    open val addsWhenActive: Boolean = false
+
+    /** Samplers of other types this one reads ("cpu", "battery", …): they run while an item of this type is sampled. */
+    open val samples: Set<String> = emptySet()
+
+    /** What it shows is the user's own business (a track's title): debug output says how long the text is, not what it says. */
+    open val discreet: Boolean = false
+
     abstract fun state(item: ItemConfig): ItemState
+
+    /**
+     * The first item of this type is being sampled: it could show in the bar, its menu is open, or
+     * the settings preview is. Register listeners here; main thread. See [onIdle].
+     */
+    open fun onLive() {}
+
+    /**
+     * The last item of this type stopped being sampled: the bar is hidden, the screen is off, or no
+     * such item is outside Off. Let go of every listener and poll; nothing of this type runs until
+     * [onLive] is called again. Main thread.
+     */
+    open fun onIdle() {}
+
+    /** Once a second while live, before [state]: only what is cheap. Slow work belongs to a [Refresher]. Main thread. */
+    open fun sample(now: Long) {}
 
     /** A primary click the item handles itself (true), instead of opening its menu. */
     open fun onClick(item: ItemConfig): Boolean = false
@@ -88,6 +145,24 @@ abstract class ItemType(
     open fun onScroll(item: ItemConfig, steps: Int) {}
     /** Uses the mouse wheel itself ([onScroll]); over other items the wheel reveals or folds hidden items. */
     open val usesWheel: Boolean get() = false
+
+    /**
+     * The slider in the bar ([ItemState.slider]) was set to [level], 0 to 1 and already on one of its
+     * steps; [done] when the pointer let go.
+     */
+    open fun onSlide(item: ItemConfig, level: Float, done: Boolean) {}
+
+    /**
+     * This type's online service was switched off, or its key removed: drop everything it sent, here
+     * and on disk. A [Refresher] made for the service has forgotten already. Main thread.
+     */
+    open fun forgetFetched() {}
+
+    /**
+     * Debug builds, from adb (`./bento debug <type> <args>`): stage a state for a test. Returns a line
+     * for the log, or null for a command it doesn't know. Release builds have nothing that calls it.
+     */
+    open fun debug(args: List<String>): String? = null
 
     /** The drop-down menu. Null means the type has none (clicks go to [onClick]). */
     open val menu: (@Composable (item: ItemConfig, host: MenuHost) -> Unit)? = null
@@ -104,9 +179,13 @@ abstract class ItemType(
  * ("shows above %1$s CPU"). Both take the [threshold]'s value, formatted, as %1$s; rules without a
  * threshold take no argument.
  */
-class Trigger(@StringRes val sentence: Int, @StringRes val short: Int, val threshold: Threshold? = null) {
-    fun sentence(item: ItemConfig, value: Int? = null): String = text(sentence, item, value)
-    fun short(item: ItemConfig): String = text(short, item, null)
+open class Trigger(@StringRes val sentence: Int, @StringRes val short: Int, val threshold: Threshold? = null) {
+    fun sentence(item: ItemConfig, value: Int? = null): String = text(sentenceRes(item), item, value)
+    fun short(item: ItemConfig): String = text(shortRes(item), item, null)
+
+    /** The long form for [item]: another sentence where an option changes the rule (the CPU item's "or the device runs hot"). */
+    @StringRes open fun sentenceRes(item: ItemConfig): Int = sentence
+    @StringRes open fun shortRes(item: ItemConfig): Int = short
     private fun text(@StringRes id: Int, item: ItemConfig, value: Int?): String =
         threshold?.let { Env.str(id, it.format(value ?: it.shown(item))) } ?: Env.str(id)
 }

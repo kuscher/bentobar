@@ -1,6 +1,7 @@
 package io.github.kuscher.bentobar.bar
 
 import android.graphics.Rect
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
@@ -30,6 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
@@ -51,7 +55,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.TextStyle
 import io.github.kuscher.bentobar.util.Fmt
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +66,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +74,7 @@ import io.github.kuscher.bentobar.data.Display
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Pill
 import io.github.kuscher.bentobar.data.TextSize
+import io.github.kuscher.bentobar.items.BarSlider
 import io.github.kuscher.bentobar.items.ItemState
 import io.github.kuscher.bentobar.items.Tone
 import io.github.kuscher.bentobar.util.Fonts
@@ -94,7 +103,21 @@ data class StripLook(
     val warn: Color get() = Contrast.orElse(if (lightText) Color(0xFFFFD27A) else Color(0xFF8A5100), background, fg)
     val alertBg: Color get() = if (lightText) Color(0xFFFFB4AB) else Color(0xFFB3261E)
     val alertFg: Color get() = if (lightText) Color(0xFF690005) else Color.White
+
+    /** How thin the text color can be drawn and still stand out from the bar at 3:1, the contrast a control's parts need. */
+    private val trackAlpha: Float get() = SLIDER_ALPHAS.firstOrNull { Contrast.ratio(fg.copy(alpha = it).compositeOver(background), background) >= 3f } ?: 1f
+    /** The slider's empty track: the text color, as thin as it may be. On a bar where nothing thinner stands out, the text color itself. */
+    val sliderTrack: Color get() = fg.copy(alpha = trackAlpha).compositeOver(background)
+    /** The slider's filled part while muted: between the track and the text color, so the kept level still shows. */
+    val sliderDimmed: Color get() = fg.copy(alpha = (trackAlpha + 1f) / 2f).compositeOver(background)
 }
+
+private val SLIDER_ALPHAS = floatArrayOf(0.45f, 0.6f, 0.8f)
+
+/** The slider in the bar: its track's width and height, and the handle that shows under the pointer. */
+val SLIDER_WIDTH = 64.dp
+private val SLIDER_HEIGHT = 4.dp
+private val SLIDER_HANDLE = 10.dp
 
 /** The pill's padding at each end (none without a pill); the controller counts it in the width budget. */
 val STRIP_PILL_PADDING = 6.dp
@@ -118,6 +141,8 @@ interface StripEvents {
     fun wheel(up: Boolean) {}
     /** [item] dragged sideways by [dx] px; [done] on release, where it should land. */
     fun drag(item: ItemConfig, dx: Float, done: Boolean) {}
+    /** [item]'s slider was set to [level] (0 to 1, on one of its steps); [done] when the pointer let go. */
+    fun slide(item: ItemConfig, level: Float, done: Boolean) {}
 }
 
 /**
@@ -310,8 +335,14 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
         Tone.NORMAL -> look.fg
     }
     val display = entry.item.display
+    // A slider takes the text's place ("Icon and text" draws icon and slider, "Text" the slider alone);
+    // shown as an icon only, the item has none.
+    val slider = s.slider?.takeIf { display != Display.ICON }
+    // While the pointer holds the slider: the level under it. Otherwise the item's own, which is the real one.
+    var held by remember { mutableStateOf<Float?>(null) }
+    val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == LayoutDirection.Rtl
     val showIcon = display != Display.TEXT || s.text.isNullOrEmpty()
-    val showText = display != Display.ICON && !s.text.isNullOrEmpty()
+    val showText = slider == null && display != Display.ICON && !s.text.isNullOrEmpty()
     Row(
         Modifier.fillMaxHeight()
             // The slot is read during placement (before this frame draws), the bounds after layout.
@@ -356,10 +387,16 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
             })
             .hoverable(source)
             .semantics(mergeDescendants = true) {
-                contentDescription = s.desc.ifEmpty { s.text.orEmpty() }; role = Role.Button
+                contentDescription = s.desc.ifEmpty { s.text.orEmpty() }
                 // The clicks come from raw pointer input, so tell assistive tech how to press it.
                 onClick { events.click(entry.item, bounds); true }
                 onLongClick(itemMenuLabel) { events.context(entry.item, bounds); true }
+                if (slider == null) role = Role.Button
+                else {
+                    // A slider for assistive tech too: it reads the description and can raise and lower the level.
+                    progressBarRangeInfo = ProgressBarRangeInfo(slider.level.coerceIn(0f, 1f), 0f..1f, (slider.steps - 1).coerceAtLeast(0))
+                    setProgress { to -> events.slide(entry.item, SliderMath.snap(to, slider.steps), true); true }
+                }
             }
             .padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -376,7 +413,11 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
                 SymIcon(s.icon, size = look.iconSp, filled = s.filled, color = color)
             }
         }
-        if (showIcon && showText && (s.image != null || !s.icon.isNullOrEmpty())) Spacer(Modifier.width(5.dp))
+        if (showIcon && (showText || slider != null) && (s.image != null || !s.icon.isNullOrEmpty())) Spacer(Modifier.width(5.dp))
+        if (slider != null) {
+            SliderTrack(slider, held, handle = hovered || held != null, look = look, rtl = rtl,
+                modifier = Modifier.slides(slider.steps, rtl, onHeld = { held = it }) { level, done -> events.slide(entry.item, level, done) })
+        }
         if (showText) {
             val template = if (s.widthKey != null) Fmt.widthTemplate(s.text!!) else null
             val slot = template?.let { tpl -> remember(tpl, textStyle) { measurer.measure(tpl, textStyle, maxLines = 1).size.width } }
@@ -390,9 +431,86 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
 }
 
 /**
+ * The slider in the bar: a track [SLIDER_WIDTH] wide over the item's whole height (all of it takes
+ * the pointer), filled to the level. While the pointer holds it ([held]) the level under the pointer
+ * is drawn, on the slider's own steps; otherwise the item's level, which is the real one. A handle
+ * shows only with [handle] (the pointer is over the item, or holds the slider); at rest there is none.
+ */
+@Composable
+private fun SliderTrack(slider: BarSlider, held: Float?, handle: Boolean, look: StripLook, rtl: Boolean, modifier: Modifier) {
+    val level = held ?: slider.level
+    val track = look.sliderTrack
+    // The same color for the track and the text (a bar where nothing thinner stands out): a thinner track tells them apart.
+    val thinTrack = track == look.fg
+    val fill = if (slider.dimmed && held == null) look.sliderDimmed else look.fg
+    Canvas(modifier.width(SLIDER_WIDTH).fillMaxHeight()) {
+        val h = SLIDER_HEIGHT.toPx()
+        val trackH = if (thinTrack) h / 2 else h
+        drawRoundRect(track, Offset(0f, (size.height - trackH) / 2), Size(size.width, trackH), CornerRadius(trackH / 2))
+        val w = SliderMath.filled(level, size.width)
+        if (w > 0f) drawRoundRect(fill, Offset(if (rtl) size.width - w else 0f, (size.height - h) / 2), Size(w, h), CornerRadius(h / 2))
+        if (handle) {
+            val r = SLIDER_HANDLE.toPx() / 2
+            val x = (if (rtl) size.width - w else w).coerceIn(r, (size.width - r).coerceAtLeast(r))
+            drawCircle(look.fg, r, Offset(x, size.height / 2))
+        }
+    }
+}
+
+/**
+ * The slider's pointer rules. A primary press on the track sets the level under the pointer at once
+ * and holds the slider: every move sets it again, and the release ends it ([onLevel] with done). The
+ * press is consumed, so the item around it ([clicks]) takes it neither for a click nor for the start
+ * of a drag to reorder. A secondary press is left alone: it is the item's menu, as anywhere on the item.
+ * [onHeld] gets the level while the pointer holds the slider, and null when it lets go.
+ */
+private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, onLevel: (level: Float, done: Boolean) -> Unit): Modifier = composed {
+    val level by rememberUpdatedState(onLevel)
+    val holds by rememberUpdatedState(onHeld)
+    pointerInput(steps, rtl) {
+        try {
+            awaitPointerEventScope {
+                var holding = false
+                var last = Float.NaN
+                while (true) {
+                    val e = awaitPointerEvent()
+                    val c = e.changes.firstOrNull() ?: continue
+                    fun at() = SliderMath.level(c.position.x, 0f, size.width.toFloat(), steps, rtl)
+                    when (e.type) {
+                        PointerEventType.Press -> if (!e.buttons.isSecondaryPressed && !c.isConsumed) {
+                            holding = true
+                            last = at()
+                            holds(last); level(last, false)
+                            c.consume()
+                        }
+                        PointerEventType.Move -> if (holding) {
+                            if (c.pressed) {
+                                val l = at()
+                                // Only a new step is news: a drag across the track is then as many reports as it has steps.
+                                if (l != last) { last = l; holds(l); level(l, false) }
+                            }
+                            c.consume()
+                        }
+                        PointerEventType.Release -> if (holding) {
+                            holding = false
+                            holds(null); level(at(), true)
+                            c.consume()
+                        }
+                    }
+                }
+            }
+        } finally {
+            // The gesture was cut short (the strip went away): nothing holds the slider any more.
+            holds(null)
+        }
+    }
+}
+
+/**
  * Primary click, secondary click (right button or touch long-press), mouse-wheel steps and, with
  * [onDrag], a sideways drag: a primary press that moves past the touch slop (mouse, touchpad press
- * or touch) becomes a drag instead of a click.
+ * or touch) becomes a drag instead of a click. A press that something inside the item has taken for
+ * itself (the slider's track, see [slides]) is not the item's: no click and no drag come of it.
  */
 private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll: ((Int) -> Unit)?,
                             onDrag: ((localX: Float, downX: Float, done: Boolean) -> Unit)? = null): Modifier = composed {
@@ -412,7 +530,11 @@ private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll
             while (true) {
                 val e = awaitPointerEvent()
                 when (e.type) {
-                    PointerEventType.Press -> {
+                    PointerEventType.Press -> if (e.changes.any { it.isConsumed }) {
+                        // Taken by something inside the item (the slider): its release and its moves aren't ours either.
+                        armed = false
+                        dragging = false
+                    } else {
                         armed = true
                         secondary = e.buttons.isSecondaryPressed
                         down = e.changes.firstOrNull()?.uptimeMillis ?: 0L
@@ -478,7 +600,7 @@ fun MeasuredStrip(bias: Float, onWidth: (Int) -> Unit, content: @Composable () -
 fun Tooltip(label: String) {
     Box(Modifier.fillMaxHeight().clip(RoundedCornerShape(6.dp)).background(Color(0xF0303134)).padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center) {
-        Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1)
+        Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

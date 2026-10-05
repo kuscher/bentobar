@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flight (AirLabs, with the user's own key). Every name here starts with flight_, item_flight_ or trigger_flight. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="item_flight_title">Flight</string>
+    <string name="item_flight_desc">Counts down to a flight\'s departure and landing, with the gate</string>
+    <string name="trigger_flight">Show from %1$s before departure until an hour after landing</string>
+    <string name="trigger_flight_short">shows from %1$s before departure</string>
+    <string name="flight_not_set_up">Not set up</string>
+    <string name="flight_words">Flight times come from AirLabs, a flight data service, with a free key of your own. BentoBar sends AirLabs your key and the flight number when you track a flight and while it follows it, nothing else.</string>
+</resources>

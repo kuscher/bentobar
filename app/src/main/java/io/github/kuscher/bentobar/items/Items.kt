@@ -10,15 +10,17 @@ import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.data.couldShow
+import io.github.kuscher.bentobar.util.Now
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** Every item type, in catalog order. */
 object Items {
     val all: List<ItemType> = listOf(
-        CpuItem, NetworkItem, BatteryItem, MemoryItem, StorageItem,
+        CpuItem, NetworkItem, BatteryItem, MemoryItem, StorageItem, HeatItem, DevicesItem,
         CalendarItem, EventItem, ClockItem, TimerItem, CountdownItem,
-        CaffeineItem, SoundItem, ToolsItem, FolderItem, AppItem, TextItem, SpacerItem,
+        CaffeineItem, MediaItem, SoundItem, ToolsItem, FolderItem, AppItem, TextItem, SpacerItem,
+        WeatherItem, FlightItem,
     )
     private val byType = all.associateBy { it.type }
 
@@ -39,6 +41,30 @@ object Ticker {
 
     val states: StateFlow<Map<String, ItemState>> get() = _states
     val tick: StateFlow<Long> get() = _tick
+
+    /**
+     * Something that shows items is on screen (the bar, a menu, the settings preview). Read from any
+     * thread: an online service is asked only while this holds (`Http.allowed`).
+     */
+    @Volatile var running = false; private set
+
+    /** The types whose [ItemType.onLive] has run and whose [ItemType.onIdle] hasn't. Main thread. */
+    private val liveTypes = HashSet<String>()
+
+    /**
+     * Tells the types which of them are being sampled now: [ItemType.onLive] for one that starts,
+     * [ItemType.onIdle] for one that stops. A type's listeners and polls hang on these two, so none
+     * exists while the bar is hidden, the screen is off, or no item of the type is outside Off.
+     */
+    private fun lifeCycle(types: Set<String>) {
+        for (t in types) if (liveTypes.add(t)) hook(t, "onLive") { it.onLive() }
+        for (t in liveTypes.filter { it !in types }) { liveTypes -= t; hook(t, "onIdle") { it.onIdle() } }
+    }
+
+    private inline fun hook(type: String, what: String, call: (ItemType) -> Unit) {
+        val t = Items.of(type) ?: return
+        try { call(t) } catch (e: Exception) { Log.w(TAG, "$what of $type failed", e) }
+    }
 
     /** Hidden items are on screen (bar expanded, or BentoBar's menu lists them): sample them too. */
     @Volatile var revealHidden = false
@@ -71,23 +97,62 @@ object Ticker {
     fun start(who: String) {
         val wasIdle = users.isEmpty()
         users += who
+        running = true
         if (wasIdle) { main.removeCallbacksAndMessages(TAG); lastRun.clear(); loop.run() }
     }
 
     fun stop(who: String) {
         users -= who
-        if (users.isEmpty()) main.removeCallbacksAndMessages(TAG)
+        if (users.isEmpty()) {
+            main.removeCallbacksAndMessages(TAG)
+            running = false
+            // Nothing shows items any more: every type lets go of what it listens to.
+            lifeCycle(emptySet())
+        }
     }
 
     /** Recomputes now (after a settings change or a click), without waiting for the next second. */
     fun refresh() { lastRun.clear(); runOnce() }
 
+    /**
+     * Recomputes one item now, and nothing else: no sampler runs. For what only that item shows and
+     * that changes many times a second (its slider being dragged), where [refresh] would feed every
+     * sampler a reading per pointer move.
+     */
+    fun refresh(item: ItemConfig) {
+        val current = Store.config.value.items.firstOrNull { it.id == item.id } ?: return
+        val type = Items.of(current.type) ?: return
+        _states.value = _states.value + (current.id to compute(type, current))
+        lastRun[current.id] = SystemClock.elapsedRealtime()
+    }
+
+    /** Recomputes the items of one type now, and nothing else (what its source shows has just changed). */
+    fun refresh(type: String) {
+        val t = Items.of(type) ?: return
+        val mine = Store.config.value.items.filter { it.type == type && it.id in _states.value }
+        if (mine.isEmpty()) return
+        val now = SystemClock.elapsedRealtime()
+        _states.value = _states.value + mine.associate { it.id to compute(t, it) }
+        mine.forEach { lastRun[it.id] = now }
+    }
+
+    private fun compute(type: ItemType, item: ItemConfig): ItemState = try { type.state(item) } catch (e: Exception) {
+        Log.w(TAG, "item ${item.type} failed", e); ItemState(icon = type.icon, text = "!", desc = Env.str(R.string.item_failed, type.title))
+    }
+
     private fun runOnce() {
         val now = SystemClock.elapsedRealtime()
         val cfg = Store.config.value
         val live = needed(cfg)
+        val types = live.mapTo(HashSet()) { it.type }
+        // Only while something shows items: a refresh() with nothing on screen must not wake a type that nobody would put back to sleep.
+        lifeCycle(if (users.isEmpty()) emptySet() else types)
         try {
-            Env.tick(now, live.mapTo(HashSet()) { it.type })
+            // A type may read another type's sampler (Heat reads the battery's temperature): those run for it too.
+            val sampled = HashSet(types)
+            for (t in types) Items.of(t)?.samples?.let { sampled += it }
+            Env.tick(now, sampled)
+            if (users.isNotEmpty()) for (t in types) hook(t, "sample") { it.sample(Now.elapsed()) }
             Timers.check()
             Caffeine.check()
         } catch (e: Exception) {
@@ -100,9 +165,7 @@ object Ticker {
             val type = Items.of(item.type) ?: continue
             val last = lastRun[item.id] ?: 0L
             if (item.id in next && now - last < type.refreshMs) continue
-            next[item.id] = try { type.state(item) } catch (e: Exception) {
-                Log.w(TAG, "item ${item.type} failed", e); ItemState(icon = type.icon, text = "!", desc = Env.str(R.string.item_failed, type.title))
-            }
+            next[item.id] = compute(type, item)
             lastRun[item.id] = now
         }
         next.keys.retainAll(ids)

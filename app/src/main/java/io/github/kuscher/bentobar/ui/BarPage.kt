@@ -211,6 +211,7 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
         override fun click(item: ItemConfig, at: Rect) = onSelect(item.id)
         override fun context(item: ItemConfig, at: Rect) = onSelect(item.id)
         override fun scroll(item: ItemConfig, steps: Int) { Items.of(item.type)?.onScroll(item, steps); Ticker.refresh() }
+        override fun slide(item: ItemConfig, level: Float, done: Boolean) { Items.of(item.type)?.onSlide(item, level, done); Ticker.refresh(item) }
         override fun chevron(at: Rect) { expanded = !expanded }
         override fun chevronContext(at: Rect) { expanded = !expanded }
         override fun hover(inside: Boolean) {}
@@ -475,6 +476,22 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
                                 (context as? android.app.Activity)?.requestPermissions(arrayOf(android.Manifest.permission.READ_CALENDAR), 2)
                             Setup.refresh(context); Ticker.refresh()
                         }) { Text(stringResource(R.string.common_allow)) }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            // The same for notification access (Now playing): the words, then the way to Android's switch.
+            if (type.notificationAccess && !setup.mediaAccess) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(stringResource(R.string.media_access_words), style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer)
+                        if (setup.sideloaded) Text(stringResource(R.string.media_access_restricted), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.padding(top = 6.dp))
+                        Spacer(Modifier.height(8.dp))
+                        FilledTonalButton(onClick = { io.github.kuscher.bentobar.items.MediaAccess.openSettings(context) }) {
+                            Text(stringResource(R.string.media_access_allow))
+                        }
                     }
                 }
                 Spacer(Modifier.height(8.dp))

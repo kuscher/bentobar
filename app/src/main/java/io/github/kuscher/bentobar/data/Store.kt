@@ -76,12 +76,13 @@ object Store {
     /**
      * A new item goes at the left of the bar, where a new item is easy to spot, but after the Next
      * meeting item, which stays at the far left: its width changes most, and at the bar's outer
-     * edge that moves nothing else. Hidden and Off items go at the end of their section.
+     * edge that moves nothing else. Hidden and Off items go at the end of their section. [whenActive]:
+     * with its "Show when" rule on (for the types that are added to When active).
      */
-    fun add(type: String, section: Section = Section.SHOWN, options: Map<String, String> = emptyMap()): String {
+    fun add(type: String, section: Section = Section.SHOWN, options: Map<String, String> = emptyMap(), whenActive: Boolean = false): String {
         val id = newId()
         update { c ->
-            val item = ItemConfig(id, type, section, options = options)
+            val item = ItemConfig(id, type, section, whenActive = whenActive, options = options)
             val at = if (section != Section.SHOWN) -1
                 else c.items.indexOfFirst { it.section == Section.SHOWN && it.type != PINNED_LEFT }
             c.copy(items = if (at < 0) c.items + item else c.items.toMutableList().apply { add(at, item) })

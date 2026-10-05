@@ -49,6 +49,12 @@ Play Console**; nothing goes to review on its own.
 If only the Play job fails, re-run that job from the Actions tab. A version code that is on Play
 already is left alone, so a re-run uploads nothing twice.
 
+**After Google has rejected an update**, Play refuses any commit that could send itself for review
+("Changes cannot be sent for review automatically"), until the next changes have been sent from the
+Play Console. The upload then commits its draft with `changesNotSentForReview=true`, which changes
+nothing about the draft. (0.8's tag ran before this was known: its bundle was put on Play by hand,
+from the workflow's `bundle` artifact.)
+
 ## A dry run
 
 Actions tab › Release › **Run workflow** (on `main`), or `gh workflow run release.yml --ref main`.

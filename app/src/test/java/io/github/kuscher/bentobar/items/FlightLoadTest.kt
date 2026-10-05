@@ -24,6 +24,7 @@ import org.junit.Test
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.Executor
 
 /**
@@ -156,6 +157,17 @@ class FlightLoadTest {
             assertEquals("2026-10-03", t.day)
             assertTrue(t.flight!!.timetable)
             assertEquals(2, sent())
+        }
+    }
+
+    @Test fun aDayChipIsTheDevicesDayAndWhatIsKeptIsTheFlightsOwn() {
+        online { net ->
+            net.says(AirLabs.FLIGHT to reply("flight-LH454-planned"))
+            // The evening of 1 October in Honolulu. The flight leaves Frankfurt in an hour, on the 2nd there.
+            val q = FlightLoad.question(item, "LH454", LocalDate.of(2026, 10, 1), ZoneId.of("Pacific/Honolulu"))!!
+            val t = found(FlightLoad.track(q, asked))
+            assertEquals(1, sent())
+            assertEquals("2026-10-02", t.day)
         }
     }
 

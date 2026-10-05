@@ -47,7 +47,7 @@ class FlightRulesTest {
         }
     }
 
-    private fun lookup(n: FlightNumber, now: Instant, day: LocalDate? = null, get: (Request) -> Reply): AirLabs.Answer = AirLabs.lookup(n, day, "k", now, get)!!
+    private fun lookup(n: FlightNumber, now: Instant, day: LocalDate? = null, get: (Request) -> Reply): AirLabs.Answer = AirLabs.lookup(n, day, "k", now, get = get)!!
     private fun again(was: Flight, get: (Request) -> Reply): AirLabs.Asked = AirLabs.again(lh455, "k", was, get)!!
     private fun ok(text: String): (Request) -> Reply = { Reply.Ok(text) }
 

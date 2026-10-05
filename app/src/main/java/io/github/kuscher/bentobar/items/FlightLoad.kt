@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -37,8 +38,8 @@ object FlightLoad {
     @Serializable
     private class Following(val number: String, val day: String? = null)
 
-    /** One press of Track: which item asks, the number, and the day that was chosen (null: the next flight). */
-    data class Question(val item: String, val number: FlightNumber, val day: LocalDate? = null) {
+    /** One press of Track: which item asks, the number, the day that was chosen (null: the next flight), and where: a day chip is a day of the device's ([zone]). */
+    data class Question(val item: String, val number: FlightNumber, val day: LocalDate? = null, val zone: ZoneId? = null) {
         /** Whose flight it is stays out of anything that prints a value. */
         override fun toString(): String = "Question(a flight)"
     }
@@ -71,7 +72,7 @@ object FlightLoad {
     }
 
     /** [text] and the chosen [day] as a question for [item], or null: what is not a flight number is never asked. */
-    fun question(item: String, text: String, day: LocalDate?): Question? = FlightNumber.read(text)?.let { Question(item, it, day) }
+    fun question(item: String, text: String, day: LocalDate?, zone: ZoneId? = null): Question? = FlightNumber.read(text)?.let { Question(item, it, day, zone) }
 
     private fun mayAsk(key: String) = key.isNotEmpty() && Online.on(service)
 
@@ -83,7 +84,7 @@ object FlightLoad {
         val key = Online.key(service)
         if (!mayAsk(key)) return Outcome.Unasked
         notFoundLately(q, now)?.let { return Outcome.Failed(it) }
-        val a = AirLabs.lookup(q.number, q.day, key, Instant.ofEpochMilli(now)) { Http.get(it) } ?: return Outcome.Unasked
+        val a = AirLabs.lookup(q.number, q.day, key, Instant.ofEpochMilli(now), q.zone) { Http.get(it) } ?: return Outcome.Unasked
         said(a.left)
         val f = a.flight
         if (f == null) {

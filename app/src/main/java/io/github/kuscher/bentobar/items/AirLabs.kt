@@ -121,10 +121,15 @@ object AirLabs {
      * `flight` does not know (one that flies once a week). Up to three requests, and one in the usual
      * case.
      *
+     * [zone]: where [day] was chosen, when it is a day of the device's (a day chip: "Today" in Los
+     * Angeles is tomorrow's date in Tokyo for a flight that leaves there in an hour). The flight the
+     * service answers with is then taken for that day too if it leaves on it by the device's clock.
+     * Null: [day] is the departure airport's own date and nothing else (what is kept of a followed flight).
+     *
      * Null: a request was not sent at all (the service was switched off or the bar hid under the
      * lookup), so there is nothing to say, neither an answer nor a failure.
      */
-    fun lookup(n: FlightNumber, day: LocalDate?, key: String, now: Instant, get: (Request) -> Reply): Answer? {
+    fun lookup(n: FlightNumber, day: LocalDate?, key: String, now: Instant, zone: ZoneId? = null, get: (Request) -> Reply): Answer? {
         var left: Int? = null
         var unsent = false
         // What is asked for: the number as it was entered, until the service has named the ticket's form of a callsign.
@@ -152,7 +157,8 @@ object AirLabs {
             // The one-flight question was tried with a callsign; the other two only with a ticket's number, which this reply has.
             if (n.callsign) FlightNumber.read(f.number)?.takeUnless { it.callsign }?.let { number = it }
             if (day != null) {
-                if (f.from.planned?.toLocalDate() == day || f.from.time?.toLocalDate() == day) return Answer(f, null, left)
+                fun onDevice(t: LocalDateTime?) = zone != null && t != null && LocalDate.ofInstant(f.from.moment(t), zone) == day
+                if (f.from.planned?.toLocalDate() == day || f.from.time?.toLocalDate() == day || onDevice(f.from.planned) || onDevice(f.from.time)) return Answer(f, null, left)
                 val timetable = ask(ROUTES) { routes(it) }
                 val lines = timetable.value ?: return Answer(null, timetable.failure?.takeIf { it != Failure.NOT_FOUND } ?: Failure.NOT_THAT_DAY, left)
                 return on(lines, f, day)?.let { Answer(dated(it, now), null, left) } ?: Answer(null, Failure.NOT_THAT_DAY, left)

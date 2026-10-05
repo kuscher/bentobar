@@ -250,7 +250,25 @@ class MediaTextTest {
         ("abc " + u(0x06DD, 0x0661, 0x0662) + " ").repeat(6), (u(0x0645, 0x06CC, 0x200C, 0x062E, 0x0648, 0x0627, 0x0647, 0x0645) + " ").repeat(5),
         (u(0x05E9, 0x05C1, 0x05B8, 0x05DC, 0x05D5, 0x05B9, 0x05DD) + " ").repeat(6), "Z" + acute.repeat(50) + "algo",
         u(0x1000, 0x102C, 0x1000, 0x1031, 0x1019, 0x103C).repeat(7), (u(0xAC00, 0xD7CB, 0x1112, 0xAC00) + "x").repeat(8),
+        // Three hundred characters and more, with line breaks, pictures and right-to-left words in them.
+        ("A very long title $note$selector that goes on$nl" + "שלום $family$tab").repeat(8),
     ) + listOf("long", "wide", "emoji", "rtl").map { MediaSamples.of(listOf(it))!!.players.single().title }
+
+    @Test fun aTitleOfThreeHundredCharactersWithLineBreaksAndPicturesIsOneShortLine() {
+        val title = titles.single { it.startsWith("A very long title") }
+        assertTrue(title.length > 300)
+        val track = Track(title, "Somebody", "Player")
+        // At 20 there is room for the note but not for the selector that belongs to it, so both go.
+        assertEquals("A very long title…", text(track))
+        assertEquals("A very long title $note$selector…", text(track, max = 21))
+        // At 40 the family of seven parts would be cut in two.
+        assertEquals("A very long title $note$selector that goes on שלום…", text(track, max = 40))
+        assertEquals("A very…", text(track, max = 8))
+        // What is said aloud and the tooltip hold the title as the source hands it on: one line of at most 200.
+        val whole = bar(Phase.PLAYING, track).tooltip!!
+        assertTrue(whole.length <= 200 + " · Somebody".length)
+        assertFalse(whole.any { it.isISOControl() })
+    }
 
     @Test fun javasOwnIdeaOfACharacterAgreesWithEveryCut() {
         // A second opinion that is not this app's: how Java itself groups a text into characters (the pattern \X), which knows

@@ -49,7 +49,7 @@ object MediaSamples {
         // A video in a browser: no title, no skipping, a length but no seeking (the position is a plain meter).
         "notitle" -> Sample(listOf(Player("Chrome", BROWSER, durationMs = 720_000, positionMs = 185_000, canPrevious = false, canNext = false)))
         "two" -> Sample(listOf(
-            Player("Spotify", MUSIC, "Clocks", "Coldplay", "A Rush of Blood to the Head", durationMs = 307_000, positionMs = 61_000, canSeek = true, art = true),
+            Player("Spotify", MUSIC, "Clocks", "Coldplay", durationMs = 307_000, positionMs = 61_000, canSeek = true, art = true),
             Player("Chrome", BROWSER, "Lo-fi beats to study to", playing = false, canPrevious = false, canNext = false)))
         "live" -> Sample(listOf(Player("Radio", "staged.radio", "Morning Show", "Radio One", canPrevious = false, canNext = false)))
         "noaccess" -> Sample(access = false, audible = true)

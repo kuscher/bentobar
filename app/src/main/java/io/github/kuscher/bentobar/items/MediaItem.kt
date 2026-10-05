@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ItemConfig
+import io.github.kuscher.bentobar.data.Section
+import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.util.Now
 import io.github.kuscher.bentobar.util.Sym
 
@@ -120,15 +122,24 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
     // ---- tests on a device (debug builds' adb hook)
 
     /**
-     * `media`: one line about the source (no titles). `media stage <name>`: a sample from
-     * [MediaSamples] in place of the real players, in the bar and in the menu; `media stage off`
-     * ends it. A staged menu's buttons still send real media keys.
+     * `media`: one line about the source. `media stage <name>`: a sample from [MediaSamples] in place
+     * of the real players, in the bar and in the menu; `media stage off` ends it. A staged menu's
+     * buttons still send real media keys. What comes back is logged, so it holds no title.
      */
     override fun debug(args: List<String>): String? = when {
-        args.isEmpty() -> NowPlaying.debugLine()
+        args.isEmpty() -> said()
         args[0] != "stage" -> null
-        args.drop(1) == listOf("off") -> { stage(null); NowPlaying.debugLine() }
-        else -> MediaSamples.of(args.drop(1))?.let { stage(it); NowPlaying.debugLine() }
+        args.drop(1) == listOf("off") -> { stage(null); said() }
+        else -> MediaSamples.of(args.drop(1))?.let { stage(it); said() }
+    }
+
+    /**
+     * The source's line, and how many characters the first Now playing item's text has as "Longest
+     * title" counts them (`state media` counts an emoji as two): the number, never the text.
+     */
+    private fun said(): String {
+        val item = Store.config.value.items.firstOrNull { it.type == type && it.section != Section.OFF }
+        return NowPlaying.debugLine() + (item?.let { " chars=" + MediaText.count(state(it).text.orEmpty()) } ?: "")
     }
 
     private const val STAGED = "staged:"

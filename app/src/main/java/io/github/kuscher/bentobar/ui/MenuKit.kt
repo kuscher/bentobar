@@ -290,8 +290,12 @@ fun SearchField(label: String, placeholder: String = "", initial: String = "", s
                 keyboardActions = KeyboardActions(onGo = { enter() }, onDone = { enter() }, onSearch = { enter() }),
                 modifier = Modifier.weight(1f).focusRequester(focus).onFocusChanged { own = it.isFocused }.onPreviewKeyEvent { e ->
                     // A hardware keyboard's Enter doesn't always arrive as the keyboard's action. Down acts and
-                    // up is swallowed, so that action can't act a second time.
-                    if (own && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { if (e.type == KeyEventType.KeyDown) enter(); true } else false
+                    // up is swallowed, so that action can't act a second time; nor does a key held down, whose
+                    // repeats would search again and again and then pick the first result that came.
+                    if (own && (e.key == Key.Enter || e.key == Key.NumPadEnter)) {
+                        if (e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount == 0) enter()
+                        true
+                    } else false
                 },
             )
             if (submit != null) FilledTonalButton(onClick = { enter() }, enabled = canSubmit) { Text(submit, maxLines = 1) }

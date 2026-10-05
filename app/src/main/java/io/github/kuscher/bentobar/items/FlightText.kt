@@ -345,8 +345,8 @@ object FlightText {
             Phase.IN_AIR -> listOfNotNull(head, left, badge, lands)
             Phase.LANDED -> listOfNotNull(head, left, f.to.time?.let { v.say(Word.FLIGHT_BAR_LANDED_AT, l.at(it)) } ?: v.say(Word.FLIGHT_LANDED), badge, l.where.belt?.let { v.say(Word.FLIGHT_BELT, it) })
         }
-        // Plain spaces: the line is for other apps, where a no-break space is only in the way.
-        return parts.reduce(l::join).replace('\u00A0', ' ')
+        // Plain spaces: the line is for other apps, where a no-break space is only in the way (a device's times have a narrow one before AM and PM).
+        return parts.reduce(l::join).replace('\u00A0', ' ').replace('\u202F', ' ')
     }
 
     /** Why a press of Track found nothing, in the menu's words. [number] as it is shown; [day]: the day that was chosen. */

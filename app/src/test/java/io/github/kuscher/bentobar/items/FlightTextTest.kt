@@ -539,6 +539,9 @@ class FlightTextTest {
         assertEquals("LH 455 SFO → FRA · Left Fri 2:47 PM · Landed 10:50 AM · 25 min late · Belt 4", card(late, "2026-10-03T09:00:00Z").copy)
         // Plain spaces on the clipboard: it is pasted into other apps.
         assertFalse('\u00A0' in card(before, morning).copy)
+        // A device writes its times with a narrow no-break space before AM and PM: that one too.
+        val device = FlightText.Voice(us.locale, us.zone, word = { us.say(it) }, plural = { c, n -> us.count(c, n) }, clock = { t, form -> us.time(t, form).replace(' ', '\u202F') })
+        assertEquals("LH 455 SFO → FRA · Leaves 3:05 PM · Delayed 25 min · Gate G13 · Lands Sat 10:50 AM", card(before, morning, v = device).copy)
     }
 
     // ---- what a press of Track can come to

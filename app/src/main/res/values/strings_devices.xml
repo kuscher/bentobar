@@ -7,4 +7,18 @@
     <string name="trigger_devices_short">shows below %1$s</string>
     <string name="devices_none">No device reports a battery</string>
     <string name="devices_note">Mice, keyboards, styluses and game controllers that tell Android their battery level. Headphones aren\'t included: reading their level would take Bluetooth access, which BentoBar doesn\'t ask for.</string>
+    <!-- A device's row in the menu: "85% · Charging" (%1$s is the level), or "Level unknown" for a battery that doesn't say. -->
+    <string name="devices_level_charging">%1$s · Charging</string>
+    <string name="devices_unknown">Level unknown</string>
+    <string name="devices_bluetooth_settings">Bluetooth settings</string>
+    <!-- Spoken, for the bar and for each row: %1$s is the device's name, %2$d its level. -->
+    <string name="devices_desc">%1$s battery %2$d percent</string>
+    <string name="devices_desc_low">%1$s battery %2$d percent, low</string>
+    <string name="devices_desc_charging">%1$s battery %2$d percent, charging</string>
+    <string name="devices_desc_unknown">%1$s, battery level unknown</string>
+
+    <plurals name="devices_count">
+        <item quantity="one">%1$d device</item>
+        <item quantity="other">%1$d devices</item>
+    </plurals>
 </resources>

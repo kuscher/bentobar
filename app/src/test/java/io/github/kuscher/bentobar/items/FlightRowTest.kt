@@ -64,11 +64,57 @@ class FlightRowTest {
         assertEquals(0.0, r.share!!, 0.0)
         assertEquals(EndSays("FRA", time("2026-10-02T09:35"), terminal = "1", gate = "A2"), r.from)
         assertEquals(EndSays("LEJ", time("2026-10-02T10:35")), r.to)
-        // Its expected time has passed and the service still calls it planned: the row says when it leaves, and counts nothing.
+        // Its expected time has passed and the service still calls it planned: nobody said that it left, so the countdown
+        // stays at its last minute. It never says "leaves 9:35" about a time that is over. How late it runs is still true.
         val past = row("flight-LH152-delayed", at("2026-10-02T07:40:00Z"))
-        assertEquals(Phase.AHEAD, past.phase)
-        assertEquals(Headline(Heading.LEAVES_AT), past.headline)
+        assertEquals(Phase.SOON, past.phase)
+        assertEquals(Headline(Heading.LEAVES_IN, 1), past.headline)
+        assertEquals(Badge(Verdict.DELAYED, 45), past.badge)
         assertEquals(0.0, past.share!!, 0.0)
+    }
+
+    @Test fun anEndWhoseClockCannotBeReadAgainstUtcMakesNoCountdown() {
+        fun without(name: String, end: String) = AirLabs.flight(reply(name).replace(Regex("\"${end}_(time|estimated|actual)_utc\": [^,]*,"), "")).value!!
+        // The same replies with no UTC twin at one end: the airport's times are right, the moments they stand for are anybody's guess.
+        val plan = without("flight-LH454-planned", "dep")
+        assertEquals(time("2026-10-02T10:25"), plan.from.planned)
+        assertTrue(plan.loose)
+        assertTrue(!flight("flight-LH454-planned").loose)
+        // It leaves in under an hour by the reply that has its clock; without it nothing is counted: when it leaves, as its airport says.
+        assertEquals(Phase.AHEAD, FlightRules.phase(plan, asked))
+        assertEquals(Headline(Heading.LEAVES_AT), FlightRules.headline(plan, asked))
+        // In the air: no minutes to landing, and no place for the plane. Landed: no "ago".
+        val air = without("flight-LH455-in-the-air", "arr")
+        assertTrue(air.loose)
+        assertEquals(Headline(Heading.IN_AIR), FlightRules.headline(air, asked))
+        assertNull(FlightRules.share(air, asked))
+        val down = without("flight-LH96-landed", "arr")
+        assertTrue(down.loose)
+        assertEquals(Headline(Heading.LANDED), FlightRules.headline(down, asked))
+        // How late it runs is one clock's two times: that stays.
+        assertEquals(Badge(Verdict.EARLY, 24), FlightRules.badge(air, asked))
+        // Every reply that was saved has its clocks at both ends: none of them is marked, in `flight` or in `schedules`.
+        for (name in listOf("flight-JL101-landed-nine-hours-ago", "flight-LH1184-cancelled", "flight-LH152-delayed", "flight-LH454-planned", "flight-LH455-in-the-air",
+            "flight-LH455-landed", "flight-LH9152-codeshare", "flight-LH96-landed", "flight-SQ26-second-leg")) assertTrue(name, !flight(name).loose)
+        for (name in listOf("schedules-LH455", "schedules-SQ26-two-legs")) assertTrue(name, AirLabs.schedules(reply(name)).value!!.none { it.loose })
+    }
+
+    @Test fun pastItsTimeAndStillCalledPlannedNobodySaysOnTime() {
+        // Leaves 08:25 UTC. A minute after, with no word that it left: one minute to go, and neither "Planned" nor "On time".
+        val plan = flight("flight-LH454-planned")
+        assertTrue(FlightRules.overdue(plan, at("2026-10-02T08:26:00Z")))
+        val r = FlightRules.row(plan, at("2026-10-02T08:26:00Z"))
+        assertEquals(Phase.SOON, r.phase)
+        assertEquals(Headline(Heading.LEAVES_IN, 1), r.headline)
+        assertNull(r.badge)
+        val onTime = plan.copy(from = plan.from.copy(expected = plan.from.planned))
+        assertEquals(Badge(Verdict.ON_TIME), FlightRules.badge(onTime, at("2026-10-02T08:24:00Z")))
+        assertNull(FlightRules.badge(onTime, at("2026-10-02T08:25:00Z")))
+        // Hours after, it is the same: the clock alone never makes a plan of a time that has passed.
+        assertEquals(Headline(Heading.LEAVES_IN, 1), FlightRules.headline(plan, at("2026-10-02T11:00:00Z")))
+        // Before its time nothing is overdue, and a timetable's flight has its own phase for a time that passed.
+        assertTrue(!FlightRules.overdue(plan, at("2026-10-02T08:24:00Z")))
+        assertTrue(!FlightRules.overdue(plan.copy(timetable = true), at("2026-10-02T08:26:00Z")))
     }
 
     @Test fun inTheAirMinutesToLandingEarlyAndThePlaneNearlyThere() {

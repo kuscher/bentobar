@@ -22,6 +22,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 
 /**
  * AirLabs' replies, read. The files in `resources/airlabs` are what the service answered on 2 October
@@ -47,7 +48,7 @@ class AirLabsTest {
         }
     }
 
-    private fun lookup(n: FlightNumber, now: Instant, day: LocalDate? = null, get: (Request) -> Reply): AirLabs.Answer = AirLabs.lookup(n, day, "k", now, get)!!
+    private fun lookup(n: FlightNumber, now: Instant, day: LocalDate? = null, get: (Request) -> Reply): AirLabs.Answer = AirLabs.lookup(n, day, "k", now, get = get)!!
     private fun ok(text: String): (Request) -> Reply = { Reply.Ok(text) }
 
     private val none = """{"response":[]}"""
@@ -332,6 +333,33 @@ class AirLabsTest {
         assertEquals(listOf("flight"), fresh.asked)
     }
 
+    @Test fun whenTheNextFlightCouldNotBeAskedForThatIsSaidNotTheOneThatLanded() {
+        val jl101 = FlightNumber("JL", 101)
+        val landed = reply("flight-JL101-landed-nine-hours-ago")
+        val now = at("2026-10-02T07:28:00Z")
+        // The one-flight question was answered; the two for the next flight found no connection.
+        val cut = Service(mapOf("flight" to landed))
+        val a = lookup(jl101, now, get = cut::get)
+        assertNull(a.flight)
+        assertEquals(Failure.OFFLINE, a.failure)
+        assertEquals(listOf("flight", "schedules", "routes"), cut.asked)
+        // One of the two is enough: told to slow down for the coming hours, or a timetable that timed out.
+        val slow = lookup(jl101, now) { r -> when (r.path) { AirLabs.FLIGHT -> Reply.Ok(landed); AirLabs.SCHEDULES -> Reply.Failed(Why.STATUS, 429); else -> Reply.Ok(none) } }
+        assertNull(slow.flight)
+        assertEquals(Failure.NO_ANSWER, slow.failure)
+        val late = lookup(jl101, now) { r -> when (r.path) { AirLabs.FLIGHT -> Reply.Ok(landed); AirLabs.SCHEDULES -> Reply.Ok(none); else -> Reply.Failed(Why.TIMEOUT) } }
+        assertNull(late.flight)
+        assertEquals(Failure.NO_ANSWER, late.failure)
+        // The timetable has the next one though the coming hours could not be asked: that one, and nothing went wrong.
+        val far = lookup(jl101, now) { r -> when (r.path) { AirLabs.FLIGHT -> Reply.Ok(landed); AirLabs.SCHEDULES -> Reply.Failed(Why.TIMEOUT); else -> Reply.Ok(reply("routes-LH455")) } }
+        assertTrue(far.flight!!.timetable)
+        assertNull(far.failure)
+        // "Not found" is an answer: nobody knows of a next one, so it is the one that landed, as it was.
+        val unknown = lookup(jl101, now) { r -> Reply.Ok(if (r.path == AirLabs.FLIGHT) landed else reply("error-not-found")) }
+        assertEquals(FlightState.LANDED, unknown.flight!!.state)
+        assertNull(unknown.failure)
+    }
+
     @Test fun aDayChosenWithTheNumber() {
         val now = at("2026-10-02T07:29:00Z")
         val both = mapOf("flight" to reply("flight-LH455-in-the-air"), "routes" to reply("routes-LH455"))
@@ -351,6 +379,27 @@ class AirLabsTest {
         assertEquals(Failure.NOT_THAT_DAY, lookup(lh455, now, LocalDate.of(2026, 10, 3), mondays::get).failure)
         val gone = Service(mapOf("flight" to reply("flight-LH455-in-the-air")))
         assertEquals(Failure.OFFLINE, lookup(lh455, now, LocalDate.of(2026, 10, 3), gone::get).failure)
+    }
+
+    @Test fun aDayChosenIsTheDevicesDayAndTakesTheFlightThatLeavesOnIt() {
+        // LH 454 leaves Frankfurt on 2 October at 10:25, which is 08:25 UTC: in Honolulu the evening of the 1st, an hour from now.
+        val now = at("2026-10-02T07:29:00Z")
+        val honolulu = ZoneId.of("Pacific/Honolulu")
+        val lh454 = FlightNumber("LH", 454)
+        val today = LocalDate.of(2026, 10, 1)
+        val s = Service(mapOf("flight" to reply("flight-LH454-planned"), "routes" to none))
+        val a = AirLabs.lookup(lh454, today, "k", now, honolulu, s::get)!!
+        // "Today" there is that flight, not the one that left Frankfurt 23 hours ago.
+        assertEquals(listOf("flight"), s.asked)
+        assertEquals(time("2026-10-02T10:25"), a.flight!!.from.planned)
+        assertFalse(a.flight.timetable)
+        // A day that is the airport's own (what is kept of a followed flight) is read as that: no device's zone, no match.
+        val kept = Service(mapOf("flight" to reply("flight-LH454-planned"), "routes" to none))
+        assertEquals(Failure.NOT_THAT_DAY, AirLabs.lookup(lh454, today, "k", now, null, kept::get)!!.failure)
+        // The day on the departure board is still taken, wherever the device is.
+        val there = Service(mapOf("flight" to reply("flight-LH454-planned")))
+        assertEquals(time("2026-10-02T10:25"), AirLabs.lookup(lh454, LocalDate.of(2026, 10, 2), "k", now, honolulu, there::get)!!.flight!!.from.planned)
+        assertEquals(listOf("flight"), there.asked)
     }
 
     @Test fun aNumberTheServiceDoesNotKnowMayStillBeInTheTimetable() {
@@ -379,6 +428,8 @@ class AirLabsTest {
             "dep_time":"2026-10-02 08:00","dep_time_utc":"2026-09-02 06:00","arr_time":"2026-10-02 10:00","arr_time_utc":"2026-10-02 23:30"}}""").value!!
         assertEquals(0, f.from.offset)
         assertEquals(-13 * 60 - 30, f.to.offset)
+        // A flight with such an end is marked: its moments are anybody's guess, and nothing is counted from them.
+        assertTrue(f.loose)
         // And nothing that is made from it throws.
         FlightRules.standing(f, at("2026-10-02T07:00:00Z"))
         FlightRules.over(f, at("2026-10-02T07:00:00Z"))

@@ -195,7 +195,7 @@ private fun SearchCard(item: ItemConfig, v: Voice, today: LocalDate, initial: St
             submit = stringResource(R.string.flight_track), selectAll = true, error = error, canSubmit = text.isNotBlank(),
             onChange = { text = it; notNumber = false; FlightItem.dropFailure(item.id) },
             onEnter = { entered ->
-                val question = FlightLoad.question(item.id, entered, days.getOrNull(day))
+                val question = FlightLoad.question(item.id, entered, days.getOrNull(day), v.zone)
                 if (question == null) notNumber = true else FlightItem.track(question, item)
             })
         if (missed != null && error == null) {

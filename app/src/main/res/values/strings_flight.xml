@@ -49,6 +49,7 @@
     <string name="flight_canceled">Canceled</string>
     <string name="flight_diverted">Diverted</string>
     <string name="flight_timetable">From the timetable</string>
+    <string name="flight_no_update">No update</string>
     <string name="flight_badge_planned">Planned</string>
     <string name="flight_badge_on_time">On time</string>
     <string name="flight_badge_delayed">Delayed %1$s</string>

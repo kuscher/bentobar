@@ -134,6 +134,55 @@ class FlightTextTest {
         assertEquals("1m · Gate G13", bar(lh455(), "2026-10-02T21:39:30Z").text)
     }
 
+    @Test fun pastItsTimeWithNoWordItStaysAtOneMinuteAndAfterAnHourSaysNoUpdate() {
+        // LH 455 leaves 2:40 PM; the last answer, at 2:20, called it planned and on time.
+        val f = lh455(sfo(expected = "2026-10-02T14:40"))
+        val heard = "2026-10-02T21:20:00Z"
+        assertEquals("1m · Gate G13", bar(f, "2026-10-02T21:39:30Z", heard).text)
+        // From 2:40 on it is still a minute: never a plan for a time that has passed.
+        for (now in listOf("2026-10-02T21:40:00Z", "2026-10-02T21:55:00Z", "2026-10-02T22:20:00Z")) {
+            assertEquals(now, "1m · Gate G13", bar(f, now, heard).text)
+            assertEquals(now, Sym.FLIGHT_TAKEOFF, bar(f, now, heard).icon)
+            assertEquals(now, "Leaves in 1\u00A0min", card(f, now, heard).headline)
+            // "On time" is nobody's to say about a time that is over.
+            assertNull(now, card(f, now, heard).badge)
+        }
+        // The last answer is over an hour old: nobody knows what became of it.
+        val silent = bar(f, "2026-10-02T22:21:00Z", heard)
+        assertEquals("LH 455 · no update", silent.text)
+        assertEquals(Sym.FLIGHT, silent.icon)
+        assertEquals(Tone.NORMAL, silent.tone)
+        assertTrue(silent.active)
+        assertEquals("LH 455: no update", silent.desc)
+        val c = card(f, "2026-10-02T22:21:00Z", heard)
+        assertEquals("No update", c.headline)
+        assertNull(c.badge)
+        assertNull(c.share)                                                        // no plane on the line: nobody knows where it is
+        assertEquals("LH 455 SFO → FRA · No update", c.copy)
+        // A delay that was known is still true once its time has passed.
+        val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
+        assertEquals("1m · +25m · Gate G13", bar(late, "2026-10-02T21:45:00Z", heard).text)
+        assertEquals("Delayed 25\u00A0min", card(late, "2026-10-02T21:45:00Z", heard).badge)
+        // With no gate to name the minute stands alone: a time that has passed is not said beside it.
+        assertEquals("1m · 2:40 PM", bar(lh455(sfo(gate = null)), "2026-10-02T21:39:30Z", heard).text)
+        assertEquals("1m", bar(lh455(sfo(gate = null)), "2026-10-02T21:45:00Z", heard).text)
+        // An old answer about a flight whose time is still to come is "not live", as before.
+        assertEquals("10m · not live", bar(f, "2026-10-02T21:30:00Z", "2026-10-02T20:29:00Z").text)
+    }
+
+    @Test fun aFlightWhoseClockNobodyGaveIsNotCountedDownTo() {
+        val f = lh455(sfo(expected = "2026-10-02T14:40")).copy(loose = true)
+        assertEquals("LH 455 · 2:40 PM", bar(f, near).text)
+        assertEquals("Leaves 2:40 PM", card(f, near).headline)
+        // The sentence about an hour's doubt is for a timetable's plan: these times are the airport's own, and right.
+        assertFalse(card(f, near).loose)
+        assertTrue(card(f.copy(timetable = true), near).loose)
+        val air = inAir(fra(expected = "2026-10-03T10:25")).copy(loose = true)
+        assertEquals("In the air", bar(air, "2026-10-03T07:00:00Z").text)
+        assertEquals("In the air", card(air, "2026-10-03T07:00:00Z").headline)
+        assertNull(card(air, "2026-10-03T07:00:00Z").share)
+    }
+
     @Test fun lateBeforeItLeavesSaysByHowMuchAndTurnsToAWarning() {
         val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
         val b = bar(late, near)
@@ -223,6 +272,26 @@ class FlightTextTest {
         assertNull(b.text)
         assertFalse(b.active)
         assertEquals("LH 455 landed at 10:25 AM", b.desc)
+    }
+
+    @Test fun aFlightTheServiceHasGoneOnFromHasLandedOnceItsTimeToLandHasPassed() {
+        // Last heard in the air, to land 10:25 AM. Then the service answered with the next day's flight, and the asking ended.
+        val t = tracked(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T07:30:00Z")
+        val ended = t.copy(ended = true)
+        fun bar(of: Tracked, now: String) = FlightText.bar(of, null, at(now), 24, us)
+        // Until its time it counts down by the clock.
+        assertEquals("25m · 10:25 AM", bar(ended, "2026-10-03T08:00:00Z").text)
+        // Nobody will ever say "landed" of it: its time to land says so. No "1m" for hours, no "Lands in 1 min".
+        val down = bar(ended, "2026-10-03T08:26:00Z")
+        assertEquals("Landed 10:25 AM", down.text)
+        assertEquals(Sym.FLIGHT_LAND, down.icon)
+        val c = FlightText.card(ended, at("2026-10-03T08:26:00Z"), us)!!
+        assertEquals("Landed 1\u00A0min ago", c.headline)
+        assertEquals(1.0, c.share!!, 0.0)
+        // An hour on it is the plane alone, like any flight that landed.
+        assertNull(bar(ended, "2026-10-03T09:26:00Z").text)
+        // A flight that is still asked about goes by the service's word: a minute to go until it says "landed", or three hours pass.
+        assertEquals("1m · 10:25 AM", bar(t, "2026-10-03T08:26:00Z").text)
     }
 
     @Test fun canceledIsTheCrossedOutPlaneAndAnAlertForAnHour() {
@@ -609,6 +678,19 @@ class FlightTextTest {
         assertEquals("Flight: not set up", FlightVoices.string("flight_desc_not_set_up"))
         assertEquals("LH 455 stays until another is found", us.say(FlightText.Word.FLIGHT_ANOTHER_SUBTITLE, "LH 455"))
         assertEquals("Looking up LH 455…", us.say(FlightText.Word.FLIGHT_LOOKING_UP, "LH 455"))
+    }
+
+    @Test fun theAboutTextSaysWhenTheServiceIsAskedAsTheRulesHaveIt() {
+        val about = FlightVoices.string("about_privacy_flight")
+        // After a landing it slept through, the item asks once more (FlightRulesTest.asleepThroughTheLandingItIsAskedAboutOnceOnWaking),
+        // and a new key asks about a flight that waited for one (aNewKeyAsksAtOnceOnlyAboutAFlightThatWaitedForOne): "never" was not true.
+        assertFalse(about, about.contains("never asks"))
+        assertTrue(about, about.contains(" Once it knows the flight has landed it stops asking; after sleeping through a landing it asks once more. "))
+        assertTrue(about, about.contains("when you track a flight, when you press Refresh or save a new key, and while it follows the flight, "))
+        // What it says of the pace is the rules' own numbers.
+        assertTrue(about, about.contains("about every 3 hours until 3 hours before departure, then every 30 minutes or sooner until it lands; a failed try is repeated sooner."))
+        assertEquals(java.time.Duration.ofHours(3), FlightRules.FAR)
+        assertEquals(java.time.Duration.ofMinutes(30), FlightRules.NEAR)
     }
 
     @Test fun charactersAreCountedAsAReaderSeesThem() {

@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -37,8 +38,8 @@ object FlightLoad {
     @Serializable
     private class Following(val number: String, val day: String? = null)
 
-    /** One press of Track: which item asks, the number, and the day that was chosen (null: the next flight). */
-    data class Question(val item: String, val number: FlightNumber, val day: LocalDate? = null) {
+    /** One press of Track: which item asks, the number, the day that was chosen (null: the next flight), and where: a day chip is a day of the device's ([zone]). */
+    data class Question(val item: String, val number: FlightNumber, val day: LocalDate? = null, val zone: ZoneId? = null) {
         /** Whose flight it is stays out of anything that prints a value. */
         override fun toString(): String = "Question(a flight)"
     }
@@ -71,7 +72,7 @@ object FlightLoad {
     }
 
     /** [text] and the chosen [day] as a question for [item], or null: what is not a flight number is never asked. */
-    fun question(item: String, text: String, day: LocalDate?): Question? = FlightNumber.read(text)?.let { Question(item, it, day) }
+    fun question(item: String, text: String, day: LocalDate?, zone: ZoneId? = null): Question? = FlightNumber.read(text)?.let { Question(item, it, day, zone) }
 
     private fun mayAsk(key: String) = key.isNotEmpty() && Online.on(service)
 
@@ -83,7 +84,7 @@ object FlightLoad {
         val key = Online.key(service)
         if (!mayAsk(key)) return Outcome.Unasked
         notFoundLately(q, now)?.let { return Outcome.Failed(it) }
-        val a = AirLabs.lookup(q.number, q.day, key, Instant.ofEpochMilli(now)) { Http.get(it) } ?: return Outcome.Unasked
+        val a = AirLabs.lookup(q.number, q.day, key, Instant.ofEpochMilli(now), q.zone) { Http.get(it) } ?: return Outcome.Unasked
         said(a.left)
         val f = a.flight
         if (f == null) {
@@ -136,7 +137,23 @@ object FlightLoad {
         runCatching { json.encodeToString(Tracked.serializer(), t) }.getOrNull()?.let { Kept.fetched(service).write(item, it, now) }
     }
 
-    /** What belonged to an item that is no longer in the layout goes with it. (An empty [items] means the last one is just being deleted, which may still be undone.) */
+    /** For this long a deleted item can come back (Undo is offered for ten seconds), and what was kept for the last Flight item is left alone. */
+    const val UNDO_MS = 30_000L
+
+    /**
+     * With no Flight item left in the layout, what was kept for one goes for good: the number, the day
+     * and the last answer. Asked [UNDO_MS] after the last item went, with the [items] there are then.
+     * True if it cleared; false, and nothing touched, while there is an item (it came back, or another
+     * was added, whose first load removes what belonged to the one that is gone).
+     */
+    fun clearWithout(items: Set<String>): Boolean = synchronized(lock) {
+        if (items.isNotEmpty()) return false
+        Kept.own(OWN).clear()
+        Kept.fetched(service).clear()
+        true
+    }
+
+    /** What belonged to an item that is no longer in the layout goes with it. (An empty [items] means the last one is just being deleted, which may still be undone: [clearWithout] comes later.) */
     private fun tidy(items: Set<String>) {
         if (items.isEmpty()) return
         Kept.own(OWN).keepOnly(items)
@@ -229,6 +246,21 @@ object FlightLoad {
         if (keyGone) synchronized(lock) { Kept.own(OWN).clear() }
     }
 
-    /** A new key was saved: how many lookups the old one had left says nothing about it. */
-    fun newKey() { left = null }
+    /**
+     * A new key was saved: how many lookups the old one had left says nothing about it. The count goes
+     * from here and from every answer that is kept, which stays as old as it was. Left in, a flight
+     * that was not asked about for want of lookups would never be asked about again, and its menu
+     * would say "few lookups left" of a key that has a thousand.
+     */
+    fun newKey() {
+        left = null
+        synchronized(lock) {
+            val kept = Kept.fetched(service)
+            for (name in kept.names()) {
+                val entry = kept.read(name) ?: continue
+                val t = decode(entry.text)?.takeIf { it.left != null } ?: continue
+                runCatching { json.encodeToString(Tracked.serializer(), t.copy(left = null)) }.getOrNull()?.let { kept.write(name, it, entry.savedAt) }
+            }
+        }
+    }
 }

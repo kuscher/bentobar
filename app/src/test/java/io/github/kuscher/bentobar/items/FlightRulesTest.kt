@@ -47,7 +47,7 @@ class FlightRulesTest {
         }
     }
 
-    private fun lookup(n: FlightNumber, now: Instant, day: LocalDate? = null, get: (Request) -> Reply): AirLabs.Answer = AirLabs.lookup(n, day, "k", now, get)!!
+    private fun lookup(n: FlightNumber, now: Instant, day: LocalDate? = null, get: (Request) -> Reply): AirLabs.Answer = AirLabs.lookup(n, day, "k", now, get = get)!!
     private fun again(was: Flight, get: (Request) -> Reply): AirLabs.Asked = AirLabs.again(lh455, "k", was, get)!!
     private fun ok(text: String): (Request) -> Reply = { Reply.Ok(text) }
 
@@ -200,7 +200,8 @@ class FlightRulesTest {
     @Test fun howLongAnAnswerIsKept() {
         assertEquals(Duration.ofMinutes(2), AirLabs.keep(null))
         assertEquals(Duration.ofSeconds(10), AirLabs.keep(Failure.OFFLINE))
-        assertEquals(Duration.ofSeconds(10), AirLabs.keep(Failure.NO_ANSWER))
+        // No answer is no reason to hurry: a "slow down", an error of the service's and a limit for the minute are all that.
+        assertEquals(Duration.ofMinutes(2), AirLabs.keep(Failure.NO_ANSWER))
         // A number nobody flies costs two lookups to find out: it is not asked again for an hour.
         assertEquals(Duration.ofHours(1), AirLabs.keep(Failure.NOT_FOUND))
         assertEquals(Duration.ofHours(1), AirLabs.keep(Failure.NOT_THAT_DAY))
@@ -261,6 +262,18 @@ class FlightRulesTest {
         assertEquals(Failure.REFUSED, again(air, ok(reply("error-unknown-key"))).failure)
         assertEquals(Failure.USED_UP, again(air, ok("""{"error":{"message":"x","code":"month_limit_exceeded"}}""")).failure)
         assertNull(again(air, ok(reply("flight-LH455-landed"))).failure)
+    }
+
+    @Test fun aReplyThatNamesNoTimeToLeaveIsNoAnswerAndNotTheEndOfTheAsking() {
+        val air = flight("flight-LH455-in-the-air")
+        // The same flight, with its planned time left empty: nobody can tell which day's flight the reply is about.
+        val bare = reply("flight-LH455-in-the-air").replace(Regex("\"dep_time\": \"[^\"]*\","), "\"dep_time\": null,")
+        assertNull(AirLabs.flight(bare).value!!.from.planned)
+        val asked = again(air, ok(bare))
+        assertEquals(AirLabs.Again.Failed, asked.again)
+        assertEquals(Failure.NO_ANSWER, asked.failure)
+        // Another day's flight of the number is still the end of it: an item follows one flight.
+        assertEquals(AirLabs.Again.Gone, again(air, ok(later(reply("flight-LH455-in-the-air"), 1))).again)
     }
 
     @Test fun aFollowedPlanFromTheTimetableWaitsForTheServiceToKnowItsDay() {
@@ -388,6 +401,18 @@ class FlightRulesTest {
         assertNull(every(t.copy(failure = Failure.USED_UP), "2026-10-02T02:00:00Z"))
         // Nor is a flight the service has gone on from: an item follows one flight, never the next day's of its number.
         assertNull(every(t.copy(ended = true), "2026-10-02T02:00:00Z"))
+    }
+
+    @Test fun aRefreshByHandWaitsTwoMinutesAndAsLongAsASlowDownAskedFor() {
+        val t = tracked(flight("flight-LH455-in-the-air"), "2026-10-02T02:00:00Z")
+        assertEquals(2 * min, FlightRules.byHand(t))
+        // Only a try that found no connection may be repeated in ten seconds.
+        assertEquals(10_000L, FlightRules.byHand(t.copy(failure = Failure.OFFLINE, failures = 1)))
+        assertEquals(2 * min, FlightRules.byHand(t.copy(failure = Failure.NO_ANSWER, failures = 1)))
+        assertEquals(5 * min, FlightRules.byHand(t.copy(failure = Failure.NO_ANSWER, failures = 1, waitSec = 300)))
+        assertEquals(2 * min, FlightRules.byHand(t.copy(failure = Failure.NO_ANSWER, failures = 1, waitSec = 30)))
+        // A wait nobody can mean is kept to for a day at most.
+        assertEquals(24 * hour, FlightRules.byHand(t.copy(failure = Failure.NO_ANSWER, waitSec = Long.MAX_VALUE)))
     }
 
     @Test fun belowTwentyLookupsLeftFollowingStops() {

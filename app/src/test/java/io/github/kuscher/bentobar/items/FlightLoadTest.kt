@@ -24,6 +24,7 @@ import org.junit.Test
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.Executor
 
 /**
@@ -115,10 +116,16 @@ class FlightLoadTest {
 
     @Test fun whatIsNotAFlightNumberIsNeverAsked() {
         online { net ->
-            for (text in listOf("hello", "", "LH", "455", "LH 455 tomorrow")) assertNull(text, FlightLoad.question(item, text, null))
-            assertEquals("LH 455", FlightLoad.question(item, "lh455", null)!!.number.shown)
-            assertEquals(0, net.asked.size)
+            net.says(AirLabs.FLIGHT to reply("flight-LH455-in-the-air"))
+            // What the field does with its text on Track: only a flight number makes a question, and only a question is sent.
+            fun entered(text: String): Outcome? = FlightLoad.question(item, text, null)?.let { FlightLoad.track(it, asked) }
+            for (text in listOf("hello", "", "LH", "455", "LH 455 tomorrow", "api_key=x", "LH455&flight_iata=UA1")) assertNull(text, entered(text))
+            assertEquals(emptyList<Request>(), net.asked)
             assertEquals(0, sent())
+            // The same way does send for a number, with the service there to answer: the zero above is not zero by construction.
+            assertTrue(entered("lh455") is Outcome.Found)
+            assertEquals(listOf("flight_iata" to "LH455", "api_key" to key), net.asked.single().query)
+            assertEquals(1, sent())
         }
     }
 
@@ -159,6 +166,17 @@ class FlightLoadTest {
         }
     }
 
+    @Test fun aDayChipIsTheDevicesDayAndWhatIsKeptIsTheFlightsOwn() {
+        online { net ->
+            net.says(AirLabs.FLIGHT to reply("flight-LH454-planned"))
+            // The evening of 1 October in Honolulu. The flight leaves Frankfurt in an hour, on the 2nd there.
+            val q = FlightLoad.question(item, "LH454", LocalDate.of(2026, 10, 1), ZoneId.of("Pacific/Honolulu"))!!
+            val t = found(FlightLoad.track(q, asked))
+            assertEquals(1, sent())
+            assertEquals("2026-10-02", t.day)
+        }
+    }
+
     // ---- the key
 
     @Test fun whatIsKeptCannotContainTheKey() {
@@ -185,6 +203,29 @@ class FlightLoadTest {
             assertEquals(emptyList<String>(), filesWith("203.0.113.7"))
             // And what is kept is there, and reads as the flight.
             assertTrue(Kept.fetched(AIRLABS).read(item)!!.text.contains("\"LH455\""))
+        }
+    }
+
+    @Test fun aNewKeyStartsWithNoCountOfLookupsAlsoInWhatIsKept() {
+        online { net ->
+            // The old key had twelve lookups left: too few to ask unasked, so the flight was left alone.
+            net.says(AirLabs.FLIGHT to withRequest(reply("flight-LH455-in-the-air"), left = 12))
+            val t = found(FlightLoad.track(question("lh455"), asked)).also { assertTrue(FlightLoad.take(item, it, asked)) }
+            assertEquals(12, t.left)
+            assertNull(FlightRules.every(t, at("2026-10-02T07:35:00Z")))
+            // Replace key.
+            Online.saveKey(AIRLABS, "another-test-key")
+            FlightLoad.newKey()
+            assertNull(FlightLoad.left)
+            // What is kept says nothing of the old key's count any more, and is as old as it was: the flight has its turn again,
+            // now and after a restart, and no menu says "few lookups left" of a key with a thousand.
+            val kept = FlightLoad.kept(item, asked + 5 * min, ids)!!
+            assertEquals(t.copy(left = null), kept.value)
+            assertEquals(5 * min, kept.ageMs)
+            assertNull(FlightLoad.left)
+            assertEquals(30 * min, FlightRules.every(kept.value, at("2026-10-02T07:35:00Z")))
+            // Nobody was asked for any of this.
+            assertEquals(1, sent())
         }
     }
 
@@ -377,6 +418,27 @@ class FlightLoadTest {
             // With no Flight item left at all nothing is cleared yet: deleting the last one can still be undone.
             FlightLoad.kept(item, asked, emptySet())
             assertEquals(setOf(item), Kept.own("flight").names())
+        }
+    }
+
+    @Test fun whatWasKeptForTheLastFlightItemGoesOnceItsDeletionCanNoLongerBeUndone() {
+        online { net ->
+            follow(net)
+            assertEquals(setOf(item), Kept.own("flight").names())
+            assertEquals(setOf(item), Kept.fetched(AIRLABS).names())
+            // The moment to undo has passed (longer than the Undo's own ten seconds), and the item is back: nothing is touched.
+            assertTrue(FlightLoad.UNDO_MS >= 30_000)
+            assertFalse(FlightLoad.clearWithout(ids))
+            assertEquals(setOf(item), Kept.own("flight").names())
+            assertEquals(setOf(item), Kept.fetched(AIRLABS).names())
+            // It has passed and there is still no Flight item: its number, its day and its last answer go, and nothing of a flight stays for good.
+            assertTrue(FlightLoad.clearWithout(emptySet()))
+            assertEquals(emptySet<String>(), Kept.own("flight").names())
+            assertEquals(emptySet<String>(), Kept.fetched(AIRLABS).names())
+            assertEquals(emptyList<String>(), filesWith("LH455"))
+            // The key is not a flight's: it stays where it is.
+            assertEquals(listOf("online.json"), filesWith(key))
+            assertEquals(1, sent())
         }
     }
 
@@ -716,6 +778,14 @@ class FlightLoadTest {
             assertFalse(r.refresh(item, floorMs = FlightRules.byHand(r.peek(item)!!)))
             elapsed += 1_000
             assertTrue(r.refresh(item, floorMs = FlightRules.byHand(r.peek(item)!!)))
+            // Told to slow down, or any other "no answer": two minutes again. Six presses in a minute are no request.
+            net.fails(Why.STATUS, 429)
+            elapsed += 2 * min
+            assertTrue(r.refresh(item, floorMs = FlightRules.byHand(r.peek(item)!!)))
+            assertEquals(Failure.NO_ANSWER, r.peek(item)!!.failure)
+            val before = sent()
+            repeat(6) { elapsed += 10_000; assertFalse(r.refresh(item, floorMs = FlightRules.byHand(r.peek(item)!!))) }
+            assertEquals(before, sent())
         }
     }
 }

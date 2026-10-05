@@ -155,6 +155,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         Word.FLIGHT_CANCELED -> R.string.flight_canceled
         Word.FLIGHT_DIVERTED -> R.string.flight_diverted
         Word.FLIGHT_TIMETABLE -> R.string.flight_timetable
+        Word.FLIGHT_NO_UPDATE -> R.string.flight_no_update
         Word.FLIGHT_BADGE_PLANNED -> R.string.flight_badge_planned
         Word.FLIGHT_BADGE_ON_TIME -> R.string.flight_badge_on_time
         Word.FLIGHT_BADGE_DELAYED -> R.string.flight_badge_delayed
@@ -308,17 +309,23 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     }
 
     /**
-     * Saves the user's key, which turns the service on. A flight that waited for one (the old key was
-     * refused or used up, or had too few lookups left) is asked about at once, if its item is in the
-     * bar; every other flight keeps its turn: a new key is no reason to ask.
+     * Saves the user's key, which turns the service on. How many lookups the old key had left goes
+     * from everything that is kept and known: it says nothing of the new one. A flight that waited
+     * for a key (the old one was refused or used up, or had too few lookups left) is asked about at
+     * once, if its item is in the bar; every other flight keeps its turn: a new key is no reason to ask.
      */
     internal fun saveKey(key: String): Boolean {
         if (!Online.saveKey(online, key)) return false
         FlightLoad.newKey()
         val now = Instant.ofEpochMilli(Now.wall())
         for (item in Store.config.value.items) {
-            if (item.type != type || item.section == Section.OFF) continue
-            if (tracker.peek(item.id)?.let { FlightRules.waitsForKey(it, now) } == true) tracker.refresh(item.id, afterRunning = true)
+            if (item.type != type) continue
+            val known = tracker.peek(item.id) ?: continue
+            val waited = item.section != Section.OFF && FlightRules.waitsForKey(known, now)
+            // What is known is read back from what is kept, which has lost the old key's count; until then the item shows it without.
+            fresh[item.id] = known.copy(left = null)
+            reread(item.id)
+            if (waited) tracker.refresh(item.id, afterRunning = true)
         }
         Ticker.refresh()
         return true
@@ -342,11 +349,18 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     /** Once a second while an item of this type is looked at: an answer that came with no menu open to take it is taken here. */
     override fun sample(now: Long) { takeAnswer() }
 
-    /** No Flight item is looked at any more: what was held for items that are gone from the layout is let go. */
+    /**
+     * No Flight item is looked at any more: what was held for items that are gone from the layout is
+     * let go. If that was the last Flight item, what is kept for it on the device goes too, once the
+     * moment to undo the deletion has passed and none is back.
+     */
     override fun onIdle() {
         val items = ids()
         tracker.keepOnly(items)
         fresh.keys.retainAll(items)
+        if (items.isEmpty()) Background.later(FlightLoad.UNDO_MS) {
+            if (FlightLoad.clearWithout(ids())) { tracker.forget(); fresh.clear(); places.clear() }
+        }
     }
 
     /** The service was switched off or its key removed: the loader and the lookup have forgotten already; this is the rest. */

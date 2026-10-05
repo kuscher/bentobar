@@ -55,9 +55,10 @@ enum class FlightState { PLANNED, IN_AIR, LANDED, CANCELED, DIVERTED }
 /**
  * One flight on one day, as the service said it. [timetable]: made from the airline's timetable, not
  * from that day's operations: a plan, with no gate, nothing known of delays and no state of its own
- * (whether it has left is what the clock says against its plan). [loose]: a timetable's flight on a
- * day after a clock change at one of its airports; its times are the timetable's, but the moments
- * they stand for may be an hour out, so nothing is made of them that must be right to the hour.
+ * (whether it has left is what the clock says against its plan). [loose]: its times are right at
+ * their airports, but the moments they stand for may be out, so nothing is counted from them. That is
+ * a timetable's flight on a day after a clock change at one of its airports (an hour out), and a
+ * flight of which the service gave a time without its UTC twin (nobody knows by how much).
  */
 @Serializable
 data class Flight(
@@ -222,8 +223,9 @@ object FlightRules {
     /**
      * Which phase [f] is in at [now]. What the service says, not the clock, decides whether it has
      * left and landed; only a timetable's flight goes by its plan, and once its time to leave has
-     * passed nobody knows more. A plan whose clocks may be an hour out ([Flight.loose]) is never
-     * counted down to.
+     * passed nobody knows more. A flight the service still calls planned after its time to leave
+     * ([overdue]) stays in its countdown, at the last minute: it is never a plan for a time that has
+     * passed. A plan whose clocks may be out ([Flight.loose]) is never counted down to.
      */
     fun phase(f: Flight, now: Instant): Phase = when (f.state) {
         FlightState.CANCELED -> Phase.CANCELED
@@ -233,10 +235,18 @@ object FlightRules {
         FlightState.PLANNED -> {
             val toGo = f.from.time?.let { until(now, f.from.moment(it)) }
             if (f.timetable && departed(f, now)) Phase.TIMETABLE
-            else if (toGo != null && toGo in 1..SOON.toMinutes() && !f.loose) Phase.SOON
+            else if (toGo != null && toGo <= SOON.toMinutes() && !f.loose) Phase.SOON
             else Phase.AHEAD
         }
     }
+
+    /**
+     * The service still calls [f] planned and its time to leave has passed: nobody has said that it
+     * left. Every flight is here for some minutes, between its time and the next answer; one with no
+     * connection stays. (A timetable's flight has a phase of its own for this, and one whose clocks
+     * may be out has no moment to be past.)
+     */
+    fun overdue(f: Flight, now: Instant): Boolean = f.state == FlightState.PLANNED && !f.timetable && !f.loose && passed(f.from, now)
 
     /**
      * The headline: the one thing needed in that phase. When it leaves; within three hours of that,
@@ -248,10 +258,10 @@ object FlightRules {
         Phase.DIVERTED -> Headline(Heading.DIVERTED)
         Phase.TIMETABLE -> Headline(Heading.TIMETABLE)
         Phase.AHEAD -> Headline(Heading.LEAVES_AT)
-        Phase.SOON -> f.from.time?.let { Headline(Heading.LEAVES_IN, until(now, f.from.moment(it))) } ?: Headline(Heading.LEAVES_AT)
-        Phase.IN_AIR -> f.to.time?.let { Headline(Heading.LANDS_IN, until(now, f.to.moment(it)).coerceAtLeast(1)) } ?: Headline(Heading.IN_AIR)
+        Phase.SOON -> f.from.time?.let { Headline(Heading.LEAVES_IN, until(now, f.from.moment(it)).coerceAtLeast(1)) } ?: Headline(Heading.LEAVES_AT)
+        Phase.IN_AIR -> f.to.time?.takeUnless { f.loose }?.let { Headline(Heading.LANDS_IN, until(now, f.to.moment(it)).coerceAtLeast(1)) } ?: Headline(Heading.IN_AIR)
         Phase.LANDED -> {
-            val ago = f.to.time?.let { Duration.between(f.to.moment(it), now) }
+            val ago = f.to.time?.takeUnless { f.loose }?.let { Duration.between(f.to.moment(it), now) }
             when {
                 ago == null || ago > OVER -> Headline(Heading.LANDED)
                 ago.seconds < 60 -> Headline(Heading.LANDED_NOW)
@@ -266,13 +276,16 @@ object FlightRules {
      * claim, made only when the service has sent a time of its own: before leaving the plan alone is
      * "Planned", in the air and after landing it is no badge at all. None either where the headline
      * has said it all: canceled, diverted, a timetable's flight past its time, and a flight nobody
-     * names a time to leave for (its headline can only say "Planned").
+     * names a time to leave for (its headline can only say "Planned"). And none about a time that has
+     * passed: once a flight is [overdue], "Planned" and "On time" are nobody's to say. A delay that
+     * was known is still true then.
      */
     fun badge(f: Flight, now: Instant): Badge? = when (phase(f, now)) {
         Phase.CANCELED, Phase.DIVERTED, Phase.TIMETABLE -> null
         Phase.AHEAD, Phase.SOON -> f.from.late.let {
             if (f.from.time == null) null
-            else if (it == null || f.timetable) Badge(Verdict.PLANNED) else if (it >= ON_TIME) Badge(Verdict.DELAYED, it) else Badge(Verdict.ON_TIME)
+            else if (it == null || f.timetable) Badge(Verdict.PLANNED).takeUnless { overdue(f, now) }
+            else if (it >= ON_TIME) Badge(Verdict.DELAYED, it) else Badge(Verdict.ON_TIME).takeUnless { overdue(f, now) }
         }
         Phase.IN_AIR -> verdict(f.to.late, Verdict.DELAYED)
         Phase.LANDED -> verdict(f.to.late, Verdict.LATE)
@@ -304,7 +317,7 @@ object FlightRules {
         Phase.IN_AIR -> {
             val left = f.from.time?.let(f.from::moment)
             val lands = f.to.time?.let(f.to::moment)
-            if (left == null || lands == null || !lands.isAfter(left)) null
+            if (left == null || lands == null || !lands.isAfter(left) || f.loose) null
             else (Duration.between(left, now).seconds.toDouble() / Duration.between(left, lands).seconds).coerceIn(EDGE, 1 - EDGE)
         }
     }
@@ -536,8 +549,8 @@ object FlightRules {
         return shown(f, now) !== f && Instant.ofEpochMilli(t.heardAt).isBefore(landing)
     }
 
-    /** How long after an ask the next one by hand has to wait: two minutes, or ten seconds after a try that reached nobody. */
-    fun byHand(t: Tracked): Long = AirLabs.keep(t.failure).toMillis()
+    /** How long after an ask the next one by hand has to wait: two minutes, ten seconds after a try that found no connection, and never less than a "slow down" asked for. */
+    fun byHand(t: Tracked): Long = maxOf(AirLabs.keep(t.failure).toMillis(), (t.waitSec ?: 0).coerceIn(0, 86_400) * 1000)
 
     /**
      * Whether a new key is what [t] waits for. The old one was refused or used up, which the menu says
@@ -566,9 +579,14 @@ object FlightRules {
      * nobody said that it did, has landed, whatever was last heard of it: a bar that slept through the
      * landing must not count down to nothing. A timetable's flight is left as it is (nobody knows what
      * became of it), and so is one the service called canceled or diverted.
+     *
+     * [ended]: the asking has ended for it (the service has gone on to another flight of the number),
+     * so nobody will ever say that it landed. Its time to land says so then, at once: it must not
+     * stand at "1 min" for the three hours a flight that is still asked about is given.
      */
-    fun shown(f: Flight, now: Instant): Flight =
-        if (!f.timetable && (f.state == FlightState.PLANNED || f.state == FlightState.IN_AIR) && standing(f, now).stage == Stage.LANDED) f.copy(state = FlightState.LANDED)
+    fun shown(f: Flight, now: Instant, ended: Boolean = false): Flight =
+        if (!f.timetable && (f.state == FlightState.PLANNED || f.state == FlightState.IN_AIR) &&
+            (standing(f, now).stage == Stage.LANDED || (ended && passed(f.to, now)))) f.copy(state = FlightState.LANDED)
         else f
 
     /** When a cancellation or a diversion was first seen: [since] if [f] was already known as one, else [now]; null for a flight that goes its way. */
@@ -584,6 +602,13 @@ object FlightRules {
 
     /** The last answer about [t]'s flight is more than [STALE] old. */
     fun stale(t: Tracked, now: Instant): Boolean = t.heardAt > 0 && Duration.between(Instant.ofEpochMilli(t.heardAt), now) > STALE
+
+    /**
+     * Nobody knows what became of [t]'s flight: it is [overdue], and the last answer is more than
+     * [STALE] old. Until then it is about to leave, for all anyone knows; from then on the item says
+     * "no update", as it does for a timetable's flight past its time.
+     */
+    fun silent(t: Tracked, now: Instant): Boolean = t.flight?.let { overdue(shown(it, now, t.ended), now) } == true && stale(t, now)
 
     /**
      * True if nothing in [f] can trip the arithmetic above: every time in a century this app can be

@@ -219,15 +219,16 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
         override fun hover(inside: Boolean) {}
         override fun placed(id: String, at: Rect) {}
     }
-    val maxPx = with(LocalDensity.current) { 900.dp.roundToPx() }
     // The preview is narrower than a status bar: what it has no room for is said under it, or an item
     // that is in the list and not in the picture looks lost.
     var dropped by remember { mutableStateOf(emptySet<String>()) }
     Column {
-        Box(
+        BoxWithConstraints(
             Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(18.dp))
                 .background(barBrush),
         ) {
+            // The strip may take what the mock clock and system icons leave (about 380 dp go to them and the gaps).
+            val maxPx = with(LocalDensity.current) { (maxWidth - 380.dp).coerceAtLeast(200.dp).roundToPx() }
             val now = remember(tick) { ZonedDateTime.now() }
             // The system's 12/24-hour setting and the locale's own short date, like the real status bar.
             val h24 = android.text.format.DateFormat.is24HourFormat(LocalContext.current)

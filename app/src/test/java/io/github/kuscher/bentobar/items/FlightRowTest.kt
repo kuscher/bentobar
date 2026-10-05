@@ -93,6 +93,10 @@ class FlightRowTest {
         assertEquals(Headline(Heading.LANDED), FlightRules.headline(down, asked))
         // How late it runs is one clock's two times: that stays.
         assertEquals(Badge(Verdict.EARLY, 24), FlightRules.badge(air, asked))
+        // Every reply that was saved has its clocks at both ends: none of them is marked, in `flight` or in `schedules`.
+        for (name in listOf("flight-JL101-landed-nine-hours-ago", "flight-LH1184-cancelled", "flight-LH152-delayed", "flight-LH454-planned", "flight-LH455-in-the-air",
+            "flight-LH455-landed", "flight-LH9152-codeshare", "flight-LH96-landed", "flight-SQ26-second-leg")) assertTrue(name, !flight(name).loose)
+        for (name in listOf("schedules-LH455", "schedules-SQ26-two-legs")) assertTrue(name, AirLabs.schedules(reply(name)).value!!.none { it.loose })
     }
 
     @Test fun pastItsTimeAndStillCalledPlannedNobodySaysOnTime() {

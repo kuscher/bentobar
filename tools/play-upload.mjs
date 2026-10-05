@@ -66,7 +66,13 @@ try {
   const draft = { ...(name ? { name } : {}), versionCodes: [String(bundle.versionCode)], status: 'draft', releaseNotes: [{ language: 'en-US', text }] };
   await call('PUT', `${E}/tracks/${track}`, { track, releases: [draft, ...kept] });
   const after = await call('GET', `${E}/tracks/${track}`);
-  await call('POST', `${E}:commit`);
+  // After Google has rejected an update, Play refuses a commit that could send itself for review, a
+  // draft included ("Changes cannot be sent for review automatically"), until someone sends the next
+  // changes from the Play Console. The draft is never sent from here anyway, so say so and commit.
+  await call('POST', `${E}:commit`).catch((e) => {
+    if (!/changesNotSentForReview/.test(String(e.message ?? e))) throw e;
+    return call('POST', `${E}:commit?changesNotSentForReview=true`);
+  });
   console.log(`${pkg}: ${track} is now ${show(after.releases)}. The new release is a draft: send it for review in the Play Console.`);
 } catch (e) {
   await call('DELETE', E).catch(() => {});

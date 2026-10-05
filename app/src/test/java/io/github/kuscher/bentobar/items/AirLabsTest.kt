@@ -392,7 +392,7 @@ class AirLabsTest {
         // "Today" there is that flight, not the one that left Frankfurt 23 hours ago.
         assertEquals(listOf("flight"), s.asked)
         assertEquals(time("2026-10-02T10:25"), a.flight!!.from.planned)
-        assertFalse(a.flight!!.timetable)
+        assertFalse(a.flight.timetable)
         // A day that is the airport's own (what is kept of a followed flight) is read as that: no device's zone, no match.
         val kept = Service(mapOf("flight" to reply("flight-LH454-planned"), "routes" to none))
         assertEquals(Failure.NOT_THAT_DAY, AirLabs.lookup(lh454, today, "k", now, null, kept::get)!!.failure)

@@ -163,6 +163,9 @@ class FlightTextTest {
         val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
         assertEquals("1m · +25m · Gate G13", bar(late, "2026-10-02T21:45:00Z", heard).text)
         assertEquals("Delayed 25\u00A0min", card(late, "2026-10-02T21:45:00Z", heard).badge)
+        // With no gate to name the minute stands alone: a time that has passed is not said beside it.
+        assertEquals("1m · 2:40 PM", bar(lh455(sfo(gate = null)), "2026-10-02T21:39:30Z", heard).text)
+        assertEquals("1m", bar(lh455(sfo(gate = null)), "2026-10-02T21:45:00Z", heard).text)
         // An old answer about a flight whose time is still to come is "not live", as before.
         assertEquals("10m · not live", bar(f, "2026-10-02T21:30:00Z", "2026-10-02T20:29:00Z").text)
     }

@@ -197,7 +197,8 @@ object FlightText {
                 if (gate == null) fit(both, figure) else fit(l.join(both, v.say(Word.FLIGHT_BAR_GATE, gate)), l.join(both, gate), both, figure)
             }
             gate != null -> fit(l.join(figure, v.say(Word.FLIGHT_BAR_GATE, gate)), l.join(figure, gate), figure)
-            leaves != null -> fit(l.join(figure, v.time(leaves, TimeForm.TIME)), figure)
+            // (Not a time that has passed: beside the last minute it would read as when it leaves.)
+            leaves != null && !FlightRules.overdue(l.f, l.now) -> fit(l.join(figure, v.time(leaves, TimeForm.TIME)), figure)
             else -> figure
         }
         val desc = v.say(Word.FLIGHT_DESC_LEAVES_IN, l.number, l.f.to.place, spoken(minutes, v)) + if (l.stale) v.say(Word.FLIGHT_DESC_NOT_LIVE, l.updated)

@@ -173,9 +173,10 @@ private fun WorldClockMenu(item: ItemConfig, host: MenuHost) {
             }
         }
         PlanTime(plan, here, time = { words.time(it, local) }, line = { WorldClock.copyLine(places, moment, words) }, onPlan = { plan = it }) { at ->
-            // The calendar app's own editor for a new event, at that moment; saving it is the calendar app's business.
+            // The calendar app's own editor for a new event, from that moment for an hour; saving it is the calendar app's business.
             host.close()
-            Env.launch(Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, at))
+            Env.launch(Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, at)
+                .putExtra(CalendarContract.EXTRA_EVENT_END_TIME, PlanATime.eventEnd(at)))
         }
         MenuDivider()
         AddCity(cfg.cities, places, now, next = edit)

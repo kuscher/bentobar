@@ -7,6 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -147,6 +148,18 @@ class PlanATimeTest {
         // Seen from Berlin on its own change day.
         assertEquals(listOf("2:30 AM, Sun · Local", "5:30 PM, Sat · −9h"), rows(LocalDate.of(2026, 10, 25), 10, berlin, "America/Los_Angeles"))
         assertEquals(listOf("3:00 AM, Sun · Local", "7:00 PM, Sat · −8h"), rows(LocalDate.of(2026, 10, 25), 12, berlin, "America/Los_Angeles"))
+    }
+
+    @Test fun aNewEventLastsAnHour() {
+        // Without an end a calendar app picks a length of its own; an hour is what a new event has in the system's calendar.
+        val nine = PlanATime.moment(Plan(LocalDate.of(2026, 10, 7), 36), la).toInstant()
+        assertEquals("2026-10-07T17:00:00Z", Instant.ofEpochMilli(PlanATime.eventEnd(nine.toEpochMilli())).toString())
+        assertEquals(60 * 60_000L, PlanATime.eventEnd(nine.toEpochMilli()) - nine.toEpochMilli())
+        // An hour as it passes, also on the night the clocks go back: from the first 1:30 to the second.
+        val first = PlanATime.moment(Plan(LocalDate.of(2026, 11, 1), 6), la)
+        val end = Instant.ofEpochMilli(PlanATime.eventEnd(first.toInstant().toEpochMilli())).atZone(la)
+        assertEquals("01:30 -07:00", "${first.toLocalTime()} ${first.offset}")
+        assertEquals("01:30 -08:00", "${end.toLocalTime()} ${end.offset}")
     }
 
     @Test fun theDayIsCalledTodayTomorrowYesterdayOrByItsDate() {

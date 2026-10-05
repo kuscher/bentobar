@@ -96,6 +96,13 @@ object PlanATime {
         return if (gap != null) gap.instant.atZone(zone) else ZonedDateTime.of(wall, zone)
     }
 
+    /**
+     * When an event that begins at [begin] ends (both in milliseconds): an hour later, the length a
+     * new event has in the system's own calendar. Sent along with the beginning, since a calendar app
+     * that gets none picks a length of its own.
+     */
+    fun eventEnd(begin: Long): Long = begin + 60 * 60_000L
+
     /** How a day is called beside the day buttons. */
     enum class Day { YESTERDAY, TODAY, TOMORROW, OTHER }
 

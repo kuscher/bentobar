@@ -93,6 +93,29 @@ class BarNeighboursTest {
         assertEquals(listOf(true, true, false, true), readings(listOf(fullScreen), listOf(windowed), listOf(windowed), desktop(windowed)))
     }
 
+    /**
+     * Under a full-screen app every screen it opens is another window under the bar, and each may
+     * bring other icons: twenty screens were forty readings. A reading is a screenshot of the bar, so
+     * they keep two seconds apart, and the last change is always read.
+     */
+    @Test fun readingsAskedForByTheWindowsKeepApart() {
+        assertEquals(300, BarNeighbours.wait(sinceLastMs = 60_000))
+        assertEquals(300, BarNeighbours.wait(sinceLastMs = 2_000))
+        assertEquals(2_000, BarNeighbours.wait(sinceLastMs = 0))
+        assertEquals(1_000, BarNeighbours.wait(sinceLastMs = 1_000))
+        // Never sooner than the bar needs to settle.
+        assertEquals(300, BarNeighbours.wait(sinceLastMs = 1_900))
+        // A window change every 400 ms for 20 seconds, the reading always re-timed by the latest: one every two seconds.
+        var lastRead = -10_000L
+        var due: Long? = null
+        var readings = 0
+        for (t in 0L..20_000L step 100) {
+            due?.let { if (t >= it) { readings++; lastRead = t; due = null } }
+            if (t % 400 == 0L) due = t + BarNeighbours.wait(t - lastRead)
+        }
+        assertTrue("$readings readings", readings in 9..11)
+    }
+
     @Test fun whatIsRemembered() {
         val (seen, moved) = BarNeighbours().next(barBottom, barWidth, desktop(floating))
         assertTrue(moved)

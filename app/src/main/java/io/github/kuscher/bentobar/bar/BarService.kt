@@ -348,7 +348,7 @@ class BarController(private val service: AccessibilityService) {
         if (show) {
             place(s!!, screenW)
             // A new status bar window can look different (see requestSample for the other triggers).
-            if (newWindow) requestSample(250) else if (moved) requestSample(300)
+            if (newWindow) requestSample(250) else if (moved) requestSample(BarNeighbours.wait(SystemClock.uptimeMillis() - lastSampleAt))
         } else {
             if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { "${it.title} " + Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
                 "enabled=${cfg.enabled} interactive=${pm.isInteractive} locked=${km.isKeyguardLocked})")
@@ -420,6 +420,8 @@ class BarController(private val service: AccessibilityService) {
     }
 
     private var sampleFailures = 0
+    /** When the last screenshot of the bar was asked for (uptime): readings the windows ask for keep apart ([BarNeighbours.wait]). */
+    private var lastSampleAt = -BarNeighbours.APART_MS
     /** A reading that differs from the last one is taken once more ([onSample]). */
     private var confirmOwed = false
 
@@ -427,6 +429,7 @@ class BarController(private val service: AccessibilityService) {
         if (!started || !strip.shown || !pm.isInteractive) return
         val s = snap ?: return applyLook()
         if (Store.config.value.color != ColorMode.AUTO) return applyLook()
+        lastSampleAt = SystemClock.uptimeMillis()
         service.takeScreenshotOfWindow(s.windowId, callbacks, object : AccessibilityService.TakeScreenshotCallback {
             override fun onSuccess(r: AccessibilityService.ScreenshotResult) {
                 val c = runCatching { barColors(r, s) }.getOrNull()

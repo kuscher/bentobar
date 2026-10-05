@@ -36,5 +36,18 @@ data class BarNeighbours(val against: String = "", val under: Set<Under> = empty
         return BarNeighbours(againstNow, if (underNow.isNotEmpty() || left) underNow else under) to moved
     }
 
-    private companion object { const val EDGE = 2 }
+    companion object {
+        private const val EDGE = 2
+        /** The bar fades to its new look: a reading asked for by a change of the windows waits this long. */
+        const val SETTLE_MS = 300L
+        /**
+         * And such readings keep this far apart. A reading is a screenshot of the bar's own window: under
+         * a full-screen app every screen it opens is another window under the bar, and one reading each
+         * would be dozens in a minute, of a bar that mostly looks the same.
+         */
+        const val APART_MS = 2_000L
+
+        /** How long a reading asked for now waits, [sinceLastMs] after the last one was taken. A later change re-times it, so the last change is always read. */
+        fun wait(sinceLastMs: Long): Long = if (sinceLastMs >= APART_MS) SETTLE_MS else maxOf(SETTLE_MS, APART_MS - sinceLastMs.coerceAtLeast(0))
+    }
 }

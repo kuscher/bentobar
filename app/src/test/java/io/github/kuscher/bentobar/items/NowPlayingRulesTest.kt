@@ -52,6 +52,24 @@ class NowPlayingRulesTest {
         assertEquals(0, NowPlayingRules.position(-1, 0, 1f, true, 60_000, 1_000_000)) // "unknown" is the start
     }
 
+    @Test fun whatIsLookedAtEveryTwoSecondsIsNotPutOffByATickThatComesAMomentEarly() {
+        // The ticks that ask come a second apart, give or take a few milliseconds. Two of them can be 1997 ms apart: that
+        // must count as two seconds, or the look slips to the third tick and "within 2 s" becomes three.
+        assertTrue(NowPlayingRules.due(now = 12_000, last = 10_000, everyMs = 2_000))
+        assertTrue(NowPlayingRules.due(now = 11_997, last = 10_000, everyMs = 2_000))
+        assertTrue(NowPlayingRules.due(now = 12_004, last = 10_000, everyMs = 2_000))
+        assertFalse(NowPlayingRules.due(now = 11_000, last = 10_000, everyMs = 2_000))
+        assertFalse(NowPlayingRules.due(now = 11_006, last = 10_000, everyMs = 2_000))
+        assertFalse(NowPlayingRules.due(now = 10_000, last = 10_000, everyMs = 2_000))
+        // With the battery saver's ticks, two seconds apart, every tick looks.
+        assertTrue(NowPlayingRules.due(now = 11_998, last = 10_000, everyMs = 2_000))
+        // A clock that was set back (a test's staged clock ending) doesn't put the next look off by hours.
+        assertTrue(NowPlayingRules.due(now = 9_000, last = 10_000, everyMs = 2_000))
+        // Without slack, the whole time has to pass.
+        assertFalse(NowPlayingRules.due(now = 12_999, last = 10_000, everyMs = 3_000, slackMs = 0))
+        assertTrue(NowPlayingRules.due(now = 13_000, last = 10_000, everyMs = 3_000, slackMs = 0))
+    }
+
     @Test fun aTitleBecomesOneLine() {
         assertEquals("Blue in Green", NowPlayingRules.oneLine("  Blue in\nGreen\t "))
         assertEquals("a b c", NowPlayingRules.oneLine("a\r\n\r\nb   c"))

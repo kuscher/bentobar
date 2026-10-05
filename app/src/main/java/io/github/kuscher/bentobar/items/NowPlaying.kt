@@ -45,7 +45,7 @@ object NowPlaying {
     /** How long "Starting…" may stand while a device binds the listener before sessions can be read. */
     private const val STARTING_MS = 3_000L
 
-    /** One player. Equal while nothing a screen shows has changed; [art] is the same instance while the track is the same. */
+    /** One player. Equal while nothing a screen shows has changed; [art] is the same instance while the picture is the same. */
     @Immutable
     data class Session(
         /** Names the session for the controls ([playPause], [open] …). Not for showing. */
@@ -124,6 +124,8 @@ object NowPlaying {
     private var accessReadAt = 0L
     private var audible = false
     private var staged: Playing? = null
+    /** How far a test's staged clock ran ahead when the players' positions were last stamped by it ([publish]); 0 in every release. */
+    private var aheadThen = 0L
     private val players = ArrayList<Player>()
     private val labels = HashMap<String, String>()
 
@@ -136,10 +138,10 @@ object NowPlaying {
         var startedAt = 0L
         var lastPlayedAt = 0L
         var wasPlaying = false
-        /** The scaled artwork, and the track it belongs to (title, artist, album, length). */
+        /** The scaled artwork, the track it belongs to (title, artist, album, length), and the metadata its picture was last asked of. */
         var art: Bitmap? = null
         var artFor: String? = null
-        var artAsked: String? = null
+        var artOf: MediaMetadata? = null
     }
 
     fun init(context: Context) { app = context.applicationContext }
@@ -185,8 +187,9 @@ object NowPlaying {
             if (askedToBind) { askedToBind = false; MediaAccess.release() }
         }
         // The listener was asked for and hasn't come: stop saying "Starting…" and go on without the titles.
-        if (askedToBind && !listening && Now.elapsed() - startingSince > STARTING_MS && !refused) { refused = true; publish() }
-        if (was != audible || before != accessOn) publish()
+        if (askedToBind && !listening && !refused && NowPlayingRules.due(Now.elapsed(), startingSince, STARTING_MS, slackMs = 0)) { refused = true; publish() }
+        // A test moved the staged clock (debug builds): positions stamped by the old one would be off by as much until a player spoke again.
+        if (was != audible || before != accessOn || Now.ahead != aheadThen) publish()
     }
 
     // ---- access
@@ -198,7 +201,8 @@ object NowPlaying {
 
     private fun readAccess(force: Boolean) {
         val now = Now.elapsed()
-        if (!force && now - accessReadAt < ACCESS_EVERY_MS) return
+        // Every second tick, also when that one comes a few milliseconds early: access that is taken away shows within two seconds.
+        if (!force && !NowPlayingRules.due(now, accessReadAt, ACCESS_EVERY_MS)) return
         accessReadAt = now
         accessOn = MediaAccess.granted(app)
     }
@@ -259,6 +263,8 @@ object NowPlaying {
         p.callback?.let { cb -> runCatching { p.controller.unregisterCallback(cb) } }
         p.callback = null
         p.art = null
+        p.artFor = null
+        p.artOf = null
         p.metadata = null
     }
 
@@ -298,6 +304,7 @@ object NowPlaying {
     }
 
     private fun publish() {
+        aheadThen = Now.ahead
         staged?.let { current.value = it; return }
         if (!started) { current.value = Playing(); return }
         val readable = accessOn && listening
@@ -351,20 +358,26 @@ object NowPlaying {
     }
 
     /**
-     * The picture the player handed over for [track], scaled down once per track on the background
-     * thread. Until it is ready there is none (the menu draws its tile). An address is never used.
+     * The picture the player handed over with [md], scaled down on the background thread, once for
+     * each metadata it sends: a player may send a track's picture a moment after its words, or
+     * replace it (a placeholder, the cover of the track before) while the words stay as they are.
+     * Until a track's first picture is ready there is none (the menu draws its tile); a later one
+     * takes its place when it is ready. A picture that is the same as the one before keeps that
+     * instance, so sending the same metadata again draws nothing anew. An address is never used.
      */
     private fun artwork(p: Player, md: MediaMetadata?, track: String) {
-        if (p.artFor == track || p.artAsked == track) return
+        if (p.artOf === md) return
+        p.artOf = md
         val source = listOf(MediaMetadata.METADATA_KEY_ART, MediaMetadata.METADATA_KEY_ALBUM_ART, MediaMetadata.METADATA_KEY_DISPLAY_ICON)
             .firstNotNullOfOrNull { k -> runCatching { md?.getBitmap(k) }.getOrNull() }
-        // No picture yet: not settled, for players hand the text over first and the picture a moment later.
         if (source == null) { p.art = null; p.artFor = null; return }
-        p.artAsked = track
+        val before = p.art.takeIf { p.artFor == track }
         work.execute {
             val small = runCatching { scaled(source) }.getOrNull()
+            val same = before != null && small != null && runCatching { small.sameAs(before) }.getOrDefault(false)
             main.post {
-                if (p in players && p.artAsked == track) { p.art = small; p.artFor = track; p.artAsked = null; changed() }
+                // Only the picture of the metadata that came last counts: an earlier one that took longer is dropped.
+                if (p in players && p.artOf === md) { p.art = if (same) before else small; p.artFor = track; changed() }
             }
         }
     }
@@ -400,21 +413,28 @@ object NowPlaying {
         }
     }
 
-    /** Plays or pauses the player [key], or the first one; without access (or a player), the media key. */
+    /**
+     * The media key [code] in a player's place, for the first player only ([key] null). A key names
+     * one player: when that one has gone or doesn't answer, nothing else is touched, where a media
+     * key would go to whichever player is in front ("Other players": that player and no other).
+     */
+    private fun keyInstead(key: String?, code: Int) { if (key == null) mediaKey(code) }
+
+    /** Plays or pauses the player [key], or the first one; for the first one without access (or a player), the media key. */
     fun playPause(key: String? = null) {
-        val p = player(key) ?: return mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+        val p = player(key) ?: return keyInstead(key, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
         runCatching { if (p.wasPlaying) p.controller.transportControls.pause() else p.controller.transportControls.play() }
-            .onFailure { mediaKey(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }
+            .onFailure { keyInstead(key, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) }
     }
 
     fun next(key: String? = null) {
-        val p = player(key) ?: return mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT)
-        runCatching { p.controller.transportControls.skipToNext() }.onFailure { mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT) }
+        val p = player(key) ?: return keyInstead(key, KeyEvent.KEYCODE_MEDIA_NEXT)
+        runCatching { p.controller.transportControls.skipToNext() }.onFailure { keyInstead(key, KeyEvent.KEYCODE_MEDIA_NEXT) }
     }
 
     fun previous(key: String? = null) {
-        val p = player(key) ?: return mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-        runCatching { p.controller.transportControls.skipToPrevious() }.onFailure { mediaKey(KeyEvent.KEYCODE_MEDIA_PREVIOUS) }
+        val p = player(key) ?: return keyInstead(key, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
+        runCatching { p.controller.transportControls.skipToPrevious() }.onFailure { keyInstead(key, KeyEvent.KEYCODE_MEDIA_PREVIOUS) }
     }
 
     /** Moves the player [key] to [positionMs], where it can seek. */

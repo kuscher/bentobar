@@ -208,7 +208,7 @@ class BarController(private val service: AccessibilityService) {
             }
         }
     }
-    private val wallpaper = WallpaperManager.OnColorsChangedListener { _, _ -> requestSample(300) }
+    private val wallpaper = WallpaperManager.OnColorsChangedListener { _, _ -> readSoon(ColorWatch.Cause.SLOW, 300) }
 
     fun start() {
         started = true
@@ -267,7 +267,7 @@ class BarController(private val service: AccessibilityService) {
     /** Rotation, density or resolution: a menu or tooltip placed for the old display would be off, so close them. */
     fun onConfigChanged() {
         closeMenu(); hideTip()
-        main.postDelayed(scanNow, 200); requestSample(500)
+        main.postDelayed(scanNow, 200); readSoon(ColorWatch.Cause.SLOW, 500)
     }
 
     private var lastColor: ColorMode? = null
@@ -275,7 +275,7 @@ class BarController(private val service: AccessibilityService) {
     private fun onConfig() {
         if (!started) return
         // Colour back to "Match the status bar": read the bar again (nothing else would until it changes).
-        Store.config.value.color.let { if (it != lastColor) { if (it == ColorMode.AUTO && lastColor != null) requestSample(100); lastColor = it } }
+        Store.config.value.color.let { if (it != lastColor) { if (it == ColorMode.AUTO && lastColor != null) readSoon(ColorWatch.Cause.QUICK, 100); lastColor = it } }
         // Switched to Show everything (or presenting) with hidden items out: nothing can fold them back.
         Store.config.value.let { if ((it.hiddenMode == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) { expanded.value = false; pinned = false } }
         applyLook()
@@ -347,8 +347,9 @@ class BarController(private val service: AccessibilityService) {
             .let { (seen, moved) -> neighbours = seen; moved }
         if (show) {
             place(s!!, screenW)
-            // A new status bar window can look different (see requestSample for the other triggers).
-            if (newWindow) requestSample(250) else if (moved) requestSample(BarNeighbours.wait(SystemClock.uptimeMillis() - lastSampleAt))
+            // A new status bar window can look different (see readSoon for the other causes).
+            if (newWindow) readSoon(ColorWatch.Cause.QUICK, 250)
+            else if (moved) { readSoon(ColorWatch.Cause.QUICK, BarNeighbours.wait(SystemClock.uptimeMillis() - lastWindowsReadAt)); windowsReadOwed = true }
         } else {
             if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { "${it.title} " + Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
                 "enabled=${cfg.enabled} interactive=${pm.isInteractive} locked=${km.isKeyguardLocked})")
@@ -356,6 +357,8 @@ class BarController(private val service: AccessibilityService) {
             hideTip()
             cancelDrag() // the strip's window goes, and with it the release that would end a drag
             strip.hide()
+            // Readings still to come were for a strip that is gone: its return asks again.
+            watch.clear(); main.removeCallbacks(sample); windowsReadOwed = false
             updateAwake()
             Ticker.stop("bar")
         }
@@ -390,8 +393,9 @@ class BarController(private val service: AccessibilityService) {
             strip.show { StripHost() }
             updateAwake()
             // Back on screen (after a full-screen app, the lock screen, a covering panel): the bar may
-            // look different now, and a reading owed while hidden is taken here.
-            requestSample(250)
+            // look different now, or only in a while (after an unlock it kept the lock screen's look for
+            // seconds), and a reading owed while hidden is taken here.
+            readSoon(ColorWatch.Cause.SLOW, 250)
             Ticker.start("bar")
             Log.i(tag, "bar shown: bar=${s.bar.toShortString()} free=${s.free.toShortString()} [${s.summary}]")
         } else strip.relayout()
@@ -400,36 +404,50 @@ class BarController(private val service: AccessibilityService) {
     // ---- colour ------------------------------------------------------------------------------
 
     /**
-     * Asks for one colour reading: a screenshot of SystemUI's status bar WINDOW only (its own surface,
-     * no app content), read at the clock ([BarPixels]). On some devices that surface is glyphs on
-     * transparent; on others it's opaque while an app is maximized (white glyphs on black) and
-     * see-through over the wallpaper otherwise.
+     * Asks for colour readings after something that can change the bar's look. A reading is a
+     * screenshot of SystemUI's status bar WINDOW only (its own surface, no app content), read at the
+     * clock ([BarPixels]). On some devices that surface is glyphs on transparent; on others it's opaque
+     * while an app is maximized (white glyphs on black) and see-through over the wallpaper otherwise.
      *
-     * A reading is taken only while the strip is on screen; asked for while it's hidden, it waits
-     * until the strip shows ([place] asks again then). The triggers are the moments the bar can
-     * change: a new status bar window, the strip coming back on screen, a window settling against the
-     * bar's lower edge or leaving it ([check]), a theme, display or wallpaper change, and switching
-     * back to "Match the status bar". Never on a timer: an accessibility service taking screenshots
-     * every 30 s looks like screen capture to Android's threat detection.
+     * The bar gives no sign when it changes, and it changes late, so one cause is followed by a few
+     * readings spread over the time the bar may take ([ColorWatch]): two within a second and a half
+     * after a change of windows, six over ten seconds when the strip comes back on screen or the
+     * theme, the wallpaper or the display changed.
+     *
+     * Readings are taken only while the strip is on screen; a cause while it's hidden waits until the
+     * strip shows ([place] asks then). The causes are the moments the bar can change: a new status bar
+     * window, the strip coming back on screen, a window settling against the bar's lower edge or under
+     * it, or leaving ([check]), a theme, display or wallpaper change, and switching back to "Match the
+     * status bar". Never on a timer: an accessibility service taking screenshots every 30 s looks like
+     * screen capture to Android's threat detection.
      */
-    private fun requestSample(delayMs: Long) {
+    private fun readSoon(cause: ColorWatch.Cause, firstMs: Long) {
         if (!started || !strip.shown) return
-        confirmOwed = true
-        main.removeCallbacks(sample)
-        main.postDelayed(sample, delayMs)
+        watch.cause(cause, SystemClock.uptimeMillis(), firstMs)
+        arm()
     }
 
-    private var sampleFailures = 0
-    /** When the last screenshot of the bar was asked for (uptime): readings the windows ask for keep apart ([BarNeighbours.wait]). */
-    private var lastSampleAt = -BarNeighbours.APART_MS
-    /** A reading that differs from the last one is taken once more ([onSample]). */
-    private var confirmOwed = false
+    /** Times the next reading [watch] has to come, if any. */
+    private fun arm() {
+        main.removeCallbacks(sample)
+        watch.due(SystemClock.uptimeMillis())?.let { main.postDelayed(sample, it) }
+    }
+
+    private val watch = ColorWatch()
+    /**
+     * When a reading that a change of windows asked for was last taken (uptime): those keep apart
+     * ([BarNeighbours.wait]). The other readings don't count: a window maximized right after an unlock
+     * would otherwise wait two seconds behind the readings the unlock asked for.
+     */
+    private var lastWindowsReadAt = -BarNeighbours.APART_MS
+    /** A change of windows still waits for its first reading. */
+    private var windowsReadOwed = false
 
     private fun sampleColor() {
-        if (!started || !strip.shown || !pm.isInteractive) return
-        val s = snap ?: return applyLook()
-        if (Store.config.value.color != ColorMode.AUTO) return applyLook()
-        lastSampleAt = SystemClock.uptimeMillis()
+        if (!started || !strip.shown || !pm.isInteractive) return watch.clear()
+        val s = snap
+        if (s == null || Store.config.value.color != ColorMode.AUTO) { watch.clear(); return applyLook() }
+        if (windowsReadOwed) { windowsReadOwed = false; lastWindowsReadAt = SystemClock.uptimeMillis() }
         service.takeScreenshotOfWindow(s.windowId, callbacks, object : AccessibilityService.TakeScreenshotCallback {
             override fun onSuccess(r: AccessibilityService.ScreenshotResult) {
                 val c = runCatching { barColors(r, s) }.getOrNull()
@@ -444,23 +462,20 @@ class BarController(private val service: AccessibilityService) {
 
     /**
      * A reading, or null for none (the screenshot failed, or the bar was caught fading and had nothing
-     * opaque to read). No reading keeps the colours the strip has and tries twice more, then uses the
-     * theme and wallpaper hints rather than a reading of how the bar looked before.
+     * opaque to read). No reading keeps the colours the strip has; after three in a row the strip uses
+     * the theme and wallpaper hints rather than a reading of how the bar looked before. [watch] says
+     * whether another reading follows.
      */
     private fun onSample(c: BarColors?) {
-        if (c == null) {
-            main.removeCallbacks(sample)
-            if (++sampleFailures <= 2) main.postDelayed(sample, 1_500)
-            else { Log.i(tag, "no status bar colour reading, using theme and wallpaper hints"); sampleFailures = 0; sampled = null; applyLook() }
-            return
+        val result = when (c) { null -> ColorWatch.Result.NOTHING; sampled -> ColorWatch.Result.SAME; else -> ColorWatch.Result.CHANGED }
+        if (result == ColorWatch.Result.CHANGED) { sampled = c; applyLook() }
+        if (watch.read(SystemClock.uptimeMillis(), result)) {
+            Log.i(tag, "no status bar colour reading, using theme and wallpaper hints"); sampled = null; applyLook()
         }
-        sampleFailures = 0
-        if (c == sampled) return
-        sampled = c
-        applyLook()
-        // The bar fades from one look to the other: a reading that differs from the last may have
-        // caught it halfway, so it's read once more when it has settled.
-        if (confirmOwed) { confirmOwed = false; main.removeCallbacks(sample); main.postDelayed(sample, 800) }
+        arm()
+        // Every reading is logged: a strip in the wrong colour can then be traced in a device's log.
+        Log.i(tag, "read ${c?.let { "text=${it.text?.let(::hex)} bg=${it.background?.let(::hex)}" } ?: "nothing"} (${result.name.lowercase()}), " +
+            (watch.due(SystemClock.uptimeMillis())?.let { "next in $it ms" } ?: "no more"))
     }
 
     /** The pixels around the clock (the whole bar when no clock was found), as [BarPixels] reads them. */

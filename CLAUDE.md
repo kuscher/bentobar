@@ -23,6 +23,8 @@ private projects and paths into their repos, and where signing keys are backed u
   - `bar/BarNeighbours.kt`: which app windows make the bar look different (one against its lower
     edge, one under it), remembered from one window list to the next; a change asks for a new color
     reading (pure, unit-tested).
+  - `bar/ColorWatch.kt`: when the bar's colors are read after a cause, and when the readings stop
+    (pure, unit-tested).
   - `bar/Overlay.kt`: a Compose host in a TYPE_ACCESSIBILITY_OVERLAY window (outside-touch and
     key callbacks for menus).
   - `bar/BarUi.kt`: the strip (chevron, FitRow, items, clicks/right-clicks/wheel), and the slider an
@@ -111,6 +113,10 @@ private projects and paths into their repos, and where signing keys are backed u
   clear|rain-soon|rain-this-hour|rain-later|raining|storm|snow|old|error|slow-down|offline|offline-new|no-answer|loading`, `weather search …`,
   `weather fail …`, `weather off`; `flight show NAME [TURN]` (`flight show` lists the names), `flight off`;
   `sound fixed on|off`. Each type's bare name prints what it knows (`media`, `devices`, `heat`, `flight`).
+  For color tests a debug build has a window that lies under the bar and turns its icons dark or light
+  on command, with no event of any kind: `adb shell am start -n io.github.kuscher.bentobar/.util.BarFlipActivity
+  --ez dark true` (now), `--ez dark false --ei after 1500` (in 1.5 s), `--ez dark true --ei unlock 3000`
+  (light from screen off until 3 s after the unlock: a bar that keeps the lock screen's look).
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
   the settings window. Menu crops include the menu's shadow margin, which can show other windows
   behind it, so don't publish them.
@@ -139,8 +145,8 @@ private projects and paths into their repos, and where signing keys are backed u
   Re-check on any new device: `look fg=… bg=… contrast=…` in the log.
 - **The bar changes its look without telling anyone.** On two Googlebooks the status bar is solid
   black while a window is maximized and see-through otherwise, in the same window, with no event. So
-  `check()` notes which app windows sit against the bar's lower edge and asks for a color reading
-  when that changes (two screenshots of the bar window: one at once, one when the fade has settled).
+  `check()` notes which app windows sit against the bar's lower edge and asks for color readings
+  when that changes (screenshots of the bar window: one at once, one a second later).
   The text color is the glyphs' cores, not the average of everything that stands out: blended edges
   made it #EFEFEF beside the system's white. A reading with nothing opaque (the bar caught fading)
   keeps the last colors and is retried.
@@ -148,6 +154,16 @@ private projects and paths into their repos, and where signing keys are backed u
   full-screen key), the app's window lies under the bar, which then takes that app's light or dark
   icons (black on a light app, and the strip stayed white). So the window
   under the bar counts too, by which window it is (`bar/BarNeighbours.kt`).
+- **The bar changes late, and a reading that matches the last one proves nothing.** After an unlock
+  the strip stayed white: the bar kept the lock screen's light icons after the strip was back, the
+  reading 250 ms in and the one 800 ms later both saw them, and nothing asked again. So a cause is
+  followed by readings spread over the time the bar may take, each taken whatever the one before
+  showed (`bar/ColorWatch.kt`): two after a change of windows, six over ten seconds when the strip
+  comes back on screen (an unlock, a wake, a full-screen app or a panel gone) or the theme, the
+  wallpaper or the display changed; a look that still differed at the last one is read once more.
+  Every reading is logged (`read text=… (same|changed|nothing), next in … ms`). No Googlebook could be
+  unlocked from a test, so this was reproduced with `BarFlipActivity` on an emulator (the unlock hook
+  above): 0.9 ends white there, this ends dark.
 - **The window list can end early.** With a dialog on top, or some apps' own windows, the
   accessibility window list holds that window and nothing below it: no home screen, no other app.
   A window missing from the list has not left. `BarNeighbours` reads only what is listed: the home

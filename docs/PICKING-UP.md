@@ -19,6 +19,21 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## After 0.9: the strip that stayed white after an unlock (branch `colour-watch`, not released)
+Reported from a Googlebook: after an unlock the strip sometimes stays white while the system's icons are dark.
+0.9 read the bar 250 ms after the strip came back and at most once more 800 ms later; a bar that keeps the lock
+screen's look longer than that was never read again. `bar/ColorWatch.kt` now decides when the bar is read: every
+cause is followed by readings spread over the time the bar may take (two after a change of windows, six over ten
+seconds when the strip comes back or the theme, wallpaper or display changed), and every reading is logged.
+- **Checked**: unit tests (`ColorWatchTest`; 0.9's schedule fails 14 of its 16), and an emulator with a window
+  that keeps light icons for 3 s and for 8 s after the unlock (`BarFlipActivity`, debug builds; CLAUDE.md has
+  the commands): 0.9 ends white, this ends dark.
+- **Not checked**: an unlock on a Googlebook. None could be unlocked from a test (the lock screen wants its
+  password), so how long the bar really keeps the lock screen's look there is not measured. After an unlock
+  on a device, `adb logcat -d -s BentoBar` shows `bar shown` and then each `read … (same|changed|nothing)`.
+- **Left as it was**: readings asked for by window changes still keep two seconds apart, and an app in full
+  screen that flips its own icons in the same window is still not noticed until the next cause.
+
 ## 0.9 (2026-10-05): six new things for the bar, and the internet permission for two of them
 Merged as pull request #17 and released as 0.9 (version code 10) from the tag `v0.9`; the next release needs a new version.
 Sent to Google Play the same day, for closed testing and production, with the new Data safety answers and a new

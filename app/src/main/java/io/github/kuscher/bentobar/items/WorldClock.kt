@@ -52,7 +52,7 @@ object WorldClock {
     fun clean(text: String): String = cut(cut(text, 10 * NAME_MAX).replace(BLANKS, " ").trim(), NAME_MAX).trimEnd()
 
     /** What an added city is called: by the name it was given, else by its zone's city. */
-    fun nameOf(city: WorldCity): String = clean(city.name).ifEmpty { cityOf(city.zone) }
+    fun nameOf(city: WorldCity): String = clean(city.name).ifEmpty { clean(cityOf(city.zone)) }
 
     // ---- the places ----
 

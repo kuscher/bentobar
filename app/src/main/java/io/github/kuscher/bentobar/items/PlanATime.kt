@@ -14,6 +14,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -122,14 +129,22 @@ fun PlanTime(plan: PlanATime.Plan?, now: ZonedDateTime, time: (moment: Long) -> 
     }
     val sliderLabel = stringResource(R.string.clock_plan_slider)
     val sliderState = if (planned != null && chosen != null) stringResource(R.string.clock_plan_state, chosen, Dates.format("EEEEMMMMd", planned, now.zone)) else word
+    val focus = LocalFocusManager.current
     Slider(
         value = (plan?.quarter ?: PlanATime.quarter(now.toLocalTime())).toFloat(),
         onValueChange = { onPlan(PlanATime.slid(plan, now, it.roundToInt())) },
         valueRange = 0f..PlanATime.LAST_QUARTER.toFloat(),
-        // A stop every quarter hour, so that the arrow keys and a screen reader move 15 minutes; 94 tick marks would only clutter.
+        // A stop every quarter hour, so that Left, Right and a screen reader move 15 minutes; 94 tick marks would only clutter.
         steps = PlanATime.LAST_QUARTER - 1,
         track = { SliderDefaults.Track(it, drawTick = { _, _ -> }) },
-        modifier = Modifier.fillMaxWidth().semantics { contentDescription = sliderLabel; stateDescription = sliderState },
+        modifier = Modifier.fillMaxWidth()
+            // Up and Down go on to the control above or below. Material's slider would take them as Right and Left: whoever
+            // walks down the menu with the arrow keys would start a plan here, and never get past it.
+            .onPreviewKeyEvent { e ->
+                val to = when (e.key) { Key.DirectionUp -> FocusDirection.Up; Key.DirectionDown -> FocusDirection.Down; else -> null }
+                if (to == null) false else { if (e.type == KeyEventType.KeyDown) focus.moveFocus(to); true }
+            }
+            .semantics { contentDescription = sliderLabel; stateDescription = sliderState },
     )
     Row(verticalAlignment = Alignment.CenterVertically) {
         val date = plan?.date ?: today

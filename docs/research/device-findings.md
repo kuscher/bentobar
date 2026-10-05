@@ -105,3 +105,12 @@ Checked over adb with the throwaway probe in `probe/` (package local.bentobar.pr
   `request.client`. `request.key.limits_total` is what is left of the month, and it lags: it read the
   same after three lookups in a row. Checked against the live service with `flight` (by number) and
   `routes` (by callsign): the fields are the ones the saved replies have.
+- **adbd logs every shell command on the emulator** (`adbd service requested 'shell…input text "…"'` in
+  logcat): a made-up key typed with `adb shell input text` showed up there, from adbd, not from the app.
+  Never type a real secret that way.
+- **Under a full-screen app each screen it opens is another window under the bar**: one colour reading
+  each would be dozens of screenshots of the bar in a minute. Readings the windows ask for keep two
+  seconds apart (`BarNeighbours.wait`); the last change is always read.
+- **Not caught, on purpose**: a full-screen app that changes its own status bar icons from dark to
+  light in the same window. No window event says so; only a timer would catch it, and a timer taking
+  screenshots is what Play Protect's threat detection looks for.

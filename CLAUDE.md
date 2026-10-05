@@ -151,8 +151,12 @@ private projects and paths into their repos, and where signing keys are backed u
 - **The window list can end early.** With a dialog on top, or some apps' own windows, the
   accessibility window list holds that window and nothing below it: no home screen, no other app.
   A window missing from the list has not left. `BarNeighbours` reads only what is listed: the home
-  screen coming and going with every dialog would otherwise cost a screenshot of the bar each time,
-  for a bar that never changed (see Play Protect below).
+  screen or a maximized window coming and going with every dialog would otherwise cost a screenshot
+  of the bar each time, for a bar that never changed (see Play Protect below). Readings the windows
+  ask for also keep two seconds apart (`BarNeighbours.wait`).
+  One case is left on purpose: a full-screen app that turns its own status bar icons from dark to
+  light in the same window (a light page, then a dark one) says so with no event, and the strip keeps
+  the old color until the next change of windows. Only a timer would catch it.
 - **Name the weight in every text style that uses `Fonts.bar`.** Compose asks the typeface for the
   style's weight, 400 when it names none, whatever weight the typeface was created with: the strip
   drew regular text beside the system's semibold clock. The status bar's style is the family

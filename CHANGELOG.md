@@ -26,7 +26,10 @@
   full screen (the keyboard's full-screen key), the bar takes that app's light or dark icons, and
   BentoBar stayed white on a light app. It now reads the bar's colors again when another window
   takes the place under the bar.
-- Smaller things: the accessibility notice no longer comes up over a service that is already on (it
+- Smaller things: an item that updates every second (a clock with seconds, the volume) could skip a
+  second now and then, and no longer does; the volume's percentage is rounded, not cut (ten of
+  fifteen steps is 67%); the preview in settings uses the window's width and says when it has no room
+  for every item; the accessibility notice no longer comes up over a service that is already on (it
   could, right after an update with the settings window open); a layout that can't be read is logged
   by the kind of fault only, not with the text around it.
 - The tag workflow's upload to Google Play works after Google has rejected an update (Play then

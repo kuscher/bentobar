@@ -137,6 +137,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     private val stagedFailure = AtomicReference<Failure?>(null)
 
     // The switch went off: the loader, the search and what was kept have forgotten already; a staged sample goes too.
+    // A staged failure stays: a tester stages it while the switch is off, so that the first request after "on" is the one that fails.
     override fun forgetFetched() { stagedReading = null; stagedSearch = null }
 
     /**

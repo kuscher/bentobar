@@ -93,7 +93,7 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun MediaMenu(item: ItemConfig, host: MenuHost) {
     val now by NowPlaying.state.collectAsState()
-    rememberTick() // the position moves by the clock, and "Paused" ends by it
+    rememberTick() // "Paused" ends by the clock, and whether access is on is asked again with each tick
     val words = MediaItem.words
     val main = now.main
     val track = main?.let(MediaItem::track)
@@ -174,7 +174,7 @@ internal fun TrackBlock(art: Bitmap?, title: String, artist: String, album: Stri
     }
 }
 
-/** How long the bar stays where it was dragged to while the player hasn't said where it is now. */
+/** How long the bar stays where it was dragged to while the player hasn't got there: after that, a player that never goes is believed. */
 private const val SOUGHT_MS = 2_000L
 
 /**
@@ -186,15 +186,16 @@ private const val SOUGHT_MS = 2_000L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PositionBar(session: NowPlaying.Session) {
+    // The position moves by the clock, so the tick is read here: with the same player as a second ago, a redraw of
+    // the menu around it would pass this bar by, and it would stand still until the player said something.
+    rememberTick()
     // Never drawn for a track without a length; held above nothing all the same, so a range can't be empty.
     val length = session.durationMs.coerceAtLeast(1)
-    val real = session.position(Now.elapsed()).coerceIn(0, length)
     var dragged by remember(length) { mutableStateOf<Float?>(null) }
-    // Where it was sent, and the player's own stamp then: until the player reports again (a new stamp), the bar
-    // stays there instead of jumping back to where the track was. A player that never answers gets two seconds.
-    var sought by remember(length) { mutableStateOf<Pair<Float, Long>?>(null) }
+    // Where the player was sent on release: the bar stays there until the player is (MediaText.position).
+    var sought by remember(length) { mutableStateOf<Long?>(null) }
     LaunchedEffect(sought) { if (sought != null) { delay(SOUGHT_MS); sought = null } }
-    val shown = (dragged ?: sought?.takeIf { it.second == session.positionAt }?.first)?.toLong()?.coerceIn(0, length) ?: real
+    val shown = MediaText.position(session.position(Now.elapsed()), dragged?.toLong(), sought, length)
     val label = stringResource(R.string.media_position)
     val state = MediaText.positionState(shown, length, MediaItem.words)
     Column(Modifier.fillMaxWidth()) {
@@ -202,18 +203,20 @@ internal fun PositionBar(session: NowPlaying.Session) {
             val source = remember { MutableInteractionSource() }
             val focused by source.collectIsFocusedAsState()
             val ring = RoundedCornerShape(10.dp)
-            // 32 dp high, all of it taking the pointer: Material's own minimum of 48 would push the buttons below apart.
+            // 32 dp high, all of it taking the pointer. Material's own minimum of 48 would push the buttons below apart, so
+            // it is switched off here; the slider is then as high as its thumb's slot, which is why that slot is 32 dp high
+            // around a 16 dp bar (with a 16 dp slot only the middle half of the 32 dp would take the pointer).
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
                 Slider(
                     value = shown.toFloat(),
                     onValueChange = { dragged = it },
                     onValueChangeFinished = {
-                        dragged?.let { to -> sought = to to session.positionAt; NowPlaying.seekTo(session.key, to.toLong()) }
+                        dragged?.let { to -> sought = to.toLong(); NowPlaying.seekTo(session.key, to.toLong()) }
                         dragged = null
                     },
                     valueRange = 0f..length.toFloat(),
                     interactionSource = source,
-                    // The menus' ring for what the keyboard is on: Material's slider shows nothing by itself.
+                    // The menus' ring for what the keyboard is on: with a thumb of its own, Material's slider shows none.
                     modifier = Modifier.fillMaxWidth().height(32.dp)
                         .then(if (focused) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, ring) else Modifier)
                         .semantics { contentDescription = label; stateDescription = state },
@@ -222,7 +225,11 @@ internal fun PositionBar(session: NowPlaying.Session) {
                             colors = SliderDefaults.colors(activeTrackColor = MaterialTheme.colorScheme.primary,
                                 inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest))
                     },
-                    thumb = { Box(Modifier.size(width = 4.dp, height = 16.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp))) },
+                    thumb = {
+                        Box(Modifier.size(width = 4.dp, height = 32.dp), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(width = 4.dp, height = 16.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)))
+                        }
+                    },
                 )
             }
         } else {

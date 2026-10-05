@@ -29,6 +29,18 @@ object MediaSamples {
     /** A title that tries the rules, playing in a player with every control. */
     private fun trying(title: String, artist: String) = Sample(listOf(Player("Spotify", MUSIC, title, artist, durationMs = 245_000, positionMs = 30_000, canSeek = true)))
 
+    /** Characters by their numbers, so that this file shows what it holds: a joiner, a selector and a line break can't be seen in an editor. */
+    private fun chars(vararg codePoints: Int) = String(codePoints, 0, codePoints.size)
+
+    /**
+     * A title with pictures in it: a sun, a beach with the selector that makes it a picture, a flag
+     * (two letters), a family of four (four people held together by three joiners), and a line break
+     * and a tab where spaces belong. At "Longest title" 24 the cut would fall inside the flag, from 27
+     * to 32 inside the family.
+     */
+    private val pictures = "Summer " + chars(0x1F31E) + " Hits" + chars(0x0A) + "2026 " + chars(0x1F3D6, 0xFE0F) + " " + chars(0x1F1F8, 0x1F1EA) + " " +
+        chars(0x1F468, 0x200D, 0x1F469, 0x200D, 0x1F467, 0x200D, 0x1F466) + " Road" + chars(0x09) + "Trip"
+
     /** The sample called by [args] (the words after `stage`), or null for a name that isn't one. */
     fun of(args: List<String>): Sample? = when (args.joinToString(" ")) {
         "playing" -> Sample(listOf(blue))
@@ -47,9 +59,7 @@ object MediaSamples {
         // Beyond the names the product spec lists: titles that try the length rule and the width cap.
         "long" -> trying("Sinfonia Concertante in E-flat major", "Mozart")
         "wide" -> trying("雨の日曜日に聴きたい静かなピアノ曲集 第二番 変ホ長調", "架空の楽団")
-        // A sun, a beach with its selector, a flag, a family of four joined into one picture; a line break and a tab.
-        "emoji" -> trying("Summer 🌞 Hits\n2026 🏖️ 🇸🇪 " +
-            "👨‍👩‍👧‍👦 Road\tTrip", "Various 🎶 Artists")
+        "emoji" -> trying(pictures, "Various " + chars(0x1F3B6) + " Artists")
         "rtl" -> trying("أغنية طويلة جدا لاختبار شريط الحالة", "فرقة الاختبار")
         else -> null
     }

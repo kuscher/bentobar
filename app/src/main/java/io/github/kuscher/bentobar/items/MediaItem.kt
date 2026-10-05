@@ -82,8 +82,9 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
     /** Playing, paused within the rule's minutes, or nothing. */
     internal fun phase(item: ItemConfig, playing: NowPlaying.Playing) = MediaText.phase(playing.active, playedAt, Now.elapsed(), linger.shown(item))
 
-    /** A player as [MediaText] needs it. A player whose app has no name to show goes by its package's. */
-    internal fun track(session: NowPlaying.Session) = MediaText.Track(session.title, session.artist, session.app.ifBlank { session.pkg }, session.album)
+    /** A player as [MediaText] needs it. A player whose app has no name that can be shown goes by its package's. */
+    internal fun track(session: NowPlaying.Session) =
+        MediaText.Track(session.title, session.artist, MediaText.line(session.app).ifEmpty { session.pkg }, session.album)
 
     /** Notification access is on in Android, which the menu then doesn't ask for (or a staged sample says so). */
     internal fun granted(): Boolean = stagedGranted ?: NowPlaying.access()

@@ -8,4 +8,107 @@
     <string name="weather_consent">Weather comes from Open-Meteo, a free weather service. BentoBar sends it the city you search for and that city\'s coordinates, nothing else; like any website, it sees your IP address.</string>
     <!-- Also the button under the credits in About: keep its name. -->
     <string name="weather_open_site">Open-Meteo.com</string>
+
+    <!-- conditions, in the menu -->
+    <string name="weather_clear">Clear</string>
+    <string name="weather_mostly_clear">Mostly clear</string>
+    <string name="weather_partly_cloudy">Partly cloudy</string>
+    <string name="weather_cloudy">Cloudy</string>
+    <string name="weather_fog">Fog</string>
+    <string name="weather_drizzle">Drizzle</string>
+    <string name="weather_freezing_drizzle">Freezing drizzle</string>
+    <string name="weather_light_rain">Light rain</string>
+    <string name="weather_rain">Rain</string>
+    <string name="weather_heavy_rain">Heavy rain</string>
+    <string name="weather_freezing_rain">Freezing rain</string>
+    <string name="weather_light_snow">Light snow</string>
+    <string name="weather_snow">Snow</string>
+    <string name="weather_heavy_snow">Heavy snow</string>
+    <string name="weather_showers">Showers</string>
+    <string name="weather_heavy_showers">Heavy showers</string>
+    <string name="weather_snow_showers">Snow showers</string>
+    <string name="weather_thunderstorm">Thunderstorm</string>
+    <string name="weather_thunderstorm_hail">Thunderstorm with hail</string>
+
+    <!-- in the bar: the temperature, what falls, the hour it is likely from ("72° · Rain 3 PM"); a label leads ("SF 72°") -->
+    <string name="weather_bar_rain">Rain</string>
+    <string name="weather_bar_snow">Snow</string>
+    <string name="weather_bar_storm">Storm</string>
+    <string name="weather_bar_soon">%1$s · %2$s %3$s</string>
+    <string name="weather_bar_now">%1$s · %2$s</string>
+    <string name="weather_bar_high_low">%1$s ↑%2$s ↓%3$s</string>
+    <string name="weather_bar_label">%1$s %2$s</string>
+    <string name="weather_tooltip">%1$s · %2$s</string>
+
+    <!-- the menu -->
+    <string name="weather_subtitle">%1$s · feels like %2$s</string>
+    <string name="weather_subtitle_there">%1$s · feels like %2$s · %3$s there</string>
+    <string name="weather_high_low">High %1$s · Low %2$s</string>
+    <string name="weather_rain_wind">Rain %1$d%% · Wind %2$s</string>
+    <string name="weather_snow_wind">Snow %1$d%% · Wind %2$s</string>
+    <string name="weather_wind_mph">%1$d\u00A0mph</string>
+    <string name="weather_wind_kmh">%1$d\u00A0km/h</string>
+    <string name="weather_chance">%1$d%%</string>
+    <string name="weather_next_hours">Next hours</string>
+    <string name="weather_next_days">Next days</string>
+    <string name="weather_sunrise">Sunrise</string>
+    <string name="weather_sunset">Sunset</string>
+    <!-- Open-Meteo's licence asks for this line. %1$s: "updated 2:40 PM", or the same after "no connection," or "no answer,". -->
+    <string name="weather_note">Weather data by Open-Meteo.com · %1$s</string>
+    <string name="weather_change_city">Change city</string>
+
+    <!-- setting it up: the city search -->
+    <string name="weather_city_label">City or town</string>
+    <string name="weather_two_letters">Type at least two letters.</string>
+    <string name="weather_searching">Searching…</string>
+    <string name="weather_not_found">No place found. Check the spelling, or try a bigger town nearby.</string>
+    <string name="weather_search_no_answer">Open-Meteo didn\'t answer. Try again in a moment.</string>
+    <string name="weather_no_answer">No answer</string>
+    <string name="weather_no_answer_15">Open-Meteo didn\'t answer. BentoBar tries again in 15 minutes.</string>
+    <string name="weather_no_answer_hour">Open-Meteo didn\'t answer. BentoBar tries again in an hour.</string>
+    <string name="weather_not_turned_on">Not turned on</string>
+    <string name="weather_turn_on">Turn on weather</string>
+
+    <!-- the item's settings -->
+    <string name="weather_city_current">City: %1$s</string>
+    <string name="weather_city_none">City: none yet</string>
+    <string name="weather_show_temp">Temperature</string>
+    <string name="weather_show_high_low">With high and low</string>
+    <string name="weather_show_feels">Feels like</string>
+    <string name="weather_label_help">Shown before the temperature, like SF</string>
+
+    <!-- spoken: the item ("San Francisco: 72 degrees. Partly cloudy. Rain likely at 3 PM.") -->
+    <string name="weather_desc">%1$s: %2$s. %3$s.</string>
+    <!-- The same where the reading has no condition, or no temperature: the city and the one there is. -->
+    <string name="weather_desc_short">%1$s: %2$s.</string>
+    <string name="weather_desc_soon">%1$s likely at %2$s.</string>
+    <string name="weather_desc_now">%1$s now.</string>
+    <string name="weather_desc_not_set_up">Weather: not set up</string>
+    <string name="weather_desc_loading">Weather: loading</string>
+    <string name="weather_desc_off">Weather: off</string>
+    <string name="weather_desc_no_reading">Weather: no reading</string>
+
+    <!-- spoken: the menu ("72 degrees. High 78, low 61. Rain, 20 percent chance. Wind 9 miles per hour.") -->
+    <string name="weather_high_low_desc">High %1$s, low %2$s.</string>
+    <string name="weather_chance_desc">%1$d percent chance</string>
+    <!-- An hour's cell and a day's row are each one spoken line, their parts joined two at a time ("3 PM, Partly cloudy, 72 degrees"). The same joins a found place's region and country. -->
+    <string name="weather_list">%1$s, %2$s</string>
+    <!-- One part of what is spoken, as a sentence of its own ("72 degrees."). -->
+    <string name="weather_sentence">%1$s.</string>
+    <!-- A day's high and low inside its spoken line ("Tuesday, Rain, high 78, low 61"). -->
+    <string name="weather_day_high_low">high %1$s, low %2$s</string>
+
+    <!-- %1$s is the number as it is written, with its minus sign; the count is its absolute value. -->
+    <plurals name="weather_degrees">
+        <item quantity="one">%1$s degree</item>
+        <item quantity="other">%1$s degrees</item>
+    </plurals>
+    <plurals name="weather_wind_mph_desc">
+        <item quantity="one">Wind %1$d mile per hour.</item>
+        <item quantity="other">Wind %1$d miles per hour.</item>
+    </plurals>
+    <plurals name="weather_wind_kmh_desc">
+        <item quantity="one">Wind %1$d kilometer per hour.</item>
+        <item quantity="other">Wind %1$d kilometers per hour.</item>
+    </plurals>
 </resources>

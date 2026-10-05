@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- British English for strings_weather.xml: only the strings whose spelling differs from the US default. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <plurals name="weather_wind_kmh_desc">
+        <item quantity="one">Wind %1$d kilometre per hour.</item>
+        <item quantity="other">Wind %1$d kilometres per hour.</item>
+    </plurals>
+</resources>

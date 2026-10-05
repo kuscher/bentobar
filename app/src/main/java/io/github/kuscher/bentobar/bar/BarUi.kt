@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInWindow
@@ -563,7 +564,8 @@ private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, 
                         PointerEventType.Press -> when {
                             // Another finger while the slider is held: the slider keeps its press, and the item around it gets none.
                             gesture.down -> e.changes.forEach { it.consume() }
-                            !e.buttons.isSecondaryPressed && !c.isConsumed -> {
+                            // The primary button, a finger or a pen; a right or a middle click is the item's own.
+                            !e.buttons.isSecondaryPressed && !e.buttons.isTertiaryPressed && !c.isConsumed -> {
                                 pointer = c.id; downX = c.position.x; downAt = c.uptimeMillis
                                 // A finger may still be about to tap or to hold: nothing is set until it says which.
                                 gesture.press(at, follows = c.type != androidx.compose.ui.input.pointer.PointerType.Touch)?.let { say(it) }
@@ -633,7 +635,8 @@ private fun Modifier.clicks(onClick: () -> Unit, onContext: () -> Unit, onScroll
                     }
                     PointerEventType.Move -> if (armed && !secondary && drag != null) {
                         val c = e.changes.firstOrNull()
-                        if (c != null && c.pressed) {
+                        // A move the slider inside has taken (it holds that pointer) is never the start of a reorder.
+                        if (c != null && c.pressed && !c.isConsumed) {
                             dx = c.position.x - downX
                             if (!dragging && kotlin.math.abs(dx) > viewConfiguration.touchSlop) dragging = true
                             if (dragging) { drag?.invoke(c.position.x, downX, false); c.consume() }

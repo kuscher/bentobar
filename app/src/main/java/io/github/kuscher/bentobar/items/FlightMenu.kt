@@ -33,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.key.Key
@@ -45,8 +44,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -84,11 +85,9 @@ import io.github.kuscher.bentobar.util.Now
 import io.github.kuscher.bentobar.util.Sym
 import java.time.Instant
 import java.time.LocalDate
-import kotlin.math.ceil
-import kotlin.math.roundToInt
 
 /** A press of Track that came to nothing, for the words under the field: the number as it is shown, why, and the day that was chosen. */
-private class Missed(val number: String, val failure: Failure, val day: LocalDate?)
+private class FlightMiss(val number: String, val failure: Failure, val day: LocalDate?)
 
 /**
  * The Flight item's menu. Which card it is follows from what is known, never from a step the user
@@ -139,10 +138,10 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
     }
     val busy = if (staged != null) (staged as? Staged.Looking)?.number else FlightItem.looking(item.id, tracked)
     val missed = when {
-        staged is Staged.Failed -> Missed(staged.number, staged.failure, null)
+        staged is Staged.Failed -> FlightMiss(staged.number, staged.failure, null)
         staged != null -> null
         else -> (asked as? Ask.State.Done)?.takeIf { it.question.item == item.id }?.let { done ->
-            (done.answer as? FlightLoad.Outcome.Failed)?.let { Missed(done.question.number.shown, it.failure, done.question.day) }
+            (done.answer as? FlightLoad.Outcome.Failed)?.let { FlightMiss(done.question.number.shown, it.failure, done.question.day) }
         }
     }
     // Not read yet: the item asks for it when it is next looked at, which can be ten seconds off; an open menu asks with every tick.
@@ -176,7 +175,7 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
  * Track found nothing; text that is no flight number is told so, and nothing is sent for it.
  */
 @Composable
-private fun SearchCard(item: ItemConfig, v: Voice, today: LocalDate, initial: String, missed: Missed?, staying: String?, left: Int?,
+private fun SearchCard(item: ItemConfig, v: Voice, today: LocalDate, initial: String, missed: FlightMiss?, staying: String?, left: Int?,
                        onChangeKey: () -> Unit, onCancel: (() -> Unit)?) {
     var text by remember { mutableStateOf(initial) }
     var day by remember { mutableIntStateOf(0) }
@@ -196,8 +195,9 @@ private fun SearchCard(item: ItemConfig, v: Voice, today: LocalDate, initial: St
                 if (question == null) notNumber = true else FlightItem.track(question, item)
             })
         if (missed != null && error == null) {
+            // The status under a search field is the one thing a menu says unasked: a screen reader hears what the press of Track came to.
             Text(FlightText.error(missed.failure, missed.number, missed.day, v), style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp).semantics { liveRegion = LiveRegionMode.Polite })
             if (missed.failure == Failure.REFUSED) MenuEntry(Sym.KEY, stringResource(R.string.flight_change_key), onClick = onChangeKey)
         }
         Spacer(Modifier.height(8.dp))
@@ -317,6 +317,7 @@ private fun EndWords(words: String, align: TextAlign, modifier: Modifier) {
  * part flown a solid 3 dp line up to 4 dp behind the plane; the plane 20 sp, nose to the arrival,
  * its center 10 dp in at the start and 10 dp from the end when it has landed. No dot stands under the
  * plane or within 2 dp of its nose. It moves in steps, as answers and minutes arrive: nothing glides.
+ * Where each of these stands is [FlightLine]'s arithmetic; this only draws it.
  */
 @Composable
 private fun FlightPath(share: Double?, modifier: Modifier) {
@@ -328,26 +329,16 @@ private fun FlightPath(share: Double?, modifier: Modifier) {
     val plane = remember(measurer, density) { measurer.measure(Sym.FLIGHT, TextStyle(fontFamily = Fonts.symbolsFilled, fontSize = 20.sp, lineHeight = 20.sp)) }
     Canvas(modifier) {
         val dot = 3.dp.toPx()
+        val line = FlightLine.of(size.width, share, dot = dot, apart = 8.dp.toPx(), plane = 20.dp.toPx(), behind = 4.dp.toPx(), ahead = 2.dp.toPx())
         val y = size.height / 2
-        val start = dot / 2
-        val length = size.width - dot
-        if (length <= 0f) return@Canvas
-        val pitch = length / (length / 8.dp.toPx()).roundToInt().coerceAtLeast(1)
-        // Distances are counted from the departure's end, which is on the right where the language reads from there.
+        // The line is reckoned from the departure's end, which is on the right where the language reads from there.
         fun x(along: Float) = if (rtl) size.width - along else along
-        val half = 10.dp.toPx()
-        val center = share?.let { half + it.toFloat().coerceIn(0f, 1f) * (size.width - 2 * half) }
-        if (center != null) {
-            val until = center - half - 4.dp.toPx()
-            if (until > start) drawLine(flown, Offset(x(start), y), Offset(x(until), y), strokeWidth = dot, cap = StrokeCap.Round)
-        }
-        // The dots keep their places as the plane moves over them: the first one drawn is the first that is clear of its nose.
-        val clear = if (center == null) start else center + half + 2.dp.toPx() + dot / 2
-        val first = start + ceil(((clear - start) / pitch).coerceAtLeast(0f)) * pitch
-        if (first <= start + length + 0.5f) drawLine(ahead, Offset(x(first), y), Offset(x(start + length), y), strokeWidth = dot, cap = StrokeCap.Round,
-            pathEffect = PathEffect.dashPathEffect(floatArrayOf(0f, pitch)))
-        if (center != null) rotate(if (rtl) -90f else 90f, Offset(x(center), y)) {
-            drawText(plane, color = flown, topLeft = Offset(x(center) - plane.size.width / 2f, y - plane.size.height / 2f))
+        line.flownUntil?.let { drawLine(flown, Offset(x(line.start), y), Offset(x(it), y), strokeWidth = dot, cap = StrokeCap.Round) }
+        for (at in line.dots) drawCircle(ahead, dot / 2, Offset(x(at), y))
+        line.center?.let { center ->
+            rotate(if (rtl) -90f else 90f, Offset(x(center), y)) {
+                drawText(plane, color = flown, topLeft = Offset(x(center) - plane.size.width / 2f, y - plane.size.height / 2f))
+            }
         }
     }
 }

@@ -12,13 +12,14 @@ import kotlin.math.roundToInt
  * the CPU item's [CpuRule] below are too.
  */
 object HeatRules {
-    // Android's thermal statuses (PowerManager.THERMAL_STATUS_…). Shutdown, 6, reads as emergency does.
+    // Android's thermal statuses (PowerManager.THERMAL_STATUS_…). Shutdown reads as emergency does.
     const val NONE = 0
     const val LIGHT = 1
     const val MODERATE = 2
     const val SEVERE = 3
     const val CRITICAL = 4
     const val EMERGENCY = 5
+    const val SHUTDOWN = 6
 
     /** The item stays this long after the device cooled below its rule's level, so that a status that flickers doesn't flicker the bar. */
     const val HOLD_MS = 60_000L
@@ -164,6 +165,13 @@ class HeatLevel(private val everyMs: Long = HeatRules.LEVEL_EVERY_MS) {
      * last asked is kept: it refuses a second call in quick succession, whatever happened between.
      */
     fun idle() { history = History(POINTS) }
+
+    /** The level is gone at once, and its chart with it: a test staged a device that reports none, or ended its staging. */
+    fun forget() {
+        level = null
+        misses = 0
+        history = History(POINTS)
+    }
 
     private companion object {
         const val NEVER = Long.MIN_VALUE

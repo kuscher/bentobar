@@ -350,6 +350,19 @@ class HeatRulesTest {
         assertTrue(level.due(10_000))
     }
 
+    @Test fun aStagedDeviceWithoutALevelLosesItAtOnce() {
+        val level = HeatLevel()
+        level.took(0.5f, 0); level.took(0.75f, 5_000)
+        level.forget()
+        assertNull(level.level)
+        assertEquals(emptyList<Double>(), level.chart())
+        assertFalse(level.due(6_000)) // the next asking still waits its turn
+        level.took(Float.NaN, 10_000)
+        assertNull(level.level)
+        level.took(0.25f, 15_000)
+        assertEquals(0.25f, level.level)
+    }
+
     @Test fun theBatterysTemperatureInTheMenuHasOneDecimal() {
         assertEquals("41.3", HeatRules.oneDecimal(41.3, fahrenheit = false))
         assertEquals("106.3", HeatRules.oneDecimal(41.3, fahrenheit = true))

@@ -30,6 +30,7 @@ import io.github.kuscher.bentobar.data.Display
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
+import io.github.kuscher.bentobar.data.notDrawn
 import io.github.kuscher.bentobar.items.Items
 import io.github.kuscher.bentobar.items.MenuHost
 import io.github.kuscher.bentobar.items.Ticker
@@ -95,7 +96,8 @@ fun ItemContextMenu(itemId: String, host: MenuHost, openMenu: () -> Unit) {
         MenuDivider()
         MenuEntry(Sym.TUNE, stringResource(R.string.context_item_settings)) { host.openItemSettings(item.id) }
         // It turns the item off (kept with its settings), so it says so; Delete is in settings, with an undo.
-        MenuEntry(Sym.VISIBILITY_OFF, stringResource(R.string.common_turn_off)) { host.close(); Store.updateItem(item.id) { it.copy(section = Section.OFF) } }
+        // Its own icon: the crossed-out eye two rows up means Hidden, which keeps the item behind ‹.
+        MenuEntry(Sym.DO_NOT_DISTURB_ON, stringResource(R.string.common_turn_off)) { host.close(); Store.updateItem(item.id) { it.copy(section = Section.OFF) } }
     }
 }
 
@@ -111,9 +113,7 @@ fun BentoBarMenu(host: MenuHost, openItem: (ItemConfig) -> Unit, hideBar: () -> 
     val cfg by Store.config.collectAsState()
     val overflow by io.github.kuscher.bentobar.bar.BarOverflow.ids.collectAsState()
     val hidden = if (everything) cfg.items.filter { it.section != Section.OFF }
-    else cfg.items.filter {
-        (it.section == Section.HIDDEN && !(it.whenActive && states[it.id]?.active == true)) || it.id in overflow
-    }
+    else cfg.notDrawn { states[it.id]?.active == true }.let { waiting -> cfg.items.filter { it in waiting || it.id in overflow } }
     val first = remember { androidx.compose.ui.focus.FocusRequester() }
     if (everything) androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
     MenuCard(Sym.WYSIWYG, stringResource(R.string.app_name),

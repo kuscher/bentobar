@@ -19,6 +19,33 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## Unreleased (2026-10-04): the consent screen Google Play asked for, and a review pass
+On the branch `review-pass` (not merged, not released; the version is still 0.7, code 8). CHANGELOG
+"Unreleased" has the user-facing list. Tested as a debug build on a Lenovo Googlebook 15: the consent
+screen (first opening, No thanks, Turn on, Agree), colors following a maximized window both ways,
+the text weight against the system clock, menus, pages, and the service switched off and on twice.
+- **Google Play's review** found the accessibility disclosure non-compliant: Setup explained the
+  service but Turn on led straight to Accessibility settings. Now `ui/Disclosure.kt` asks first, with
+  Agree and No thanks (see CLAUDE.md). About › Privacy links the privacy policy.
+- **Color:** `bar/BarPixels.kt` (pure, tested) reads the text and background; a window settling
+  against the bar triggers a reading; an unreadable one keeps the last colors and retries.
+- **Font:** the strip names the status bar's weight (`Fonts.barWeight`).
+- **Bugs from a full read of the code:** an early timer alarm arms itself again (`Timers.due`);
+  `Env.launch` survives any exception; `Calendar.refresh` doesn't count a refused load, and loads the
+  month the menu pages to (`Calendar.view`, `Meetings.spans`); the chip plans from every loaded
+  meeting and catches up on wake; `Store.import` keeps this install's switches (`keepingLocal`); one
+  rule each for "behind ‹" and "not drawn" (`behindChevron`, `notDrawn`); a drag ends when the strip
+  hides; the 2 s check compares the spacer with its own last bounds.
+- **Before a release:** bump the version, write `docs/release-notes/<version>.md` and Play's text,
+  record a new video for Play's Accessibility declaration that shows the consent screen (first
+  opening › Agree › Accessibility settings › on › items in the bar), and send the store description
+  in `store-submission/listing` with it.
+- Not checked on a device: the calendar changes (no calendar access on the test install), the
+  timer's early alarm, the look on a light wallpaper (dark status bar text), an arm64 Googlebook.
+- Still open: the window's caption bar keeps the system's color (other apps by the same author paint
+  it the header's color); in Show everything mode the ‹ menu calls a rule item that is waiting
+  "hidden".
+
 ## 0.7 (2026-10-01): fixes after 0.6, and a keyboard shortcut
 Tested on the Acer Googlebook 14 as a side-by-side debug build. CHANGELOG "Unreleased" has the
 user-facing list. What changed, by area:

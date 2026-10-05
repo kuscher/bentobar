@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import io.github.kuscher.bentobar.data.ColorMode
 import io.github.kuscher.bentobar.data.HiddenMode
 import io.github.kuscher.bentobar.data.shows
+import io.github.kuscher.bentobar.data.behindChevron
 import io.github.kuscher.bentobar.data.moved
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Pill
@@ -163,6 +164,8 @@ class BarController(private val service: AccessibilityService) {
         }
     }
     private var lastFullScan = 0L
+    /** The app windows sitting against the bar's lower edge, as their left and right edges ([check]). */
+    private var againstBar = ""
 
     private fun lightCheck() {
         val s = snap ?: return scan()
@@ -171,8 +174,10 @@ class BarController(private val service: AccessibilityService) {
         // (with clearCache) every 2 s is costly, so between full scans only the window list is read.
         if (node == null) return if (SystemClock.uptimeMillis() - lastFullScan > 10_000) scan() else check(full = false)
         if (SystemClock.uptimeMillis() - lastFullScan > 30_000 || !node.refresh()) return scan()
+        // Against the spacer's own last bounds: with the spacer squeezed to nothing, the free area is
+        // the widest gap instead, and comparing with that would run a full scan every time.
         val r = Rect().also { node.getBoundsInScreen(it) }
-        if (r != s.free) scan()
+        if (r != s.spacer) scan()
     }
     private val expandOnHover = Runnable { if (hovering) expanded.value = true }
     private val collapse = Runnable {
@@ -190,7 +195,11 @@ class BarController(private val service: AccessibilityService) {
             if (i.action == Intent.ACTION_SCREEN_OFF) closeMenu()
             updateAwake()
             main.post(scanNow)
-            if (i.action == Intent.ACTION_SCREEN_ON) { main.removeCallbacks(poll); main.postDelayed(poll, 2_000) }
+            if (i.action == Intent.ACTION_SCREEN_ON) {
+                main.removeCallbacks(poll); main.postDelayed(poll, 2_000)
+                // The chip's next change is timed on a clock that stops while the device sleeps: catch up.
+                Chips.update(service)
+            }
         }
     }
     private val wallpaper = WallpaperManager.OnColorsChangedListener { _, _ -> requestSample(300) }
@@ -322,15 +331,25 @@ class BarController(private val service: AccessibilityService) {
             s == null -> BarStatus.NO_BAR
             else -> BarStatus.COVERED
         }
+        // An app window settled against the bar's lower edge (maximized, or snapped to a side): SystemUI
+        // then gives the bar a background of its own, and takes it away when the window leaves, without
+        // an event of the bar's own. Only the windows' bounds are looked at, from the list at hand.
+        val against = if (s == null) "" else windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+            .map { w -> Rect().also { w.getBoundsInScreen(it) } }
+            .filter { kotlin.math.abs(it.top - s.bar.bottom) <= 2 && it.width() >= s.bar.width() / 4 }
+            .sortedBy { it.left }.joinToString(" ") { "${it.left}-${it.right}" }
+        val moved = against != againstBar
+        againstBar = against
         if (show) {
             place(s!!, screenW)
             // A new status bar window can look different (see requestSample for the other triggers).
-            if (newWindow) requestSample(250)
+            if (newWindow) requestSample(250) else if (moved) requestSample(300)
         } else {
             if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { "${it.title} " + Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
                 "enabled=${cfg.enabled} interactive=${pm.isInteractive} locked=${km.isKeyguardLocked})")
             closeMenu()
             hideTip()
+            cancelDrag() // the strip's window goes, and with it the release that would end a drag
             strip.hide()
             updateAwake()
             Ticker.stop("bar")
@@ -376,25 +395,28 @@ class BarController(private val service: AccessibilityService) {
     // ---- colour ------------------------------------------------------------------------------
 
     /**
-     * Copies the status bar's text colour: a screenshot of SystemUI's status bar WINDOW only (its
-     * own surface, no app content), read at the clock. On some devices that surface is glyphs on
-     * transparent (the HP); on others it's opaque, e.g. white glyphs on a black bar (the Acer).
-     */
-    /**
-     * Asks for one colour reading. It's taken only while the strip is on screen; asked for while it's
-     * hidden, it waits until the strip shows ([place] asks again then). The triggers are the moments
-     * the bar can change: a new status bar window, the strip coming back on screen, a theme, display
-     * or wallpaper change, and switching back to "Match the status bar". Never on a timer: an
-     * accessibility service taking screenshots every 30 s looks like screen capture to Android's
-     * threat detection. A bar that changes colour with none of these isn't followed (none seen so far).
+     * Asks for one colour reading: a screenshot of SystemUI's status bar WINDOW only (its own surface,
+     * no app content), read at the clock ([BarPixels]). On some devices that surface is glyphs on
+     * transparent; on others it's opaque while an app is maximized (white glyphs on black) and
+     * see-through over the wallpaper otherwise.
+     *
+     * A reading is taken only while the strip is on screen; asked for while it's hidden, it waits
+     * until the strip shows ([place] asks again then). The triggers are the moments the bar can
+     * change: a new status bar window, the strip coming back on screen, a window settling against the
+     * bar's lower edge or leaving it ([check]), a theme, display or wallpaper change, and switching
+     * back to "Match the status bar". Never on a timer: an accessibility service taking screenshots
+     * every 30 s looks like screen capture to Android's threat detection.
      */
     private fun requestSample(delayMs: Long) {
         if (!started || !strip.shown) return
+        confirmOwed = true
         main.removeCallbacks(sample)
         main.postDelayed(sample, delayMs)
     }
 
     private var sampleFailures = 0
+    /** A reading that differs from the last one is taken once more ([onSample]). */
+    private var confirmOwed = false
 
     private fun sampleColor() {
         if (!started || !strip.shown || !pm.isInteractive) return
@@ -404,62 +426,51 @@ class BarController(private val service: AccessibilityService) {
             override fun onSuccess(r: AccessibilityService.ScreenshotResult) {
                 val c = runCatching { barColors(r, s) }.getOrNull()
                 // A result can arrive after stop(): it mustn't paint a strip that's gone.
-                main.post { if (started) { sampled = c; sampleFailures = 0; applyLook() } }
+                main.post { if (started) onSample(c) }
             }
             override fun onFailure(code: Int) {
-                main.post {
-                    if (!started) return@post
-                    // One-off readings now: try twice more, then use the theme and wallpaper hints rather
-                    // than a reading of how the bar looked before.
-                    if (++sampleFailures <= 2) { Log.i(tag, "status bar colour sample failed ($code), retrying"); requestSample(2_000) }
-                    else { Log.i(tag, "status bar colour sample failed ($code), using wallpaper hints"); sampled = null; sampleFailures = 0; applyLook() }
-                }
+                main.post { if (started) { Log.i(tag, "status bar colour sample failed ($code)"); onSample(null) } }
             }
         })
     }
 
     /**
-     * The clock's text colour and, when the bar is opaque there, the bar's own colour. Averaging
-     * every opaque pixel (as before) only works on a transparent bar: on an opaque one it blends
-     * glyphs and background into a grey (#474747 on the Acer's black bar, 2.3:1).
+     * A reading, or null for none (the screenshot failed, or the bar was caught fading and had nothing
+     * opaque to read). No reading keeps the colours the strip has and tries twice more, then uses the
+     * theme and wallpaper hints rather than a reading of how the bar looked before.
      */
+    private fun onSample(c: BarColors?) {
+        if (c == null) {
+            main.removeCallbacks(sample)
+            if (++sampleFailures <= 2) main.postDelayed(sample, 1_500)
+            else { Log.i(tag, "no status bar colour reading, using theme and wallpaper hints"); sampleFailures = 0; sampled = null; applyLook() }
+            return
+        }
+        sampleFailures = 0
+        if (c == sampled) return
+        sampled = c
+        applyLook()
+        // The bar fades from one look to the other: a reading that differs from the last may have
+        // caught it halfway, so it's read once more when it has settled.
+        if (confirmOwed) { confirmOwed = false; main.removeCallbacks(sample); main.postDelayed(sample, 800) }
+    }
+
+    /** The pixels around the clock (the whole bar when no clock was found), as [BarPixels] reads them. */
     private fun barColors(r: AccessibilityService.ScreenshotResult, s: BarSnapshot): BarColors? {
         val hb = r.hardwareBuffer
         val bmp = try {
             Bitmap.wrapHardwareBuffer(hb, r.colorSpace)?.let { wrapped -> wrapped.copy(Bitmap.Config.ARGB_8888, false).also { wrapped.recycle() } }
         } finally { hb.close() }
         bmp ?: return null
-        val area = Rect(s.clock ?: s.bar).apply { offset(-s.bar.left, -s.bar.top) }
-        area.intersect(0, 0, bmp.width, bmp.height)
-        val opaque = ArrayList<Int>()
-        var total = 0
-        for (y in area.top until area.bottom) for (x in area.left until area.right) {
-            val px = bmp.getPixel(x, y)
-            total++
-            if ((px ushr 24) >= 230) opaque.add(px)
-        }
-        bmp.recycle()
-        if (opaque.size < 12) return null
-        // Transparent bar: only the glyphs are opaque, so they are the text colour.
-        if (opaque.size < total * 0.8) return BarColors(average(opaque), null)
-        // Opaque bar: the commonest colour is the background; the text is what stands out most from it.
-        val bg = opaque.groupingBy { it and 0xFFFFFF }.eachCount().maxBy { it.value }.key
-        val dist = opaque.map { distance(it, bg) }
-        val far = dist.max()
-        val background = Color(0xFF000000.toInt() or bg)
-        if (far < 60) return BarColors(null, background) // nothing readable in the box
-        return BarColors(average(opaque.filterIndexed { i, _ -> dist[i] >= far * 0.6 }), background)
+        try {
+            val area = Rect(s.clock ?: s.bar).apply { offset(-s.bar.left, -s.bar.top) }
+            // A clock box outside the picture (the bar changed size since the scan): read all of it.
+            if (!area.intersect(0, 0, bmp.width, bmp.height)) area.set(0, 0, bmp.width, bmp.height)
+            val px = IntArray(area.width() * area.height())
+            bmp.getPixels(px, 0, area.width(), area.left, area.top, area.width(), area.height())
+            return BarPixels.colors(px, area.width())
+        } finally { bmp.recycle() }
     }
-
-    private fun average(px: List<Int>): Color {
-        var rr = 0L; var gg = 0L; var bb = 0L
-        for (p in px) { rr += (p shr 16) and 0xFF; gg += (p shr 8) and 0xFF; bb += p and 0xFF }
-        return Color((rr / px.size).toInt(), (gg / px.size).toInt(), (bb / px.size).toInt())
-    }
-
-    private fun distance(a: Int, b: Int): Int =
-        kotlin.math.abs(((a shr 16) and 0xFF) - ((b shr 16) and 0xFF)) +
-            kotlin.math.abs(((a shr 8) and 0xFF) - ((b shr 8) and 0xFF)) + kotlin.math.abs((a and 0xFF) - (b and 0xFF))
 
     /** No sample: a dark system theme means a dark bar on Googlebooks; otherwise the wallpaper decides. */
     private fun fallbackText(): Color {
@@ -488,12 +499,9 @@ class BarController(private val service: AccessibilityService) {
 
     // ---- the strip ---------------------------------------------------------------------------
 
-    private fun isActive(item: ItemConfig, states: Map<String, io.github.kuscher.bentobar.items.ItemState>) =
-        item.whenActive && states[item.id]?.active == true
-
     fun hiddenItems(): List<ItemConfig> {
         val states = Ticker.states.value
-        return Store.config.value.items.filter { it.section == Section.HIDDEN && !isActive(it, states) }
+        return Store.config.value.behindChevron { states[it.id]?.active == true }
     }
 
     @Composable
@@ -509,8 +517,7 @@ class BarController(private val service: AccessibilityService) {
             // Next meeting stays at the far left: its text changes width most, and there it moves nothing else.
             .sortedBy { if (it.type == Store.PINNED_LEFT) 0 else 1 }
         // Behind ‹ (click or hover modes): hidden items not out on their own. Show everything: none.
-        val hidden = if (cfg.presenting || cfg.hiddenMode == HiddenMode.SHOW_ALL) emptyList()
-        else cfg.items.filter { it.section == Section.HIDDEN && !isActive(it, states) }
+        val hidden = if (cfg.presenting) emptyList() else cfg.behindChevron { states[it.id]?.active == true }
         val overflow by BarOverflow.ids.collectAsState()
         // Without the ‹ button there's no way to fold hidden items back, so they stay folded.
         val open = expanded.value && cfg.hiddenMode != HiddenMode.SHOW_ALL && !cfg.presenting
@@ -557,6 +564,9 @@ class BarController(private val service: AccessibilityService) {
     private var dragCenters: Map<String, Float> = emptyMap()
     /** While an item is dragged: its id and the index it would land at, for the strip's live order. */
     private val dragPreview = mutableStateOf<Pair<String, Int>?>(null)
+
+    /** Ends a drag without moving anything: the order drawn is the saved one again. */
+    private fun cancelDrag() { dragPreview.value = null; dragFrom = null; dragCenters = emptyMap() }
 
     private val events = object : StripEvents {
         override fun placed(id: String, at: Rect) { placed[id] = at }
@@ -630,8 +640,7 @@ class BarController(private val service: AccessibilityService) {
             }
             trace("drag ${item.type} dx=${dx.toInt()} -> index $index")
             if (index != null) Store.move(item.id, Section.SHOWN, index)
-            dragPreview.value = null
-            dragFrom = null
+            cancelDrag()
         }
 
         override fun wheel(up: Boolean) {

@@ -65,9 +65,9 @@ object Calendar {
      */
     fun refresh(force: Boolean = false) {
         val now = System.currentTimeMillis()
+        if (!allowed()) { forget(); return }
         if (!force && now - loadedAt < 60_000) return
         loadedAt = now
-        if (!allowed()) { forget(); return }
         observe()
         if (loading) { again = true; return }
         loading = true
@@ -86,6 +86,7 @@ object Calendar {
     fun forget() {
         generation++
         again = false
+        loadedAt = 0 // allowed again: load at once, not up to a minute later
         if (events.isNotEmpty()) { events = emptyList(); if (::app.isInitialized) Chips.update(app) }
     }
 
@@ -98,9 +99,24 @@ object Calendar {
             })
     }
 
+    /**
+     * The days the month menu shows beyond the ones always kept loaded (36 hours back to 40 days
+     * ahead), loaded as well while it shows them. Without it, a month further out looked empty.
+     */
+    @Volatile private var view: LongRange? = null
+
+    /** The month menu shows [from] to [to]; nulls when it has closed. */
+    fun view(from: Long?, to: Long?) {
+        val next = if (from == null || to == null) null else from..to
+        if (next == view) return
+        view = next
+        if (next != null && allowed()) refresh(force = true)
+    }
+
     private fun load(now: Long): List<Event> = try {
         val begin = now - 36 * 3_600_000L
         val end = now + 40 * 86_400_000L
+        val spans = Meetings.spans(begin..end, view)
         val projection = arrayOf(
             CalendarContract.Instances.EVENT_ID, CalendarContract.Instances.TITLE,
             CalendarContract.Instances.BEGIN, CalendarContract.Instances.END,
@@ -112,7 +128,9 @@ object Calendar {
         val out = ArrayList<Event>()
         // The calendar owner of each event, for telling the user apart from other attendees.
         val owners = HashMap<Long, String>()
-        CalendarContract.Instances.query(app.contentResolver, projection, begin, end)?.use { c ->
+        // An occurrence that crosses from one span into the next comes back from both.
+        val seen = HashSet<Pair<Long, Long>>()
+        for (span in spans) CalendarContract.Instances.query(app.contentResolver, projection, span.first, span.last)?.use { c ->
             while (c.moveToNext()) {
                 if (c.getInt(9) == 0) continue // calendar hidden by the user
                 if (c.getInt(8) == CalendarContract.Attendees.ATTENDEE_STATUS_DECLINED) continue
@@ -123,6 +141,7 @@ object Calendar {
                 if (CallLinks.isTask(text)) continue
                 val allDay = c.getInt(4) != 0
                 val id = c.getLong(0)
+                if (!seen.add(id to c.getLong(2))) continue
                 c.getString(11)?.let { owners[id] = it }
                 out += Event(
                     eventId = id, title = c.getString(1).orEmpty().ifBlank { app.getString(R.string.calendar_no_title) },
@@ -186,6 +205,9 @@ object Calendar {
         val horizon = Meetings.horizon(now, ZoneId.systemDefault())
         return events.filter { it.meeting && Meetings.inHorizon(it.begin, it.end, now, horizon) }
     }
+
+    /** Every loaded meeting that hasn't ended, today's and later ones: the chip plans its next change from these. */
+    fun upcomingMeetings(now: Long): List<Event> = if (!allowed()) emptyList() else events.filter { it.meeting && it.end > now }
 
     fun current(now: Long) = meetings(now).firstOrNull { it.begin <= now }
     fun next(now: Long) = meetings(now).firstOrNull { it.begin > now }

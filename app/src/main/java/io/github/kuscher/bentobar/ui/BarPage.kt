@@ -96,6 +96,7 @@ import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Position
 import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.shows
+import io.github.kuscher.bentobar.data.behindChevron
 import io.github.kuscher.bentobar.data.HiddenMode
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.items.ItemState
@@ -189,9 +190,8 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
     val cfg by Store.config.collectAsState()
     val tick by Ticker.tick.collectAsState()
     var expanded by remember { mutableStateOf(false) }
-    val active = { it: ItemConfig -> it.whenActive && states[it.id]?.active == true }
     val visible = cfg.items.filter { cfg.shows(it, states[it.id]?.active == true) }
-    val hidden = if (cfg.hiddenMode == HiddenMode.SHOW_ALL) emptyList() else cfg.items.filter { it.section == Section.HIDDEN && !active(it) }
+    val hidden = cfg.behindChevron { states[it.id]?.active == true }
     val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.stateOf(it)) } }
     // The preview uses the strip's real colours: the sampled bar when BentoBar is running and the
     // colour is automatic, else the forced Light or Dark choice.
@@ -227,7 +227,7 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
             val h24 = android.text.format.DateFormat.is24HourFormat(LocalContext.current)
             Row(Modifier.fillMaxSize().padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(Dates.format(Dates.timeSkeleton(h24), now) + "   " + Dates.format("EEEMMMd", now), color = look.fg,
-                    fontFamily = Fonts.bar, fontSize = 14.sp)
+                    fontFamily = Fonts.bar, fontWeight = Fonts.barWeight, fontSize = 14.sp)
                 if (cfg.position == Position.LEFT) Spacer(Modifier.width(16.dp)) else Spacer(Modifier.weight(1f))
                 Strip(entries(visible), if (expanded) entries(hidden) else emptyList(), hidden.isNotEmpty(),
                     chevronAlways = hidden.isNotEmpty(), chevronReservePx = 0, expanded = expanded,
@@ -235,7 +235,7 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
                 if (cfg.position == Position.LEFT) Spacer(Modifier.weight(1f)) else if (cfg.position == Position.CENTER) Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("US", color = look.fg, fontFamily = Fonts.bar, fontSize = 13.sp)
+                    Text("US", color = look.fg, fontFamily = Fonts.bar, fontWeight = Fonts.barWeight, fontSize = 13.sp)
                     SymIcon(Sym.NOTIFICATIONS, size = 18.sp, color = look.fg)
                     SymIcon(Sym.WIFI, size = 18.sp, color = look.fg)
                     SymIcon(Sym.BATTERY_FULL, size = 18.sp, color = look.fg)
@@ -460,13 +460,21 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
                     color = MaterialTheme.colorScheme.primary, maxLines = 1)
             }
             Spacer(Modifier.height(12.dp))
-            val missing = type.permissions.filter { context.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }
-            if (missing.isNotEmpty()) {
+            // "Needs calendar access" by the same rule the item itself uses (granted, and not switched off in
+            // Setup), from the observed setup state: asking Android while drawing isn't re-read when it changes.
+            val setup by Setup.state.collectAsState()
+            if (android.Manifest.permission.READ_CALENDAR in type.permissions && !setup.calendar) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer), modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.detail_needs_calendar), style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onTertiaryContainer)
-                        FilledTonalButton(onClick = { (context as? android.app.Activity)?.requestPermissions(missing.toTypedArray(), 2) }) { Text(stringResource(R.string.common_allow)) }
+                        FilledTonalButton(onClick = {
+                            // Allow here is also switching Calendar back on in Setup; Android is asked only if it still has to grant it.
+                            Store.update { it.copy(turnedOff = it.turnedOff - io.github.kuscher.bentobar.data.Uses.CALENDAR) }
+                            if (context.checkSelfPermission(android.Manifest.permission.READ_CALENDAR) != PackageManager.PERMISSION_GRANTED)
+                                (context as? android.app.Activity)?.requestPermissions(arrayOf(android.Manifest.permission.READ_CALENDAR), 2)
+                            Setup.refresh(context); Ticker.refresh()
+                        }) { Text(stringResource(R.string.common_allow)) }
                     }
                 }
                 Spacer(Modifier.height(8.dp))

@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.Typeface as ComposeTypeface
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.TextUnit
@@ -23,6 +24,12 @@ object Fonts {
     /** The status bar's look: Google Sans on Google devices, the platform sans-serif elsewhere. */
     lateinit var bar: FontFamily private set
     lateinit var barTypeface: Typeface private set
+    /**
+     * The weight of the status bar's own text. A text style has to name it: Compose asks the typeface
+     * for the style's weight, and for a style without one that is 400, whatever weight the typeface
+     * was made with. (The strip drew regular text next to the system's semibold clock that way.)
+     */
+    var barWeight: FontWeight = FontWeight.Medium; private set
 
     @Synchronized
     fun init(context: Context) {
@@ -30,10 +37,13 @@ object Fonts {
         val am = context.applicationContext.assets
         symbols = FontFamily(ComposeTypeface(Typeface.createFromAsset(am, "fonts/MaterialSymbolsRounded.ttf")))
         symbolsFilled = FontFamily(ComposeTypeface(Typeface.createFromAsset(am, "fonts/MaterialSymbolsRounded_Fill.ttf")))
-        // Googlebooks name their UI font "google-sans-flex" (variable; the status bar uses it); older
-        // builds had "google-sans-text-medium". Without either, BentoBar fell back to the generic
-        // sans-serif, which looked technical next to the system's clock.
-        barTypeface = systemFamily("google-sans-flex")?.let { Typeface.create(it, 500, false) }
+        // Googlebooks name their UI font "google-sans-flex" (variable). The status bar draws its clock in
+        // the emphasized label style: weight 600 with rounded ends, which has a family name of its own.
+        // Older builds had "google-sans-text-medium". Without any of them, BentoBar fell back to the
+        // generic sans-serif, which looked technical next to the system's clock.
+        val flex = systemFamily("variable-label-large-emphasized") ?: systemFamily("google-sans-flex")
+        if (flex != null) barWeight = FontWeight.SemiBold
+        barTypeface = flex?.let { Typeface.create(it, barWeight.weight, false) }
             ?: systemFamily("google-sans-text-medium") ?: systemFamily("google-sans-medium")
             ?: systemFamily("google-sans")?.let { Typeface.create(it, 500, false) }
             ?: Typeface.create("sans-serif-medium", Typeface.NORMAL)

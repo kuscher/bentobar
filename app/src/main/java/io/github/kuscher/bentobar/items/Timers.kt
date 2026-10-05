@@ -140,6 +140,18 @@ object Timers {
         finish(s)
     }
 
+    /**
+     * The alarm, or the in-process callback, came due. They count real time and [State.at] is a wall
+     * time, so after a small clock correction (under two seconds isn't followed as a clock change)
+     * they can be a moment early: then [check] finishes nothing, and they are armed again. Without
+     * that, a timer ending while nothing ticks (the bar hidden, the device asleep) stayed silent
+     * until the bar next showed.
+     */
+    fun due() {
+        check()
+        _state.value?.let { if (it.running && it.mode != Mode.STOPWATCH && now() < it.at) schedule(it) }
+    }
+
     private fun finish(s: State) {
         finishedAt = now()
         prefs.edit().putLong("finishedAt", finishedAt).apply()
@@ -189,7 +201,7 @@ object Timers {
         } catch (e: SecurityException) {
             Log.w(TAG, "alarm not allowed", e)
         }
-        main.postAtTime({ check() }, this, android.os.SystemClock.uptimeMillis() + (s.at - now()).coerceAtLeast(0) + 50)
+        main.postAtTime({ due() }, this, android.os.SystemClock.uptimeMillis() + (s.at - now()).coerceAtLeast(0) + 50)
     }
 }
 
@@ -197,6 +209,6 @@ object Timers {
 class TimerAlarm : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Env.init(context)
-        Timers.check()
+        Timers.due()
     }
 }

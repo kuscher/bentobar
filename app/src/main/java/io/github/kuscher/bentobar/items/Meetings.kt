@@ -33,4 +33,12 @@ object Meetings {
      */
     fun isMeeting(allDay: Boolean, editable: Boolean, hasCallLink: Boolean, hasOthers: Boolean): Boolean =
         !allDay && editable && (hasCallLink || hasOthers)
+
+    /** What the calendar loads: the [usual] window, then whatever part of the [viewed] month lies before or after it. */
+    fun spans(usual: LongRange, viewed: LongRange?): List<LongRange> = buildList {
+        add(usual)
+        if (viewed == null) return@buildList
+        if (viewed.first < usual.first) add(viewed.first..minOf(viewed.last, usual.first))
+        if (viewed.last > usual.last) add(maxOf(viewed.first, usual.last)..viewed.last)
+    }
 }

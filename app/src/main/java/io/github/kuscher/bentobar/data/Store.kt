@@ -22,10 +22,28 @@ object Store {
     private val state = MutableStateFlow(BarConfig())
     val config: StateFlow<BarConfig> get() = state.asStateFlow()
 
+    /**
+     * The user's answer to the accessibility disclosure. Google Play's User Data policy wants an app
+     * that isn't an accessibility tool to say what it uses the AccessibilityService API for and get
+     * consent, with a way to decline, before it sends anyone to turn its service on. Kept beside the
+     * layout, not in it: Copy settings must not carry consent to another install.
+     */
+    enum class Consent { NOT_ASKED, DECLINED, AGREED }
+
+    private const val KEY_CONSENT = "accessibility_consent"
+    private val consentState = MutableStateFlow(Consent.NOT_ASKED)
+    val consent: StateFlow<Consent> get() = consentState.asStateFlow()
+
+    fun setConsent(answer: Consent) {
+        consentState.value = answer
+        prefs.edit().putString(KEY_CONSENT, answer.name).apply()
+    }
+
     @Synchronized
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("bentobar", Context.MODE_PRIVATE)
+        consentState.value = prefs.getString(KEY_CONSENT, null)?.let { runCatching { Consent.valueOf(it) }.getOrNull() } ?: Consent.NOT_ASKED
         val raw = prefs.getString(KEY, null)
         state.value = raw?.let {
             runCatching { json.decodeFromString(BarConfig.serializer(), it) }
@@ -83,9 +101,14 @@ object Store {
 
     fun export(): String = json.encodeToString(BarConfig.serializer(), state.value)
 
+    /**
+     * Replaces the layout and the look with a pasted one. What belongs to this install stays as it
+     * is here: the permissions switched off in Setup (a pasted layout must not switch calendar reading
+     * back on), whether the bar is shown, presenting, and the first-run state.
+     */
     fun import(text: String): Boolean {
         val c = parseLayout(text) ?: return false
-        update { c }
+        update { c.keepingLocal(it) }
         return true
     }
 

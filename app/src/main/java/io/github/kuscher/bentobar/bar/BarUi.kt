@@ -296,7 +296,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     // reading (Fmt.widthTemplate), right-aligned, so nothing next to them moves as they change.
     val density = androidx.compose.ui.platform.LocalDensity.current
     val measurer = rememberTextMeasurer()
-    val textStyle = TextStyle(fontFamily = Fonts.bar, fontSize = look.textSp, fontFeatureSettings = "tnum", lineHeight = look.textSp)
+    val textStyle = TextStyle(fontFamily = Fonts.bar, fontWeight = Fonts.barWeight, fontSize = look.textSp, fontFeatureSettings = "tnum", lineHeight = look.textSp)
     // Appearing (the strip starting, an item popping out, ‹ revealing hidden items) fades and slides
     // in instead of popping. Drawn in the graphics layer only: no relayout, so the window doesn't
     // resize per frame.

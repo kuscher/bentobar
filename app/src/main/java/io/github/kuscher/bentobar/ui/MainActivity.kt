@@ -63,6 +63,8 @@ class MainActivity : ComponentActivity() {
     private val services = AccessibilityManager.AccessibilityServicesStateChangeListener { Setup.refresh(this) }
     private var page by mutableIntStateOf(0)
     private var selected by mutableStateOf<String?>(null)
+    /** The accessibility disclosure is up ([AccessibilityDisclosure]). */
+    private var disclosure by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,8 +74,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         // Recreated (theme, language, text size or density changed): stay where the user was, and
         // don't act on the launch intent again (it could ask for a permission twice).
-        if (savedInstanceState == null) handle(intent)
-        else { page = savedInstanceState.getInt(STATE_PAGE); selected = savedInstanceState.getString(STATE_SELECTED) }
+        if (savedInstanceState == null) {
+            handle(intent)
+            // First opening, service still off: the disclosure comes up by itself, in the app's normal
+            // use, not behind a page someone has to find. Once answered, only Turn on brings it back.
+            disclosure = Store.consent.value == Store.Consent.NOT_ASKED && !serviceOn(this) && !Env.advancedProtection()
+        } else {
+            page = savedInstanceState.getInt(STATE_PAGE); selected = savedInstanceState.getString(STATE_SELECTED)
+            disclosure = savedInstanceState.getBoolean(STATE_DISCLOSURE)
+        }
         setContent {
             BentoBarTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
@@ -93,6 +102,16 @@ class MainActivity : ComponentActivity() {
         super.onSaveInstanceState(outState)
         outState.putInt(STATE_PAGE, page)
         outState.putString(STATE_SELECTED, selected)
+        outState.putBoolean(STATE_DISCLOSURE, disclosure)
+    }
+
+    /**
+     * Setup's Turn on. BentoBar opens Accessibility settings only after the user agreed to what its
+     * service does (Google Play's prominent disclosure and consent): until then this shows the
+     * disclosure, and Agree there opens the settings.
+     */
+    private fun turnOn() {
+        if (Store.consent.value == Store.Consent.AGREED) openAccessibility(this) else disclosure = true
     }
 
     private fun handle(intent: Intent?) {
@@ -181,7 +200,7 @@ class MainActivity : ComponentActivity() {
                             style = MaterialTheme.typography.headlineSmall)
                         // Says what the strip is actually doing, not just whether the service is on.
                         Text(stringResource(when {
-                            !running -> R.string.status_service_off
+                            !running -> if (page == 3) R.string.status_service_off_setup else R.string.status_service_off
                             !cfg.enabled -> R.string.status_hidden
                             else -> when (status) {
                                 BarStatus.STOPPED -> R.string.status_starting
@@ -210,7 +229,7 @@ class MainActivity : ComponentActivity() {
                             Notice.post(getString(R.string.add_added, title), getString(R.string.bar_undo)) { Store.remove(id) }
                         }
                         2 -> LookPage()
-                        3 -> SetupPage(this@MainActivity, setup)
+                        3 -> SetupPage(this@MainActivity, setup, onTurnOn = ::turnOn)
                         else -> AboutPage()
                     }
                     val snackbar = androidx.compose.runtime.remember { SnackbarHostState() }
@@ -223,6 +242,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        if (disclosure) AccessibilityDisclosure(
+            onAgree = { disclosure = false; Store.setConsent(Store.Consent.AGREED); openAccessibility(this) },
+            onDecline = { disclosure = false; Store.setConsent(Store.Consent.DECLINED) },
+            onDismiss = { disclosure = false },
+        )
     }
 
     companion object {
@@ -233,6 +257,7 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_REQUEST = "request"
         private const val STATE_PAGE = "page"
         private const val STATE_SELECTED = "selected"
+        private const val STATE_DISCLOSURE = "disclosure"
 
         /** Opens BentoBar's settings, on [itemId] if given. */
         fun open(context: Context, itemId: String?) {

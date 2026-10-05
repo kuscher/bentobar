@@ -135,6 +135,19 @@ class RefresherTest {
         assertEquals("zurich#2", r.peek("zurich"))
     }
 
+    @Test fun aKeyForgottenWhileItsFirstLoadRunsLooksAtWhatIsKeptAgainNextTime() {
+        val asked = ArrayList<String>()
+        held = true
+        val r = refresher(restore = { key -> asked += key; null })
+        r.want("zurich")
+        r.forget("zurich")
+        run()
+        held = false
+        r.want("zurich")
+        // The answer that was dropped must not count as "what is kept was looked at".
+        assertEquals(listOf("zurich", "zurich"), asked)
+    }
+
     @Test fun forgettingOneKeyLeavesTheOthers() {
         val r = refresher()
         r.want("zurich"); r.want("oslo")

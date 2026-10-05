@@ -141,7 +141,8 @@ class Refresher<K : Any, V : Any>(
                 loading -= key
                 val current = all == generation && own == (keyGeneration[key] ?: 0)
                 val now = wiring.elapsed()
-                if (tryRestore) restored += key
+                // Only an answer that counts: a key forgotten while this ran is looked up in what is kept again.
+                if (tryRestore && current) restored += key
                 when {
                     !current -> {}
                     kept != null -> { slots[key] = Slot(kept.value, now - kept.ageMs.coerceAtLeast(0)); wiring.changed() }

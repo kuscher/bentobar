@@ -415,6 +415,27 @@ class FlightLoadTest {
         }
     }
 
+    @Test fun whatWasKeptForTheLastFlightItemGoesOnceItsDeletionCanNoLongerBeUndone() {
+        online { net ->
+            follow(net)
+            assertEquals(setOf(item), Kept.own("flight").names())
+            assertEquals(setOf(item), Kept.fetched(AIRLABS).names())
+            // The moment to undo has passed (longer than the Undo's own ten seconds), and the item is back: nothing is touched.
+            assertTrue(FlightLoad.UNDO_MS >= 30_000)
+            assertFalse(FlightLoad.clearWithout(ids))
+            assertEquals(setOf(item), Kept.own("flight").names())
+            assertEquals(setOf(item), Kept.fetched(AIRLABS).names())
+            // It has passed and there is still no Flight item: its number, its day and its last answer go, and nothing of a flight stays for good.
+            assertTrue(FlightLoad.clearWithout(emptySet()))
+            assertEquals(emptySet<String>(), Kept.own("flight").names())
+            assertEquals(emptySet<String>(), Kept.fetched(AIRLABS).names())
+            assertEquals(emptyList<String>(), filesWith("LH455"))
+            // The key is not a flight's: it stays where it is.
+            assertEquals(listOf("online.json"), filesWith(key))
+            assertEquals(1, sent())
+        }
+    }
+
     @Test fun whatCannotBeReadIsNotKept() {
         online { net ->
             val t = follow(net)

@@ -63,6 +63,9 @@ object Background {
         mine.forEach { it() }
     }
 
+    /** Runs [block] on the main thread after [ms]: for what has to wait out a moment (an Undo's) before it is done for good. */
+    fun later(ms: Long, block: () -> Unit) { main.postDelayed(block, ms) }
+
     /** Runs [block] on the main thread: now if this is it, else posted. */
     fun onMain(block: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) block() else main.post(block)

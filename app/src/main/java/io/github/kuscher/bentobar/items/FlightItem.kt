@@ -349,11 +349,18 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     /** Once a second while an item of this type is looked at: an answer that came with no menu open to take it is taken here. */
     override fun sample(now: Long) { takeAnswer() }
 
-    /** No Flight item is looked at any more: what was held for items that are gone from the layout is let go. */
+    /**
+     * No Flight item is looked at any more: what was held for items that are gone from the layout is
+     * let go. If that was the last Flight item, what is kept for it on the device goes too, once the
+     * moment to undo the deletion has passed and none is back.
+     */
     override fun onIdle() {
         val items = ids()
         tracker.keepOnly(items)
         fresh.keys.retainAll(items)
+        if (items.isEmpty()) Background.later(FlightLoad.UNDO_MS) {
+            if (FlightLoad.clearWithout(ids())) { tracker.forget(); fresh.clear(); places.clear() }
+        }
     }
 
     /** The service was switched off or its key removed: the loader and the lookup have forgotten already; this is the rest. */

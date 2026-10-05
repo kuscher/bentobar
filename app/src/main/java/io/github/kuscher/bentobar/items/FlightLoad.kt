@@ -137,7 +137,23 @@ object FlightLoad {
         runCatching { json.encodeToString(Tracked.serializer(), t) }.getOrNull()?.let { Kept.fetched(service).write(item, it, now) }
     }
 
-    /** What belonged to an item that is no longer in the layout goes with it. (An empty [items] means the last one is just being deleted, which may still be undone.) */
+    /** For this long a deleted item can come back (Undo is offered for ten seconds), and what was kept for the last Flight item is left alone. */
+    const val UNDO_MS = 30_000L
+
+    /**
+     * With no Flight item left in the layout, what was kept for one goes for good: the number, the day
+     * and the last answer. Asked [UNDO_MS] after the last item went, with the [items] there are then.
+     * True if it cleared; false, and nothing touched, while there is an item (it came back, or another
+     * was added, whose first load removes what belonged to the one that is gone).
+     */
+    fun clearWithout(items: Set<String>): Boolean = synchronized(lock) {
+        if (items.isNotEmpty()) return false
+        Kept.own(OWN).clear()
+        Kept.fetched(service).clear()
+        true
+    }
+
+    /** What belonged to an item that is no longer in the layout goes with it. (An empty [items] means the last one is just being deleted, which may still be undone: [clearWithout] comes later.) */
     private fun tidy(items: Set<String>) {
         if (items.isEmpty()) return
         Kept.own(OWN).keepOnly(items)

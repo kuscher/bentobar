@@ -369,6 +369,16 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         }
     }
 
+    /**
+     * At the app's start: with no Flight item in the layout, nothing stays kept for one. [onIdle] cannot
+     * see every way the last item goes: one deleted while it was in Off never made the type idle, and a
+     * process that ended inside the half minute after a deletion never got to clear. No Undo outlives
+     * the process, so there is nothing to wait for here.
+     */
+    internal fun sweepAtStart() {
+        runCatching { FlightLoad.clearWithout(ids()) }
+    }
+
     /** The service was switched off or its key removed: the loader and the lookup have forgotten already; this is the rest. */
     override fun forgetFetched() {
         FlightLoad.forget(keyGone = !Online.hasKey(online))

@@ -55,6 +55,7 @@ object Env {
         // Android leaves out of backups and device transfers. Then the rules for going online at all.
         Online.init(app.noBackupFilesDir)
         wireOnline()
+        FlightItem.sweepAtStart()
         NowPlaying.init(app)
         // Before Timers: a timer that finished while BentoBar wasn't running ends in init, and its
         // chip update asks the calendar.

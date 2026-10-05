@@ -144,8 +144,9 @@ private projects and paths into their repos, and where signing keys are backed u
   The text color is the glyphs' cores, not the average of everything that stands out: blended edges
   made it #EFEFEF beside the system's white. A reading with nothing opaque (the bar caught fading)
   keeps the last colors and is retried.
-  A third look: an app opened full screen with the bar kept lies under the bar, which then takes
-  that app's light or dark icons (black on a light app, and the strip stayed white). So the window
+  A third look: on a Googlebook that keeps the bar when an app goes full screen (the keyboard's
+  full-screen key), the app's window lies under the bar, which then takes that app's light or dark
+  icons (black on a light app, and the strip stayed white). So the window
   under the bar counts too, by which window it is (`bar/BarNeighbours.kt`).
 - **The window list can end early.** With a dialog on top, or some apps' own windows, the
   accessibility window list holds that window and nothing below it: no home screen, no other app.

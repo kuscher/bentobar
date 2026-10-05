@@ -71,9 +71,11 @@ Checked over adb with the throwaway probe in `probe/` (package local.bentobar.pr
 - Memory for context: 31.4 GB RAM; the Linux Terminal VM (crosvm_debian) held 12.2 GB RSS.
 
 ## More findings (2026-10-05, BentoBar 0.9; an Intel Googlebook 15 and an Android 17 emulator)
-- **A full-screen app can keep the status bar.** Opened in full-screen windowing mode (not immersive),
-  an app's window lies under the bar (from 0,0 to the screen's size), the bar stays see-through and
-  takes that app's light or dark icons: black glyphs over a light app. No window sits against the
+- **A full-screen app can keep the status bar.** The keyboard's full-screen key puts an app in
+  full-screen windowing mode, and on this Googlebook the status bar stays (on the HP it hid after about
+  1.9 s). The app's window then lies under the bar (from 0,0 to the screen's size), the bar stays
+  see-through and takes that app's light or dark icons: black glyphs over a light app. The window keeps
+  its id through the change; the key again brings it back. The caption's menu has only "App info". No window sits against the
   bar's lower edge then, so the trigger of 0.8 never fired and the strip stayed white on white. A
   dialog of that app dims the screen and the icons turn white again. `bar/BarNeighbours.kt` now counts
   the window under the bar.

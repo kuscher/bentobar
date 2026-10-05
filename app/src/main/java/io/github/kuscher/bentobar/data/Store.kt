@@ -47,7 +47,8 @@ object Store {
         val raw = prefs.getString(KEY, null)
         state.value = raw?.let {
             runCatching { json.decodeFromString(BarConfig.serializer(), it) }
-                .onFailure { e -> Log.w(TAG, "settings unreadable, starting fresh", e) }
+                // The exception's own message quotes the text around the fault, which can be a city or a note.
+                .onFailure { e -> Log.w(TAG, "settings unreadable (${e.javaClass.simpleName}), starting fresh") }
                 .getOrNull()
         } ?: Defaults.config()
         // v1 → v2: timed hiding of revealed items became opt-in; 8 s was only the old default.

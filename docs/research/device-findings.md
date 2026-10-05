@@ -69,3 +69,37 @@ Checked over adb with the throwaway probe in `probe/` (package local.bentobar.pr
   (`getRoot(FLAG_PREFETCH_DESCENDANTS_DEPTH_FIRST | FLAG_PREFETCH_UNINTERRUPTIBLE)`) reads the
   ~35-node status bar tree in one round trip.
 - Memory for context: 31.4 GB RAM; the Linux Terminal VM (crosvm_debian) held 12.2 GB RSS.
+
+## More findings (2026-10-05, BentoBar 0.9; an Intel Googlebook 15 and an Android 17 emulator)
+- **A full-screen app can keep the status bar.** Opened in full-screen windowing mode (not immersive),
+  an app's window lies under the bar (from 0,0 to the screen's size), the bar stays see-through and
+  takes that app's light or dark icons: black glyphs over a light app. No window sits against the
+  bar's lower edge then, so the trigger of 0.8 never fired and the strip stayed white on white. A
+  dialog of that app dims the screen and the icons turn white again. `bar/BarNeighbours.kt` now counts
+  the window under the bar.
+- **The accessibility window list can end early.** With some windows on top (a dialog; BentoBar's own
+  settings window, even floating) `getWindows()` returned that window, the status bar and our overlay
+  and nothing else: no home screen, no taskbar, no other app. With a terminal or a browser on top it
+  listed everything down to the home screen. (AOSP's list accounts for a window's whole display frame
+  when the window takes the touches around it, and stops when no space is left.) So a window missing
+  from the list is not a window that left: compare what is listed, never what isn't.
+- `am task resize` to the maximized bounds does not turn the bar black; the caption's maximize button
+  does. BentoBar then read `bg=#000000` within a second, and `transparent` again after restoring.
+- **Thermal headroom**: `getThermalHeadroom()` gives nothing on the Intel Googlebook; the thermal
+  status and the battery temperature read fine there.
+- **Input for tests from adb**: `input mouse tap|swipe|scroll X Y --axis VSCROLL,1` reaches the strip
+  as mouse events (click, drag, wheel). A right button can't be injected that way: use the `ctx` hook,
+  or a touch long-press (`input touchscreen swipe X Y X Y 800`). The shell's
+  `cmd media_session volume --set` is ignored on Android 17; BentoBar's own `setStreamVolume` works.
+- **Cost**: the release build with eleven items in the bar (the six new ones among them, a clock with
+  seconds and CPU) used 0.73% and 0.76% of one core over 60 and 90 seconds, after
+  `cmd package compile -m speed -f`.
+- **After an update with the settings window open**, Android restarts the activity before it binds
+  the service again: `getEnabledAccessibilityServiceList` is empty for a moment while the secure
+  setting still names the service. The first-opening disclosure asks the setting too.
+- **Open-Meteo's hourly chance of rain is for the hour that ends at the entry's time** ("preceding
+  hour"); the temperature and the weather code are of that instant (open-meteo.com/en/docs).
+- **AirLabs** repeats the key in `request.key.api_key` of every reply, with the caller's address under
+  `request.client`. `request.key.limits_total` is what is left of the month, and it lags: it read the
+  same after three lookups in a row. Checked against the live service with `flight` (by number) and
+  `routes` (by callsign): the fields are the ones the saved replies have.

@@ -22,6 +22,12 @@
 - **BentoBar now has the internet permission.** Two items use it, Weather and Flight, and only after
   you set them up on this device; Setup › Online services switches each off. Requests go to
   Open-Meteo and AirLabs and nowhere else. Everything else stays on your Googlebook, as before.
+- **Colors under a full-screen app.** An app opened full screen that keeps the status bar gives the
+  bar its own light or dark icons, and BentoBar stayed white on a light app. It now reads the bar's
+  colors again when another window takes the place under the bar.
+- Smaller things: the accessibility notice no longer comes up over a service that is already on (it
+  could, right after an update with the settings window open); a layout that can't be read is logged
+  by the kind of fault only, not with the text around it.
 - The tag workflow's upload to Google Play works after Google has rejected an update (Play then
   wants the commit marked as not sent for review).
 

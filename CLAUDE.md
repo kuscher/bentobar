@@ -20,6 +20,9 @@ private projects and paths into their repos, and where signing keys are backed u
     (the `DesktopStatusBarSpacer` node on Googlebook OS, else the widest gap).
   - `bar/BarPixels.kt`: the status bar's text and background color from the pixels around its clock
     (pure, unit-tested); `bar/Contrast.kt` then holds every strip color to 4.5:1.
+  - `bar/BarNeighbours.kt`: which app windows make the bar look different (one against its lower
+    edge, one under it), remembered from one window list to the next; a change asks for a new color
+    reading (pure, unit-tested).
   - `bar/Overlay.kt`: a Compose host in a TYPE_ACCESSIBILITY_OVERLAY window (outside-touch and
     key callbacks for menus).
   - `bar/BarUi.kt`: the strip (chevron, FitRow, items, clicks/right-clicks/wheel), and the slider an
@@ -100,7 +103,14 @@ private projects and paths into their repos, and where signing keys are backed u
   Also `now +3h|+90m|off` (moves the clock everything newer reads, `util/Now`), `net [reset]` (requests
   sent per host, and whether each service may be asked right now), `online weather|flights on|off`,
   and `TYPE …` or `item TYPE …`, which go to that item type's own `debug(args)`. What a hook prints
-  is logged: no hook takes or prints a key, and a type marked `discreet` prints no title.
+  is logged: no hook takes or prints a key, and a type marked `discreet` prints no title (`state media`
+  and `state flight` print the text's length).
+  The types' own hooks stage what a test can't make happen: `media stage playing|paused|none|notitle|two|
+  live|noaccess|starting|long|wide|emoji|rtl|off`; `devices stage mouse=15 keyboard=40c stylus=unknown`
+  and `devices off`; `heat stage 0..6`, `heat level 0.84`, `heat temp 41.3`, `heat off`; `weather stage
+  clear|rain-soon|rain-later|raining|storm|snow|old|error|slow-down|offline|loading`, `weather search …`,
+  `weather fail …`, `weather off`; `flight show NAME [TURN]` (`flight show` lists the names), `flight off`;
+  `sound fixed on|off`. Each type's bare name prints what it knows (`media`, `devices`, `heat`, `flight`).
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
   the settings window. Menu crops include the menu's shadow margin, which can show other windows
   behind it, so don't publish them.
@@ -134,6 +144,14 @@ private projects and paths into their repos, and where signing keys are backed u
   The text color is the glyphs' cores, not the average of everything that stands out: blended edges
   made it #EFEFEF beside the system's white. A reading with nothing opaque (the bar caught fading)
   keeps the last colors and is retried.
+  A third look: an app opened full screen with the bar kept lies under the bar, which then takes
+  that app's light or dark icons (black on a light app, and the strip stayed white). So the window
+  under the bar counts too, by which window it is (`bar/BarNeighbours.kt`).
+- **The window list can end early.** With a dialog on top, or some apps' own windows, the
+  accessibility window list holds that window and nothing below it: no home screen, no other app.
+  A window missing from the list has not left. `BarNeighbours` reads only what is listed: the home
+  screen coming and going with every dialog would otherwise cost a screenshot of the bar each time,
+  for a bar that never changed (see Play Protect below).
 - **Name the weight in every text style that uses `Fonts.bar`.** Compose asks the typeface for the
   style's weight, 400 when it names none, whatever weight the typeface was created with: the strip
   drew regular text beside the system's semibold clock. The status bar's style is the family
@@ -159,7 +177,12 @@ private projects and paths into their repos, and where signing keys are backed u
   `HttpTest` and `HttpTransportTest` pin the three hosts and what a request may carry.
 - **A flight service's reply repeats the key it was asked with**, and the platform puts addresses
   into exception messages. So: never keep or log a reply as it came, never log or rethrow what a
-  request threw, and keep a key out of every state, description and debug line.
+  request threw, and keep a key out of every state, description and debug line. Its count of lookups
+  left (`request.key.limits_total`) lags: the same figure after three lookups in a row, so the app
+  says "about".
+- **A weather service's hourly chance of rain is for the hour that ends at its time** (Open-Meteo:
+  "preceding hour"), while the temperature and the weather code are of that instant. The rain rule
+  names the hour the chance is for, and an hour's cell takes its chance from the entry after it.
 - **Least privilege** (user feedback): the accessibility config subscribes only to
   `typeWindowsChanged`. No content events, key filtering or motion events. Code reads only the
   status bar window. Don't add broader access for nice-to-haves.

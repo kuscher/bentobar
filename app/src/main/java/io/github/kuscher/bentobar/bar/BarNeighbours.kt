@@ -14,7 +14,8 @@ data class AppWindow(val id: Int, val left: Int, val top: Int, val right: Int, v
  * or dark icons, so which window it is counts as well as where it is. A narrow window (a menu, a
  * tooltip) changes nothing.
  */
-data class BarNeighbours(val against: String = "", val under: Set<Under> = emptySet()) {
+data class BarNeighbours(val against: Set<Against> = emptySet(), val under: Set<Under> = emptySet()) {
+    data class Against(val id: Int, val left: Int, val right: Int)
     data class Under(val id: Int, val left: Int, val right: Int)
 
     /**
@@ -22,19 +23,36 @@ data class BarNeighbours(val against: String = "", val under: Set<Under> = empty
      *
      * The list is not all there is: with some windows on top (a dialog, some apps' windows) it ends
      * at that window, and everything below is missing, the home screen too, which is the window
-     * under the bar on the desktop. So a list with no window under the bar says nothing about the
-     * bar: the home screen coming and going with every dialog would cost a reading each time, for a
-     * bar that never changed. Only another window under the bar counts, or the remembered one being
-     * in the list and no longer under the bar (it left full screen).
+     * under the bar on the desktop. So a window that is missing from the list has not left, and a
+     * list without the windows that were remembered says nothing about the bar: the home screen or a
+     * maximized window coming and going with every dialog would cost a reading each time, for a bar
+     * that never changed.
+     *
+     * Under the bar, a change is another window there, or the remembered one being in the list and
+     * no longer under the bar (it left full screen). Against the bar, a change is another stretch of
+     * the bar's edge being taken (whichever app takes it), or none any more: the remembered window is
+     * in the list elsewhere, or the list reaches a window under the bar again, which a maximized
+     * window would cover.
      */
     fun next(barBottom: Int, barWidth: Int, windows: List<AppWindow>): Pair<BarNeighbours, Boolean> {
         val near = windows.filter { it.top <= barBottom + EDGE && it.bottom > barBottom + EDGE && it.right - it.left >= barWidth / 4 }
-        val againstNow = near.filter { it.top >= barBottom - EDGE }.sortedBy { it.left }.joinToString(" ") { "${it.left}-${it.right}" }
+        val againstNow = near.filter { it.top >= barBottom - EDGE }.mapTo(HashSet()) { Against(it.id, it.left, it.right) }
         val underNow = near.filter { it.top < barBottom - EDGE }.mapTo(HashSet()) { Under(it.id, it.left, it.right) }
-        val left = underNow.isEmpty() && under.any { u -> windows.any { it.id == u.id } }
-        val moved = againstNow != against || (underNow.isNotEmpty() && underNow != under) || left
-        return BarNeighbours(againstNow, if (underNow.isNotEmpty() || left) underNow else under) to moved
+        fun listed(id: Int) = windows.any { it.id == id }
+
+        val leftUnder = underNow.isEmpty() && under.any { listed(it.id) }
+        val underMoved = (underNow.isNotEmpty() && underNow != under) || leftUnder
+        val underNext = if (underNow.isNotEmpty() || leftUnder) underNow else under
+
+        val gone = againstNow.isEmpty() && against.isNotEmpty() && (against.any { listed(it.id) } || underNow.isNotEmpty())
+        val againstMoved = if (againstNow.isNotEmpty()) spans(againstNow) != spans(against) else gone
+        val againstNext = if (againstNow.isNotEmpty() || gone) againstNow else against
+
+        return BarNeighbours(againstNext, underNext) to (againstMoved || underMoved)
     }
+
+    /** Where the bar's edge is taken, whichever windows take it: the bar is the system's own color there whatever the app. */
+    private fun spans(s: Set<Against>): Set<Pair<Int, Int>> = s.mapTo(HashSet()) { it.left to it.right }
 
     companion object {
         private const val EDGE = 2

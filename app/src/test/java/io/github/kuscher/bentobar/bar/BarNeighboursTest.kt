@@ -40,22 +40,51 @@ class BarNeighboursTest {
 
     @Test fun aPixelOrTwoOffIsStillAgainstTheBar() {
         fun against(top: Int) = BarNeighbours().next(barBottom, barWidth, listOf(maximized.copy(top = top))).first.against
-        assertEquals("0-2880", against(54))
-        assertEquals("0-2880", against(56))
-        assertEquals("0-2880", against(52))
-        assertEquals("", against(57))
+        val there = setOf(BarNeighbours.Against(7, 0, 2880))
+        assertEquals(there, against(54))
+        assertEquals(there, against(56))
+        assertEquals(there, against(52))
+        assertEquals(emptySet<BarNeighbours.Against>(), against(57))
     }
 
     @Test fun snappedWindowsAreReadLeftToRight() {
         val left = AppWindow(8, 0, 54, 1440, 1716)
         val right = AppWindow(9, 1440, 54, 2880, 1716)
-        assertEquals("0-1440 1440-2880", BarNeighbours().next(barBottom, barWidth, listOf(right, left)).first.against)
+        assertEquals(setOf(BarNeighbours.Against(8, 0, 1440), BarNeighbours.Against(9, 1440, 2880)),
+            BarNeighbours().next(barBottom, barWidth, listOf(right, left)).first.against)
         assertEquals(listOf(true, true, false), readings(listOf(left), listOf(left, right), listOf(right, left)))
     }
 
     @Test fun anotherWindowAgainstTheBarInTheSamePlaceIsNoChange() {
         // The bar is the system's own black there whatever the app.
         assertEquals(listOf(true, false), readings(listOf(maximized), listOf(maximized.copy(id = 12))))
+    }
+
+    /**
+     * What a list that ends early costs against the bar: a dialog over a maximized window is the
+     * whole list, the maximized window is not in it, and the bar is as black as before. That was a
+     * reading when the dialog opened and another when it closed.
+     */
+    @Test fun aDialogOverAMaximizedWindowCostsNoReading() {
+        assertEquals(listOf(true, false, false, false, false),
+            readings(listOf(maximized, floating), listOf(dialog), listOf(maximized, floating), listOf(dialog), listOf(maximized)))
+        // The same with two windows snapped side by side.
+        val left = AppWindow(8, 0, 54, 1440, 1716)
+        val right = AppWindow(9, 1440, 54, 2880, 1716)
+        assertEquals(listOf(true, false, false), readings(listOf(left, right), listOf(dialog), listOf(right, left)))
+    }
+
+    @Test fun aMaximizedWindowThatIsClosedAsksWhenTheDesktopShows() {
+        // Closed or minimized: it is not in the list, and the list reaches the home screen again.
+        assertEquals(listOf(true, true, false), readings(listOf(maximized), desktop(floating), desktop(floating)))
+        // Closed behind a dialog: nothing is known until the dialog goes; then the desktop says it.
+        assertEquals(listOf(true, false, true, false), readings(listOf(maximized), listOf(dialog), desktop(floating), desktop()))
+        // Covered by another maximized window, which then closes: the bar was black all along.
+        assertEquals(listOf(true, false, false), readings(listOf(maximized), listOf(maximized.copy(id = 12)), listOf(maximized)))
+    }
+
+    @Test fun aMaximizedWindowThatGoesFullScreenAsks() {
+        assertEquals(listOf(true, true, true), readings(listOf(maximized), listOf(maximized.copy(top = 0, bottom = 1800)), listOf(maximized)))
     }
 
     @Test fun aNarrowWindowChangesNothing() {

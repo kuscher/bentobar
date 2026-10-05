@@ -22,16 +22,17 @@ object SoundRules {
     fun percent(volume: Int, max: Int): Int = volume * 100 / max.coerceAtLeast(1)
 
     /**
-     * The level to draw while muted. Android reports a volume of 0 for a muted stream, so the item
-     * keeps the last level it saw while the sound was on: [before] stays while [muted], and follows
-     * the volume otherwise.
+     * The level to draw while muted. Android reports a volume of 0 for a muted stream, whatever it is
+     * underneath, so the item keeps the last level it saw while the stream was not muted: [before]
+     * stays while [muted], and follows the volume otherwise (down to 0, for a volume that was lowered
+     * to nothing rather than muted).
      */
     fun kept(before: Float, volume: Int, min: Int, max: Int, muted: Boolean): Float = if (muted) before else level(volume, min, max)
 
     /**
      * What the bar draws in the number's place, or null for the number itself: with the option [on],
-     * unless the output's volume is [fixed] (nothing could be set) or there is only one volume. Muted,
-     * it is the [kept] level, dimmed.
+     * unless the output's volume is [fixed] (nothing could be set) or there is only one volume. With
+     * the stream [muted], it is the [kept] level, dimmed.
      */
     fun slider(on: Boolean, fixed: Boolean, volume: Int, min: Int, max: Int, muted: Boolean, kept: Float): BarSlider? =
         if (!on || fixed || max <= min) null

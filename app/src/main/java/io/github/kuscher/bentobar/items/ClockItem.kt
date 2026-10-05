@@ -27,14 +27,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -190,6 +193,9 @@ private fun WorldClockMenu(item: ItemConfig, host: MenuHost) {
 private fun PlaceRow(row: WorldClock.Row, planned: Boolean, editing: Boolean, onRemove: (WorldCity) -> Unit) {
     // One line for a screen reader, in the order it is read: "Tokyo, 6:10 AM, Tomorrow · +16h, Night there".
     val spoken = WorldClock.spoken(row, stringResource(R.string.clock_night))
+    val focus = LocalFocusManager.current
+    // Whether the keyboard's focus is on this row's button.
+    val held = remember { BooleanArray(1) }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).padding(vertical = 6.dp).clearAndSetSemantics { contentDescription = spoken }, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f).padding(end = 8.dp)) {
@@ -203,8 +209,15 @@ private fun PlaceRow(row: WorldClock.Row, planned: Boolean, editing: Boolean, on
             Text(row.time, style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"), maxLines = 1,
                 color = if (planned) MaterialTheme.colorScheme.primary else Color.Unspecified)
         }
-        if (editing) Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            row.place.city?.let { city -> SmallIconButton(Sym.CLOSE, stringResource(R.string.clock_remove_city, WorldClock.nameOf(city))) { onRemove(city) } }
+        if (editing) Box(Modifier.size(48.dp).onFocusChanged { held[0] = it.hasFocus }, contentAlignment = Alignment.Center) {
+            row.place.city?.let { city ->
+                SmallIconButton(Sym.CLOSE, stringResource(R.string.clock_remove_city, WorldClock.nameOf(city))) {
+                    // The button goes with its city. If it holds the keyboard's focus, that moves on to the next control
+                    // first: dropped, it would start again at the top of the menu.
+                    if (held[0]) focus.moveFocus(FocusDirection.Next)
+                    onRemove(city)
+                }
+            }
         }
     }
 }
@@ -219,7 +232,9 @@ private fun PlaceRow(row: WorldClock.Row, planned: Boolean, editing: Boolean, on
 @Composable
 private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now: Long) {
     var adding by remember { mutableStateOf(false) }
-    // After Enter took a result, the keyboard's focus goes back to the entry: the next city is one more Enter away.
+    // The field and its results go away when a city is taken or the search is closed. If one of them held the keyboard's
+    // focus, it goes to the entry that comes back (the next city is one more Enter away); dropped, it would start again
+    // at the top of the menu.
     var refocus by remember { mutableStateOf(false) }
     val entry = remember { FocusRequester() }
     val full = WorldClock.full(cities)
@@ -235,30 +250,42 @@ private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now
     // The differences beside the results are those of this minute.
     val hits = remember(query, cities, places, now / 60_000) { zoneIndex.search(query, places, cities, now) }
     val free = WorldClock.firstFree(hits)
+    val focus = LocalFocusManager.current
     val field = remember { FocusRequester() }
     val first = remember { FocusRequester() }
-    fun take(hit: WorldClock.Hit?, byKey: Boolean) {
+    // Whether the keyboard's focus is in the field (or on its ×), and whether it is on a result.
+    val inField = remember { BooleanArray(1) }
+    val inResults = remember { BooleanArray(1) }
+    fun close(focused: Boolean) { refocus = focused; adding = false }
+    fun take(hit: WorldClock.Hit?, focused: Boolean) {
         if (hit == null || hit.added) return
         Store.update { it.copy(cities = WorldClock.add(it.cities, hit.zone, hit.nameInList)) }
-        refocus = byKey
-        adding = false
+        close(focused)
     }
-    // Down from the field goes to the first result that can be taken, and Up from there back to the field.
-    Box(Modifier.onPreviewKeyEvent { e ->
-        if (e.key == Key.DirectionDown && free != null) { if (e.type == KeyEventType.KeyDown) runCatching { first.requestFocus() }; true } else false
+    // The arrows walk the menu from the field as from any other control: Down to the first result that can be taken
+    // (and Up from there back to the field), else on to whatever is under the field; Up to what is above it.
+    Box(Modifier.onFocusChanged { inField[0] = it.hasFocus }.onPreviewKeyEvent { e ->
+        val down = e.type == KeyEventType.KeyDown
+        when (e.key) {
+            Key.DirectionDown -> { if (down) { if (free != null) runCatching { first.requestFocus() } else focus.moveFocus(FocusDirection.Down) }; true }
+            Key.DirectionUp -> { if (down) focus.moveFocus(FocusDirection.Up); true }
+            else -> false
+        }
     }) {
         SearchField(stringResource(R.string.clock_search_label), placeholder = stringResource(R.string.clock_zone_find_hint), focus = field,
-            onClose = { adding = false }, onChange = { query = it }, onEnter = { take(free, byKey = true) })
+            onClose = { close(inField[0]) }, onChange = { query = it }, onEnter = { take(free, focused = true) })
     }
     when {
         WorldClock.key(query).length < WorldClock.MIN_LETTERS -> {}
         hits.isEmpty() -> Box(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) { MenuNote(stringResource(R.string.clock_search_none)) }
-        else -> hits.forEach { hit ->
-            MenuEntry(Sym.PUBLIC, if (hit.region != null) stringResource(R.string.clock_search_region, hit.name, hit.region) else hit.name,
-                detail = WorldClock.beside(hit, stringResource(R.string.clock_search_added), stringResource(R.string.clock_same_time)), enabled = !hit.added,
-                modifier = if (hit !== free) Modifier else Modifier.focusRequester(first).onPreviewKeyEvent { e ->
-                    if (e.key == Key.DirectionUp) { if (e.type == KeyEventType.KeyDown) runCatching { field.requestFocus() }; true } else false
-                }) { take(hit, byKey = false) }
+        else -> Column(Modifier.onFocusChanged { inResults[0] = it.hasFocus }) {
+            hits.forEach { hit ->
+                MenuEntry(Sym.PUBLIC, if (hit.region != null) stringResource(R.string.clock_search_region, hit.name, hit.region) else hit.name,
+                    detail = WorldClock.beside(hit, stringResource(R.string.clock_search_added), stringResource(R.string.clock_same_time)), enabled = !hit.added,
+                    modifier = if (hit !== free) Modifier else Modifier.focusRequester(first).onPreviewKeyEvent { e ->
+                        if (e.key == Key.DirectionUp) { if (e.type == KeyEventType.KeyDown) runCatching { field.requestFocus() }; true } else false
+                    }) { take(hit, focused = inResults[0]) }
+            }
         }
     }
 }
@@ -274,7 +301,10 @@ private fun CitiesInSettings() {
     SectionLabel(stringResource(R.string.clock_cities_section))
     if (cfg.cities.isEmpty()) { Body(stringResource(R.string.clock_cities_empty)); return }
     Body(stringResource(R.string.clock_cities_help))
-    WorldClock.ordered(cfg.cities, Now.wall()).forEach { city ->
+    // The menu's order, worked out when a city comes or goes and not with every letter of a name: among cities of one
+    // offset the names decide, and the row being named would move away under the typing.
+    val order = remember(cfg.cities.map { it.zone }) { WorldClock.ordered(cfg.cities, Now.wall()).map { it.zone } }
+    order.mapNotNull { zone -> cfg.cities.firstOrNull { it.zone == zone } }.forEach { city ->
         key(city.zone) {
             // "Remove" is what the button reads; a screen reader hears which city.
             val remove = stringResource(R.string.clock_remove_city, WorldClock.nameOf(city))

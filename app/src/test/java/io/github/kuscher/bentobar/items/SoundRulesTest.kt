@@ -81,6 +81,15 @@ class SoundRulesTest {
         assertEquals(true, slider.dimmed)
     }
 
+    @Test fun aVolumeLoweredToNothingWithoutAMuteKeepsNothing() {
+        // Where Android says "volume 0, not muted", there is no level underneath to come back to.
+        val kept = SoundRules.kept(0.6f, volume = 0, min = 0, max = 15, muted = false)
+        assertEquals(0f, kept, 0f)
+        val slider = SoundRules.slider(on = true, fixed = false, volume = 0, min = 0, max = 15, muted = false, kept = 0.6f)!!
+        assertEquals(0f, slider.level, 0f)
+        assertEquals(false, slider.dimmed)
+    }
+
     @Test fun aKeptLevelStaysWithinTheTrack() {
         assertEquals(1f, SoundRules.slider(on = true, fixed = false, volume = 0, min = 0, max = 15, muted = true, kept = 3f)!!.level, 0f)
         assertEquals(0f, SoundRules.slider(on = true, fixed = false, volume = 0, min = 0, max = 15, muted = true, kept = Float.NaN)!!.level, 0f)

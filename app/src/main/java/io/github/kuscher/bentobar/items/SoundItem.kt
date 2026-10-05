@@ -60,26 +60,38 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
     private var lowest: Int? = null
     private fun min(am: AudioManager): Int = lowest ?: runCatching { am.getStreamMinVolume(STREAM) }.getOrDefault(0).also { lowest = it }
 
-    /** Whether this device's volume is fixed (nothing could be set): asked once each time the item comes alive. */
+    /**
+     * Whether the volume is fixed, so that nothing could be set. An output with a fixed volume can be
+     * plugged in and taken away while the bar shows, so the answer is only good for a few seconds:
+     * [sample] drops it, and the next [state] of an item with the slider on asks again.
+     */
     private var fixedNow: Boolean? = null
+    private var fixedAt = 0L
+    private const val FIXED_GOOD_FOR_MS = 5_000L
     /** Debug builds: a fixed volume staged from adb, to see the item without its slider on a device that has none. */
     @Volatile private var fixedStaged: Boolean? = null
     private fun fixed(am: AudioManager): Boolean = fixedStaged ?: fixedNow ?: runCatching { am.isVolumeFixed }.getOrDefault(false).also { fixedNow = it }
 
     override fun onLive() { fixedNow = null }
 
+    override fun sample(now: Long) {
+        if (now - fixedAt >= FIXED_GOOD_FOR_MS) { fixedAt = now; fixedNow = null }
+    }
+
     override fun state(item: ItemConfig): ItemState {
         val am = am() ?: return ItemState(icon = Sym.VOLUME_UP)
         val max = am.getStreamMaxVolume(STREAM).coerceAtLeast(1)
         val v = am.getStreamVolume(STREAM)
-        val muted = am.isStreamMute(STREAM) || v == 0
+        val silenced = am.isStreamMute(STREAM)
+        val muted = silenced || v == 0
         val pct = SoundRules.percent(v, max)
         val on = item.optBool("slider", false)
         // Only with the option on: a slider needs the lowest volume and whether there is anything to set.
         val slider = if (!on) null else {
             val min = min(am)
-            kept = SoundRules.kept(kept, v, min, max, muted)
-            SoundRules.slider(on = true, fixed = fixed(am), volume = v, min = min, max = max, muted = muted, kept = kept)
+            // Only a muted stream hides its level. A volume of nothing that isn't muted is just that: nothing is kept, nothing filled.
+            kept = SoundRules.kept(kept, v, min, max, silenced)
+            SoundRules.slider(on = true, fixed = fixed(am), volume = v, min = min, max = max, muted = silenced, kept = kept)
         }
         return ItemState(icon = when { muted -> Sym.VOLUME_OFF; pct < 34 -> Sym.VOLUME_MUTE; pct < 67 -> Sym.VOLUME_DOWN; else -> Sym.VOLUME_UP },
             text = if (muted) Env.str(R.string.sound_muted) else "$pct%", widthKey = if (muted) null else "pct",

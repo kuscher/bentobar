@@ -11,10 +11,14 @@ import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -130,6 +134,15 @@ fun PlanTime(plan: PlanATime.Plan?, now: ZonedDateTime, time: (moment: Long) -> 
     val sliderLabel = stringResource(R.string.clock_plan_slider)
     val sliderState = if (planned != null && chosen != null) stringResource(R.string.clock_plan_state, chosen, Dates.format("EEEEMMMMd", planned, now.zone)) else word
     val focus = LocalFocusManager.current
+    val slider = remember { FocusRequester() }
+    // Whether the keyboard's focus is on one of the three buttons under the slider.
+    val below = remember { BooleanArray(1) }
+    // "Now" disables itself when it is pressed, and a day button at the last day it reaches. A button that does so while
+    // it holds the keyboard's focus would drop it, and the next Tab would start at the top of the menu: the slider takes it.
+    fun go(next: PlanATime.Plan?, stays: Boolean) {
+        if (below[0] && !stays) runCatching { slider.requestFocus() }
+        onPlan(next)
+    }
     Slider(
         value = (plan?.quarter ?: PlanATime.quarter(now.toLocalTime())).toFloat(),
         onValueChange = { onPlan(PlanATime.slid(plan, now, it.roundToInt())) },
@@ -137,7 +150,7 @@ fun PlanTime(plan: PlanATime.Plan?, now: ZonedDateTime, time: (moment: Long) -> 
         // A stop every quarter hour, so that Left, Right and a screen reader move 15 minutes; 94 tick marks would only clutter.
         steps = PlanATime.LAST_QUARTER - 1,
         track = { SliderDefaults.Track(it, drawTick = { _, _ -> }) },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().focusRequester(slider)
             // Up and Down go on to the control above or below. Material's slider would take them as Right and Left: whoever
             // walks down the menu with the arrow keys would start a plan here, and never get past it.
             .onPreviewKeyEvent { e ->
@@ -146,24 +159,24 @@ fun PlanTime(plan: PlanATime.Plan?, now: ZonedDateTime, time: (moment: Long) -> 
             }
             .semantics { contentDescription = sliderLabel; stateDescription = sliderState },
     )
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.onFocusChanged { below[0] = it.hasFocus }, verticalAlignment = Alignment.CenterVertically) {
         val date = plan?.date ?: today
         Text(when (PlanATime.day(date, today)) {
             PlanATime.Day.TODAY -> stringResource(R.string.calendar_today)
             PlanATime.Day.TOMORROW -> stringResource(R.string.clock_tomorrow)
             PlanATime.Day.YESTERDAY -> stringResource(R.string.clock_yesterday)
-            PlanATime.Day.OTHER -> Dates.format("EEEMMMd", date)
+            PlanATime.Day.OTHER -> Dates.format("EEEMMMd", date.atStartOfDay(now.zone))
         }, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f),
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         SmallIconButton(Sym.CHEVRON_LEFT, stringResource(R.string.clock_plan_previous_day), enabled = PlanATime.canStep(plan, today, -1)) {
-            onPlan(PlanATime.stepped(plan, now, -1))
+            PlanATime.stepped(plan, now, -1).let { go(it, stays = PlanATime.canStep(it, today, -1)) }
         }
         // "Now" is only there while a time is planned, but its room is kept at rest: the first step back would
         // otherwise put it under the pointer, where the next click would undo the step.
-        TextButton(onClick = { onPlan(null) }, enabled = plan != null,
+        TextButton(onClick = { go(null, stays = false) }, enabled = plan != null,
             modifier = if (plan != null) Modifier else Modifier.alpha(0f).clearAndSetSemantics { }) { Text(word, maxLines = 1) }
         SmallIconButton(Sym.CHEVRON_RIGHT, stringResource(R.string.clock_plan_next_day), enabled = PlanATime.canStep(plan, today, 1)) {
-            onPlan(PlanATime.stepped(plan, now, 1))
+            PlanATime.stepped(plan, now, 1).let { go(it, stays = PlanATime.canStep(it, today, 1)) }
         }
     }
     if (planned != null && chosen != null) {

@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Online
+import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.util.Dates
 import io.github.kuscher.bentobar.util.Now
@@ -12,6 +13,7 @@ import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.Units
 import java.time.ZoneId
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Weather: the temperature and conditions of a city the user picks, from Open-Meteo, with the next
@@ -42,6 +44,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         background = Background.wiring(type).background,
         wall = Now::wall,
         layout = { Store.config.value.items },
+        staged = { stagedFailure.getAndSet(null) },
     )
 
     /** The rules' words, from the app's resources. */
@@ -120,24 +123,34 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     @Volatile internal var stagedSearch: Ask.State<Query, Found>? = null
         private set
 
-    /** The sample staged for [item], if it is the first Weather item of the layout. */
-    internal fun staged(item: ItemConfig): WeatherSamples.Sample? =
-        stagedReading?.takeIf { Store.config.value.items.firstOrNull { i -> i.type == type }?.id == item.id }
+    /** The first Weather item that could show: the one a staged sample is for. */
+    private fun firstShown(): ItemConfig? = Store.config.value.items.firstOrNull { it.type == type && it.section != Section.OFF }
+
+    /** The sample staged for [item], if it is the first Weather item of the layout that is not turned off. */
+    internal fun staged(item: ItemConfig): WeatherSamples.Sample? = stagedReading?.takeIf { firstShown()?.id == item.id }
+
+    /**
+     * A failure the next forecast request comes back as, without being sent: with it the pace after
+     * an error ("one retry after 15 minutes") can be watched on a device, with the real loader and
+     * the request counter. Taken once, on the loader's thread.
+     */
+    private val stagedFailure = AtomicReference<Failure?>(null)
 
     // The switch went off: the loader, the search and what was kept have forgotten already; a staged sample goes too.
     override fun forgetFetched() { stagedReading = null; stagedSearch = null }
 
     /**
      * `./bento debug weather stage <sample>`, `weather search places|none|offline|error|busy`,
-     * `weather off`, and `weather` alone for where things stand. What it answers is logged, so it
-     * names no city and no coordinates.
+     * `weather fail error|slow-down|offline`, `weather off`, and `weather` alone for where things
+     * stand. What it answers is logged, so it names no city and no coordinates.
      */
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> {
             val items = Store.config.value.items.filter { it.type == type }
-            val first = items.firstOrNull()
+            val first = firstShown()
             val reading = first?.let { source.peek(it) }
-            "staged=${stagedReading?.name ?: "none"} search=${if (stagedSearch == null) "real" else "staged"} items=${items.size} places=${WeatherLoad.places(items).size}" +
+            "staged=${stagedReading?.name ?: "none"} search=${if (stagedSearch == null) "real" else "staged"} fail=${stagedFailure.get() ?: "none"}" +
+                " items=${items.size} places=${WeatherLoad.places(items).size}" +
                 " on=${Online.on(online)} setUp=${Online.setUp(online)}" + (first?.let {
                     " first=${status(it, Now.wall()).javaClass.simpleName} loading=${source.loading(it)} failure=${reading?.failure ?: "none"}" +
                         " read=${if (reading == null || reading.fetchedAt == 0L) "never" else "${(Now.wall() - reading.fetchedAt) / 1000}s ago"}"
@@ -169,9 +182,16 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
             Ticker.refresh()
             if (state == null) "search staging off (places, none, offline, error or busy stage an answer)" else "staged a search answer: ${args[1]}"
         }
+        "fail" -> {
+            val failure = when (args.getOrNull(1)) { "error" -> Failure.NO_ANSWER; "slow-down" -> Failure.SLOW_DOWN; "offline" -> Failure.OFFLINE; else -> null }
+            stagedFailure.set(failure)
+            if (failure == null) "no failure staged (error, slow-down or offline stage one)"
+            else "the next forecast request is not sent and counts as ${args[1]}"
+        }
         "off" -> {
             stagedReading = null
             stagedSearch = null
+            stagedFailure.set(null)
             Ticker.refresh()
             "staging off"
         }

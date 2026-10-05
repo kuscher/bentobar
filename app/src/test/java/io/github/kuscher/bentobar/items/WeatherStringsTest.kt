@@ -128,6 +128,15 @@ class WeatherStringsTest {
         assertEquals((deck.keys + added.keys + deckPlurals.keys).sorted(), own.sorted())
     }
 
+    @Test fun everyStringOfTheWeatherFileIsShownSomewhere() {
+        // A text nobody asks for is a leftover: each is named in the app's code, as a string or as a plural.
+        val code = java.io.File("src/main/java").walkTopDown().filter { it.isFile && it.extension == "kt" }.joinToString("\n") { it.readText() }
+        for (name in WeatherFileWords.names("src/main/res/values/strings_weather.xml")) {
+            val kind = if (name in deckPlurals) "plurals" else "string"
+            assertTrue("R.$kind.$name is in strings_weather.xml and nowhere in the code", Regex("R\\.$kind\\.$name\\b").containsMatchIn(code))
+        }
+    }
+
     @Test fun britishEnglishDiffersInOneWord() {
         val british = WeatherFileWords("values-en-rGB")
         assertEquals("Wind %1\$d kilometre per hour.", british.plurals.getValue("weather_wind_kmh_desc")["one"])

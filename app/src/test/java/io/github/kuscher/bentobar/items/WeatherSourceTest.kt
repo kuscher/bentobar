@@ -50,13 +50,13 @@ class WeatherSourceTest {
      * (which the fake leaves wide open). Here neither does, on purpose: what keeps a request from
      * going out in these tests is the item's own rule and nothing behind it.
      */
-    private fun source(): WeatherSource {
+    private fun source(staged: () -> Failure? = { null }): WeatherSource {
         val wiring = Refresher.Wiring(Executor { it.run() }, { it.run() }, { elapsed }, { changes++ }, minGapMs = 10_000, afterThrowMs = 60_000,
             mayLoad = { shown })
         return WeatherSource.make(
             refresher = { every, restore, load -> Refresher(wiring, every, restore, load).also { readings = it } },
             ask = { work -> Ask(wiring, work).also { asking = it } },
-            background = Executor { it.run() }, wall = { wall }, layout = { layout })
+            background = Executor { it.run() }, wall = { wall }, layout = { layout }, staged = staged)
     }
 
     /** What the app does when the switch goes off (`Env.wireOnline`): the loader and the search forget. */
@@ -344,6 +344,31 @@ class WeatherSourceTest {
         assertEquals(3, net.asked.size)
     }
 
+    @Test fun openingTheMenuWithoutANetworkSaysSoAtOnceAndSendsNothing() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        // Airplane mode, two minutes after a good reading: the menu's note should not go on saying "updated" as if all were well.
+        pass(2 * min)
+        Http.connected = { false }
+        s.opened(item)
+        val notLive = s.status(item, wall) as Status.Live
+        assertEquals(Failure.OFFLINE, notLive.reading.failure)
+        assertEquals(18.1, notLive.reading.current!!.temp!!, 1e-9) // the bar keeps its reading
+        assertEquals(1, net.asked.size)
+        assertEquals(1, Http.sent(Host.OPEN_METEO))
+        s.opened(item); s.opened(item)
+        assertEquals(1, net.asked.size)
+        // Back online, the next check brings a live reading again.
+        Http.connected = { true }
+        s.watch(item, 1 * min)
+        assertEquals(2, net.asked.size)
+        assertNull((s.status(item, wall) as Status.Live).reading.failure)
+    }
+
     @Test fun refreshIsOnceAMinuteAtMost() = FakeHttp.use { net ->
         net.forecasts()
         val s = source()
@@ -466,6 +491,48 @@ class WeatherSourceTest {
         // That one went out: now the minute holds.
         assertFalse(s.mayAgain(item))
         assertFalse(s.again(item))
+    }
+
+    // ---- a tester's staged failure ------------------------------------------------------------------
+
+    @Test fun aStagedFailureStandsInForTheNextAnswerIsNotSentAndIsRetriedLikeARealOne() = FakeHttp.use { net ->
+        net.forecasts()
+        // `./bento debug weather fail error`: the next forecast request is not sent and counts as "no answer".
+        var next: Failure? = Failure.NO_ANSWER
+        val s = source(staged = { next.also { next = null } })
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        assertEquals(Failure.NO_ANSWER, s.reading(item)!!.failure)
+        assertEquals(Status.Missing(Failure.NO_ANSWER), s.status(item, wall))
+        sentNothing(net)
+        // One retry after fifteen minutes, and that one is real.
+        s.watch(item, 14 * min + 50 * sec)
+        sentNothing(net)
+        s.watch(item, 10 * sec)
+        assertEquals(1, net.asked.size)
+        assertTrue(s.status(item, wall) is Status.Live)
+    }
+
+    @Test fun aStagedSlowDownWaitsAnHourAndAStagedOfflineAMinute() = FakeHttp.use { net ->
+        net.forecasts()
+        var next: Failure? = Failure.SLOW_DOWN
+        val s = source(staged = { next.also { next = null } })
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        s.watch(item, 59 * min + 50 * sec)
+        sentNothing(net)
+        s.watch(item, 10 * sec)
+        assertEquals(1, net.asked.size)
+        // Not live, with a reading: the numbers stay and the next check comes within a minute.
+        next = Failure.OFFLINE
+        assertTrue(s.again(item.also { pass(1 * min) }))
+        assertEquals(Failure.OFFLINE, (s.status(item, wall) as Status.Live).reading.failure)
+        assertEquals(1, net.asked.size)
+        s.watch(item, 1 * min)
+        assertEquals(2, net.asked.size)
     }
 
     // ---- kept, and deleted ------------------------------------------------------------------------

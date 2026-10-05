@@ -84,8 +84,16 @@ object WeatherLoad {
             // A status, a timeout, too much, or a reply that is no forecast (a public network's sign-in page).
             else -> Failure.NO_ANSWER
         }
+        return failed(place, last, failure, went, wait)
+    }
+
+    /**
+     * What a failed try leaves: the numbers that were there for [place] (never another place's), with
+     * what went wrong. [went]: the request did go out, so it counts as one more miss in a row.
+     */
+    fun failed(place: Place, last: Reading?, failure: Failure, went: Boolean, waitSec: Long = 0): Reading {
         val known = last?.takeIf { it.place == place.key } ?: Reading(place.key)
-        return known.copy(failure = failure, misses = known.misses + if (went) 1 else 0, retryAfterSec = wait)
+        return known.copy(failure = failure, misses = known.misses + if (went) 1 else 0, retryAfterSec = waitSec)
     }
 
     /**
@@ -177,12 +185,19 @@ class WeatherSource(
 
     /**
      * The item's menu opened: a good reading older than ten minutes is asked again. One whose last
-     * try failed keeps to its own pace, as its words say ("tries again in 15 minutes"). Main thread.
+     * try failed keeps to its own pace, as its words say ("tries again in 15 minutes"). And without
+     * a network a good reading of any age is tried at once: nothing goes out for that, and the menu
+     * then says "no connection" beside the reading's time instead of passing it off as live.
+     * Main thread.
      */
     fun opened(item: ItemConfig) {
         val place = asked(item) ?: return
         val reading = readings.peek(place)
-        if (reading == null) readings.want(place) else if (reading.failure == null) readings.refresh(place, floorMs = WeatherRules.MENU_MS)
+        when {
+            reading == null -> readings.want(place)
+            reading.failure != null -> {}
+            else -> readings.refresh(place, floorMs = if (Http.connected()) WeatherRules.MENU_MS else 0)
+        }
     }
 
     /** How soon after the last try Refresh may ask again: a minute, or at once when that try found no network and so cost nothing. */
@@ -243,6 +258,8 @@ class WeatherSource(
          * The source with its loader and its search wired to [WeatherLoad]: the app and the tests make
          * it here alike and differ only in where work runs and what time it is. [wall]: the wall
          * clock; [layout]: the layout's items right now (asked from the background thread).
+         * [staged]: a debug build's test hook; when it names a failure, the load that asked is not
+         * sent and comes back as that failure, so the pace after an error can be watched on a device.
          */
         fun make(
             refresher: (every: (Place, Reading) -> Long?, restore: (Place) -> Refresher.Restored<Reading>?, load: (Place, Reading?) -> Reading?) -> Refresher<Place, Reading>,
@@ -250,9 +267,14 @@ class WeatherSource(
             background: Executor,
             wall: () -> Long,
             layout: () -> List<ItemConfig>,
+            staged: () -> Failure? = { null },
         ): WeatherSource = WeatherSource(
             refresher({ _, reading -> WeatherRules.every(reading) }, { place -> WeatherLoad.kept(place, wall()) },
-                { place, last -> WeatherLoad.load(place, last, wall()) { WeatherLoad.places(layout()) } }),
+                { place, last ->
+                    // "No connection" is what nothing-went-out looks like; the other two stand for a try that did.
+                    staged()?.let { WeatherLoad.failed(place, last, it, went = it != Failure.OFFLINE) }
+                        ?: WeatherLoad.load(place, last, wall()) { WeatherLoad.places(layout()) }
+                }),
             ask { query -> WeatherLoad.search(query.text) },
             background,
         )

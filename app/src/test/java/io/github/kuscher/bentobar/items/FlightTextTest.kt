@@ -484,6 +484,9 @@ class FlightTextTest {
         assertEquals("", bare.to.words)
         assertEquals("From SFO, 2:40 PM.", bare.from.spoken)
         assertEquals("To Frankfurt, FRA, Sat 10:25 AM.", bare.to.spoken)
+        // An end nobody names a time for is its city and its letters; with no city either, the letters once.
+        assertEquals("To Frankfurt, FRA.", card(lh455(to = fra(planned = null, terminal = null)), morning).to.spoken)
+        assertEquals("FRA", card(lh455(to = fra(planned = null, terminal = null).copy(city = "")), morning).to.spoken)
     }
 
     @Test fun aNumberSoldByAnotherAirlineSaysWhoFliesIt() {

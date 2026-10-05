@@ -287,6 +287,8 @@ object FlightText {
             e.belt?.let { v.say(Word.FLIGHT_BELT, it) }, e.aircraft)
         val rest = (listOfNotNull(time.takeIf { it.isNotEmpty() }?.let { if (e.struck) v.say(Word.FLIGHT_TIME_WAS, it) else it }) + words).joinToString(", ")
         val spoken = when {
+            // Nothing is known of it but its letters: those, once.
+            city.isEmpty() && rest.isEmpty() -> e.code
             city.isEmpty() || rest.isEmpty() -> v.say(if (from) Word.FLIGHT_ROUTE_FROM_CODE else Word.FLIGHT_ROUTE_TO_CODE, city.ifEmpty { e.code }, rest.ifEmpty { e.code })
             else -> v.say(if (from) Word.FLIGHT_ROUTE_FROM else Word.FLIGHT_ROUTE_TO, city, e.code, rest)
         }

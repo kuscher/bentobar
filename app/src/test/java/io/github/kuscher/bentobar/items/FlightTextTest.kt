@@ -677,6 +677,19 @@ class FlightTextTest {
         assertEquals("Looking up LH 455…", us.say(FlightText.Word.FLIGHT_LOOKING_UP, "LH 455"))
     }
 
+    @Test fun theAboutTextSaysWhenTheServiceIsAskedAsTheRulesHaveIt() {
+        val about = FlightVoices.string("about_privacy_flight")
+        // After a landing it slept through, the item asks once more (FlightRulesTest.asleepThroughTheLandingItIsAskedAboutOnceOnWaking),
+        // and a new key asks about a flight that waited for one (aNewKeyAsksAtOnceOnlyAboutAFlightThatWaitedForOne): "never" was not true.
+        assertFalse(about, about.contains("never asks"))
+        assertTrue(about, about.contains(" Once it knows the flight has landed it stops asking; after sleeping through a landing it asks once more. "))
+        assertTrue(about, about.contains("when you track a flight, when you press Refresh or save a new key, and while it follows the flight, "))
+        // What it says of the pace is the rules' own numbers.
+        assertTrue(about, about.contains("about every 3 hours until 3 hours before departure, then every 30 minutes or sooner until it lands; a failed try is repeated sooner."))
+        assertEquals(java.time.Duration.ofHours(3), FlightRules.FAR)
+        assertEquals(java.time.Duration.ofMinutes(30), FlightRules.NEAR)
+    }
+
     @Test fun charactersAreCountedAsAReaderSeesThem() {
         assertEquals(20, FlightText.length("LH 455 · Fri 2:40 PM"))
         assertEquals(1, FlightText.length("e\u0301"))                             // a letter and its accent

@@ -47,6 +47,12 @@ class WeatherFileWords(folder: String = "values") : WeatherWords {
     fun text(name: String, vararg args: Any): String = String.format(Locale.US, strings.getValue(name), *args)
 
     companion object {
+        /** The names of the strings and plurals one file defines, in its order. */
+        fun names(path: String): List<String> {
+            val nodes = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(File(path)).documentElement.childNodes
+            return (0 until nodes.length).mapNotNull { nodes.item(it) as? Element }.map { it.getAttribute("name") }
+        }
+
         /** What Android makes of a resource's text: `\'` is an apostrophe, `\u00A0` a character, `\n` a new line. */
         fun unescape(raw: String): String {
             val out = StringBuilder()

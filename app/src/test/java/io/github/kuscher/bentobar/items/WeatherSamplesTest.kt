@@ -1,0 +1,152 @@
+package io.github.kuscher.bentobar.items
+
+import io.github.kuscher.bentobar.util.Sym
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import java.time.ZoneId
+import java.time.ZonedDateTime
+
+/**
+ * The made-up readings a tester stages on a device (`./bento debug weather stage rain-soon`): each
+ * must show the row of the product's table it stands for, as that row is written.
+ */
+class WeatherSamplesTest {
+    private val w = WeatherFileWords()
+    private val sf = ZoneId.of("America/Los_Angeles")
+    private val t = WeatherFileWords.times(sf)
+    private val hour = 3_600_000L
+    /** Monday 5 October 2026, 1:30 PM in San Francisco. */
+    private val now = ZonedDateTime.of(2026, 10, 5, 13, 30, 0, 0, sf).toInstant().toEpochMilli()
+    private val us = Look("San Francisco", null, WeatherRules.SHOW_TEMP, fahrenheit = true, miles = true, rainHours = 2)
+
+    private fun staged(name: String, at: Long = now) = WeatherSamples.of(name, at, sf)!!
+    private fun status(name: String, at: Long = now, look: Long = at) = WeatherRules.status(true, true, true, staged(name, at).reading, look)
+    private fun bar(name: String, at: Long = now, seen: Long = at, look: Look = us) = WeatherRules.bar(status(name, at, seen), look, seen, w, t)
+
+    @Test fun theNamesATesterUsesAllExist() {
+        for (name in listOf("clear", "rain-soon", "raining", "storm", "snow", "old", "error", "slow-down", "offline", "loading"))
+            assertNotNull(name, WeatherSamples.of(name, now, sf))
+        for (name in WeatherSamples.names) assertEquals(name, WeatherSamples.of(name, now, sf)!!.name)
+        assertNull(WeatherSamples.of("sunny", now, sf))
+        assertNull(WeatherSamples.of("", now, sf))
+    }
+
+    @Test fun clearIsTheTemperatureAlone() {
+        val b = bar("clear")
+        assertEquals("72°", b.text)
+        assertEquals(Sym.CLEAR_DAY, b.icon)
+        assertEquals(Tone.NORMAL, b.tone)
+        assertFalse(b.active)
+        assertEquals("San Francisco: 72 degrees. Clear.", b.desc)
+        // Staged after dark it is the night's glyph.
+        assertEquals(Sym.CLEAR_NIGHT, bar("clear", at = now + 8 * hour).icon)
+    }
+
+    @Test fun rainSoonIsAnEightyPercentChanceInNinetyMinutes() {
+        val b = bar("rain-soon")
+        assertEquals("72° · Rain 3 PM", b.text)
+        assertEquals(Tone.ACCENT, b.tone)
+        assertTrue(b.active)
+        assertEquals(Sym.RAINY, b.icon)
+        val wet = staged("rain-soon").reading!!.hours.single { (it.chance ?: 0) >= 50 }
+        assertEquals(80, wet.chance)
+        assertEquals(now + 90 * 60_000L, wet.at * 1000)
+        // Whenever it is staged, the hour lies within the rule's two hours and beyond one.
+        for (minute in listOf(0, 1, 29, 59)) {
+            val at = ZonedDateTime.of(2026, 10, 5, 9, minute, 0, 0, sf).toInstant().toEpochMilli()
+            assertEquals("staged at 9:$minute", "72° · Rain 11 AM", bar("rain-soon", at).text)
+            assertFalse(bar("rain-soon", at, look = Look("San Francisco", null, WeatherRules.SHOW_TEMP, true, true, rainHours = 1)).active)
+        }
+    }
+
+    @Test fun rainLaterLeavesTheItemHidden() {
+        val b = bar("rain-later")
+        assertEquals("72°", b.text)
+        assertFalse(b.active)
+        assertEquals(Tone.NORMAL, b.tone)
+        val wet = staged("rain-later").reading!!.hours.single { (it.chance ?: 0) >= 50 }
+        assertTrue(wet.at * 1000 - now >= 4 * hour)
+    }
+
+    @Test fun rainingStormAndSnowSayWhatFalls() {
+        assertEquals("72° · Rain", bar("raining").text)
+        assertEquals(Tone.ACCENT, bar("raining").tone)
+        assertTrue(bar("raining").active)
+        assertEquals("72° · Storm", bar("storm").text)
+        assertEquals(Tone.WARN, bar("storm").tone)
+        assertEquals(Sym.THUNDERSTORM, bar("storm").icon)
+        assertEquals("−4° · Snow", bar("snow").text)
+        assertEquals(Tone.ACCENT, bar("snow").tone)
+        assertEquals(Sym.WEATHER_SNOWY, bar("snow").icon)
+        // On the snow day the menu's chance says "Snow".
+        assertTrue(WeatherRules.menu(staged("snow").reading!!, us, now, w, t).rainWind!!.startsWith("Snow "))
+    }
+
+    @Test fun oldIsNoReadingForThreeHours() {
+        val b = bar("old")
+        assertEquals(Sym.CLOUD_OFF, b.icon)
+        assertFalse(b.filled)
+        assertNull(b.text)
+        assertEquals(Status.Missing(Failure.OFFLINE), status("old"))
+    }
+
+    @Test fun errorAndSlowDownAreTheTwoNoAnswerStates() {
+        assertEquals(Status.Missing(Failure.NO_ANSWER), status("error"))
+        assertEquals(Status.Missing(Failure.SLOW_DOWN), status("slow-down"))
+        for (name in listOf("error", "slow-down")) {
+            assertEquals(Sym.CLOUD_OFF, bar(name).icon)
+            assertNull(bar(name).text) // a state with words, never "!"
+        }
+        assertEquals(Status.Missing(Failure.OFFLINE), status("offline-new"))
+    }
+
+    @Test fun offlineKeepsItsReadingAndSaysSoInTheNote() {
+        val s = status("offline") as Status.Live
+        assertEquals("72°", bar("offline").text)
+        assertEquals("Weather data by Open-Meteo.com · no connection, updated 1:30 PM", WeatherRules.menu(s.reading, us, now, w, t).note)
+        // With the clock staged three hours on, the number goes.
+        assertEquals(Sym.CLOUD_OFF, bar("offline", seen = now + 3 * hour).icon)
+        assertNull(bar("offline", seen = now + 3 * hour).text)
+        assertEquals("72°", bar("offline", seen = now + 3 * hour - 60_000).text)
+        val noAnswer = status("no-answer") as Status.Live
+        assertEquals("Weather data by Open-Meteo.com · no answer, updated 1:30 PM", WeatherRules.menu(noAnswer.reading, us, now, w, t).note)
+    }
+
+    @Test fun loadingIsTheOutlinedCloud() {
+        assertNull(staged("loading").reading)
+        assertEquals(Status.Loading, status("loading"))
+        assertEquals(Sym.CLOUD, bar("loading").icon)
+        assertFalse(bar("loading").filled)
+    }
+
+    @Test fun theStagedMenuIsTheDesignsPicture() {
+        // Staged at 2:45 PM, the menu reads as the design draws it.
+        val at = ZonedDateTime.of(2026, 10, 5, 14, 45, 0, 0, sf).toInstant().toEpochMilli()
+        val m = WeatherRules.menu(staged("clear", at).reading!!, us, at, w, t)
+        assertEquals("72°", m.temp)
+        assertEquals("Clear · feels like 68°", m.subtitle)
+        assertEquals("High 78° · Low 61°", m.highLow)
+        assertEquals(listOf("3 PM", "4 PM", "5 PM", "6 PM", "7 PM", "8 PM"), m.hours.map { it.time })
+        assertEquals(listOf("72°", "71°", "69°", "66°", "64°", "62°"), m.hours.map { it.temp })
+        assertEquals(listOf("Tue", "Wed", "Thu", "Fri", "Sat"), m.days.map { it.day })
+        assertEquals(listOf("78°", "75°", "80°", "82°", "74°"), m.days.map { it.high })
+        assertEquals(listOf("61°", "59°", "62°", "63°", "60°"), m.days.map { it.low })
+        assertEquals(listOf("60%", null, null, null, "20%"), m.days.map { it.chance })
+        assertEquals("7:08 AM", m.sunrise)
+        assertEquals("6:42 PM", m.sunset)
+        assertEquals("Weather data by Open-Meteo.com · updated 2:45 PM", m.note)
+    }
+
+    @Test fun aSampleNamesNoRealPlaceAndIsInTheZoneItIsStagedIn() {
+        for (name in WeatherSamples.names) staged(name).reading?.let { r ->
+            assertEquals(WeatherSamples.PLACE, r.place)
+            if (r.current != null) assertEquals(sf, WeatherRules.zone(r))
+        }
+        val tokyo = ZoneId.of("Asia/Tokyo")
+        assertEquals(tokyo, WeatherRules.zone(WeatherSamples.of("clear", now, tokyo)!!.reading!!))
+    }
+}

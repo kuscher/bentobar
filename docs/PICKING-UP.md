@@ -19,9 +19,9 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
-## Unreleased (2026-10-04): the consent screen Google Play asked for, and a review pass
-On the branch `review-pass` (not merged, not released; the version is still 0.7, code 8). CHANGELOG
-"Unreleased" has the user-facing list. Tested as a debug build on a Lenovo Googlebook 15: the consent
+## 0.8 (2026-10-05): the consent screen Google Play asked for, and a review pass
+Merged as pull request #16 and released as 0.8 (version code 9); the next release needs a new version.
+CHANGELOG has the user-facing list. Tested as a debug build on a Lenovo Googlebook 15: the consent
 screen (first opening, No thanks, Turn on, Agree), colors following a maximized window both ways,
 the text weight against the system clock, menus, pages, and the service switched off and on twice.
 - **Google Play's review** found the accessibility disclosure non-compliant: Setup explained the
@@ -36,10 +36,9 @@ the text weight against the system clock, menus, pages, and the service switched
   meeting and catches up on wake; `Store.import` keeps this install's switches (`keepingLocal`); one
   rule each for "behind ‹" and "not drawn" (`behindChevron`, `notDrawn`); a drag ends when the strip
   hides; the 2 s check compares the spacer with its own last bounds.
-- **Before a release:** bump the version, write `docs/release-notes/<version>.md` and Play's text,
-  record a new video for Play's Accessibility declaration that shows the consent screen (first
-  opening › Agree › Accessibility settings › on › items in the bar), and send the store description
-  in `store-submission/listing` with it.
+- **For Google Play:** the video in the Accessibility declaration has to show the consent screen
+  (first opening › Agree › Accessibility settings › on › items in the bar); the store description in
+  `store-submission/listing` goes with the release.
 - Not checked on a device: the calendar changes (no calendar access on the test install), the
   timer's early alarm, the look on a light wallpaper (dark status bar text), an arm64 Googlebook.
 - Still open: the window's caption bar keeps the system's color (other apps by the same author paint

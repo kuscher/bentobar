@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8 (2026-10-05)
 
 - **BentoBar asks before it uses its accessibility service.** The first time you open it, and
   whenever you press Turn on in Setup, BentoBar says what its accessibility service does (draws your

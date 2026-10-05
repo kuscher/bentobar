@@ -108,10 +108,11 @@ status bar may work, but haven't been tested.
    install apps, then tap **Install**. Google Play Protect may then say *"App blocked to protect
    your device"* because it hasn't seen an app from this developer before: tap **More details** ›
    **Install anyway**.
-3. Open **BentoBar** and go to **Setup** › **Turn on**. Android opens Accessibility settings.
+3. Open **BentoBar**. It says what its accessibility service does and asks whether you agree:
+   **Agree** opens Android's Accessibility settings. (Later, the same is under **Setup** › **Turn on**.)
 4. Because BentoBar came from a download, Android guards this switch the first time:
    1. Open **BentoBar** and tap the switch. Android says *"Restricted setting"*. Tap **OK**.
-   2. Back in BentoBar, tap **App info**, then **⋮** (top right) › **Allow restricted
+   2. Back in BentoBar, open **Setup** and tap **App info**, then **⋮** (top right) › **Allow restricted
       settings**, and confirm with your PIN.
    3. Return to Accessibility › **BentoBar** and turn it on.
 5. Optional: in **Setup**, allow notifications (timer alerts, the Live Update chip) and calendar

@@ -332,6 +332,33 @@ class AirLabsTest {
         assertEquals(listOf("flight"), fresh.asked)
     }
 
+    @Test fun whenTheNextFlightCouldNotBeAskedForThatIsSaidNotTheOneThatLanded() {
+        val jl101 = FlightNumber("JL", 101)
+        val landed = reply("flight-JL101-landed-nine-hours-ago")
+        val now = at("2026-10-02T07:28:00Z")
+        // The one-flight question was answered; the two for the next flight found no connection.
+        val cut = Service(mapOf("flight" to landed))
+        val a = lookup(jl101, now, get = cut::get)
+        assertNull(a.flight)
+        assertEquals(Failure.OFFLINE, a.failure)
+        assertEquals(listOf("flight", "schedules", "routes"), cut.asked)
+        // One of the two is enough: told to slow down for the coming hours, or a timetable that timed out.
+        val slow = lookup(jl101, now) { r -> when (r.path) { AirLabs.FLIGHT -> Reply.Ok(landed); AirLabs.SCHEDULES -> Reply.Failed(Why.STATUS, 429); else -> Reply.Ok(none) } }
+        assertNull(slow.flight)
+        assertEquals(Failure.NO_ANSWER, slow.failure)
+        val late = lookup(jl101, now) { r -> when (r.path) { AirLabs.FLIGHT -> Reply.Ok(landed); AirLabs.SCHEDULES -> Reply.Ok(none); else -> Reply.Failed(Why.TIMEOUT) } }
+        assertNull(late.flight)
+        assertEquals(Failure.NO_ANSWER, late.failure)
+        // The timetable has the next one though the coming hours could not be asked: that one, and nothing went wrong.
+        val far = lookup(jl101, now) { r -> when (r.path) { AirLabs.FLIGHT -> Reply.Ok(landed); AirLabs.SCHEDULES -> Reply.Failed(Why.TIMEOUT); else -> Reply.Ok(reply("routes-LH455")) } }
+        assertTrue(far.flight!!.timetable)
+        assertNull(far.failure)
+        // "Not found" is an answer: nobody knows of a next one, so it is the one that landed, as it was.
+        val unknown = lookup(jl101, now) { r -> Reply.Ok(if (r.path == AirLabs.FLIGHT) landed else reply("error-not-found")) }
+        assertEquals(FlightState.LANDED, unknown.flight!!.state)
+        assertNull(unknown.failure)
+    }
+
     @Test fun aDayChosenWithTheNumber() {
         val now = at("2026-10-02T07:29:00Z")
         val both = mapOf("flight" to reply("flight-LH455-in-the-air"), "routes" to reply("routes-LH455"))

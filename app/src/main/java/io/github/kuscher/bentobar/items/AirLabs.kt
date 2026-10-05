@@ -158,11 +158,15 @@ object AirLabs {
                 return on(lines, f, day)?.let { Answer(dated(it, now), null, left) } ?: Answer(null, Failure.NOT_THAT_DAY, left)
             }
             if (!FlightRules.over(f, now)) return Answer(f, null, left)
-            val soon = ask(SCHEDULES) { schedules(it) }.value.orEmpty()
-            FlightRules.next(soon, now)?.let { return Answer(named(it, f), null, left) }
-            val lines = ask(ROUTES) { routes(it) }.value.orEmpty()
+            val soon = ask(SCHEDULES) { schedules(it) }
+            FlightRules.next(soon.value.orEmpty(), now)?.let { return Answer(named(it, f), null, left) }
+            val lines = ask(ROUTES) { routes(it) }
+            upcoming(lines.value.orEmpty(), f, now)?.let { return Answer(dated(it, now), null, left) }
+            // No next flight, and one of the two was not to be had (no connection, told to slow down): that is what went wrong.
+            // To follow the one that landed hours ago instead would be to say "Landed" and never ask again.
+            listOf(soon.failure, lines.failure).firstOrNull { it != null && it != Failure.NOT_FOUND }?.let { return Answer(null, it, left) }
             // Nothing ahead that anyone knows of: the one that was, as it was.
-            return Answer(upcoming(lines, f, now)?.let { dated(it, now) } ?: f, null, left)
+            return Answer(f, null, left)
         }
         return found().takeIf { !unsent }
     }

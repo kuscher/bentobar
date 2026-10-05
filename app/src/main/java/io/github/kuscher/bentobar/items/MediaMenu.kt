@@ -289,11 +289,14 @@ internal fun MediaOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
     // Observed, not asked while drawing: Android's switch is flipped in a window of its own while this one stays up.
     val setup by Setup.state.collectAsState()
     val resources = LocalResources.current
-    ChoiceRow(stringResource(R.string.option_show), listOf(MediaText.Show.TITLE.id to stringResource(R.string.media_show_title),
-        MediaText.Show.BOTH.id to stringResource(R.string.media_show_both), MediaText.Show.ARTIST.id to stringResource(R.string.media_show_artist)),
-        MediaItem.show(item).id, help = if (setup.mediaAccess) null else stringResource(R.string.media_show_needs_access)) { set(item.with("show", it)) }
-    SliderRow(stringResource(R.string.event_longest_title), MediaItem.chars(item), MediaText.CHARS,
-        { resources.getQuantityString(R.plurals.event_characters, it, it) }) { set(item.with("maxChars", it.toString())) }
-    ChoiceRow(stringResource(R.string.media_click), listOf("menu" to stringResource(R.string.media_click_menu),
-        "toggle" to stringResource(R.string.media_click_toggle)), if (MediaItem.toggles(item)) "toggle" else "menu") { set(item.with("click", it)) }
+    ChoiceRow(stringResource(R.string.option_show), listOf(MediaText.Show.TITLE to stringResource(R.string.media_show_title),
+        MediaText.Show.BOTH to stringResource(R.string.media_show_both), MediaText.Show.ARTIST to stringResource(R.string.media_show_artist)),
+        MediaText.show(item.options), help = if (setup.mediaAccess) null else stringResource(R.string.media_show_needs_access)) {
+        set(item.with(MediaText.OPTION_SHOW, it.id))
+    }
+    SliderRow(stringResource(R.string.event_longest_title), MediaText.chars(item.options), MediaText.CHARS,
+        { resources.getQuantityString(R.plurals.event_characters, it, it) }) { set(item.with(MediaText.OPTION_CHARS, it.toString())) }
+    ChoiceRow(stringResource(R.string.media_click), listOf(MediaText.CLICK_MENU to stringResource(R.string.media_click_menu),
+        MediaText.CLICK_TOGGLE to stringResource(R.string.media_click_toggle)),
+        if (MediaText.toggles(item.options)) MediaText.CLICK_TOGGLE else MediaText.CLICK_MENU) { set(item.with(MediaText.OPTION_CLICK, it)) }
 }

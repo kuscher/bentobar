@@ -27,7 +27,7 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
     override val menuWidthDp = 320
 
     /** How long the item stays after playback pauses, in minutes: a pause for a call doesn't lose it. */
-    private val linger = Threshold("lingerMin", MediaText.DEFAULT_LINGER, MediaText.LINGER) { Env.plural(R.plurals.common_minutes_short, it, it) }
+    private val linger = Threshold(MediaText.OPTION_LINGER, MediaText.DEFAULT_LINGER, MediaText.LINGER) { Env.plural(R.plurals.common_minutes_short, it, it) }
     override val trigger = Trigger(R.string.trigger_media, R.string.trigger_media_short, linger)
 
     /**
@@ -77,15 +77,6 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
         })
     }
 
-    // ---- the options, as the layout stores them
-
-    /** "Show": title, title and artist, or artist. */
-    internal fun show(item: ItemConfig) = MediaText.Show.of(item.options["show"])
-    /** "Longest title", in characters. */
-    internal fun chars(item: ItemConfig) = item.optInt("maxChars", MediaText.DEFAULT_CHARS).coerceIn(MediaText.CHARS)
-    /** "A click: Plays or pauses", instead of opening the menu. */
-    internal fun toggles(item: ItemConfig) = item.opt("click", "menu") == "toggle"
-
     // ---- what the item shows
 
     /** Playing, paused within the rule's minutes, or nothing. */
@@ -102,8 +93,8 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
         val phase = phase(item, playing)
         // Paused, the bar shows what it showed while playing: the words of the app that was playing, and no other's.
         val main = playing.main?.takeIf { MediaText.follows(phase, it.pkg, playedBy) }
-        val chars = chars(item)
-        val bar = MediaText.bar(phase, main?.let(::track), show(item), chars, words)
+        val chars = MediaText.chars(item.options)
+        val bar = MediaText.bar(phase, main?.let(::track), MediaText.show(item.options), chars, words)
         return ItemState(
             // Each state has a glyph of its own, always filled: at this size the note looks the same outlined.
             icon = when (bar.glyph) { MediaText.Glyph.NOTE -> Sym.MUSIC_NOTE; MediaText.Glyph.PAUSE -> Sym.PAUSE; MediaText.Glyph.OFF -> Sym.MUSIC_OFF },
@@ -114,7 +105,7 @@ object MediaItem : ItemType("media", R.string.item_media_title, Sym.MUSIC_NOTE, 
 
     /** With "A click: Plays or pauses" the item acts on a click, as Keep awake does; right-click › Open still reaches the menu. */
     override fun onClick(item: ItemConfig): Boolean {
-        if (!toggles(item)) return false
+        if (!MediaText.toggles(item.options)) return false
         NowPlaying.playPause()
         return true
     }

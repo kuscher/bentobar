@@ -315,6 +315,29 @@ class MediaTextTest {
         assertEquals(listOf("title", "both", "artist"), Show.entries.map { it.id })
     }
 
+    @Test fun theOptionsAreReadFromTheLayoutByTheirFixedNames() {
+        // Saved layouts and the test hooks (`set media show=both`) use these names.
+        assertEquals(listOf("show", "maxChars", "click", "lingerMin"),
+            listOf(MediaText.OPTION_SHOW, MediaText.OPTION_CHARS, MediaText.OPTION_CLICK, MediaText.OPTION_LINGER))
+        val set = mapOf("show" to "both", "maxChars" to "8", "click" to "toggle")
+        assertEquals(Show.BOTH, MediaText.show(set))
+        assertEquals(8, MediaText.chars(set))
+        assertTrue(MediaText.toggles(set))
+        // Nothing set: the title, 20 characters, a click opens the menu; the rule waits 2 minutes, 1 to 10.
+        assertEquals(Show.TITLE, MediaText.show(emptyMap()))
+        assertEquals(20, MediaText.chars(emptyMap()))
+        assertFalse(MediaText.toggles(emptyMap()))
+        assertEquals(8..40, MediaText.CHARS)
+        assertEquals(2, MediaText.DEFAULT_LINGER)
+        assertEquals(1..10, MediaText.LINGER)
+        // A layout that was pasted in can say anything.
+        assertEquals(40, MediaText.chars(mapOf("maxChars" to "500")))
+        assertEquals(8, MediaText.chars(mapOf("maxChars" to "-1")))
+        assertEquals(20, MediaText.chars(mapOf("maxChars" to "many")))
+        assertFalse(MediaText.toggles(mapOf("click" to "menu")))
+        assertFalse(MediaText.toggles(mapOf("click" to "TOGGLE")))
+    }
+
     // ---- the bar, state by state
 
     private fun bar(phase: Phase, track: Track?, show: Show = Show.TITLE, max: Int = 20) = MediaText.bar(phase, track, show, max, words)

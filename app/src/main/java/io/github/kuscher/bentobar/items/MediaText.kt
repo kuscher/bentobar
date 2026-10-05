@@ -24,6 +24,14 @@ object MediaText {
     private const val ELLIPSIS = "…"
     private const val JOINER = 0x200D
 
+    /** The options' names in a layout, and the two things a click can do. Saved layouts and the test hooks use them: never rename one. */
+    const val OPTION_SHOW = "show"
+    const val OPTION_CHARS = "maxChars"
+    const val OPTION_CLICK = "click"
+    const val OPTION_LINGER = "lingerMin"
+    const val CLICK_MENU = "menu"
+    const val CLICK_TOGGLE = "toggle"
+
     /** The Show option: what of a track the bar names. [id] is what the layout stores. */
     enum class Show(val id: String) {
         TITLE("title"), BOTH("both"), ARTIST("artist");
@@ -33,6 +41,16 @@ object MediaText {
             fun of(id: String?): Show = entries.firstOrNull { it.id == id } ?: TITLE
         }
     }
+
+    // ---- an item's options, read from its layout (which may have been pasted in, and can say anything)
+
+    fun show(options: Map<String, String>): Show = Show.of(options[OPTION_SHOW])
+
+    /** "Longest title", in characters, within the slider's range. */
+    fun chars(options: Map<String, String>): Int = (options[OPTION_CHARS]?.toIntOrNull() ?: DEFAULT_CHARS).coerceIn(CHARS)
+
+    /** "A click: Plays or pauses", instead of opening the menu. */
+    fun toggles(options: Map<String, String>): Boolean = options[OPTION_CLICK] == CLICK_TOGGLE
 
     /** The words the rules use. The names are the copy deck's without their `media_` (two are older, shared words). */
     enum class Word {

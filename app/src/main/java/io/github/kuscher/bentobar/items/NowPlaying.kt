@@ -284,12 +284,16 @@ object NowPlaying {
             }
             p.callback = cb
             runCatching { c.registerCallback(cb, main) }
+            // Whether it plays is asked here and now (a short question to Android itself), so the first value published
+            // holds every player's state. Asked in the background, each answer came in a post of its own: for some frames
+            // after the bar came back nothing was "playing", and of two playing players the one answered last counted as
+            // the one that started last. Now they are all first seen at one moment, and the system's order stands.
+            p.playback = runCatching { c.playbackState }.getOrNull()
             players += p
-            // What it plays right now is asked off the main thread (metadata can carry a large picture).
+            // What it plays is asked off the main thread: metadata can carry a large picture.
             work.execute {
-                val playback = runCatching { c.playbackState }.getOrNull()
                 val metadata = runCatching { c.metadata }.getOrNull()
-                main.post { if (p in players) { if (p.playback == null) p.playback = playback; if (p.metadata == null) p.metadata = metadata; changed() } }
+                main.post { if (p in players) { if (p.metadata == null) p.metadata = metadata; changed() } }
             }
         }
         // Keep the system's order (the most important player first) as the tie-break.

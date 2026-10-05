@@ -33,6 +33,23 @@ class NowPlayingRulesTest {
         assertEquals(emptyList<String>(), NowPlayingRules.order(emptyList()))
     }
 
+    @Test fun playersFoundPlayingAtOneMomentKeepTheSystemsOrder() {
+        // When the bar comes back, every player that is already playing is first seen at the same moment: none of them
+        // "started last", so the order the system gave them stands. (Which is why the source asks all of them for their
+        // state before it publishes anything: seen a few milliseconds apart, the last one asked would win.)
+        val together = NowPlayingRules.order(listOf(
+            Standing("music", playing = true, startedAt = 5_000, lastPlayedAt = 5_000),
+            Standing("browser", playing = true, startedAt = 5_000, lastPlayedAt = 5_000),
+            Standing("podcasts", playing = false, startedAt = 0, lastPlayedAt = 0),
+        ))
+        assertEquals(listOf("music", "browser", "podcasts"), together)
+        val apart = NowPlayingRules.order(listOf(
+            Standing("music", playing = true, startedAt = 5_000, lastPlayedAt = 5_000),
+            Standing("browser", playing = true, startedAt = 5_004, lastPlayedAt = 5_004),
+        ))
+        assertEquals(listOf("browser", "music"), apart)
+    }
+
     @Test fun aPlayingTrackCountsOnByTheClock() {
         // 1:40 in at second 1000, five minutes long.
         fun at(now: Long, playing: Boolean = true, speed: Float = 1f, duration: Long = 300_000) =

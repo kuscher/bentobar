@@ -161,6 +161,9 @@ class WorldClockTest {
         val morning = at("2026-10-06T08:00", tokyo)
         val rows = WorldClock.rows(WorldClock.places(tokyo, emptyList(), cities("America/Los_Angeles", "Asia/Seoul"), morning), morning, false, words)
         assertEquals(listOf("Local", "Yesterday · −16h", "Same time"), rows.map { it.sub })
+        // Four in the afternoon in Los Angeles is one at night in Berlin, the next day.
+        val afternoon = at("2026-10-05T16:00", la)
+        assertEquals("Tomorrow · +9h", WorldClock.rows(WorldClock.places(la, emptyList(), cities("Europe/Berlin"), afternoon), afternoon, false, words)[1].sub)
     }
 
     @Test fun twoDaysApartIsSaidAsAWeekday() {
@@ -550,5 +553,15 @@ class WorldClockTest {
         for ((name, text) in deck) assertEquals(name, text, appText(name))
         // The message names the limit the code has.
         assertTrue(appText("clock_full").contains(" ${WorldClock.MAX_CITIES} "))
+    }
+
+    @Test fun theWordsFillInAsTheSpecsWriteThem() {
+        val nine = words.time(wednesday, la)
+        assertEquals("Wed, Oct 7 · 9:00 AM", String.format(appText("clock_plan_subtitle"), words.date(wednesday, la), nine))
+        assertEquals("New event at 9:00 AM", String.format(appText("clock_plan_new_event"), nine))
+        assertEquals("9:00 AM, Wednesday, October 7", String.format(appText("clock_plan_state"), nine, "Wednesday, October 7"))
+        assertEquals("Remove Tokyo", String.format(appText("clock_remove_city"), "Tokyo"))
+        assertEquals("San Juan (Argentina)", String.format(appText("clock_search_region"), "San Juan", "Argentina"))
+        assertEquals("Here (Los Angeles)", String.format(appText("clock_here"), "Los Angeles"))
     }
 }

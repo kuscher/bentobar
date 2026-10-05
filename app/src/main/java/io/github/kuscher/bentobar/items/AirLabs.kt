@@ -122,9 +122,10 @@ object AirLabs {
      * case.
      *
      * [zone]: where [day] was chosen, when it is a day of the device's (a day chip: "Today" in Los
-     * Angeles is tomorrow's date in Tokyo for a flight that leaves there in an hour). The flight the
-     * service answers with is then taken for that day too if it leaves on it by the device's clock.
-     * Null: [day] is the departure airport's own date and nothing else (what is kept of a followed flight).
+     * Angeles is tomorrow's date in Tokyo for a flight that leaves there in an hour). The flight is
+     * then that day's if the moment it leaves falls on it by the device's clock, and by nothing
+     * else: the service's flight and the timetable's alike. Null: [day] is the departure airport's
+     * own date (what is kept of a followed flight).
      *
      * Null: a request was not sent at all (the service was switched off or the bar hid under the
      * lookup), so there is nothing to say, neither an answer nor a failure.
@@ -150,18 +151,17 @@ object AirLabs {
                 timetable.failure?.takeIf { it != Failure.NOT_FOUND }?.let { return Answer(null, it, left) }
                 val lines = timetable.value.orEmpty()
                 val like = Flight(n.code, "", FlightEnd(""), FlightEnd(""), FlightState.PLANNED)
-                val planned = (if (day != null) on(lines, like, day) else upcoming(lines, like, now))?.let { dated(it, now) }
+                val planned = (if (day != null) on(lines, like, day, zone) else upcoming(lines, like, now))?.let { dated(it, now) }
                 return Answer(planned, if (planned != null) null else if (day != null && lines.isNotEmpty()) Failure.NOT_THAT_DAY else Failure.NOT_FOUND, left)
             }
             val f = first.value ?: return Answer(null, first.failure ?: Failure.NO_ANSWER, left)
             // The one-flight question was tried with a callsign; the other two only with a ticket's number, which this reply has.
             if (n.callsign) FlightNumber.read(f.number)?.takeUnless { it.callsign }?.let { number = it }
             if (day != null) {
-                fun onDevice(t: LocalDateTime?) = zone != null && t != null && LocalDate.ofInstant(f.from.moment(t), zone) == day
-                if (f.from.planned?.toLocalDate() == day || f.from.time?.toLocalDate() == day || onDevice(f.from.planned) || onDevice(f.from.time)) return Answer(f, null, left)
+                if (listOfNotNull(f.from.planned, f.from.time).any { leavesOn(f, it, zone) == day }) return Answer(f, null, left)
                 val timetable = ask(ROUTES) { routes(it) }
                 val lines = timetable.value ?: return Answer(null, timetable.failure?.takeIf { it != Failure.NOT_FOUND } ?: Failure.NOT_THAT_DAY, left)
-                return on(lines, f, day)?.let { Answer(dated(it, now), null, left) } ?: Answer(null, Failure.NOT_THAT_DAY, left)
+                return on(lines, f, day, zone)?.let { Answer(dated(it, now), null, left) } ?: Answer(null, Failure.NOT_THAT_DAY, left)
             }
             if (!FlightRules.over(f, now)) return Answer(f, null, left)
             val soon = ask(SCHEDULES) { schedules(it) }
@@ -396,9 +396,23 @@ object AirLabs {
         return soonest(same) ?: soonest(other)
     }
 
-    /** The timetable's flight on [day], whichever of its lines flies then; the lines that start where [like] started come first. */
-    fun on(routes: List<Route>, like: Flight, day: LocalDate): Flight? =
-        routes.sortedBy { it.from != like.from.code }.firstNotNullOfOrNull { planned(it, like, day) }
+    /**
+     * The day [f] leaves at the time [t] of its start: by the clock of [zone], where a day of the
+     * device's is meant, else the airport's own date.
+     */
+    private fun leavesOn(f: Flight, t: LocalDateTime, zone: ZoneId?): LocalDate = if (zone == null) t.toLocalDate() else LocalDate.ofInstant(f.from.moment(t), zone)
+
+    /**
+     * The timetable's flight on [day], whichever of its lines flies then; the lines that start where
+     * [like] started come first. With a [zone], [day] is a day of the device's and the flight is the
+     * one that leaves on it by that clock, which can be the day before or after at its airport (two,
+     * between the clocks furthest apart). Without one, [day] is the airport's own date.
+     */
+    fun on(routes: List<Route>, like: Flight, day: LocalDate, zone: ZoneId? = null): Flight? =
+        routes.sortedBy { it.from != like.from.code }.firstNotNullOfOrNull { r ->
+            if (zone == null) planned(r, like, day)
+            else (-2L..2L).firstNotNullOfOrNull { d -> planned(r, like, day.plusDays(d))?.takeIf { f -> f.from.planned?.let { leavesOn(f, it, zone) } == day } }
+        }
 
     /** The zones there are, for [steady]: read once. */
     private val ZONES: List<ZoneId> by lazy { ZoneId.getAvailableZoneIds().mapNotNull { runCatching { ZoneId.of(it) }.getOrNull() } }

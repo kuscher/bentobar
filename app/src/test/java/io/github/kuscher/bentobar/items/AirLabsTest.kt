@@ -396,10 +396,58 @@ class AirLabsTest {
         // A day that is the airport's own (what is kept of a followed flight) is read as that: no device's zone, no match.
         val kept = Service(mapOf("flight" to reply("flight-LH454-planned"), "routes" to none))
         assertEquals(Failure.NOT_THAT_DAY, AirLabs.lookup(lh454, today, "k", now, null, kept::get)!!.failure)
-        // The day on the departure board is still taken, wherever the device is.
+        // "Tomorrow" in Honolulu is not that flight, though the 2nd is its date on the departure board: the timetable is asked
+        // for the one that leaves on the 2nd by Honolulu's clock (and is not to be had here).
         val there = Service(mapOf("flight" to reply("flight-LH454-planned")))
-        assertEquals(time("2026-10-02T10:25"), AirLabs.lookup(lh454, LocalDate.of(2026, 10, 2), "k", now, honolulu, there::get)!!.flight!!.from.planned)
-        assertEquals(listOf("flight"), there.asked)
+        assertEquals(Failure.OFFLINE, AirLabs.lookup(lh454, LocalDate.of(2026, 10, 2), "k", now, honolulu, there::get)!!.failure)
+        assertEquals(listOf("flight", "routes"), there.asked)
+    }
+
+    @Test fun aDayChipMeansTheDayItLeavesByTheDevicesClockForTheLiveFlightAndForTheTimetable() {
+        // Los Angeles, 8 PM on 5 October. JL 2 leaves Tokyo in an hour: at 1 PM on the 6th there, which is 9 PM on the 5th here.
+        val now = at("2026-10-06T03:00:00Z")
+        val la = ZoneId.of("America/Los_Angeles")
+        val jl2 = FlightNumber("JL", 2)
+        val live = """{"response":{"flight_iata":"JL2","flight_icao":"JAL2","airline_name":"Japan Airlines","status":"scheduled",
+            "dep_iata":"HND","dep_city":"Tokyo","dep_time":"2026-10-06 13:00","dep_time_utc":"2026-10-06 04:00",
+            "arr_iata":"SFO","arr_city":"San Francisco","arr_time":"2026-10-06 06:30","arr_time_utc":"2026-10-06 13:30"}}"""
+        val table = """{"response":[{"flight_iata":"JL2","flight_icao":"JAL2","dep_iata":"HND","arr_iata":"SFO","dep_time":"13:00","dep_time_utc":"04:00",
+            "arr_time":"06:30","arr_time_utc":"13:30","duration":570,"days":["mon","tue","wed","thu","fri","sat","sun"]}]}"""
+        fun service() = Service(mapOf("flight" to live, "routes" to table))
+        // "Today" is that flight: one request.
+        val today = service()
+        val a = AirLabs.lookup(jl2, LocalDate.of(2026, 10, 5), "k", now, la, today::get)!!.flight!!
+        assertEquals(listOf("flight"), today.asked)
+        assertEquals(time("2026-10-06T13:00"), a.from.planned)
+        assertFalse(a.timetable)
+        // "Tomorrow" is not that flight, though the 6th is its date in Tokyo. It is the one that leaves on the 6th by this
+        // device's clock: 1 PM on the 7th in Tokyo, from the timetable.
+        val tomorrow = service()
+        val b = AirLabs.lookup(jl2, LocalDate.of(2026, 10, 6), "k", now, la, tomorrow::get)!!.flight!!
+        assertEquals(listOf("flight", "routes"), tomorrow.asked)
+        assertTrue(b.timetable)
+        assertEquals(time("2026-10-07T13:00"), b.from.planned)
+        assertEquals(LocalDate.of(2026, 10, 6), LocalDate.ofInstant(b.from.moment(b.from.planned!!), la))
+        assertEquals("Tokyo", b.from.city)
+        // The same when the service does not know the number and only the timetable does.
+        val unknown = Service(mapOf("flight" to reply("error-not-found"), "routes" to table))
+        assertEquals(time("2026-10-07T13:00"), AirLabs.lookup(jl2, LocalDate.of(2026, 10, 6), "k", now, la, unknown::get)!!.flight!!.from.planned)
+        // A day that comes with no zone is the airport's own date (what is kept of a followed flight): the 6th is the live flight then,
+        // and the timetable's 6th is Tokyo's.
+        val kept = service()
+        assertFalse(AirLabs.lookup(jl2, LocalDate.of(2026, 10, 6), "k", now, null, kept::get)!!.flight!!.timetable)
+        assertEquals(listOf("flight"), kept.asked)
+        assertEquals(time("2026-10-07T13:00"), AirLabs.lookup(jl2, LocalDate.of(2026, 10, 7), "k", now, null, service()::get)!!.flight!!.from.planned)
+
+        // Frankfurt, half past midnight on the 6th. A flight that left San Francisco twenty minutes ago, on the 5th there, left today here.
+        val frankfurt = ZoneId.of("Europe/Berlin")
+        val gone = """{"response":{"flight_iata":"UA926","dep_iata":"SFO","arr_iata":"FRA","status":"en-route",
+            "dep_time":"2026-10-05 15:10","dep_time_utc":"2026-10-05 22:10","dep_actual":"2026-10-05 15:10","dep_actual_utc":"2026-10-05 22:10",
+            "arr_time":"2026-10-06 11:00","arr_time_utc":"2026-10-06 09:00"}}"""
+        val s = Service(mapOf("flight" to gone))
+        val c = AirLabs.lookup(FlightNumber("UA", 926), LocalDate.of(2026, 10, 6), "k", at("2026-10-05T22:30:00Z"), frankfurt, s::get)!!.flight!!
+        assertEquals(FlightState.IN_AIR, c.state)
+        assertEquals(listOf("flight"), s.asked)
     }
 
     @Test fun aNumberTheServiceDoesNotKnowMayStillBeInTheTimetable() {

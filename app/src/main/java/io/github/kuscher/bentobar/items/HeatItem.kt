@@ -77,7 +77,11 @@ object HeatItem : ItemType("heat", R.string.item_heat_title, Sym.DEVICE_THERMOST
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host ->
         rememberTick()
-        MenuCard(Sym.DEVICE_THERMOSTAT, stringResource(R.string.item_heat_title), stringResource(Heat.words(Heat.status()))) {
+        val status = Heat.status()
+        // From "Hot" on the status is the news, in the color the CPU menu's Heat row gives it: on a device that
+        // reports no heat level there is nothing else in this menu to carry it.
+        MenuCard(Sym.DEVICE_THERMOSTAT, stringResource(R.string.item_heat_title), stringResource(Heat.words(status)),
+            subtitleColor = if (HeatRules.step(status) >= HeatRules.MODERATE) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant) {
             // A device that reports no heat level has no such row, meter or chart, and a note without the sentence about it.
             val level = Heat.level
             if (level != null) {

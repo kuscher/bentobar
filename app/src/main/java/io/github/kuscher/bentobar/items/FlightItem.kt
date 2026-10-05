@@ -298,6 +298,12 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         return !tracker.loading(id) && (tracker.age(id) ?: Long.MAX_VALUE) >= FlightRules.byHand(t)
     }
 
+    /** Refresh has nothing to do for [id] because the service just answered: the entry says "up to date". Not after a try that failed, nor while one is on its way. */
+    internal fun upToDate(id: String): Boolean {
+        val t = tracker.peek(id) ?: return false
+        return !tracker.loading(id) && t.failure == null && t.flight != null && (tracker.age(id) ?: Long.MAX_VALUE) < FlightRules.byHand(t)
+    }
+
     internal fun refresh(id: String) {
         tracker.peek(id)?.let { tracker.refresh(id, floorMs = FlightRules.byHand(it)) }
     }

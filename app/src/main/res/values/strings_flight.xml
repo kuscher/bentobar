@@ -72,6 +72,7 @@
     <string name="flight_track_another">Track another flight</string>
     <string name="flight_another_subtitle">%1$s stays until another is found</string>
     <string name="flight_stop">Stop tracking</string>
+    <string name="flight_up_to_date">up to date</string>
 
     <!-- What went wrong, under the field. -->
     <string name="flight_err_not_number">A flight number looks like LH 455 or DLH455.</string>

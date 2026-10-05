@@ -117,13 +117,16 @@ fun MenuCard(
     }
 }
 
-/** "Label ........ value" with tabular figures. */
+/**
+ * "Label ........ value", with tabular figures where the value has figures. In this font they also
+ * widen the spaces, which pulled a value of words alone ("Hot, slowing a little") apart.
+ */
 @Composable
 fun InfoRow(label: String, value: String, valueColor: Color = MaterialTheme.colorScheme.onSurface) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+        Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = if (value.any(Char::isDigit)) "tnum" else null),
             fontWeight = FontWeight.Medium, color = valueColor)
     }
 }
@@ -276,7 +279,8 @@ fun SearchField(label: String, placeholder: String = "", initial: String = "", s
     fun enter() { if (canSubmit) onEnter(field.text) }
     // The field itself has the focus, not the × inside it: Enter on the × is the ×'s.
     var own by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+    // Room under the field too: a result's focus ring otherwise touches the field's border.
+    Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = field,

@@ -157,6 +157,7 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
         // Not read yet (the menu was opened in the item's first moment): what is kept is a moment away.
         tracked == null -> MenuCard(Sym.FLIGHT, title, stringResource(R.string.usage_loading)) {}
         card != null && !another -> FollowedCard(card, FlightItem.place(card), refresh = staged == null && FlightItem.mayRefresh(item.id),
+            upToDate = staged == null && FlightItem.upToDate(item.id),
             onRefresh = { FlightItem.refresh(item.id) }, onChangeKey = changeKey, onPage = { host.close(); FlightItem.openPage(it) },
             onAnother = { if (staged == null) anotherSince = FlightItem.takes else FlightItem.stop(item) },
             onStop = { last = FlightNumber.shown(tracked.number); FlightItem.stop(item) })
@@ -224,12 +225,13 @@ private fun SearchCard(item: ItemConfig, v: Voice, today: LocalDate, initial: St
 
 /** A flight that is followed: the one thing needed as the headline, whether it runs to plan under it, the flight as a line, and what can be done. */
 @Composable
-private fun FollowedCard(card: FlightText.Card, share: Double?, refresh: Boolean, onRefresh: () -> Unit, onChangeKey: () -> Unit, onPage: (String) -> Unit,
+private fun FollowedCard(card: FlightText.Card, share: Double?, refresh: Boolean, upToDate: Boolean, onRefresh: () -> Unit, onChangeKey: () -> Unit, onPage: (String) -> Unit,
                          onAnother: () -> Unit, onStop: () -> Unit) {
     MenuCard(Sym.FLIGHT, card.title, card.route) {
         // Headline and badge are one thing to a screen reader: "Leaves in 1 hour 37 minutes. Delayed 25 minutes."
         Column(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = card.spoken }) {
-            Text(card.headline, style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            // No tabular figures here or in the two times below: in this font they widen the spaces between the words as well.
+            Text(card.headline, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = if (card.gone) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
             if (card.badge != null) {
                 Spacer(Modifier.height(4.dp))
@@ -244,7 +246,9 @@ private fun FollowedCard(card: FlightText.Card, share: Double?, refresh: Boolean
         MenuNote(card.note)
         MenuDivider()
         if (card.changeKey) MenuEntry(Sym.KEY, stringResource(R.string.flight_change_key), onClick = onChangeKey)
-        MenuEntry(Sym.REFRESH, stringResource(R.string.common_refresh), enabled = refresh, onClick = onRefresh)
+        // Dimmed because the service was just asked and answered: say so, or the entry looks broken.
+        MenuEntry(Sym.REFRESH, stringResource(R.string.common_refresh), detail = if (upToDate) stringResource(R.string.flight_up_to_date) else null,
+            enabled = refresh, onClick = onRefresh)
         if (card.callsign != null) {
             val says = stringResource(R.string.flight_open_page_desc)
             MenuEntry(Sym.OPEN_IN_NEW, stringResource(R.string.flight_open_page), modifier = Modifier.semantics { contentDescription = says }) { onPage(card.callsign) }
@@ -306,7 +310,7 @@ internal fun RouteLine(from: FlightText.End, to: FlightText.End, share: Double?)
 @Composable
 private fun EndTime(end: FlightText.End, align: TextAlign, modifier: Modifier) {
     Text(end.time, modifier = modifier, textAlign = align, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium,
-        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum", textDecoration = if (end.struck) TextDecoration.LineThrough else null),
+        style = MaterialTheme.typography.bodyMedium.copy(textDecoration = if (end.struck) TextDecoration.LineThrough else null),
         color = if (end.struck) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
 }
 

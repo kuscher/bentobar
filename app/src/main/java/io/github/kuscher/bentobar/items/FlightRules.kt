@@ -55,9 +55,10 @@ enum class FlightState { PLANNED, IN_AIR, LANDED, CANCELED, DIVERTED }
 /**
  * One flight on one day, as the service said it. [timetable]: made from the airline's timetable, not
  * from that day's operations: a plan, with no gate, nothing known of delays and no state of its own
- * (whether it has left is what the clock says against its plan). [loose]: a timetable's flight on a
- * day after a clock change at one of its airports; its times are the timetable's, but the moments
- * they stand for may be an hour out, so nothing is made of them that must be right to the hour.
+ * (whether it has left is what the clock says against its plan). [loose]: its times are right at
+ * their airports, but the moments they stand for may be out, so nothing is counted from them. That is
+ * a timetable's flight on a day after a clock change at one of its airports (an hour out), and a
+ * flight of which the service gave a time without its UTC twin (nobody knows by how much).
  */
 @Serializable
 data class Flight(
@@ -258,9 +259,9 @@ object FlightRules {
         Phase.TIMETABLE -> Headline(Heading.TIMETABLE)
         Phase.AHEAD -> Headline(Heading.LEAVES_AT)
         Phase.SOON -> f.from.time?.let { Headline(Heading.LEAVES_IN, until(now, f.from.moment(it)).coerceAtLeast(1)) } ?: Headline(Heading.LEAVES_AT)
-        Phase.IN_AIR -> f.to.time?.let { Headline(Heading.LANDS_IN, until(now, f.to.moment(it)).coerceAtLeast(1)) } ?: Headline(Heading.IN_AIR)
+        Phase.IN_AIR -> f.to.time?.takeUnless { f.loose }?.let { Headline(Heading.LANDS_IN, until(now, f.to.moment(it)).coerceAtLeast(1)) } ?: Headline(Heading.IN_AIR)
         Phase.LANDED -> {
-            val ago = f.to.time?.let { Duration.between(f.to.moment(it), now) }
+            val ago = f.to.time?.takeUnless { f.loose }?.let { Duration.between(f.to.moment(it), now) }
             when {
                 ago == null || ago > OVER -> Headline(Heading.LANDED)
                 ago.seconds < 60 -> Headline(Heading.LANDED_NOW)
@@ -316,7 +317,7 @@ object FlightRules {
         Phase.IN_AIR -> {
             val left = f.from.time?.let(f.from::moment)
             val lands = f.to.time?.let(f.to::moment)
-            if (left == null || lands == null || !lands.isAfter(left)) null
+            if (left == null || lands == null || !lands.isAfter(left) || f.loose) null
             else (Duration.between(left, now).seconds.toDouble() / Duration.between(left, lands).seconds).coerceIn(EDGE, 1 - EDGE)
         }
     }

@@ -73,6 +73,28 @@ class FlightRowTest {
         assertEquals(0.0, past.share!!, 0.0)
     }
 
+    @Test fun anEndWhoseClockCannotBeReadAgainstUtcMakesNoCountdown() {
+        fun without(name: String, end: String) = AirLabs.flight(reply(name).replace(Regex("\"${end}_(time|estimated|actual)_utc\": [^,]*,"), "")).value!!
+        // The same replies with no UTC twin at one end: the airport's times are right, the moments they stand for are anybody's guess.
+        val plan = without("flight-LH454-planned", "dep")
+        assertEquals(time("2026-10-02T10:25"), plan.from.planned)
+        assertTrue(plan.loose)
+        assertTrue(!flight("flight-LH454-planned").loose)
+        // It leaves in under an hour by the reply that has its clock; without it nothing is counted: when it leaves, as its airport says.
+        assertEquals(Phase.AHEAD, FlightRules.phase(plan, asked))
+        assertEquals(Headline(Heading.LEAVES_AT), FlightRules.headline(plan, asked))
+        // In the air: no minutes to landing, and no place for the plane. Landed: no "ago".
+        val air = without("flight-LH455-in-the-air", "arr")
+        assertTrue(air.loose)
+        assertEquals(Headline(Heading.IN_AIR), FlightRules.headline(air, asked))
+        assertNull(FlightRules.share(air, asked))
+        val down = without("flight-LH96-landed", "arr")
+        assertTrue(down.loose)
+        assertEquals(Headline(Heading.LANDED), FlightRules.headline(down, asked))
+        // How late it runs is one clock's two times: that stays.
+        assertEquals(Badge(Verdict.EARLY, 24), FlightRules.badge(air, asked))
+    }
+
     @Test fun pastItsTimeAndStillCalledPlannedNobodySaysOnTime() {
         // Leaves 08:25 UTC. A minute after, with no word that it left: one minute to go, and neither "Planned" nor "On time".
         val plan = flight("flight-LH454-planned")

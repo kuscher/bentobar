@@ -428,6 +428,8 @@ class AirLabsTest {
             "dep_time":"2026-10-02 08:00","dep_time_utc":"2026-09-02 06:00","arr_time":"2026-10-02 10:00","arr_time_utc":"2026-10-02 23:30"}}""").value!!
         assertEquals(0, f.from.offset)
         assertEquals(-13 * 60 - 30, f.to.offset)
+        // A flight with such an end is marked: its moments are anybody's guess, and nothing is counted from them.
+        assertTrue(f.loose)
         // And nothing that is made from it throws.
         FlightRules.standing(f, at("2026-10-02T07:00:00Z"))
         FlightRules.over(f, at("2026-10-02T07:00:00Z"))

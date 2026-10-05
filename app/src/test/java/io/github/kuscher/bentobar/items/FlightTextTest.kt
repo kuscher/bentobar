@@ -167,6 +167,19 @@ class FlightTextTest {
         assertEquals("10m · not live", bar(f, "2026-10-02T21:30:00Z", "2026-10-02T20:29:00Z").text)
     }
 
+    @Test fun aFlightWhoseClockNobodyGaveIsNotCountedDownTo() {
+        val f = lh455(sfo(expected = "2026-10-02T14:40")).copy(loose = true)
+        assertEquals("LH 455 · 2:40 PM", bar(f, near).text)
+        assertEquals("Leaves 2:40 PM", card(f, near).headline)
+        // The sentence about an hour's doubt is for a timetable's plan: these times are the airport's own, and right.
+        assertFalse(card(f, near).loose)
+        assertTrue(card(f.copy(timetable = true), near).loose)
+        val air = inAir(fra(expected = "2026-10-03T10:25")).copy(loose = true)
+        assertEquals("In the air", bar(air, "2026-10-03T07:00:00Z").text)
+        assertEquals("In the air", card(air, "2026-10-03T07:00:00Z").headline)
+        assertNull(card(air, "2026-10-03T07:00:00Z").share)
+    }
+
     @Test fun lateBeforeItLeavesSaysByHowMuchAndTurnsToAWarning() {
         val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
         val b = bar(late, near)

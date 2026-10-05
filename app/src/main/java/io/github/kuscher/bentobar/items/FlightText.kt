@@ -331,7 +331,7 @@ object FlightText {
             share = row.share.takeUnless { l.silent },
             from = end(l, row.from, f.from.city, from = true), to = end(l, far, f.to.city, from = false),
             operatedAs = f.flownAs?.let { v.say(Word.FLIGHT_OPERATED_AS, FlightNumber.shown(it)) },
-            loose = f.loose && before, note = v.say(Word.FLIGHT_NOTE, status),
+            loose = f.loose && f.timetable && before, note = v.say(Word.FLIGHT_NOTE, status),
             copy = copied(l, headline, badge), callsign = f.callsign, changeKey = t.failure == Failure.REFUSED,
             plane = listOf(t.number, t.day.orEmpty(), f.from.code).joinToString(" "),
         )

@@ -282,8 +282,12 @@ object AirLabs {
 
     private fun flight(m: JsonObject): Flight? {
         val number = m.text("flight_iata", 8) ?: m.text("flight_icao", 8) ?: return null
-        val from = end(m, "dep") ?: return null
-        val to = end(m, "arr") ?: return null
+        val leaves = clock(m, "dep")
+        val lands = clock(m, "arr")
+        val from = end(m, "dep", leaves ?: 0) ?: return null
+        val to = end(m, "arr", lands ?: 0) ?: return null
+        // An end with a time and no clock to read it by: the time is right at its airport, the moment it stands for is anybody's guess.
+        val loose = (leaves == null && from.time != null) || (lands == null && to.time != null)
         val state = when (m.text("status", 20)) {
             "scheduled" -> FlightState.PLANNED
             "en-route", "active" -> FlightState.IN_AIR
@@ -293,7 +297,7 @@ object AirLabs {
             // A word not seen before: what the times say.
             else -> if (to.actual != null) FlightState.LANDED else if (from.actual != null) FlightState.IN_AIR else FlightState.PLANNED
         }
-        return Flight(number, m.text("airline_name", 40).orEmpty(), from, to, state, flownAs = m.text("cs_flight_iata", 8),
+        return Flight(number, m.text("airline_name", 40).orEmpty(), from, to, state, flownAs = m.text("cs_flight_iata", 8), loose = loose,
             aircraft = m.text("model", 60)?.let(::aircraft), callsign = m.callsign())
     }
 
@@ -302,14 +306,20 @@ object AirLabs {
     /** The aircraft's type as it is said: the service's "Boeing 747-8 pax" without what it adds to the type (a remark in brackets, and "pax" for one that carries passengers). */
     private fun aircraft(model: String): String? = model.replace(REMARK, "").trim().removeSuffix(" pax").trim().take(40).trim().takeIf { it.isNotEmpty() }
 
-    /** One end, from the fields that start with [p] (`dep`, `arr`). Its clock's distance from UTC is read off a time that is given both ways. */
-    private fun end(m: JsonObject, p: String): FlightEnd? {
+    /**
+     * How far an end's clock is from UTC, in minutes: read off a time of the fields that start with
+     * [p] (`dep`, `arr`) that is given both ways. Null: none is, so nobody knows which moment its
+     * times stand for (taken as UTC they would be out by hours, with nothing saying so).
+     */
+    private fun clock(m: JsonObject, p: String): Int? = listOf("time", "estimated", "actual").firstNotNullOfOrNull { k ->
+        val local = m.time("${p}_$k"); val utc = m.time("${p}_${k}_utc")
+        // (No clock on earth is further from UTC than fourteen hours: anything else is not an airport's time.)
+        if (local != null && utc != null) Duration.between(utc, local).toMinutes().takeIf { it in -FlightRules.MOST_OFFSET..FlightRules.MOST_OFFSET }?.toInt() else null
+    }
+
+    /** One end, from the fields that start with [p], with its clock [offset] minutes from UTC. */
+    private fun end(m: JsonObject, p: String, offset: Int): FlightEnd? {
         val code = m.text("${p}_iata", 4) ?: m.text("${p}_icao", 4) ?: return null
-        val offset = listOf("time", "estimated", "actual").firstNotNullOfOrNull { k ->
-            val local = m.time("${p}_$k"); val utc = m.time("${p}_${k}_utc")
-            // (No clock on earth is further from UTC than fourteen hours: anything else is not an airport's time.)
-            if (local != null && utc != null) Duration.between(utc, local).toMinutes().takeIf { it in -FlightRules.MOST_OFFSET..FlightRules.MOST_OFFSET }?.toInt() else null
-        } ?: 0
         return FlightEnd(
             code, m.text("${p}_city", 40).orEmpty(),
             m.time("${p}_time"), m.time("${p}_estimated"), m.time("${p}_actual"), offset,
@@ -358,8 +368,9 @@ object AirLabs {
     fun planned(route: Route, like: Flight, day: LocalDate): Flight? {
         if (route.days.isNotEmpty() && day.dayOfWeek !in route.days) return null
         fun known(code: String) = listOf(like.from, like.to).firstOrNull { it.code == code }
-        val fromOffset = known(route.from)?.takeIf { it.time != null }?.offset ?: route.fromOffset
-        val toOffset = known(route.to)?.takeIf { it.time != null }?.offset ?: route.toOffset
+        // (Not from a reply whose own clocks could not be read.)
+        val fromOffset = known(route.from)?.takeIf { it.time != null && !like.loose }?.offset ?: route.fromOffset
+        val toOffset = known(route.to)?.takeIf { it.time != null && !like.loose }?.offset ?: route.toOffset
         val leaves = day.atTime(route.leaves)
         val lands = LocalDateTime.ofEpochSecond(leaves.toEpochSecond(ZoneOffset.ofTotalSeconds(fromOffset * 60)) + route.minutes * 60L, 0, ZoneOffset.ofTotalSeconds(toOffset * 60))
         return Flight(

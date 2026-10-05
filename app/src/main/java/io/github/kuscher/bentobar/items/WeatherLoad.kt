@@ -228,19 +228,23 @@ class WeatherSource(
         }
     }
 
-    /** How soon after the last try Refresh may ask again: a minute, or at once when that try found no network and so cost nothing. */
-    private fun floor(reading: Reading?): Long = if (reading?.failure == Failure.OFFLINE && reading.misses == 0) 0 else WeatherRules.AGAIN_MS
-
-    /** Whether Refresh (or Try again) would ask now: the entry is dimmed while it wouldn't. Main thread. */
-    fun mayAgain(item: ItemConfig): Boolean {
-        val place = asked(item) ?: return false
-        return !readings.loading(place) && (readings.age(place) ?: Long.MAX_VALUE) >= floor(readings.peek(place))
+    /**
+     * Refresh (or Try again) as [item]'s menu draws it right now: see [WeatherRules.again]. For an
+     * item that may ask nothing (no city, in Off, the switch off) it is dimmed and says nothing.
+     * Main thread.
+     */
+    fun againEntry(item: ItemConfig): Again {
+        val place = asked(item) ?: return Again.WAIT
+        return WeatherRules.again(readings.peek(place), readings.age(place), readings.loading(place))
     }
 
-    /** Refresh, or Try again: asks now, but once a minute at most. False: nothing was asked. Main thread. */
+    /**
+     * Refresh, or Try again: asks now, unless the last try came back too short a while ago for that
+     * ([WeatherRules.againAfter]). False: nothing was asked. Main thread.
+     */
     fun again(item: ItemConfig): Boolean {
         val place = asked(item) ?: return false
-        return !readings.loading(place) && readings.refresh(place, floorMs = floor(readings.peek(place)))
+        return !readings.loading(place) && readings.refresh(place, floorMs = readings.peek(place)?.let { WeatherRules.againAfter(it) } ?: 0)
     }
 
     /** The search's state, for whoever draws it; see [shown]. */

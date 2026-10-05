@@ -160,6 +160,16 @@ sealed interface Status {
     data class Live(val reading: Reading) : Status
 }
 
+/** Refresh, or Try again, as the menu draws it ([WeatherRules.again]). */
+enum class Again {
+    /** A press asks now. */
+    READY,
+    /** Dimmed, and the entry says why: an answer came less than a minute ago, there is nothing newer to fetch. */
+    UP_TO_DATE,
+    /** Dimmed with nothing to add: a request is on its way, or a try just failed and the menu says so above the entry. */
+    WAIT,
+}
+
 /** What the bar shows; the item turns it into its state. */
 class Bar(val icon: String, val filled: Boolean, val text: String? = null, val desc: String, val active: Boolean = false,
           val tone: Tone = Tone.NORMAL, val tooltip: String? = null)
@@ -188,8 +198,10 @@ object WeatherRules {
     const val FRESH_MS = 30 * MIN_MS
     /** Opening the menu asks again if the reading is older than this. */
     const val MENU_MS = 10 * MIN_MS
-    /** Refresh and Try again: once a minute at most. */
+    /** Refresh after an answer: once a minute at most. */
     const val AGAIN_MS = MIN_MS
+    /** Try again after a try that reached nobody or got no answer ([againAfter]). */
+    const val SOON_MS = 10_000L
     /** After no answer. */
     const val RETRY_MS = 15 * MIN_MS
     /** After being told to slow down, unless the service named a longer time. */
@@ -442,6 +454,25 @@ object WeatherRules {
         Failure.NO_ANSWER -> RETRY_MS
         Failure.SLOW_DOWN -> maxOf(SLOW_MS, r.retryAfterSec * 1000)
         Failure.OFFLINE -> if (r.misses <= 1) MIN_MS else minOf(RETRY_MS, MIN_MS shl (r.misses - 1).coerceAtMost(4))
+    }
+
+    /**
+     * How long after a try came back the next one by hand (Refresh, Try again) has to wait. A minute
+     * after an answer: there is nothing newer to fetch. Ten seconds after a try that reached nobody
+     * or got no answer: the menu then says what went wrong, and the retry is the one thing it offers.
+     * And never less than the service asked for, where it named a time.
+     */
+    fun againAfter(r: Reading): Long = maxOf(if (r.failure == null) AGAIN_MS else SOON_MS, r.retryAfterSec * 1000)
+
+    /**
+     * Refresh, or Try again, as the menu draws it. [age]: how long ago the last try for [r] came
+     * back, in milliseconds; null when there was none. [loading]: a request is on its way.
+     */
+    fun again(r: Reading?, age: Long?, loading: Boolean): Again = when {
+        loading -> Again.WAIT
+        r == null || age == null || age >= againAfter(r) -> Again.READY
+        r.failure == null -> Again.UP_TO_DATE
+        else -> Again.WAIT
     }
 
     /**

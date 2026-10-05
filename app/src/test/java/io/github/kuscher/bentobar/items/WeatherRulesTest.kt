@@ -18,7 +18,8 @@ class WeatherRulesTest {
     private val w = WeatherFileWords()
     private val sf = ZoneId.of("America/Los_Angeles")
     private val t = WeatherFileWords.times(sf)
-    private val min = 60_000L
+    private val sec = 1_000L
+    private val min = 60 * sec
     private val hour = 60 * min
 
     /** A moment on Monday 5 October 2026 in San Francisco, or on another day of that month. */
@@ -738,6 +739,64 @@ class WeatherRulesTest {
         // A sign-in page, a name that can't be found: those tries do go out, so they step back.
         val tries = (1..8).map { WeatherRules.every(reading().copy(failure = Failure.OFFLINE, misses = it)) / min }
         assertEquals(listOf(1L, 2L, 4L, 8L, 15L, 15L, 15L, 15L), tries)
+    }
+
+    // ---- Refresh and Try again: when a press asks ---------------------------------------------------
+
+    @Test fun byHandItIsAMinuteAfterAnAnswerAndTenSecondsAfterATryThatFailed() {
+        // After an answer there is nothing new to fetch for a while.
+        assertEquals(1 * min, WeatherRules.againAfter(reading()))
+        // After a try that reached nobody or got no answer, the retry is the one thing the menu offers.
+        assertEquals(10 * sec, WeatherRules.againAfter(reading().copy(failure = Failure.OFFLINE)))
+        assertEquals(10 * sec, WeatherRules.againAfter(reading().copy(failure = Failure.OFFLINE, misses = 5)))
+        assertEquals(10 * sec, WeatherRules.againAfter(reading().copy(failure = Failure.NO_ANSWER, misses = 1)))
+        assertEquals(10 * sec, WeatherRules.againAfter(Reading(place = "1.00,2.00", failure = Failure.NO_ANSWER, misses = 7)))
+        // Told to slow down, with no time named: no answer like the others.
+        assertEquals(10 * sec, WeatherRules.againAfter(reading().copy(failure = Failure.SLOW_DOWN, misses = 1)))
+    }
+
+    @Test fun byHandItIsNeverSoonerThanTheServiceAskedFor() {
+        assertEquals(5 * min, WeatherRules.againAfter(reading().copy(failure = Failure.SLOW_DOWN, retryAfterSec = 300)))
+        assertEquals(2 * hour, WeatherRules.againAfter(reading().copy(failure = Failure.SLOW_DOWN, retryAfterSec = 7200)))
+        // A service that is down for a while can name a time too.
+        assertEquals(2 * min, WeatherRules.againAfter(reading().copy(failure = Failure.NO_ANSWER, retryAfterSec = 120)))
+        // A wait shorter than the ten seconds changes nothing, and one second more than them is kept.
+        assertEquals(10 * sec, WeatherRules.againAfter(reading().copy(failure = Failure.SLOW_DOWN, retryAfterSec = 3)))
+        assertEquals(10 * sec, WeatherRules.againAfter(reading().copy(failure = Failure.NO_ANSWER, retryAfterSec = 10)))
+        assertEquals(11 * sec, WeatherRules.againAfter(reading().copy(failure = Failure.NO_ANSWER, retryAfterSec = 11)))
+    }
+
+    @Test fun refreshIsDimmedForAMinuteAfterAnAnswerAndSaysItIsUpToDate() {
+        val good = reading()
+        assertEquals(Again.UP_TO_DATE, WeatherRules.again(good, age = 0, loading = false))
+        assertEquals(Again.UP_TO_DATE, WeatherRules.again(good, age = 1 * min - 1, loading = false))
+        assertEquals(Again.READY, WeatherRules.again(good, age = 1 * min, loading = false))
+        assertEquals(Again.READY, WeatherRules.again(good, age = 5 * hour, loading = false))
+    }
+
+    @Test fun tryAgainIsDimmedForTenSecondsAfterATryThatFailedAndAddsNoWordToWhatTheMenuSays() {
+        // With the numbers from before (not live) and without any (no reading): dimmed, and never "up to date".
+        for (failure in Failure.entries) for (r in listOf(reading().copy(failure = failure), Reading(place = "1.00,2.00", failure = failure, misses = 1))) {
+            assertEquals("$failure", Again.WAIT, WeatherRules.again(r, age = 0, loading = false))
+            assertEquals("$failure", Again.WAIT, WeatherRules.again(r, age = 10 * sec - 1, loading = false))
+            assertEquals("$failure", Again.READY, WeatherRules.again(r, age = 10 * sec, loading = false))
+        }
+        // The service's own wait holds it longer, still without a word.
+        val told = reading().copy(failure = Failure.SLOW_DOWN, retryAfterSec = 300)
+        assertEquals(Again.WAIT, WeatherRules.again(told, age = 1 * min, loading = false))
+        assertEquals(Again.WAIT, WeatherRules.again(told, age = 5 * min - 1, loading = false))
+        assertEquals(Again.READY, WeatherRules.again(told, age = 5 * min, loading = false))
+    }
+
+    @Test fun whileARequestIsOnItsWayAPressAsksNothingAndNothingIsClaimed() {
+        for (age in listOf(0L, 30 * sec, 5 * hour)) {
+            // Not "up to date": what comes back is not known yet.
+            assertEquals(Again.WAIT, WeatherRules.again(reading(), age, loading = true))
+            assertEquals(Again.WAIT, WeatherRules.again(reading().copy(failure = Failure.NO_ANSWER), age, loading = true))
+        }
+        assertEquals(Again.WAIT, WeatherRules.again(null, null, loading = true))
+        // Nothing known yet and nothing on its way: a press asks.
+        assertEquals(Again.READY, WeatherRules.again(null, null, loading = false))
     }
 
     @Test fun threeHoursIsTheAgeAtWhichAReadingIsNoReading() {

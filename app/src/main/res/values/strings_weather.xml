@@ -56,6 +56,8 @@
     <!-- Open-Meteo's licence asks for this line. %1$s: "updated 2:40 PM", or the same after "no connection," or "no answer,". -->
     <string name="weather_note">Weather data by Open-Meteo.com · %1$s</string>
     <string name="weather_change_city">Change city</string>
+    <!-- Beside Refresh while it is dimmed because an answer came less than a minute ago. -->
+    <string name="weather_up_to_date">up to date</string>
 
     <!-- setting it up: the city search -->
     <string name="weather_city_label">City or town</string>

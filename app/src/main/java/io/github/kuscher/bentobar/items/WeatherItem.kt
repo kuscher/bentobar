@@ -78,6 +78,18 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     internal fun status(item: ItemConfig, now: Long): Status =
         staged(item)?.let { WeatherRules.status(hasPlace = true, on = true, setUp = true, reading = it.reading, now = now) } ?: source.status(item, now)
 
+    /**
+     * Refresh (or Try again) as [item]'s menu draws it. A staged sample goes by the same rule, counted
+     * from when it was staged, so what a tester sees there is what a real reading does.
+     */
+    internal fun againEntry(item: ItemConfig): Again =
+        staged(item)?.let { WeatherRules.again(it.reading, Now.elapsed() - stagedSince, loading = false) } ?: source.againEntry(item)
+
+    /** A press of Refresh or Try again. A staged sample asks nobody: its wait begins again, as after a try that came back the same. */
+    internal fun again(item: ItemConfig) {
+        if (staged(item) != null) stagedSince = Now.elapsed() else source.again(item)
+    }
+
     override fun state(item: ItemConfig): ItemState {
         val now = Now.wall()
         // Loads the place's reading if it is due: only for an item with a city, outside Off, while the switch is on.
@@ -123,6 +135,9 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     /** A made-up reading shown instead of the real one, for the first Weather item; it asks nothing. */
     @Volatile private var stagedReading: WeatherSamples.Sample? = null
 
+    /** When that sample was staged, or its Refresh last pressed, by the time since boot: the moment its "last try came back". */
+    @Volatile private var stagedSince = 0L
+
     /** A made-up answer under the search field, wherever one is drawn. */
     @Volatile internal var stagedSearch: Ask.State<Query, Found>? = null
         private set
@@ -158,6 +173,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
                 " items=${items.size} places=${WeatherLoad.places(items).size}" +
                 " on=${Online.on(online)} setUp=${Online.setUp(online)}" + (first?.let {
                     " first=${status(it, Now.wall()).javaClass.simpleName} loading=${source.loading(it)} failure=${reading?.failure ?: "none"}" +
+                        " again=${againEntry(it)}" +
                         " read=${if (reading == null || reading.fetchedAt == 0L) "never" else "${(Now.wall() - reading.fetchedAt) / 1000}s ago"}"
                 } ?: "")
         }
@@ -165,6 +181,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
             val sample = WeatherSamples.of(args.getOrNull(1).orEmpty(), Now.wall(), ZoneId.systemDefault())
             if (sample == null) "no such sample; there are: ${WeatherSamples.names.joinToString(" ")}" else {
                 stagedReading = sample
+                stagedSince = Now.elapsed()
                 Ticker.refresh()
                 "staged ${sample.name} for the first Weather item"
             }

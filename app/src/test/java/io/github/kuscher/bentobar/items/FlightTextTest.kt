@@ -578,6 +578,18 @@ class FlightTextTest {
         }
     }
 
+    @Test fun theItemGivesEveryWordTheResourceOfItsName() {
+        // These tests read the words from the resource files by name; the app gets them through a table in the item.
+        // Read here as text: a word paired with another's resource would say the wrong thing on a device, and nowhere else.
+        val item = java.io.File("src/main/java/io/github/kuscher/bentobar/items/FlightItem.kt").readText()
+        val words = Regex("""Word\.([A-Z_0-9]+) -> R\.string\.([a-z_0-9]+)""").findAll(item).map { it.groupValues[1] to it.groupValues[2] }.toList()
+        assertEquals(FlightText.Word.entries.map { it.name }.sorted(), words.map { it.first }.sorted())
+        for ((word, resource) in words) assertEquals(word.lowercase(), resource)
+        val counts = Regex("""Count\.([A-Z_0-9]+) -> R\.plurals\.([a-z_0-9]+)""").findAll(item).map { it.groupValues[1] to it.groupValues[2] }.toList()
+        assertEquals(FlightText.Count.entries.map { it.name }.sorted(), counts.map { it.first }.sorted())
+        for ((count, resource) in counts) assertEquals(count.lowercase(), resource)
+    }
+
     @Test fun theWordsNobodyBuildsAreTheCopyDecks() {
         assertEquals("Flight times come from AirLabs, a flight data service, with a free key of your own. BentoBar sends AirLabs your key and the flight number " +
             "when you track a flight and while it follows it, nothing else. AirLabs sees your IP address and knows which key asked.", FlightVoices.string("flight_consent"))

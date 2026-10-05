@@ -127,10 +127,12 @@ object AirLabs {
     fun lookup(n: FlightNumber, day: LocalDate?, key: String, now: Instant, get: (Request) -> Reply): Answer? {
         var left: Int? = null
         var unsent = false
+        // What is asked for: the number as it was entered, until the service has named the ticket's form of a callsign.
+        var number = n
         fun <T> ask(path: String, read: (String) -> Read<T>): Read<T> {
             // Once a request was not sent, the lookup is over: nothing more is tried.
             if (unsent) return Read(null, Failure.NO_ANSWER)
-            return when (val reply = send(request(path, n, key), get)) {
+            return when (val reply = send(request(path, number, key), get)) {
                 is Reply.Ok -> read(reply.text).also { r -> r.left?.let { left = it } }
                 is Reply.Failed -> { if (reply.why == Why.OFF) unsent = true; Read(null, failure(reply)) }
             }
@@ -147,6 +149,8 @@ object AirLabs {
                 return Answer(planned, if (planned != null) null else if (day != null && lines.isNotEmpty()) Failure.NOT_THAT_DAY else Failure.NOT_FOUND, left)
             }
             val f = first.value ?: return Answer(null, first.failure ?: Failure.NO_ANSWER, left)
+            // The one-flight question was tried with a callsign; the other two only with a ticket's number, which this reply has.
+            if (n.callsign) FlightNumber.read(f.number)?.takeUnless { it.callsign }?.let { number = it }
             if (day != null) {
                 if (f.from.planned?.toLocalDate() == day || f.from.time?.toLocalDate() == day) return Answer(f, null, left)
                 val timetable = ask(ROUTES) { routes(it) }

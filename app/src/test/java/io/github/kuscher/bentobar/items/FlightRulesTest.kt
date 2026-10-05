@@ -211,6 +211,7 @@ class FlightRulesTest {
     // ---- a flight that is followed
 
     @Test fun aFollowerThatSleptThroughTheLandingSaysLandedAndAsksNothing() {
+        // (By the pace alone. A bar item asks once more on waking, see asleepThroughTheLandingItIsAskedAboutOnceOnWaking.)
         val air = flight("flight-LH455-in-the-air")                              // expected to land 08:01 UTC
         // Still in the air, and for three hours after the landing nobody saw: it counts down to nothing and goes on asking.
         assertEquals(Standing(Stage.IN_AIR, 0), FlightRules.standing(air, at("2026-10-02T11:00:00Z")))

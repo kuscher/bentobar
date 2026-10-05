@@ -43,6 +43,8 @@ object FlightSamples {
             val leaves = local(now, 0, SFO).toLocalDate().plusDays(2).atTime(14, 40)
             lh455(sfo(leaves, gate = null), fra(leaves.plusMinutes(FLIGHT + (FRA - SFO))), FlightState.PLANNED)
         },
+        // In 25 hours: an hour too early for the rule's 24. With the clock two hours on it is 23 hours off, and out.
+        "tomorrow" to { now -> lh455(sfo(local(now, 25 * 60, SFO), gate = null), fra(local(now, 25 * 60 + FLIGHT, FRA)), FlightState.PLANNED) },
         // "1h 37m · Gate G13", On time.
         "soon" to { now -> lh455(sfo(local(now, 97, SFO), expected = local(now, 97, SFO)), fra(local(now, 97 + FLIGHT, FRA)), FlightState.PLANNED) },
         // "1h 37m · +25m · G13", Delayed 25 min.

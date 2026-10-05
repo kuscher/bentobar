@@ -149,7 +149,9 @@ class FlightLoadTest {
             net.says(AirLabs.FLIGHT to reply("flight-LH455-in-the-air"), AirLabs.ROUTES to reply("routes-LH455"))
             val t = found(FlightLoad.track(question("dlh455", LocalDate.of(2026, 10, 3)), asked))
             assertEquals(listOf("/api/v9/flight", "/api/v9/routes"), net.paths)
-            for (r in net.asked) assertEquals(listOf("flight_icao" to "DLH455", "api_key" to key), r.query)
+            // The callsign for the one flight; for the timetable the ticket's number, which the first reply named.
+            assertEquals(listOf("flight_icao" to "DLH455", "api_key" to key), net.asked[0].query)
+            assertEquals(listOf("flight_iata" to "LH455", "api_key" to key), net.asked[1].query)
             assertEquals("DLH455", t.number)
             assertEquals("2026-10-03", t.day)
             assertTrue(t.flight!!.timetable)

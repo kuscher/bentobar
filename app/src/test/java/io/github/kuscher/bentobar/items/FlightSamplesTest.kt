@@ -91,6 +91,20 @@ class FlightSamplesTest {
         assertNull(FlightText.card(tracked("landed"), now.plusSeconds(24 * 3600), us))
     }
 
+    @Test fun theRuleCanBeWalkedThroughWithTheClock() {
+        // Hidden 25 hours before it leaves, out at 23.
+        assertFalse(bar("tomorrow").active)
+        assertFalse(bar("tomorrow", later = 59).active)
+        assertTrue(bar("tomorrow", later = 60).active)
+        assertTrue(bar("tomorrow", later = 120).active)
+        // The landed one came down 20 minutes before it was staged: still out 59 minutes after landing, hidden at 61.
+        assertTrue(bar("landed", later = 39).active)
+        assertFalse(bar("landed", later = 41).active)
+        // And cleared a day after it landed: the menu is back at "No flight tracked".
+        assertNull(FlightText.card(tracked("landed"), now.plusSeconds(24 * 3600 - 20 * 60), us))
+        assertEquals("No flight tracked", FlightText.bar(tracked("landed"), null, now.plusSeconds(24 * 3600 - 20 * 60), 24, us).desc)
+    }
+
     @Test fun aSampleStartsOnItsFigureWhateverTheSecond() {
         for (second in listOf("00", "01", "30", "59")) {
             val at = Instant.parse("2026-10-08T06:20:${second}Z")

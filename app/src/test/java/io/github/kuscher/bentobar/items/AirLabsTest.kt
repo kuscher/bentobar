@@ -397,6 +397,22 @@ class AirLabsTest {
         assertEquals(0, lookup(lh455, now, get = ok(spent)).left)
     }
 
+    @Test fun aCallsignIsAskedForByItsTicketNumberOnceTheServiceHasNamedIt() {
+        // JAL101 was entered. The one-flight question takes a callsign; its reply names the ticket's number, and the
+        // two further questions are then asked with that, the way they were tried against the service.
+        val asked = ArrayList<Request>()
+        val replies = mapOf(AirLabs.FLIGHT to reply("flight-JL101-landed-nine-hours-ago"), AirLabs.SCHEDULES to none, AirLabs.ROUTES to none)
+        val a = lookup(FlightNumber("JAL", 101), at("2026-10-02T07:28:00Z")) { r -> asked += r; Reply.Ok(replies.getValue(r.path)) }
+        assertEquals(FlightState.LANDED, a.flight!!.state)
+        assertEquals(listOf(AirLabs.FLIGHT to ("flight_icao" to "JAL101"), AirLabs.SCHEDULES to ("flight_iata" to "JL101"), AirLabs.ROUTES to ("flight_iata" to "JL101")),
+            asked.map { it.path to it.query.first() })
+        for (r in asked) assertEquals(listOf(r.query.first().first, "api_key"), r.query.map { it.first })
+        // A number the service does not know has no ticket form to go by: its timetable is asked for as it was entered.
+        asked.clear()
+        lookup(FlightNumber("JAL", 9999), at("2026-10-02T07:28:00Z")) { r -> asked += r; Reply.Ok(if (r.path == AirLabs.FLIGHT) reply("error-not-found") else none) }
+        assertEquals(listOf("flight_icao" to "JAL9999", "flight_icao" to "JAL9999"), asked.map { it.query.first() })
+    }
+
     @Test fun aRequestThatWasNotSentIsNoAnswerOfAnyKind() {
         // The switch went off or the bar hid under the lookup: nothing was asked, so there is nothing to say, not "no answer".
         val now = at("2026-10-02T07:29:00Z")

@@ -149,6 +149,27 @@ class DevicesRulesTest {
         assertEquals(listOf(Device("pad", "Controller", Kind.GAMEPAD, 40, charging = true)), both)
     }
 
+    @Test fun twoDevicesAndroidCannotTellApartAreOneRowThatNeverHidesTheLowOne() {
+        // Android's own words: indistinguishable devices, "two keyboards made by the same manufacturer", can share a descriptor.
+        fun twins(first: Pair<Float, Int>, second: Pair<Float, Int>) = DevicesRules.devices(listOf(
+            Seen("twin", "Keyboard", keyboardSources, alphabetic, present = true, capacity = first.first, status = first.second),
+            Seen("twin", "Keyboard", keyboardSources, alphabetic, present = true, capacity = second.first, status = second.second),
+        )).single()
+        assertEquals(10, twins(0.8f to discharging, 0.1f to discharging).percent)
+        assertEquals(10, twins(0.1f to discharging, 0.8f to discharging).percent)
+        // As in the bar: the one charging at 5% doesn't hide the one running out at 30%.
+        val mixed = twins(0.05f to charging, 0.3f to discharging)
+        assertEquals(30, mixed.percent)
+        assertFalse(mixed.charging)
+        val bothCharging = twins(0.4f to charging, 0.2f to charging)
+        assertEquals(20, bothCharging.percent)
+        assertTrue(bothCharging.charging)
+        // Neither says its level: the row says so, and that it is charging if either is.
+        val unknown = twins(Float.NaN to 1, Float.NaN to charging)
+        assertNull(unknown.percent)
+        assertTrue(unknown.charging)
+    }
+
     @Test fun twoDevicesOfOneNameWithDescriptorsOfTheirOwnAreTwo() {
         val listed = DevicesRules.devices(listOf(
             Seen("left", "Controller", 0x401, 0, present = true, capacity = 0.9f, status = discharging),

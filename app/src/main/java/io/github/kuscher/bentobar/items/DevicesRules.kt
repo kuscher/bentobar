@@ -16,6 +16,8 @@ object DevicesRules {
     const val FLOOR_MS = 1_000L
     /** A device that has just connected is asked once more after this long: it often tells its level a moment later. */
     const val SETTLE_MS = 5_000L
+    /** Opening the menu reads the levels again, unless the last reading is younger than this. */
+    const val MENU_FLOOR_MS = 5_000L
     /** The tones' own numbers, as for the Googlebook's battery: a warning below 20%, an alert below 10%, whatever the rule's number is. */
     const val WARN_BELOW = 20
     const val ALERT_BELOW = 10
@@ -76,22 +78,27 @@ object DevicesRules {
      * The devices to list, in the menu's order: one for each descriptor that has a battery. A device
      * that shows up as keys and as a pointer is two input devices with one descriptor: it is one
      * device, with the shorter of the names ("Keychron K3", not "Keychron K3 Mouse") and whatever
-     * either half knows of the battery. A device without a battery is left out: the built-in
-     * keyboard, a wired mouse, a receiver that passes no level on.
+     * either half knows of the battery. Should the halves disagree (Android gives two devices it
+     * can't tell apart one descriptor too), the row is the one that matters more: the lowest that is
+     * not charging, as in the bar. A device without a battery is left out: the built-in keyboard, a
+     * wired mouse, a receiver that passes no level on.
      */
     fun devices(seen: List<Seen>): List<Device> {
         val byDescriptor = LinkedHashMap<String, MutableList<Seen>>()
         // Without a descriptor nothing says that two of them are one: each stands for itself.
         seen.forEachIndexed { i, s -> byDescriptor.getOrPut(s.descriptor.ifEmpty { "\u0000$i" }) { ArrayList() } += s }
         return order(byDescriptor.values.mapNotNull { parts ->
-            val withBattery = parts.filter { it.present }
-            if (withBattery.isEmpty()) return@mapNotNull null
+            val batteries = parts.filter { it.present }.map { percent(it.capacity) to charging(it.status) }
+            if (batteries.isEmpty()) return@mapNotNull null
+            val known = batteries.filter { it.first != null }
+            val (percent, charging) = known.filter { !it.second }.minByOrNull { it.first ?: 0 } ?: known.minByOrNull { it.first ?: 0 }
+                ?: (null to batteries.any { it.second })
             Device(
                 descriptor = parts.first().descriptor,
                 name = parts.map { NowPlayingRules.oneLine(it.name, NAME_MAX) }.filter { it.isNotEmpty() }.minByOrNull { it.length }.orEmpty(),
                 kind = kind(parts.fold(0) { all, p -> all or p.sources }, parts.maxOf { it.keyboardType }),
-                percent = withBattery.firstNotNullOfOrNull { percent(it.capacity) },
-                charging = withBattery.any { charging(it.status) },
+                percent = percent,
+                charging = charging,
             )
         })
     }
@@ -113,7 +120,11 @@ object DevicesRules {
     /** Low: under 20% and not charging. The menu's row is drawn in the error color then, and the sentence says "low". */
     fun low(device: Device): Boolean = device.percent != null && device.percent < WARN_BELOW && !device.charging
 
-    private fun name(device: Device, words: Words) = device.name.ifEmpty { words.unnamed() }
+    /** The device's name as it is shown; a device that has none is called by the word for that. */
+    fun name(device: Device, words: Words): String = device.name.ifEmpty { words.unnamed() }
+
+    /** A level as the bar and the menu write it: "85%". */
+    fun percentText(percent: Int): String = "$percent%"
 
     /** One device as a sentence: the bar's spoken description, and its row's in the menu. */
     fun desc(device: Device, words: Words): String {
@@ -143,7 +154,7 @@ object DevicesRules {
             percent < WARN_BELOW -> Tone.WARN
             else -> Tone.NORMAL
         }
-        return Bar(device.kind.glyph, filled = true, text = "$percent%", tone = tone, active = !device.charging && percent < lowPct,
+        return Bar(device.kind.glyph, filled = true, text = percentText(percent), tone = tone, active = !device.charging && percent < lowPct,
             desc = desc(device, words), tooltip = name(device, words))
     }
 

@@ -32,6 +32,14 @@ object NowPlayingRules {
     }
 
     /**
+     * Whether something that is looked at again every [everyMs] is due at [now], having last been
+     * looked at at [last] (the same clock). Whoever asks is ticked a second apart, give or take a
+     * few milliseconds: a tick that comes a moment early ([slackMs]) counts, or every other look
+     * would slip by a whole tick. A clock that was set back counts as due.
+     */
+    fun due(now: Long, last: Long, everyMs: Long, slackMs: Long = 250): Boolean = (now - last).let { it < 0 || it >= everyMs - slackMs }
+
+    /**
      * [text] as one line: line breaks, tabs and other control characters become spaces, runs of
      * spaces one, none at the ends; at most [max] characters, cut between whole characters (never
      * through the two halves of an emoji). Null is the empty string.

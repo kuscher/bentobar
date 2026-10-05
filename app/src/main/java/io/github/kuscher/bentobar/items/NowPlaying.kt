@@ -185,7 +185,7 @@ object NowPlaying {
             if (askedToBind) { askedToBind = false; MediaAccess.release() }
         }
         // The listener was asked for and hasn't come: stop saying "Starting…" and go on without the titles.
-        if (askedToBind && !listening && Now.elapsed() - startingSince > STARTING_MS && !refused) { refused = true; publish() }
+        if (askedToBind && !listening && !refused && NowPlayingRules.due(Now.elapsed(), startingSince, STARTING_MS, slackMs = 0)) { refused = true; publish() }
         if (was != audible || before != accessOn) publish()
     }
 
@@ -198,7 +198,8 @@ object NowPlaying {
 
     private fun readAccess(force: Boolean) {
         val now = Now.elapsed()
-        if (!force && now - accessReadAt < ACCESS_EVERY_MS) return
+        // Every second tick, also when that one comes a few milliseconds early: access that is taken away shows within two seconds.
+        if (!force && !NowPlayingRules.due(now, accessReadAt, ACCESS_EVERY_MS)) return
         accessReadAt = now
         accessOn = MediaAccess.granted(app)
     }
@@ -259,6 +260,7 @@ object NowPlaying {
         p.callback?.let { cb -> runCatching { p.controller.unregisterCallback(cb) } }
         p.callback = null
         p.art = null
+        p.artFor = null
         p.artOf = null
         p.metadata = null
     }

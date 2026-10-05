@@ -311,18 +311,18 @@ class AirLabsTest {
         // Among the coming ten hours' flights, with the names of the one that landed.
         val soon = Service(mapOf("flight" to landed, "schedules" to """{"response":[{"flight_iata":"JL101","dep_iata":"HND","arr_iata":"ITM","status":"scheduled",
             "dep_time":"2026-10-03 06:30","dep_time_utc":"2026-10-02 21:30","arr_time":"2026-10-03 07:35","arr_time_utc":"2026-10-02 22:35","dep_terminal":"1","dep_gate":"14"}]}"""))
-        val a = lookup(jl101, now, get = soon::get)
+        val a = lookup(jl101, now, get = soon::get).flight!!
         assertEquals(listOf("flight", "schedules"), soon.asked)
-        assertEquals(time("2026-10-03T06:30"), a.flight!!.from.planned)
-        assertEquals("Tokyo", a.flight!!.from.city)
-        assertEquals("Japan Airlines", a.flight!!.airline)
-        assertEquals("14", a.flight!!.from.gate)
+        assertEquals(time("2026-10-03T06:30"), a.from.planned)
+        assertEquals("Tokyo", a.from.city)
+        assertEquals("Japan Airlines", a.airline)
+        assertEquals("14", a.from.gate)
         // Not among them: the timetable's next (here another number's lines stand in for it: the flow is what is tried).
         val far = Service(mapOf("flight" to landed, "schedules" to none, "routes" to reply("routes-LH455")))
-        val b = lookup(jl101, now, get = far::get)
+        val b = lookup(jl101, now, get = far::get).flight!!
         assertEquals(listOf("flight", "schedules", "routes"), far.asked)
-        assertTrue(b.flight!!.timetable)
-        assertEquals(time("2026-10-02T14:40"), b.flight!!.from.planned)
+        assertTrue(b.timetable)
+        assertEquals(time("2026-10-02T14:40"), b.from.planned)
         // Nobody knows of a next one: the one that landed, as it was.
         val last = Service(mapOf("flight" to landed, "schedules" to none, "routes" to none))
         assertEquals(FlightState.LANDED, lookup(jl101, now, get = last::get).flight!!.state)
@@ -341,11 +341,11 @@ class AirLabsTest {
         assertEquals(listOf("flight"), same.asked)
         // Another day: the timetable's.
         val other = Service(both)
-        val a = lookup(lh455, now, LocalDate.of(2026, 10, 3), other::get)
+        val a = lookup(lh455, now, LocalDate.of(2026, 10, 3), other::get).flight!!
         assertEquals(listOf("flight", "routes"), other.asked)
-        assertTrue(a.flight!!.timetable)
-        assertEquals(time("2026-10-03T14:40"), a.flight!!.from.planned)
-        assertEquals("San Francisco", a.flight!!.from.city)
+        assertTrue(a.timetable)
+        assertEquals(time("2026-10-03T14:40"), a.from.planned)
+        assertEquals("San Francisco", a.from.city)
         // A day the timetable does not have it on, and a timetable that is not to be had.
         val mondays = Service(mapOf("flight" to reply("flight-LH455-in-the-air"), "routes" to reply("routes-LH455").replace(Regex("\"days\": \\[[^]]*]"), "\"days\": [\"mon\"]")))
         assertEquals(Failure.NOT_THAT_DAY, lookup(lh455, now, LocalDate.of(2026, 10, 3), mondays::get).failure)
@@ -360,13 +360,13 @@ class AirLabsTest {
         assertEquals(Failure.NOT_FOUND, a.failure)
         assertEquals(listOf("flight", "routes"), unknown.asked)
         val weekly = Service(mapOf("flight" to reply("error-not-found"), "routes" to reply("routes-LH455")))
-        val b = lookup(lh455, now, get = weekly::get)
-        assertTrue(b.flight!!.timetable)
-        assertEquals("LH455", b.flight!!.number)
-        assertEquals("", b.flight!!.airline)                     // the timetable names no airline, and there is no table of them here
-        assertEquals("DLH455", b.flight!!.callsign)              // but it has the callsign, for the flight's page
-        assertEquals("SFO", b.flight!!.from.place)               // no city: the three letters
-        assertEquals(time("2026-10-02T14:40"), b.flight!!.from.planned)
+        val b = lookup(lh455, now, get = weekly::get).flight!!
+        assertTrue(b.timetable)
+        assertEquals("LH455", b.number)
+        assertEquals("", b.airline)                              // the timetable names no airline, and there is no table of them here
+        assertEquals("DLH455", b.callsign)                       // but it has the callsign, for the flight's page
+        assertEquals("SFO", b.from.place)                        // no city: the three letters
+        assertEquals(time("2026-10-02T14:40"), b.from.planned)
         // The timetable could not be asked: that is what is said, not "nothing found" (which would be remembered for an hour).
         val cut = Service(mapOf("flight" to reply("error-not-found")))
         assertEquals(Failure.OFFLINE, lookup(lh455, now, get = cut::get).failure)
@@ -429,9 +429,10 @@ class AirLabsTest {
         val same = planned.copy(from = planned.from.copy(expected = planned.from.planned))
         assertEquals(Said(Saying.ON_TIME), FlightRules.said(same, asked))
         // Late starts fifteen minutes after the plan.
-        val fourteen = planned.copy(from = planned.from.copy(expected = planned.from.planned!!.plusMinutes(14)))
+        val plan = planned.from.planned!!
+        val fourteen = planned.copy(from = planned.from.copy(expected = plan.plusMinutes(14)))
         assertEquals(Said(Saying.ON_TIME), FlightRules.said(fourteen, asked))
-        val fifteen = planned.copy(from = planned.from.copy(expected = planned.from.planned!!.plusMinutes(15)))
+        val fifteen = planned.copy(from = planned.from.copy(expected = plan.plusMinutes(15)))
         assertEquals(Said(Saying.DELAYED, 15), FlightRules.said(fifteen, asked))
         // In the air with nothing known of the landing but its plan.
         val air = flight("flight-LH455-in-the-air")
@@ -449,7 +450,7 @@ class AirLabsTest {
             "dep_iata":"SFO","dep_city":" San\tFrancisco ","dep_gate":"G13\n$long","dep_terminal":"$long","arr_iata":"FRA","arr_baggage":"21 $long","model":"$long"}}""").value!!
         assertEquals("San Francisco", f.from.city)
         assertTrue(f.airline.startsWith("Luft hansa x") && f.airline.length <= 40)
-        assertTrue(f.from.gate!!.length <= 8 && '\n' !in f.from.gate!!)
+        assertTrue(f.from.gate!!.let { it.length <= 8 && '\n' !in it })
         assertTrue(f.from.terminal!!.length <= 12)
         assertTrue(f.to.belt!!.length <= 8)
         assertTrue(f.aircraft!!.length <= 40)

@@ -65,13 +65,13 @@ class FlightRulesTest {
         // The last one landed hours ago, the next is canceled, and the timetable knows of a flight every day.
         val s = Service(mapOf("flight" to reply("flight-JL101-landed-nine-hours-ago"), "schedules" to canceled,
             "routes" to """{"response":[${line("HND", "ITM", "06:30", "21:30", "07:35", "22:35", 65, daily)}]}"""))
-        val a = lookup(jl101, at("2026-10-02T12:00:00Z"), get = s::get)
+        val a = lookup(jl101, at("2026-10-02T12:00:00Z"), get = s::get).flight!!
         assertEquals(listOf("flight", "schedules"), s.asked)
-        assertEquals(FlightState.CANCELED, a.flight!!.state)
-        assertFalse(a.flight!!.timetable)
-        assertEquals(time("2026-10-03T06:30"), a.flight!!.from.planned)
-        assertEquals("Tokyo", a.flight!!.from.city)
-        assertEquals(Said(Saying.CANCELED), FlightRules.said(a.flight!!, at("2026-10-02T12:00:00Z")))
+        assertEquals(FlightState.CANCELED, a.state)
+        assertFalse(a.timetable)
+        assertEquals(time("2026-10-03T06:30"), a.from.planned)
+        assertEquals("Tokyo", a.from.city)
+        assertEquals(Said(Saying.CANCELED), FlightRules.said(a, at("2026-10-02T12:00:00Z")))
         // Three hours after it was to leave it is over, and the one after it is the next.
         assertNull(FlightRules.next(AirLabs.schedules(canceled).value!!, at("2026-10-03T01:00:00Z")))
     }
@@ -338,11 +338,29 @@ class FlightRulesTest {
         assertEquals(30 * min, every(t, "2026-10-02T05:25:00Z"))
         val air = tracked(flight("flight-LH455-in-the-air"), "2026-10-02T02:00:00Z")   // lands 08:01 UTC
         assertEquals(30 * min, every(air, "2026-10-02T02:00:00Z"))
-        // None after landing, none after a cancellation, and none three hours past a landing nobody heard of.
+        // None after landing, and none after a cancellation.
         assertNull(every(tracked(flight("flight-LH96-landed"), "2026-10-02T07:29:00Z"), "2026-10-02T07:30:00Z"))
         assertNull(every(tracked(flight("flight-LH1184-cancelled"), "2026-10-02T07:29:00Z"), "2026-10-02T07:30:00Z"))
-        assertEquals(30 * min, every(air, "2026-10-02T11:00:00Z"))
-        assertNull(every(air, "2026-10-02T11:02:00Z"))
+        // None either three hours past a landing the service never reported, though it was asked all along: it is shown as landed.
+        val asking = tracked(flight("flight-LH455-in-the-air"), "2026-10-02T10:31:00Z")
+        assertEquals(30 * min, every(asking, "2026-10-02T11:00:00Z"))
+        assertNull(every(asking, "2026-10-02T11:02:00Z"))
+    }
+
+    @Test fun asleepThroughTheLandingItIsAskedAboutOnceOnWaking() {
+        // Last heard of in the air at two in the night; the lid opens at four in the afternoon, eight hours after it was to land.
+        val air = tracked(flight("flight-LH455-in-the-air"), "2026-10-02T02:00:00Z")   // expected 08:01 UTC
+        assertEquals(FlightState.LANDED, FlightRules.shown(air.flight!!, at("2026-10-02T16:00:00Z")).state)
+        assertEquals(30 * min, every(air, "2026-10-02T16:00:00Z"))               // long overdue, so: at once
+        // Whatever that ask brings, it was the one: still "in the air" as before, the service gone on to the next day's flight, or landed.
+        assertNull(every(air.copy(askedAt = ms("2026-10-02T16:00:00Z"), heardAt = ms("2026-10-02T16:00:00Z")), "2026-10-02T16:01:00Z"))
+        assertNull(every(air.copy(askedAt = ms("2026-10-02T16:00:00Z"), ended = true), "2026-10-02T16:01:00Z"))
+        assertNull(every(tracked(flight("flight-LH455-landed"), "2026-10-02T16:00:00Z"), "2026-10-02T16:01:00Z"))
+        // If it came to nothing, it is tried again like any failed ask.
+        assertEquals(2 * min, every(air.copy(askedAt = ms("2026-10-02T16:00:00Z"), failure = Failure.OFFLINE, failures = 1), "2026-10-02T16:01:00Z"))
+        // A plan from the timetable was never the service's word: nothing to ask about once its time has passed.
+        val plan = AirLabs.planned(AirLabs.routes(reply("routes-LH455")).value!![0], flight("flight-LH455-in-the-air"), LocalDate.of(2026, 10, 3))!!
+        assertNull(every(tracked(plan, "2026-10-02T07:29:00Z"), "2026-10-04T12:00:00Z"))
     }
 
     @Test fun afterAFailureTheNextAskComesInTwoMinutesAndThenTwiceAsLateEachTimeUpToThirty() {

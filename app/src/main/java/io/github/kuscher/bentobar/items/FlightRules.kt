@@ -511,6 +511,10 @@ object FlightRules {
      * the service has gone on to another flight, nothing while the key is refused or used up, and
      * nothing with fewer than [FEW] lookups left. After an ask that came to nothing: [retry]. A flight
      * that is [cleared] is due at once: the load that follows only puts it away.
+     *
+     * One ask more than [pace] has: a flight that is taken for landed by the clock alone, and was last
+     * heard of before it was to land (the lid was closed through the landing), is asked about once on
+     * waking. The service may know what the clock cannot: that it landed late, or was diverted.
      */
     fun every(t: Tracked, now: Instant): Long? {
         if (!t.following) return null
@@ -518,10 +522,22 @@ object FlightRules {
         val failed = t.failure == AirLabs.Failure.OFFLINE || t.failure == AirLabs.Failure.NO_ANSWER
         if (t.ended || (t.failure != null && !failed)) return null
         if (t.left != null && t.left < FEW) return null
-        // Asked for and never answered (the switch came back on without a connection): there is only the trying again.
-        val usual = if (t.flight == null) NEAR else pace(t.flight, now, t.left) ?: return null
+        val usual = when {
+            // Asked for and never answered (the switch came back on without a connection): there is only the trying again.
+            t.flight == null -> NEAR
+            else -> pace(t.flight, now, t.left) ?: if (unheard(t, t.flight, now)) NEAR else return null
+        }
         return (if (failed) maxOf(retry(t.failures), Duration.ofSeconds((t.waitSec ?: 0).coerceIn(0, 86_400))) else usual).toMillis()
     }
+
+    /** [f] is landed only by [shown]'s reckoning, and nothing was heard of it since it was to land. */
+    private fun unheard(t: Tracked, f: Flight, now: Instant): Boolean {
+        val landing = f.to.time?.let(f.to::moment) ?: return false
+        return shown(f, now) !== f && Instant.ofEpochMilli(t.heardAt).isBefore(landing)
+    }
+
+    /** How long after an ask the next one by hand has to wait: two minutes, or ten seconds after a try that reached nobody. */
+    fun byHand(t: Tracked): Long = AirLabs.keep(t.failure).toMillis()
 
     /** When [f] is put away: [CLEARED] after it landed or was to land; for a flight nobody names a landing for, after it left or was to leave. */
     private fun clearedAt(f: Flight): Instant? = (f.to.time?.let(f.to::moment) ?: f.from.time?.let(f.from::moment))?.plus(CLEARED)

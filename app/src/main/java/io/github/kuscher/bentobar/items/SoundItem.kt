@@ -3,6 +3,7 @@ package io.github.kuscher.bentobar.items
 import android.content.Intent
 import android.media.AudioManager
 import android.provider.Settings
+import android.util.Log
 import android.view.KeyEvent
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,35 +25,93 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kuscher.bentobar.R
+import io.github.kuscher.bentobar.data.Display
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.ui.MediaButtons
 import io.github.kuscher.bentobar.ui.MenuCard
 import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
 import io.github.kuscher.bentobar.ui.SectionLabel
+import io.github.kuscher.bentobar.ui.SwitchRow
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Sym
 import io.github.kuscher.bentobar.util.SymIcon
 
-// The Sound item, in a file of its own (it was in ToolItems.kt).
-
+/**
+ * The Sound item: the media volume as an icon and a number, with the volume and the media keys in
+ * its menu. With "Slider in the bar" on, the number's place is a slider instead: the strip draws it
+ * and takes the pointer (`bar/BarUi.kt`), the item says how full it is and sets what it is dragged
+ * to ([onSlide]). Its arithmetic is in [SoundRules]. With the option off, nothing here differs from
+ * the item before there was a slider.
+ */
 object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R.string.item_sound_desc) {
+    private const val STREAM = AudioManager.STREAM_MUSIC
+
     private fun am() = Env.app.getSystemService(AudioManager::class.java)
+
+    /**
+     * The level the slider draws while the sound is muted: Android reports 0 for a muted stream, so
+     * this is the last level seen while it was on, or the last one the slider itself set (dragged
+     * down to nothing, nothing is kept). 0 until a level was seen.
+     */
+    private var kept = 0f
+
+    /** The lowest media volume there is; it never changes, so it is asked once. */
+    private var lowest: Int? = null
+    private fun min(am: AudioManager): Int = lowest ?: runCatching { am.getStreamMinVolume(STREAM) }.getOrDefault(0).also { lowest = it }
+
+    /** Whether this device's volume is fixed (nothing could be set): asked once each time the item comes alive. */
+    private var fixedNow: Boolean? = null
+    /** Debug builds: a fixed volume staged from adb, to see the item without its slider on a device that has none. */
+    @Volatile private var fixedStaged: Boolean? = null
+    private fun fixed(am: AudioManager): Boolean = fixedStaged ?: fixedNow ?: runCatching { am.isVolumeFixed }.getOrDefault(false).also { fixedNow = it }
+
+    override fun onLive() { fixedNow = null }
 
     override fun state(item: ItemConfig): ItemState {
         val am = am() ?: return ItemState(icon = Sym.VOLUME_UP)
-        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
-        val v = am.getStreamVolume(AudioManager.STREAM_MUSIC)
-        val muted = am.isStreamMute(AudioManager.STREAM_MUSIC) || v == 0
-        val pct = v * 100 / max
+        val max = am.getStreamMaxVolume(STREAM).coerceAtLeast(1)
+        val v = am.getStreamVolume(STREAM)
+        val muted = am.isStreamMute(STREAM) || v == 0
+        val pct = SoundRules.percent(v, max)
+        val on = item.optBool("slider", false)
+        // Only with the option on: a slider needs the lowest volume and whether there is anything to set.
+        val slider = if (!on) null else {
+            val min = min(am)
+            kept = SoundRules.kept(kept, v, min, max, muted)
+            SoundRules.slider(on = true, fixed = fixed(am), volume = v, min = min, max = max, muted = muted, kept = kept)
+        }
         return ItemState(icon = when { muted -> Sym.VOLUME_OFF; pct < 34 -> Sym.VOLUME_MUTE; pct < 67 -> Sym.VOLUME_DOWN; else -> Sym.VOLUME_UP },
             text = if (muted) Env.str(R.string.sound_muted) else "$pct%", widthKey = if (muted) null else "pct",
-            desc = if (muted) Env.str(R.string.sound_muted_desc) else Env.plural(R.plurals.sound_volume_desc, pct))
+            desc = if (muted) Env.str(R.string.sound_muted_desc) else Env.plural(R.plurals.sound_volume_desc, pct),
+            slider = slider,
+            // The number the slider stands for; shown as an icon only, the item has no slider and keeps its name as the tooltip.
+            tooltip = if (slider == null || item.display == Display.ICON) null else if (muted) Env.str(R.string.sound_muted) else Env.str(R.string.sound_tooltip, pct))
     }
 
     override val usesWheel = true
     override fun onScroll(item: ItemConfig, steps: Int) {
-        am()?.adjustStreamVolume(AudioManager.STREAM_MUSIC, if (steps > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER, 0)
+        am()?.adjustStreamVolume(STREAM, if (steps > 0) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER, 0)
+    }
+
+    /**
+     * The slider was clicked or is being dragged: [level] is on one of the volume's steps already. The
+     * flags are 0, so Android shows no volume panel over the bar. This is called from the strip's
+     * pointer handling, where nothing catches: Android refusing must not take the bar down.
+     */
+    override fun onSlide(item: ItemConfig, level: Float, done: Boolean) {
+        val am = am() ?: return
+        try {
+            val min = min(am)
+            val volume = SoundRules.volume(level, min, am.getStreamMaxVolume(STREAM).coerceAtLeast(1))
+            // The level first: on current Android a level above nothing unmutes by itself, and unmuting first
+            // would play the level from before the mute for a moment. Where it doesn't, unmute after.
+            am.setStreamVolume(STREAM, volume, 0)
+            if (volume > min && am.isStreamMute(STREAM)) am.adjustStreamVolume(STREAM, AudioManager.ADJUST_UNMUTE, 0)
+            kept = level.coerceIn(0f, 1f)
+        } catch (e: Exception) {
+            Log.w(Env.TAG, "can't set the volume: ${e.javaClass.simpleName}")
+        }
     }
 
     private fun mediaKey(code: Int) {
@@ -65,25 +124,25 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
         rememberTick()
         val am = am()
         if (am != null) {
-            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+            val max = am.getStreamMaxVolume(STREAM).coerceAtLeast(1)
             // Follows the volume keys and the scroll wheel while the menu is open, except mid-drag.
-            val actual = am.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
+            val actual = am.getStreamVolume(STREAM).toFloat()
             var dragging by remember { mutableStateOf(false) }
             var v by remember { mutableFloatStateOf(actual) }
             LaunchedEffect(actual) { if (!dragging) v = actual }
-            val muted = am.isStreamMute(AudioManager.STREAM_MUSIC)
+            val muted = am.isStreamMute(STREAM)
             val volumeLabel = stringResource(R.string.sound_media_volume)
             MenuCard(Sym.VOLUME_UP, stringResource(R.string.item_sound_title),
                 if (muted) stringResource(R.string.sound_muted) else stringResource(R.string.sound_media_volume_pct, (v * 100 / max).toInt())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FilledTonalIconButton(onClick = {
-                        am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_TOGGLE_MUTE, 0)
+                        am.adjustStreamVolume(STREAM, AudioManager.ADJUST_TOGGLE_MUTE, 0)
                     }) { SymIcon(if (muted) Sym.VOLUME_OFF else Sym.VOLUME_UP, size = 20.sp, contentDescription = stringResource(if (muted) R.string.sound_unmute else R.string.sound_mute)) }
                     Spacer(Modifier.width(8.dp))
                     Slider(value = v, onValueChange = {
                         dragging = true
                         v = it
-                        am.setStreamVolume(AudioManager.STREAM_MUSIC, it.toInt(), 0)
+                        am.setStreamVolume(STREAM, it.toInt(), 0)
                     }, onValueChangeFinished = { dragging = false }, valueRange = 0f..max.toFloat(), steps = (max - 1).coerceAtLeast(0),
                         modifier = Modifier.weight(1f).semantics { contentDescription = volumeLabel })
                 }
@@ -95,5 +154,23 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
                 MenuEntry(Sym.SETTINGS, stringResource(R.string.sound_settings)) { host.close(); Env.launch(Intent(Settings.ACTION_SOUND_SETTINGS)) }
             }
         }
+    }
+
+    override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
+        rememberTick() // the help follows the output while settings are open
+        val fixed = am()?.let { fixed(it) } == true
+        // The switch stays usable on a fixed volume: it applies as soon as there is something to set.
+        SwitchRow(stringResource(R.string.sound_slider), item.optBool("slider", false),
+            help = stringResource(if (fixed) R.string.sound_slider_fixed else R.string.sound_slider_help)) { set(item.with("slider", it.toString())) }
+    }
+
+    override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
+        // `sound fixed on|off` stages a fixed (or a settable) volume, anything else ends the staging.
+        "fixed" -> {
+            fixedStaged = when (args.getOrNull(1)) { "on" -> true; "off" -> false; else -> null }
+            Ticker.refresh()
+            "fixed volume staged=$fixedStaged"
+        }
+        else -> null
     }
 }

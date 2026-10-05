@@ -61,10 +61,11 @@ object WorldClock {
 
     /**
      * One row of the list: a zone and what it is called. [here]: the device's own zone, the first row.
-     * [city]: the city that was added for this zone, if one was (the row can then be removed in the
-     * menu; a row can be a Clock item's and an added city's at once).
+     * [labeled]: a Clock item's label names it, so the name of an added city would not show. [city]:
+     * the city that was added for this zone, if one was (it can then be removed in the menu; a row
+     * can be a Clock item's and an added city's at once).
      */
-    data class Place(val zone: ZoneId, val name: String, val here: Boolean = false, val city: WorldCity? = null)
+    data class Place(val zone: ZoneId, val name: String, val here: Boolean = false, val labeled: Boolean = false, val city: WorldCity? = null)
 
     /**
      * The places of the list at [now]: the device's zone first, then the zones of the Clock items and
@@ -85,7 +86,7 @@ object WorldClock {
         val at = Instant.ofEpochMilli(now)
         val all = found.values.map { f ->
             val name = f.label.ifEmpty { f.city?.let { clean(it.name) }.orEmpty() }.ifEmpty { cityOf(f.zone.id) }
-            Place(f.zone, name, here = f.zone.id == local.id, city = f.city)
+            Place(f.zone, name, here = f.zone.id == local.id, labeled = f.label.isNotEmpty(), city = f.city)
         }
         return all.take(1) + all.drop(1).map { it to it.zone.rules.getOffset(at).totalSeconds }
             .sortedWith(compareBy<Pair<Place, Int>> { it.second }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.first.name }.thenBy { it.first.zone.id })
@@ -237,7 +238,8 @@ object WorldClock {
     /**
      * One result. [region]: what tells it from another result of the same name ("San Juan
      * (Argentina)"), else null. [ahead]: seconds ahead of the device's time at this moment. [added]:
-     * the list has its zone already. [named]: found as a city of the table rather than as a zone.
+     * the list has it already, so it can't be taken. [named]: found as a city of the table rather than
+     * as a zone.
      */
     data class Hit(val zone: String, val name: String, val region: String?, val ahead: Int, val added: Boolean, val named: Boolean) {
         /** What it is called in the list once added: "Munich" for a city of the table; nothing for a zone, which is called by its own city anyway. */
@@ -278,13 +280,22 @@ object WorldClock {
         /**
          * At most [limit] results for what was typed, from [MIN_LETTERS] letters on: each group of
          * [rank] by name. Two results with one name get their [Hit.region], unless they are one place
-         * under two zone names (Asia/Istanbul and Europe/Istanbul), which is listed once. [cities]: the
-         * list as it is, for [Hit.added]; [local] and [now]: for the difference beside each result.
+         * under two zone names (Asia/Istanbul and Europe/Istanbul), which is listed once.
+         *
+         * A result reads as added when the list has a city of its zone ([cities]: a zone is not added
+         * twice), and also when a row of its zone is among the [places] anyway (the device's own, a
+         * Clock item's) and taking the result would change nothing there. It would change something
+         * where it brings the row a name: with the device in Los Angeles, "Los Angeles" is there
+         * already, while "San Francisco" makes the row "Here (San Francisco)". A row that a Clock
+         * item's label names keeps that name whatever is added. The differences beside the results are
+         * those to the device's time at [now].
          */
-        fun search(text: String, cities: List<WorldCity>, local: ZoneId, now: Long, limit: Int = RESULTS): List<Hit> {
+        fun search(text: String, places: List<Place>, cities: List<WorldCity>, now: Long, limit: Int = RESULTS): List<Hit> {
             val q = key(cut(text, 64))
             if (q.length < MIN_LETTERS) return emptyList()
-            val listed = cities.mapTo(HashSet()) { it.zone }
+            val inList = cities.mapTo(HashSet()) { it.zone }
+            val rows = places.associateBy { it.zone.id }
+            fun there(e: Entry): Boolean = e.zone in inList || rows[e.zone]?.let { it.labeled || !e.named } == true
             class Pick(var entry: Entry, val zone: ZoneId)
             val picked = ArrayList<Pick>()
             // The entries are in the order of their names, and sorting by rank keeps that order within a rank.
@@ -293,18 +304,18 @@ object WorldClock {
                 val twin = picked.firstOrNull { it.entry.key == e.key && it.zone.rules == zone.rules }
                 if (twin != null) {
                     // If the list has the place under one of its two names, that is the one to show, as added.
-                    if (e.zone in listed && twin.entry.zone !in listed) twin.entry = e
+                    if (there(e) && !there(twin.entry)) twin.entry = e
                     continue
                 }
                 if (picked.size >= limit) break
                 picked += Pick(e, zone)
             }
             val at = Instant.ofEpochMilli(now)
-            val here = local.rules.getOffset(at).totalSeconds
+            val here = places.firstOrNull { it.here }?.zone?.rules?.getOffset(at)?.totalSeconds ?: 0
             return picked.map { p ->
                 val twice = picked.count { it.entry.key == p.entry.key } > 1
                 Hit(p.entry.zone, p.entry.name, p.entry.region.takeIf { twice && it.isNotEmpty() }, p.zone.rules.getOffset(at).totalSeconds - here,
-                    added = p.entry.zone in listed, named = p.entry.named)
+                    added = there(p.entry), named = p.entry.named)
             }
         }
     }

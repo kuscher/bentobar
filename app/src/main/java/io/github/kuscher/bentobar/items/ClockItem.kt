@@ -173,7 +173,7 @@ private fun WorldClockMenu(item: ItemConfig, host: MenuHost) {
             Env.launch(Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, at))
         }
         MenuDivider()
-        AddCity(cfg.cities, local, now)
+        AddCity(cfg.cities, places, now)
         if (cfg.cities.isNotEmpty()) MenuEntry(if (editing) Sym.CHECK else Sym.EDIT, stringResource(if (editing) R.string.common_done else R.string.clock_edit_cities)) { editing = !editing }
         MenuEntry(Sym.ALARM, stringResource(R.string.clock_alarms)) { host.close(); Env.launch(Intent(AlarmClock.ACTION_SHOW_ALARMS)) }
         MenuEntry(Sym.SETTINGS, stringResource(R.string.clock_date_settings)) { host.close(); Env.launch(Intent(Settings.ACTION_DATE_SETTINGS)) }
@@ -213,10 +213,11 @@ private fun PlaceRow(row: WorldClock.Row, planned: Boolean, editing: Boolean, on
  * "Add a city": the entry, and in its place once it is clicked a field that lists cities and zones
  * as they are typed, from what the device knows (no connection is involved). Enter takes the first
  * result that isn't in the list yet, a click any; the field then closes and the entry is back. With
- * the list full the entry is dimmed and the reason stands under it.
+ * the list full the entry is dimmed and the reason stands under it. [places]: the rows as they are,
+ * so that a place that has one reads "added".
  */
 @Composable
-private fun AddCity(cities: List<WorldCity>, local: ZoneId, now: Long) {
+private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now: Long) {
     var adding by remember { mutableStateOf(false) }
     // After Enter took a result, the keyboard's focus goes back to the entry: the next city is one more Enter away.
     var refocus by remember { mutableStateOf(false) }
@@ -232,7 +233,7 @@ private fun AddCity(cities: List<WorldCity>, local: ZoneId, now: Long) {
     }
     var query by remember { mutableStateOf("") }
     // The differences beside the results are those of this minute.
-    val hits = remember(query, cities, local, now / 60_000) { zoneIndex.search(query, cities, local, now) }
+    val hits = remember(query, cities, places, now / 60_000) { zoneIndex.search(query, places, cities, now) }
     val free = WorldClock.firstFree(hits)
     val field = remember { FocusRequester() }
     val first = remember { FocusRequester() }

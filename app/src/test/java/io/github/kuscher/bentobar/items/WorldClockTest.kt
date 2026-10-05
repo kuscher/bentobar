@@ -44,6 +44,7 @@ class WorldClockTest {
     private val utc = ZoneId.of("UTC")
     private val words = worldClockWords()
     private val everyZone = WorldClock.Index(ZoneId.getAvailableZoneIds())
+    private val json = Json { encodeDefaults = true }
 
     private fun at(local: String, zone: ZoneId): Long = LocalDateTime.parse(local).atZone(zone).toInstant().toEpochMilli()
     private fun city(zone: String, name: String = "") = WorldCity(zone, name)
@@ -124,6 +125,7 @@ class WorldClockTest {
         assertEquals(listOf("Los Angeles", "MUC", "Tokyo"), places.map { it.name })
         // The row of a clock keeps the city that was added for its zone, so that the city can be removed again.
         assertEquals(listOf(null, city("Europe/Berlin", "Munich"), city("Asia/Tokyo")), places.map { it.city })
+        assertEquals(listOf(false, true, false), places.map { it.labeled })
     }
 
     @Test fun theDevicesOwnZoneIsHereAndIsNamedTheSameWay() {
@@ -332,7 +334,7 @@ class WorldClockTest {
 
     @Test fun citiesAddedInTheMenuTravelWithACopiedLayout() {
         val cities = WorldClock.add(WorldClock.add(emptyList(), "Asia/Tokyo"), "Europe/Berlin", "Munich")
-        val copied = Json { encodeDefaults = true }.encodeToString(BarConfig.serializer(), BarConfig(cities = cities))
+        val copied = json.encodeToString(BarConfig.serializer(), BarConfig(cities = cities))
         val pasted = Store.parseLayout(copied)!!.keepingLocal(BarConfig())
         assertEquals(listOf(city("Asia/Tokyo"), city("Europe/Berlin", "Munich")), pasted.cities)
     }
@@ -344,8 +346,12 @@ class WorldClockTest {
 
     private fun names(hits: List<WorldClock.Hit>) = hits.map { if (it.region != null) "${it.name} (${it.region})" else it.name }
 
+    /** What the search finds on a device in Los Angeles that Monday, with these cities in the list and these Clock items in the bar. */
+    private fun find(text: String, cities: List<WorldCity> = emptyList(), clocks: List<Clock> = emptyList(), index: WorldClock.Index = everyZone,
+                     limit: Int = WorldClock.RESULTS) = index.search(text, WorldClock.places(la, clocks, cities, monday), cities, monday, limit)
+
     @Test fun tokListsTokyoAtOnce() {
-        val hit = everyZone.search("tok", emptyList(), la, monday).first()
+        val hit = find("tok").first()
         assertEquals("Asia/Tokyo", hit.zone)
         assertEquals("Tokyo", hit.name)
         assertEquals("", hit.nameInList)
@@ -354,74 +360,74 @@ class WorldClockTest {
     }
 
     @Test fun resultsComeFromTwoLetters() {
-        assertEquals(emptyList<WorldClock.Hit>(), everyZone.search("", emptyList(), la, monday))
-        assertEquals(emptyList<WorldClock.Hit>(), everyZone.search("t", emptyList(), la, monday))
-        assertEquals(emptyList<WorldClock.Hit>(), everyZone.search(" t. ", emptyList(), la, monday))
-        assertTrue(everyZone.search("to", emptyList(), la, monday).isNotEmpty())
+        assertEquals(emptyList<WorldClock.Hit>(), find(""))
+        assertEquals(emptyList<WorldClock.Hit>(), find("t"))
+        assertEquals(emptyList<WorldClock.Hit>(), find(" t. "))
+        assertTrue(find("to").isNotEmpty())
         assertEquals(2, WorldClock.MIN_LETTERS)
     }
 
     @Test fun atMostSixResultsShow() {
         assertEquals(6, WorldClock.RESULTS)
-        assertEquals(6, everyZone.search("an", emptyList(), la, monday).size)
-        assertEquals(3, everyZone.search("an", emptyList(), la, monday, limit = 3).size)
+        assertEquals(6, find("an").size)
+        assertEquals(3, find("an", limit = 3).size)
     }
 
     @Test fun namesThatBeginWithTheTextComeFirstThenNamesThatContainItEachByName() {
-        assertEquals(listOf("Tokyo", "Toronto", "Porto-Novo", "Stockholm"), names(few.search("to", emptyList(), la, monday)))
-        assertEquals(listOf("Stockholm"), names(few.search("STOCK", emptyList(), la, monday)))
-        assertEquals(emptyList<String>(), names(few.search("zz", emptyList(), la, monday)))
+        assertEquals(listOf("Tokyo", "Toronto", "Porto-Novo", "Stockholm"), names(find("to", index = few)))
+        assertEquals(listOf("Stockholm"), names(find("STOCK", index = few)))
+        assertEquals(emptyList<String>(), names(find("zz", index = few)))
     }
 
     @Test fun aTimeZoneCanBeTypedToo() {
-        assertEquals(listOf("Berlin", "Stockholm"), names(few.search("europe", emptyList(), la, monday)))
-        assertEquals(listOf("Stockholm"), names(few.search("Europe/St", emptyList(), la, monday)))
-        assertEquals(listOf("UTC"), few.search("utc", emptyList(), la, monday).map { it.zone })
+        assertEquals(listOf("Berlin", "Stockholm"), names(find("europe", index = few)))
+        assertEquals(listOf("Stockholm"), names(find("Europe/St", index = few)))
+        assertEquals(listOf("UTC"), find("utc", index = few).map { it.zone })
     }
 
     @Test fun onlyPlacesAndUtcAreOffered() {
         // Not the old short names (EST5EDT, Japan), and not Etc/GMT+5, whose sign means the opposite of what it says.
-        assertEquals(emptyList<String>(), names(few.search("gmt", emptyList(), la, monday)))
-        assertEquals(emptyList<String>(), names(few.search("est", emptyList(), la, monday)))
-        assertEquals(emptyList<String>(), names(few.search("japan", emptyList(), la, monday)))
-        assertEquals(listOf("UTC"), names(few.search("ut", emptyList(), la, monday)))
-        assertEquals(listOf("GMT"), everyZone.search("gmt", emptyList(), la, monday).map { it.zone })
+        assertEquals(emptyList<String>(), names(find("gmt", index = few)))
+        assertEquals(emptyList<String>(), names(find("est", index = few)))
+        assertEquals(emptyList<String>(), names(find("japan", index = few)))
+        assertEquals(listOf("UTC"), names(find("ut", index = few)))
+        assertEquals(listOf("GMT"), find("gmt").map { it.zone })
     }
 
     @Test fun accentsCapitalsAndPunctuationMakeNoDifference() {
-        assertEquals("America/Sao_Paulo", everyZone.search("São Paulo", emptyList(), la, monday).first().zone)
-        assertEquals("America/Port-au-Prince", everyZone.search("port au", emptyList(), la, monday).first().zone)
-        assertEquals("America/New_York", everyZone.search("  new   york ", emptyList(), la, monday).first().zone)
-        assertEquals("America/New_York", everyZone.search("NEW_YORK", emptyList(), la, monday).first().zone)
-        for (typed in listOf("st louis", "St. Louis", "ST.LOUIS")) assertEquals("St. Louis", everyZone.search(typed, emptyList(), la, monday).first().name)
+        assertEquals("America/Sao_Paulo", find("São Paulo").first().zone)
+        assertEquals("America/Port-au-Prince", find("port au").first().zone)
+        assertEquals("America/New_York", find("  new   york ").first().zone)
+        assertEquals("America/New_York", find("NEW_YORK").first().zone)
+        for (typed in listOf("st louis", "St. Louis", "ST.LOUIS")) assertEquals("St. Louis", find(typed).first().name)
         assertEquals("sao paulo", WorldClock.key(" São  Paulo! "))
     }
 
     @Test fun oneAlreadyInTheListIsMarkedAndEnterTakesTheFirstThatIsNot() {
-        val hits = few.search("to", cities("Asia/Tokyo"), la, monday)
+        val hits = find("to", cities("Asia/Tokyo"), index = few)
         assertEquals(listOf(true, false, false, false), hits.map { it.added })
         assertEquals("Toronto", WorldClock.firstFree(hits)!!.name)
-        assertNull(WorldClock.firstFree(few.search("tok", cities("Asia/Tokyo"), la, monday)))
+        assertNull(WorldClock.firstFree(find("tok", cities("Asia/Tokyo"), index = few)))
         assertNull(WorldClock.firstFree(emptyList()))
     }
 
     @Test fun theResultsReadAsTheDesignDrawsThem() {
-        val hits = everyZone.search("to", cities("Asia/Tokyo"), la, monday, limit = 50).associateBy { it.name }
+        val hits = find("to", cities("Asia/Tokyo"), limit = 50).associateBy { it.name }
         fun beside(hit: WorldClock.Hit) = WorldClock.beside(hit, appText("clock_search_added"), appText("clock_same_time"))
         assertEquals("added", beside(hits.getValue("Tokyo")))
         assertEquals("+3h", beside(hits.getValue("Toronto")))
         assertEquals("+3h", beside(hits.getValue("Tortola")))
         assertEquals("+20h", beside(hits.getValue("Tongatapu")))
-        // The device's own place has no difference.
-        assertEquals("Same time", beside(everyZone.search("los angeles", emptyList(), la, monday).first()))
+        // Another place with the device's time.
+        assertEquals("Same time", beside(find("vancouver").first()))
     }
 
     @Test fun twoResultsWithOneNameGetTheirRegion() {
-        assertEquals(setOf("San Juan (Argentina)", "San Juan (Puerto Rico)"), names(everyZone.search("san juan", emptyList(), la, monday)).toSet())
-        assertEquals(listOf("Pacific (Canada)", "Pacific (US)"), names(everyZone.search("pacific", emptyList(), la, monday)).take(2))
+        assertEquals(setOf("San Juan (Argentina)", "San Juan (Puerto Rico)"), names(find("san juan")).toSet())
+        assertEquals(listOf("Pacific (Canada)", "Pacific (US)"), names(find("pacific")).take(2))
         assertEquals("%1\$s (%2\$s)", appText("clock_search_region"))
         // One of a kind has none.
-        assertNull(everyZone.search("tokyo", emptyList(), la, monday).single().region)
+        assertNull(find("tokyo").single().region)
         assertEquals("Argentina", WorldClock.regionOf("America/Argentina/San_Juan"))
         assertEquals("Europe", WorldClock.regionOf("Europe/Istanbul"))
         assertEquals("", WorldClock.regionOf("UTC"))
@@ -429,21 +435,46 @@ class WorldClockTest {
 
     @Test fun onePlaceUnderTwoZoneNamesIsListedOnce() {
         // Asia/Istanbul and Europe/Istanbul are one zone under two names.
-        val istanbul = everyZone.search("istanbul", emptyList(), la, monday)
+        val istanbul = find("istanbul")
         assertEquals(listOf("Istanbul"), names(istanbul))
         // If the list has it under the other name, that is the one found, and it reads "added".
         for (id in listOf("Asia/Istanbul", "Europe/Istanbul")) {
-            val hit = everyZone.search("istanbul", cities(id), la, monday).single()
+            val hit = find("istanbul", cities(id)).single()
             assertEquals(id, hit.zone)
             assertTrue(hit.added)
         }
-        assertEquals(listOf("Buenos Aires"), names(everyZone.search("buenos", emptyList(), la, monday)))
+        assertEquals(listOf("Buenos Aires"), names(find("buenos")))
+        // The same when it is a Clock item that has it under the other name.
+        val clock = find("istanbul", clocks = listOf(Clock(ZoneId.of("Europe/Istanbul"), "IST"))).single()
+        assertEquals("Europe/Istanbul", clock.zone)
+        assertTrue(clock.added)
+    }
+
+    @Test fun aPlaceThatHasARowAnywayReadsAddedUnlessTheResultWouldNameIt() {
+        // Where the device is: Los Angeles is in the list as "Here"; San Francisco would be its name.
+        assertTrue(find("los angeles").first().added)
+        val sanFrancisco = find("san francisco").single()
+        assertFalse(sanFrancisco.added)
+        assertEquals("Same time", WorldClock.beside(sanFrancisco, appText("clock_search_added"), appText("clock_same_time")))
+        assertEquals("Here (San Francisco)", WorldClock.rows(WorldClock.places(la, emptyList(), WorldClock.add(emptyList(), sanFrancisco.zone, sanFrancisco.nameInList), monday), monday, false, words).single().title)
+        // A Clock item of Berlin without a label: Berlin is there, and Munich would name its row.
+        val plain = listOf(Clock(berlin))
+        assertTrue(find("berlin", clocks = plain).first().added)
+        assertFalse(find("munich", clocks = plain).single().added)
+        assertEquals("Munich", WorldClock.places(la, plain, WorldClock.add(emptyList(), "Europe/Berlin", "Munich"), monday).last().name)
+        // A label names the row whatever is added: taking Berlin or Munich would change nothing, so neither can be taken.
+        val labeled = listOf(Clock(berlin, "MUC"))
+        assertTrue(find("berlin", clocks = labeled).first().added)
+        assertTrue(find("munich", clocks = labeled).single().added)
+        assertNull(WorldClock.firstFree(find("munich", clocks = labeled)))
+        // Places without a row are free as ever.
+        assertFalse(find("tokyo", clocks = labeled).single().added)
     }
 
     // ---- cities that are no zone's name ----
 
     @Test fun munichFindsBerlinsZoneAndIsAddedAsMunich() {
-        val hit = everyZone.search("Munich", emptyList(), la, monday).single()
+        val hit = find("Munich").single()
         assertEquals("Europe/Berlin", hit.zone)
         assertEquals("Munich", hit.name)
         assertEquals("Munich", hit.nameInList)
@@ -451,22 +482,22 @@ class WorldClockTest {
         assertEquals(listOf(city("Europe/Berlin", "Munich")), added)
         assertEquals("Munich", WorldClock.places(la, emptyList(), added, monday).last().name)
         // Its zone can't be added twice: Berlin and Munich both read "added" now.
-        assertTrue(everyZone.search("munich", added, la, monday).single().added)
-        assertTrue(everyZone.search("berlin", added, la, monday).first().added)
+        assertTrue(find("munich", added).single().added)
+        assertTrue(find("berlin", added).first().added)
     }
 
     @Test fun sanFranciscoAndBengaluruAreFoundToo() {
-        assertEquals("America/Los_Angeles", everyZone.search("san fr", emptyList(), la, monday).single().zone)
-        assertEquals("San Francisco", everyZone.search("francisco", emptyList(), la, monday).single().nameInList)
-        assertEquals("Asia/Kolkata", everyZone.search("bengaluru", emptyList(), la, monday).single().zone)
-        assertEquals("Asia/Kolkata", everyZone.search("bangal", emptyList(), la, monday).single().zone)
-        assertEquals("+12:30", WorldClock.offset(everyZone.search("mumbai", emptyList(), la, monday).single().ahead))
+        assertEquals("America/Los_Angeles", find("san fr").single().zone)
+        assertEquals("San Francisco", find("francisco").single().nameInList)
+        assertEquals("Asia/Kolkata", find("bengaluru").single().zone)
+        assertEquals("Asia/Kolkata", find("bangal").single().zone)
+        assertEquals("+12:30", WorldClock.offset(find("mumbai").single().ahead))
     }
 
     @Test fun aCityWhoseZoneThisDeviceLacksIsNotOffered() {
         val index = WorldClock.Index(listOf("Asia/Tokyo"), listOf(WorldClockCities.City("Osaka", "Asia/Tokyo"), WorldClockCities.City("Munich", "Europe/Berlin")))
-        assertEquals(listOf("Osaka"), names(index.search("os", emptyList(), la, monday)))
-        assertEquals(emptyList<String>(), names(index.search("mu", emptyList(), la, monday)))
+        assertEquals(listOf("Osaka"), names(find("os", index = index)))
+        assertEquals(emptyList<String>(), names(find("mu", index = index)))
     }
 
     @Test fun everyCityOfTheTableIsInAZoneThisMachineKnows() {

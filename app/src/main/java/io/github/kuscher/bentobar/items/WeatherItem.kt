@@ -93,8 +93,11 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     private var keptFor: Set<Place>? = null
 
     /**
-     * The last reading of a place is deleted with the last item that shows it (or when that item
-     * gets another city): looked at whenever the layout's items changed. Main thread.
+     * The last reading of a place is deleted with the last item that shows it, when that item gets
+     * another city, and when it is turned off: looked at whenever the layout's items changed, from
+     * [sample] and from [onIdle]. That an item in Off keeps no reading is what makes this sure: the
+     * tick that turns the last item off still runs [onIdle] for the type, while a later delete of an
+     * item that is off runs nothing at all ([WeatherLoad.places]). Main thread.
      */
     private fun tidy() {
         val items = Store.config.value.items

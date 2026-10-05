@@ -55,8 +55,14 @@ object WeatherLoad {
     /** The city search: the text of the field and nothing of the user. No language is sent (the consent words name none), so names come in English. */
     fun searchRequest(text: String) = Request(Host.OPEN_METEO_GEOCODING, "/v1/search", listOf("name" to text, "count" to "5", "format" to "json"))
 
-    /** The places the layout's Weather items ask about, wherever the items are: one that is turned off keeps its settings, and its last reading with them. */
-    fun places(items: List<ItemConfig>): Set<Place> = items.filter { it.type == "weather" }.mapNotNullTo(HashSet()) { WeatherRules.place(it) }
+    /**
+     * The places a reading is kept for: those of the layout's Weather items that are not turned off.
+     * An item in Off keeps its settings and nothing else. Its reading goes while the type still has a
+     * live item to look at the layout (the tick that turns it off); kept with an item that is off, it
+     * would outlive the item, since nothing runs for a type whose last item is off when that is deleted.
+     */
+    fun places(items: List<ItemConfig>): Set<Place> =
+        items.filter { it.type == "weather" && it.section != Section.OFF }.mapNotNullTo(HashSet()) { WeatherRules.place(it) }
 
     /**
      * Asks the service about [place]; blocks, so only a background load calls it. A good answer is a
@@ -268,11 +274,12 @@ class WeatherSource(
 
     /**
      * The layout's places are now [places]: readings of any other place go, from memory at once and
-     * from the device in the background ("deleted with the item"). Main thread.
+     * from the device in the background ("deleted with the item"). On an install that never set
+     * Weather up nothing was ever fetched, so there is nothing to look for. Main thread.
      */
     fun keepOnly(places: Set<Place>) {
         readings.keepOnly(places)
-        background.execute { WeatherLoad.tidy(places) }
+        if (Online.setUp(service)) background.execute { WeatherLoad.tidy(places) }
     }
 
     companion object {

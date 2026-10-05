@@ -56,8 +56,11 @@ class WeatherSourceTest {
         return WeatherSource.make(
             refresher = { every, restore, load -> Refresher(wiring, every, restore, load).also { readings = it } },
             ask = { work -> Ask(wiring, work).also { asking = it } },
-            background = Executor { it.run() }, wall = { wall }, layout = { layout }, staged = staged, up = { elapsed })
+            background = Executor { backgroundRuns++; it.run() }, wall = { wall }, layout = { layout }, staged = staged, up = { elapsed })
     }
+
+    /** How often something was handed to the background thread that tidies the device. */
+    private var backgroundRuns = 0
 
     /** What the app does when the switch goes off (`Env.wireOnline`): the loader and the search forget. */
     private fun switchOff() { Online.turnOff(OPEN_METEO); readings.forget(); asking.clear() }
@@ -675,6 +678,45 @@ class WeatherSourceTest {
         after.watch(item, 1 * min)
         assertEquals(2, net.asked.size)
         assertTrue(after.status(item, wall) is Status.Live)
+    }
+
+    @Test fun anItemTurnedOffLeavesNoReadingSoDeletingItLaterLeavesNoneEither() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        assertEquals(setOf(Kept.safe("47.37,8.55")), Kept.fetched(OPEN_METEO).names())
+        // Turned off. The tick that puts the type to sleep looks at the layout one last time, and that is when the reading goes.
+        val off = item.copy(section = Section.OFF)
+        layout = listOf(off)
+        s.keepOnly(WeatherLoad.places(layout))
+        assertEquals(emptySet<String>(), Kept.fetched(OPEN_METEO).names())
+        assertNull(s.peek(off))
+        // Deleted while off: nothing runs for a type without a live item, and nothing has to.
+        layout = emptyList()
+        assertEquals(emptySet<String>(), Kept.fetched(OPEN_METEO).names())
+        // Turned on again instead, it asks afresh: one request, like an item that is new.
+        layout = listOf(item)
+        s.keepOnly(WeatherLoad.places(layout))
+        assertNotNull(s.reading(item))
+        assertEquals(2, net.asked.size)
+    }
+
+    @Test fun onAnInstallThatNeverSetWeatherUpThereIsNothingToTidy() = FakeHttp.use { net ->
+        val s = source()
+        layout = listOf(added)
+        s.keepOnly(WeatherLoad.places(layout))
+        s.keepOnly(emptySet())
+        // No work for a background thread, no folder made: nothing was ever fetched here.
+        assertEquals(0, backgroundRuns)
+        assertFalse(File(dir, "fetched").exists())
+        sentNothing(net)
+        // Once it was set up, a change of the layout does look.
+        s.turnOn()
+        s.keepOnly(emptySet())
+        assertEquals(1, backgroundRuns)
     }
 
     @Test fun theLastReadingIsDeletedWithTheItem() = FakeHttp.use { net ->

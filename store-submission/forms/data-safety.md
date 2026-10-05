@@ -28,7 +28,10 @@ Proposed answers:
    device and has no accounts. Answer as Play's form allows for an app without accounts; deletion at the two
    services is theirs (the AirLabs key is the user's own account there).
 4. **Approximate location:** collected, not shared; optional (only with the Weather item); purpose: App
-   functionality; processed ephemerally by the service, not stored by the developer.
+   functionality. **Not** "processed ephemerally": the form's word for data that is only held in memory for
+   one request, and such data is then left off the listing. The developer stores nothing, but Open-Meteo
+   keeps request logs for 90 days (its terms, and the app's own About page says so), so the type is declared
+   and shown.
 5. **In-app search history:** collected, not shared; optional (Weather's city search, Flight's number);
    purpose: App functionality.
 6. **"Shared"** (a transfer to a third party): proposed **No**, under the form's exception for a transfer the
@@ -42,4 +45,8 @@ stored or sent); calendar events; device and battery readings; the layout.
 
 Also to change with 0.9, outside this form: the privacy page (googlebook.studio/privacy/bentobar), the store
 description's "Private" paragraph (done in `listing/en-US/full-description.txt`), the permission list in
-`app-content.md`. The Accessibility declaration and its video stay valid: the consent screen did not change.
+`app-content.md`, the reason in `content-rating.md`. In the Accessibility declaration the consent screen did
+not change, but the description Android shows on the page with the switch did: 0.8's ended "It has no internet
+permission", 0.9's ends "Nothing the service reads ever leaves your Googlebook: BentoBar never collects or
+shares it." The declaration's video shows that page, so record it again with the 0.9 build before sending 0.9
+for review, and publish the new privacy page before that too.

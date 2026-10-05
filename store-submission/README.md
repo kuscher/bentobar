@@ -17,7 +17,7 @@ account Fika Labs (7424304467248438473).
 | Screenshots | [graphics/large-screen/](graphics/large-screen) (4) | 1920 × 1080 (16:9), 24-bit PNG. Used for phone, 7-inch, 10-inch and Chromebook |
 | Store settings, contact, category | [forms/store-settings.md](forms/store-settings.md) | |
 | Privacy policy | https://googlebook.studio/privacy/bentobar | public, outside googlebook.studio's invite gate |
-| Data safety | [forms/data-safety.md](forms/data-safety.md) | "No data collected" |
+| Data safety | [forms/data-safety.md](forms/data-safety.md) | "No data collected" up to 0.8; from 0.9 the form changes, see the draft in the file |
 | Content rating (IARC) | [forms/content-rating.md](forms/content-rating.md) | expected: Everyone / PEGI 3 |
 | Other App content declarations | [forms/app-content.md](forms/app-content.md) | |
 

@@ -453,13 +453,24 @@ class FlightRulesTest {
         assertEquals(30 * min, every(t, "2026-10-02T07:24:00Z"))
         assertEquals(10 * min, every(t, "2026-10-02T07:25:00Z"))
         assertEquals(10 * min, every(t, "2026-10-02T08:25:00Z"))
-        // Its time has passed and nobody says it has left: the usual pace again.
-        assertEquals(30 * min, every(t, "2026-10-02T08:26:00Z"))
+        // Its time has passed and nobody says it has left: that is when someone watches most, so the quicker pace holds
+        // for an hour more, and then it is the usual one again.
+        assertEquals(10 * min, every(t, "2026-10-02T08:26:00Z"))
+        assertEquals(10 * min, every(t, "2026-10-02T09:25:00Z"))
+        assertEquals(30 * min, every(t, "2026-10-02T09:26:00Z"))
         val air = tracked(flight("flight-LH455-in-the-air"), "2026-10-02T07:00:00Z")   // expected to land 08:01 UTC
         assertEquals(30 * min, every(air, "2026-10-02T07:30:00Z"))
         assertEquals(10 * min, every(air, "2026-10-02T07:31:00Z"))
         assertEquals(10 * min, every(air, "2026-10-02T08:01:00Z"))
-        assertEquals(30 * min, every(air, "2026-10-02T08:02:00Z"))
+        // The same past the time it was to land, while nobody says that it has.
+        assertEquals(10 * min, every(air, "2026-10-02T08:02:00Z"))
+        assertEquals(10 * min, every(air, "2026-10-02T09:01:00Z"))
+        assertEquals(30 * min, every(air, "2026-10-02T09:02:00Z"))
+        // Past its time too, only with lookups to spare.
+        assertEquals(30 * min, every(t.copy(left = 100), "2026-10-02T08:26:00Z"))
+        assertEquals(30 * min, every(air.copy(left = null), "2026-10-02T08:02:00Z"))
+        // And not for a flight whose clock nobody gave: its moments are a guess, and no lookups are spent on one.
+        assertEquals(30 * min, every(t.copy(flight = planned.copy(loose = true)), "2026-10-02T08:00:00Z"))
         // Only while more than a hundred lookups are left, and only where the reply says how many.
         assertEquals(30 * min, every(t.copy(left = 100), "2026-10-02T07:25:00Z"))
         assertEquals(10 * min, every(t.copy(left = 101), "2026-10-02T07:25:00Z"))

@@ -164,8 +164,8 @@ class BarController(private val service: AccessibilityService) {
         }
     }
     private var lastFullScan = 0L
-    /** The app windows sitting against the bar's lower edge, as their left and right edges ([check]). */
-    private var againstBar = ""
+    /** The app windows against the bar's lower edge and under the bar, as [check] last saw them. */
+    private var neighbours = BarNeighbours()
 
     private fun lightCheck() {
         val s = snap ?: return scan()
@@ -337,15 +337,14 @@ class BarController(private val service: AccessibilityService) {
             s == null -> BarStatus.NO_BAR
             else -> BarStatus.COVERED
         }
-        // An app window settled against the bar's lower edge (maximized, or snapped to a side): SystemUI
-        // then gives the bar a background of its own, and takes it away when the window leaves, without
-        // an event of the bar's own. Only the windows' bounds are looked at, from the list at hand.
-        val against = if (s == null) "" else windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
-            .map { w -> Rect().also { w.getBoundsInScreen(it) } }
-            .filter { kotlin.math.abs(it.top - s.bar.bottom) <= 2 && it.width() >= s.bar.width() / 4 }
-            .sortedBy { it.left }.joinToString(" ") { "${it.left}-${it.right}" }
-        val moved = against != againstBar
-        againstBar = against
+        // An app window settled against the bar's lower edge (maximized, or snapped to a side), or a
+        // full-screen one lies under the bar: SystemUI then gives the bar a background of its own, or that
+        // app's light or dark icons, and takes them away when the window leaves, without an event of the
+        // bar's own. Only the windows' ids and bounds are looked at, from the list at hand.
+        val moved = s != null && neighbours.next(s.bar.bottom, s.bar.width(),
+            windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+                .map { w -> Rect().also { w.getBoundsInScreen(it) }.let { AppWindow(w.id, it.left, it.top, it.right, it.bottom) } })
+            .let { (seen, moved) -> neighbours = seen; moved }
         if (show) {
             place(s!!, screenW)
             // A new status bar window can look different (see requestSample for the other triggers).

@@ -179,7 +179,11 @@ object NowPlaying {
         val before = accessOn
         readAccess(force = false)
         if (accessOn && !before) { refused = false; listen() }
-        if (!accessOn && before) unlisten()
+        if (!accessOn && before) {
+            unlisten()
+            // Android has let the listener go with the access; given again, it is asked for afresh.
+            if (askedToBind) { askedToBind = false; MediaAccess.release() }
+        }
         // The listener was asked for and hasn't come: stop saying "Starting…" and go on without the titles.
         if (askedToBind && !listening && Now.elapsed() - startingSince > STARTING_MS && !refused) { refused = true; publish() }
         if (was != audible || before != accessOn) publish()
@@ -234,6 +238,9 @@ object NowPlaying {
             } else if (MediaAccess.connected) {
                 Log.i(TAG, "media sessions refused with the listener running: going on without titles")
                 refused = true
+                // It was of no use: no reason to keep it running.
+                askedToBind = false
+                MediaAccess.release()
             }
         } catch (e: Exception) {
             Log.w(TAG, "media sessions unavailable: ${e.javaClass.simpleName}")
@@ -351,7 +358,8 @@ object NowPlaying {
         if (p.artFor == track || p.artAsked == track) return
         val source = listOf(MediaMetadata.METADATA_KEY_ART, MediaMetadata.METADATA_KEY_ALBUM_ART, MediaMetadata.METADATA_KEY_DISPLAY_ICON)
             .firstNotNullOfOrNull { k -> runCatching { md?.getBitmap(k) }.getOrNull() }
-        if (source == null) { p.art = null; p.artFor = track; return }
+        // No picture yet: not settled, for players hand the text over first and the picture a moment later.
+        if (source == null) { p.art = null; p.artFor = null; return }
         p.artAsked = track
         work.execute {
             val small = runCatching { scaled(source) }.getOrNull()

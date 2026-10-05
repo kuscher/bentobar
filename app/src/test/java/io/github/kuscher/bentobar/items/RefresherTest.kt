@@ -19,7 +19,9 @@ class RefresherTest {
     private val background = Executor { r -> if (held) waiting.addLast(r) else r.run() }
     private fun run() { while (waiting.isNotEmpty()) waiting.removeFirst().run() }
 
-    private fun wiring(minGapMs: Long = 0) = Refresher.Wiring(background, { it.run() }, { clock }, { changes++ }, minGapMs = minGapMs, afterThrowMs = min)
+    private var may = true
+    private fun wiring(minGapMs: Long = 0) = Refresher.Wiring(background, { it.run() }, { clock }, { changes++ }, minGapMs = minGapMs, afterThrowMs = min,
+        mayLoad = { may })
 
     /** Loads "key#n", counting per test; fresh for half an hour, a value starting with "failed" for 15 minutes, "once" forever. */
     private fun refresher(minGapMs: Long = 0, restore: ((String) -> Refresher.Restored<String>?)? = null, load: ((String, String?) -> String)? = null) =
@@ -183,6 +185,55 @@ class RefresherTest {
         assertEquals("oslo#2", r.peek("oslo"))
         clock += 31 * min; r.want("oslo")
         assertEquals(listOf("zurich", "oslo"), asked)
+    }
+
+    @Test fun nothingLoadsWhileItMayNot() {
+        // Nothing shows items, or the service is switched off: asking for a state then loads nothing.
+        val r = refresher()
+        may = false
+        r.want("zurich")
+        assertFalse(r.refresh("zurich"))
+        assertEquals(emptyList<String>(), loads)
+        assertNull(r.peek("zurich"))
+        may = true
+        r.want("zurich")
+        assertEquals("zurich#1", r.peek("zurich"))
+        // What there is stays while it may not, however old it grows; then it is loaded once.
+        may = false
+        clock += 5 * 60 * min; r.want("zurich")
+        assertEquals("zurich#1", r.peek("zurich"))
+        may = true
+        r.want("zurich")
+        assertEquals("zurich#2", r.peek("zurich"))
+    }
+
+    @Test fun aLoadWithNothingToSayLeavesWhatThereIs() {
+        // The request was refused under the load (the switch went off, the bar hid): that is no answer and no failure.
+        var refused = false
+        val r = Refresher<String, String>(wiring(minGapMs = 10_000), every = { _, _ -> 30 * min },
+            load = { key, _ -> loads += key; if (refused) null else "$key#${loads.size}" })
+        r.want("zurich")
+        refused = true
+        clock += 31 * min; r.want("zurich")
+        assertEquals(2, loads.size)
+        assertEquals("zurich#1", r.peek("zurich"))
+        assertEquals(31 * min, r.age("zurich"))
+        assertEquals(1, changes)
+        // It is asked again, but not every second.
+        repeat(9) { clock += 1_000; r.want("zurich") }
+        assertEquals(2, loads.size)
+        refused = false
+        clock += 1_000; r.want("zurich")
+        assertEquals("zurich#3", r.peek("zurich"))
+        // With nothing there yet it is the same: no snapshot, and another try after the gap.
+        refused = true
+        r.want("oslo")
+        assertNull(r.peek("oslo"))
+        clock += 5_000; r.want("oslo")
+        assertEquals(4, loads.size)
+        refused = false
+        clock += 5_000; r.want("oslo")
+        assertEquals("oslo#5", r.peek("oslo"))
     }
 
     @Test fun everyNewSnapshotIsToldOnce() {

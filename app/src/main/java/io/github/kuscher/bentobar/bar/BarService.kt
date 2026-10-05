@@ -180,13 +180,19 @@ class BarController(private val service: AccessibilityService) {
         if (r != s.spacer) scan()
     }
     private val expandOnHover = Runnable { if (hovering) expanded.value = true }
-    private val collapse = Runnable {
-        if (!hovering && menuKey == null && expanded.value) {
-            Log.i(tag, "collapse (pinned=$pinned autoCollapse=${Store.config.value.autoCollapseSec}s)")
-            expanded.value = false; pinned = false
-            if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
+    private val collapse: Runnable = object : Runnable {
+        override fun run() {
+            // A slider held by a pointer that has wandered off the strip: its item stays where it is until it lets go.
+            if (sliding) { main.postDelayed(this, 300); return }
+            if (!hovering && menuKey == null && expanded.value) {
+                Log.i(tag, "collapse (pinned=$pinned autoCollapse=${Store.config.value.autoCollapseSec}s)")
+                expanded.value = false; pinned = false
+                if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
+            }
         }
     }
+    /** A pointer holds an item's slider: between its first report and the one that says `done`. */
+    private var sliding = false
     private val awakeExpiry = Runnable { Caffeine.check() }
     private val sample = Runnable { sampleColor() }
 
@@ -596,6 +602,7 @@ class BarController(private val service: AccessibilityService) {
 
         /** The slider in the bar: the item sets what it stands for, and only that item is drawn again (no sampler runs for a drag). */
         override fun slide(item: ItemConfig, level: Float, done: Boolean) {
+            sliding = !done
             hideTip()
             Items.of(item.type)?.onSlide(item, level, done)
             Ticker.refresh(item)
@@ -657,7 +664,7 @@ class BarController(private val service: AccessibilityService) {
 
         override fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {
             main.removeCallbacks(showTip)
-            if (inside && menu == null) { tipFor = item to Rect(at); main.postDelayed(showTip, 600) } else hideTip()
+            if (inside && menu == null && !sliding) { tipFor = item to Rect(at); main.postDelayed(showTip, 600) } else hideTip()
         }
 
         override fun hover(inside: Boolean) {

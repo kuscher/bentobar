@@ -25,8 +25,12 @@ class Ask<Q : Any, A : Any>(private val wiring: Refresher.Wiring, private val wo
     private val current = MutableStateFlow<State<Q, A>>(State.Idle)
     val state: StateFlow<State<Q, A>> get() = current
 
-    /** Counts questions and clears: an answer is shown only if nothing came after its question. Main thread. */
-    private var generation = 0
+    /**
+     * Counts questions and clears: an answer is shown only if nothing came after its question, and a
+     * question that was overtaken while it waited for its turn is not asked at all. Written on the
+     * main thread, read on the background one.
+     */
+    @Volatile private var generation = 0
 
     /** Asks; the state is [State.Busy] until the answer is in. Main thread. */
     fun ask(question: Q) {
@@ -34,6 +38,8 @@ class Ask<Q : Any, A : Any>(private val wiring: Refresher.Wiring, private val wo
         current.value = State.Busy(question)
         try {
             wiring.background.execute {
+                // Overtaken or cleared while it waited: nobody wants this answer, so nothing is sent for it.
+                if (mine != generation) return@execute
                 val answer = runCatching { work(question) }.getOrNull()
                 wiring.main(Runnable {
                     if (mine != generation) return@Runnable

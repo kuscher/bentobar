@@ -12,7 +12,8 @@ class AskTest {
     private val wiring = Refresher.Wiring(Executor { r -> if (held) waiting.addLast(r) else r.run() }, { it.run() }, { 0L }, { changes++ })
     private fun run() { while (waiting.isNotEmpty()) waiting.removeFirst().run() }
 
-    private val search = Ask<String, List<String>>(wiring) { q -> if (q == "bug") error("a bug") else listOf("$q, Illinois", "$q, Missouri") }
+    private val asked = ArrayList<String>()
+    private val search = Ask<String, List<String>>(wiring) { q -> asked += q; if (q == "bug") error("a bug") else listOf("$q, Illinois", "$q, Missouri") }
 
     @Test fun anAnswerArrives() {
         assertEquals(Ask.State.Idle, search.state.value)
@@ -46,6 +47,20 @@ class AskTest {
         run()
         assertEquals(Ask.State.Idle, search.state.value)
         assertEquals(0, changes)
+    }
+
+    @Test fun aQuestionThatWasOvertakenBeforeItsTurnIsNotAsked() {
+        // Three presses while the first is still on its way: only the last one's text goes out after it.
+        held = true
+        search.ask("Spring"); search.ask("Springf"); search.ask("Springfield")
+        run()
+        assertEquals(listOf("Springfield"), asked)
+        assertEquals("Springfield", (search.state.value as Ask.State.Done).question)
+        // And a question that was cleared before its turn is not asked either.
+        search.ask("Zurich"); search.clear()
+        run()
+        assertEquals(listOf("Springfield"), asked)
+        assertEquals(Ask.State.Idle, search.state.value)
     }
 
     @Test fun workThatThrowsLeavesNothingShowing() {

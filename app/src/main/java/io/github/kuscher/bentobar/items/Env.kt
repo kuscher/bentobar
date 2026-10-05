@@ -85,7 +85,8 @@ object Env {
             Background.onMain {
                 Background.forget(service)
                 Items.all.filter { it.online == service }.forEach { type ->
-                    try { type.forgetFetched() } catch (e: Exception) { Log.w(TAG, "forgetting what ${type.type} fetched failed", e) }
+                    // Only the kind of failure: these types handle a city, a flight number and a key.
+                    try { type.forgetFetched() } catch (e: Exception) { Log.w(TAG, "forgetting what ${type.type} fetched failed: ${e.javaClass.simpleName}") }
                 }
                 Ticker.refresh()
             }

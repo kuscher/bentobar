@@ -25,7 +25,9 @@ private projects and paths into their repos, and where signing keys are backed u
   - `bar/BarUi.kt`: the strip (chevron, FitRow, items, clicks/right-clicks/wheel), and the slider an
     item can have in its text's place (`ItemState.slider`: `VolumeTrack` draws it, `Modifier.slides`
     takes the pointer in its zone and consumes the press, so `clicks` on the item around it sees
-    neither a click nor a drag). Its arithmetic is `bar/SliderMath.kt` (pure, unit-tested).
+    neither a click nor a drag). Its arithmetic and the rules of a press (`SliderGesture`: a click, a
+    drag, a finger's tap, swipe and long hold, a press that is taken away) are in `bar/SliderMath.kt`,
+    pure and unit-tested; change the rules there, not in the pointer loop.
   - `bar/Menus.kt`: the menu card, the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
     visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,

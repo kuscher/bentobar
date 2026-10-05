@@ -49,3 +49,91 @@ object SliderMath {
         return if (track <= 2 * edge) track / 2 else (l * track).coerceIn(edge, track - edge)
     }
 }
+
+/**
+ * One press on the slider, from the pointer going down to its letting go: which levels the slider
+ * reports on the way and how the press ends. Apart from the pointer events, so that the rules are
+ * unit-tested (`SliderGestureTest`). Levels come in as they are under the pointer, 0 to 1.
+ *
+ * A mouse, a touchpad or a stylus follows from the press on. A finger first has to say what it is
+ * about: a tap sets the level when it lifts, a move past the touch slop makes the level follow, a
+ * long hold asks for the item's menu. A click or a tap never sets nothing at all (its lowest level
+ * is one step): only a pointer that has really moved to another level can, so a click that
+ * trembles at the track's start is still a click.
+ */
+class SliderGesture(private val steps: Int) {
+    /** How a press ended. */
+    sealed interface End {
+        /** The slider stays at [level]: report it once more, as the last word. */
+        data class Level(val level: Float) : End
+        /** A long hold that never followed: the item's menu, and nothing is set. */
+        data object Menu : End
+        /** Nothing was set and nothing is: a finger that lifted somewhere else, a touch that was taken away. */
+        data object None : End
+    }
+
+    /** The pointer is down. */
+    var down = false; private set
+    /** The level follows the pointer. */
+    var following = false; private set
+    private var moved = false
+    /** The level under the pointer when it was last looked at, on its step; NaN: not looked at yet. */
+    private var under = Float.NaN
+    /** The last level reported; NaN: none yet. */
+    private var said = Float.NaN
+
+    /**
+     * The pointer went down over [level]. [follows]: it is not a finger, so the level is set at once.
+     * Returns the level to report, or null (a finger: nothing yet).
+     */
+    fun press(level: Float, follows: Boolean): Float? {
+        down = true; moved = false; following = follows; said = Float.NaN
+        under = if (follows) SliderMath.snap(level, steps) else Float.NaN
+        return if (follows) say(SliderMath.atLeastOneStep(level, steps)) else null
+    }
+
+    /**
+     * The pointer moved and is over [level] now. [pastSlop]: it is far enough from where it went down
+     * for a finger to mean it. Returns a level to report, or null: only a new level is news.
+     */
+    fun move(level: Float, pastSlop: Boolean): Float? {
+        if (!down) return null
+        if (!following && pastSlop) following = true
+        if (!following) return null
+        val l = SliderMath.snap(level, steps)
+        if (l == under) return null
+        under = l
+        moved = true
+        return if (l == said) null else say(l)
+    }
+
+    /**
+     * The pointer let go over [level]. [inside]: it is still on the slider; [longHold]: it was down
+     * for as long as a long press takes. Both only matter for a finger that never followed.
+     */
+    fun release(level: Float, inside: Boolean, longHold: Boolean): End {
+        if (!down) return End.None
+        val followed = following
+        down = false; following = false
+        return when {
+            // A drag ends where it is let go; a click ends on the level it set when the button went down.
+            followed -> if (moved || said.isNaN()) End.Level(SliderMath.snap(level, steps)) else End.Level(said)
+            !inside -> End.None
+            longHold -> End.Menu
+            else -> End.Level(SliderMath.atLeastOneStep(level, steps))
+        }
+    }
+
+    /**
+     * The press was taken away: the strip went, the item left it, the system took the touch. What was
+     * set stays and is the last word; a finger that had set nothing sets nothing.
+     */
+    fun cancel(): End {
+        if (!down) return End.None
+        val end = if (following && !said.isNaN()) End.Level(said) else End.None
+        down = false; following = false
+        return end
+    }
+
+    private fun say(level: Float): Float { said = level; return level }
+}

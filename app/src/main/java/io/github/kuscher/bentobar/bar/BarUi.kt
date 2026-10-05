@@ -412,7 +412,8 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
                 // The clicks come from raw pointer input, so tell assistive tech how to press it.
                 onClick { events.click(entry.item, bounds); true }
                 onLongClick(itemMenuLabel) { events.context(entry.item, bounds); true }
-                if (slider == null) role = Role.Button
+                // In the settings preview the track is only drawn: the item is a button there, like every other.
+                if (slider == null || !events.slidable) role = Role.Button
                 else {
                     // A slider for assistive tech too: it reads the description and can raise and lower the
                     // level, step by step where the slider has steps (0 to 15 for a volume of fifteen steps).
@@ -469,11 +470,16 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
  */
 @Composable
 private fun VolumeTrack(slider: BarSlider, held: Float?, handle: Boolean, look: StripLook, rtl: Boolean, modifier: Modifier) {
+    // Under the pointer nothing glides: the level set there is the item's own a moment later, and a glide that
+    // were still on its way when the pointer lets go would draw the fill a step back first.
     val glided by androidx.compose.animation.core.animateFloatAsState(slider.level.coerceIn(0f, 1f),
-        androidx.compose.animation.core.tween(120, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "level")
+        if (held != null) androidx.compose.animation.core.snap()
+        else androidx.compose.animation.core.tween(120, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "level")
     val level = held ?: glided
     val track = look.sliderTrack
-    val fill = if (slider.dimmed && held == null) look.sliderMuted else look.fg
+    // Muted, the fill is drawn solid in the color its strength gives on the bar: its round end lies over the
+    // track's start, and a see-through fill would show that as a darker or lighter cap.
+    val fill = if (slider.dimmed && held == null) look.sliderMuted.compositeOver(look.background) else look.fg
     val mark = look.fg
     Canvas(modifier.width(SLIDER_ZONE).fillMaxHeight()) {
         val w = SLIDER_TRACK.toPx()
@@ -522,6 +528,8 @@ private fun VolumeTrack(slider: BarSlider, held: Float?, handle: Boolean, look: 
  * The press is consumed, so the item around the slider takes it neither for a click nor for the
  * start of a drag to reorder. A secondary press is left alone: it is the item's menu, as anywhere on
  * the item. [onHeld] gets the level while the pointer holds the slider, and null when it lets go.
+ * Whatever was reported while it held is followed by one last report with `done`, also when the
+ * press is taken away.
  */
 private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, onContext: () -> Unit,
                             onLevel: (level: Float, done: Boolean) -> Unit): Modifier = composed {
@@ -530,60 +538,58 @@ private fun Modifier.slides(steps: Int, rtl: Boolean, onHeld: (Float?) -> Unit, 
     val menu by rememberUpdatedState(onContext)
     pointerInput(steps, rtl) {
         val track = SLIDER_TRACK.toPx()
+        // The rules are SliderGesture's (unit-tested); this turns pointer events into its four calls.
+        val gesture = SliderGesture(steps)
+        fun say(l: Float) { holds(l); level(l, false) }
+        fun end(how: SliderGesture.End) {
+            holds(null)
+            when (how) {
+                is SliderGesture.End.Level -> level(how.level, true)
+                SliderGesture.End.Menu -> menu()
+                SliderGesture.End.None -> {}
+            }
+        }
         try {
             awaitPointerEventScope {
-                var down = false          // a primary press began in the zone and hasn't ended
-                var following = false     // the level follows the pointer
-                var moved = false         // it has changed since the press: no longer "a click"
-                var last = Float.NaN
+                var pointer: androidx.compose.ui.input.pointer.PointerId? = null
                 var downX = 0f
                 var downAt = 0L
                 while (true) {
                     val e = awaitPointerEvent()
-                    val c = e.changes.firstOrNull() ?: continue
-                    fun at() = SliderMath.level(c.position.x, if (rtl) size.width - track else 0f, track, steps, rtl)
-                    fun set(l: Float, done: Boolean) { last = l; if (!done) holds(l); level(l, done) }
+                    // The pointer that holds the slider, while one does; a second finger is not it.
+                    val c = (if (gesture.down) e.changes.firstOrNull { it.id == pointer } else e.changes.firstOrNull()) ?: continue
+                    val at = SliderMath.level(c.position.x, if (rtl) size.width - track else 0f, track, steps, rtl)
                     when (e.type) {
-                        PointerEventType.Press -> if (!e.buttons.isSecondaryPressed && !c.isConsumed) {
-                            down = true; moved = false; last = Float.NaN
-                            downX = c.position.x; downAt = c.uptimeMillis
-                            // A finger may still be about to scroll, tap or hold: nothing is set until it says which.
-                            following = c.type != androidx.compose.ui.input.pointer.PointerType.Touch
-                            if (following) set(SliderMath.atLeastOneStep(at(), steps), false)
+                        PointerEventType.Press -> when {
+                            // Another finger while the slider is held: the slider keeps its press, and the item around it gets none.
+                            gesture.down -> e.changes.forEach { it.consume() }
+                            !e.buttons.isSecondaryPressed && !c.isConsumed -> {
+                                pointer = c.id; downX = c.position.x; downAt = c.uptimeMillis
+                                // A finger may still be about to tap or to hold: nothing is set until it says which.
+                                gesture.press(at, follows = c.type != androidx.compose.ui.input.pointer.PointerType.Touch)?.let { say(it) }
+                                c.consume()
+                            }
+                        }
+                        // A pressed mouse that crosses the zone's edge arrives as Exit or Enter: it has moved all the same.
+                        PointerEventType.Move, PointerEventType.Enter, PointerEventType.Exit -> if (gesture.down) {
+                            if (c.pressed) gesture.move(at, kotlin.math.abs(c.position.x - downX) > viewConfiguration.touchSlop)?.let { say(it) }
                             c.consume()
                         }
-                        PointerEventType.Move -> if (down) {
-                            if (c.pressed) {
-                                if (!following && kotlin.math.abs(c.position.x - downX) > viewConfiguration.touchSlop) following = true
-                                if (following) {
-                                    val l = at()
-                                    // Only a new step is news: a drag across the track is as many reports as it has steps.
-                                    if (l != last) { moved = true; set(l, false) }
-                                }
+                        PointerEventType.Release -> if (gesture.down && !c.pressed) {
+                            // Taken away by the system, not lifted (such a change arrives consumed): what was set stays, nothing more is.
+                            if (c.isConsumed) end(gesture.cancel())
+                            else {
+                                val inside = c.position.x >= 0 && c.position.y >= 0 && c.position.x <= size.width && c.position.y <= size.height
+                                end(gesture.release(at, inside, longHold = c.uptimeMillis - downAt > LONG_PRESS_MS))
+                                c.consume()
                             }
-                            c.consume()
-                        }
-                        PointerEventType.Release -> if (down) {
-                            down = false
-                            holds(null)
-                            // A finger that never followed: where it lifts decides, as for a tap on any item.
-                            val inside = c.position.x >= 0 && c.position.y >= 0 && c.position.x <= size.width && c.position.y <= size.height
-                            when {
-                                // A drag ends where it is; a click ends on the level it set when the button went down.
-                                following -> level(if (moved) at() else last, true)
-                                !inside -> {}
-                                c.uptimeMillis - downAt > LONG_PRESS_MS -> menu()
-                                else -> level(SliderMath.atLeastOneStep(at(), steps), true)
-                            }
-                            following = false
-                            c.consume()
                         }
                     }
                 }
             }
         } finally {
-            // The gesture was cut short (the strip went away): nothing holds the slider any more.
-            holds(null)
+            // Cut short (the strip went away, the item left it): what was set is the last word, and nothing holds the slider.
+            end(gesture.cancel())
         }
     }
 }

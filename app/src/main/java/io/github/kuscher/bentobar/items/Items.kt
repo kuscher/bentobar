@@ -58,12 +58,34 @@ object Ticker {
      */
     private fun lifeCycle(types: Set<String>) {
         for (t in types) if (liveTypes.add(t)) hook(t, "onLive") { it.onLive() }
-        for (t in liveTypes.filter { it !in types }) { liveTypes -= t; hook(t, "onIdle") { it.onIdle() } }
+        for (t in liveTypes.filter { it !in types }) {
+            liveTypes -= t
+            hook(t, "onIdle") { it.onIdle() }
+            // What such a type last showed (a track's title) is not kept while nobody shows it.
+            if (Items.of(t)?.discreet == true) forgetStates(t)
+        }
+    }
+
+    private fun forgetStates(type: String) {
+        val ids = Store.config.value.items.filter { it.type == type }.mapTo(HashSet()) { it.id }
+        if (ids.any { it in _states.value }) _states.value = _states.value - ids
+        ids.forEach { lastRun -= it }
     }
 
     private inline fun hook(type: String, what: String, call: (ItemType) -> Unit) {
         val t = Items.of(type) ?: return
-        try { call(t) } catch (e: Exception) { Log.w(TAG, "$what of $type failed", e) }
+        try { call(t) } catch (e: Throwable) { failed(t, "$what of $type failed", e) }
+    }
+
+    /**
+     * A type's own code failed: the tick goes on without it (also for a method this device's Android
+     * doesn't have, which is no Exception). What went wrong is logged, but for a type that goes online
+     * or shows the user's own things only its kind: an exception's message can quote what was being
+     * read (a reply, a title).
+     */
+    private fun failed(type: ItemType, what: String, e: Throwable) {
+        if (e is VirtualMachineError) throw e
+        if (type.online != null || type.discreet) Log.w(TAG, "$what: ${e.javaClass.simpleName}") else Log.w(TAG, what, e)
     }
 
     /** Hidden items are on screen (bar expanded, or BentoBar's menu lists them): sample them too. */
@@ -143,8 +165,9 @@ object Ticker {
         _tick.value = System.currentTimeMillis()
     }
 
-    private fun compute(type: ItemType, item: ItemConfig): ItemState = try { type.state(item) } catch (e: Exception) {
-        Log.w(TAG, "item ${item.type} failed", e); ItemState(icon = type.icon, text = "!", desc = Env.str(R.string.item_failed, type.title))
+    private fun compute(type: ItemType, item: ItemConfig): ItemState = try { type.state(item) } catch (e: Throwable) {
+        failed(type, "item ${item.type} failed", e)
+        ItemState(icon = type.icon, text = "!", desc = Env.str(R.string.item_failed, type.title))
     }
 
     private fun runOnce() {

@@ -25,19 +25,23 @@ import java.util.concurrent.RejectedExecutionException
  * @param restore reads what was kept from an earlier run (and how old it is), on the background
  *   thread, the first time a key is wanted: a restart then shows the last value without asking.
  * @param load runs on the background thread and gets the last value. It returns the new one; a
- *   failure is a value too, carrying what went wrong and what was known before. It should not throw
- *   (if it does, the key is left alone for [Wiring.afterThrowMs]).
+ *   failure is a value too, carrying what went wrong and what was known before. Null means there is
+ *   nothing to say: it was not asked after all (the request was refused because the switch went off
+ *   or the bar hid under it), so what there is stays as it is. It should not throw (if it does, the
+ *   key is left alone for [Wiring.afterThrowMs]).
  */
 class Refresher<K : Any, V : Any>(
     private val wiring: Wiring,
     private val every: (key: K, value: V) -> Long?,
     private val restore: ((key: K) -> Restored<V>?)? = null,
-    private val load: (key: K, last: V?) -> V,
+    private val load: (key: K, last: V?) -> V?,
 ) {
     /**
      * Where work runs and what time it is. [elapsed] counts sleep (a night with the lid closed makes
      * a snapshot old). [changed] is told on the main thread after a snapshot changed. Whatever
-     * [every] says, [want] never loads a key again within [minGapMs] of its last load.
+     * [every] says, [want] never loads a key again within [minGapMs] of its last load. [mayLoad] is
+     * asked on the main thread before anything is loaded: while it says no (nothing shows items, the
+     * service is switched off), [want] and [refresh] do nothing.
      */
     class Wiring(
         val background: Executor,
@@ -46,6 +50,7 @@ class Refresher<K : Any, V : Any>(
         val changed: () -> Unit = {},
         val minGapMs: Long = 10_000,
         val afterThrowMs: Long = 60_000,
+        val mayLoad: () -> Boolean = { true },
     )
 
     /** A value from an earlier run, and how long ago it was loaded. */
@@ -59,6 +64,8 @@ class Refresher<K : Any, V : Any>(
     private val again = HashSet<K>()
     private val restored = HashSet<K>()
     private val threwAt = HashMap<K, Long>()
+    /** When a load for the key last came back, whatever it brought. */
+    private val triedAt = HashMap<K, Long>()
     /** Bumped by [forget]: a load that started before must not publish. One counter for all, one per key. */
     private var generation = 0
     private val keyGeneration = HashMap<K, Int>()
@@ -74,24 +81,27 @@ class Refresher<K : Any, V : Any>(
 
     /** Loads [key] if it was never loaded or has grown older than [every] allows. Main thread; returns at once. */
     fun want(key: K) {
-        if (key in loading) return
+        if (key in loading || !wiring.mayLoad()) return
         val now = wiring.elapsed()
         threwAt[key]?.let { if (now - it < wiring.afterThrowMs) return }
+        triedAt[key]?.let { if (now - it < wiring.minGapMs) return }
         val slot = slots[key]
         if (slot != null) {
             val keep = every(key, slot.value) ?: return
-            if (now - slot.at < maxOf(keep, wiring.minGapMs)) return
+            if (now - slot.at < keep) return
         }
         start(key, tryRestore = slot == null && restore != null && key !in restored)
     }
 
     /**
      * Loads [key] now, whatever [every] says: the user pressed Refresh, or something changed that the
-     * snapshot can't know of. Unless it was loaded less than [floorMs] ago: then nothing happens and
-     * the answer is false. While a load is running none is added, except with [afterRunning]: then one
-     * more follows the running one (what that one read may be older than the reason for asking).
+     * snapshot can't know of. Unless it was loaded less than [floorMs] ago, or nothing may be loaded
+     * right now: then nothing happens and the answer is false. While a load is running none is added,
+     * except with [afterRunning]: then one more follows the running one (what that one read may be
+     * older than the reason for asking).
      */
     fun refresh(key: K, floorMs: Long = 0, afterRunning: Boolean = false): Boolean {
+        if (!wiring.mayLoad()) return false
         if (key in loading) { if (afterRunning) again += key; return true }
         slots[key]?.let { if (wiring.elapsed() - it.at < floorMs) return false }
         threwAt -= key
@@ -106,10 +116,10 @@ class Refresher<K : Any, V : Any>(
     fun forget(key: K? = null) {
         if (key == null) {
             generation++
-            slots.clear(); again.clear(); restored.clear(); threwAt.clear()
+            slots.clear(); again.clear(); restored.clear(); threwAt.clear(); triedAt.clear()
         } else {
             keyGeneration[key] = (keyGeneration[key] ?: 0) + 1
-            slots.remove(key); again -= key; restored -= key; threwAt -= key
+            slots.remove(key); again -= key; restored -= key; threwAt -= key; triedAt -= key
         }
     }
 
@@ -135,7 +145,12 @@ class Refresher<K : Any, V : Any>(
                 when {
                     !current -> {}
                     kept != null -> { slots[key] = Slot(kept.value, now - kept.ageMs.coerceAtLeast(0)); wiring.changed() }
-                    loaded != null && loaded.isSuccess -> { threwAt -= key; slots[key] = Slot(loaded.getOrThrow(), now); wiring.changed() }
+                    loaded != null && loaded.isSuccess -> {
+                        threwAt -= key
+                        triedAt[key] = now
+                        // Nothing to say: what there is stays, as old as it is.
+                        loaded.getOrNull()?.let { slots[key] = Slot(it, now); wiring.changed() }
+                    }
                     else -> threwAt[key] = now
                 }
                 if (again.remove(key) && current) start(key, tryRestore = false)

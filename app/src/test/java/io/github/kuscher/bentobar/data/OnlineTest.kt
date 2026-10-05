@@ -114,6 +114,21 @@ class OnlineTest {
         assertEquals(listOf("online.json"), dir.walkTopDown().filter { it.isFile && it.readText().contains(key) }.map { it.name }.toList())
     }
 
+    @Test fun whatCannotBeSavedIsRemovedNotLeftAsItWas() {
+        Online.saveKey(AIRLABS, key)
+        assertTrue(File(dir, "online.json").readText().contains(key))
+        // The disk refuses the next write (here: something is in the way of the file that is written first).
+        File(dir, "online.json.part").mkdirs()
+        Online.removeKey(AIRLABS)
+        assertFalse(Online.hasKey(AIRLABS))
+        // Better nothing on disk than the key that was just removed: the next start finds nothing set up.
+        assertFalse(File(dir, "online.json").exists())
+        assertFalse(File(dir, "online.json.part").exists())
+        restart()
+        assertEquals("", Online.key(AIRLABS))
+        assertFalse(Online.on(AIRLABS))
+    }
+
     @Test fun aFileNobodyCanReadCountsAsNothingSetUp() {
         File(dir, "online.json").writeText("not json {")
         restart()

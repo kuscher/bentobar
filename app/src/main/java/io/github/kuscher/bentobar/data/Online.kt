@@ -137,18 +137,27 @@ object Online {
         onOff(service)
     }
 
-    /** The whole file, written beside itself and renamed, so it is never half written. */
+    /**
+     * The whole file, written beside itself and renamed, so it is never half written. If that fails
+     * (a full disk), the file is removed instead, which needs no room: left as it was, it would bring
+     * back a switch that was turned off or a key that was removed at the next start. What holds now
+     * holds for this run; the next start finds nothing set up. Nothing of it is logged (a key is in it).
+     */
     private fun save() {
         val target = file ?: return
-        try {
+        val part = File(target.parentFile, target.name + ".part")
+        val saved = try {
             val s = current.value
             val text = json.encodeToString(Saved.serializer(), Saved(s.on.map { it.id }, s.setUp.map { it.id }, keys.mapKeys { it.key.id }))
             target.parentFile?.mkdirs()
-            val part = File(target.parentFile, target.name + ".part")
             part.writeText(text, Charsets.UTF_8)
-            if (!part.renameTo(target)) part.delete()
+            part.renameTo(target)
         } catch (e: Exception) {
-            // Not saved: it holds for this run, and the next start asks again. Nothing of it is logged (a key is in it).
+            false
+        }
+        if (!saved) {
+            runCatching { part.delete() }
+            runCatching { target.delete() }
         }
     }
 }

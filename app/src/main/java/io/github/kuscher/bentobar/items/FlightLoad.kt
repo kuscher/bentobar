@@ -180,8 +180,10 @@ object FlightLoad {
         val was = last?.takeIf { asked.isFor(it) }
         val number = FlightNumber.read(asked.number)
         if (number == null || (was != null && FlightRules.cleared(was, Instant.ofEpochMilli(now)))) {
-            stop(item)
-            return Tracked()
+            // It is put away, unless the item was told to follow something else this very moment: then that is another load's business.
+            return synchronized(lock) {
+                if (following(item)?.let { it.number == asked.number && it.day == asked.day } == true) { stop(item); Tracked() } else null
+            }
         }
         val flight = was?.flight
         val next = (if (was == null || flight == null) lookUp(asked, number, was, key, now) else again(number, was, flight, key, now)) ?: return null

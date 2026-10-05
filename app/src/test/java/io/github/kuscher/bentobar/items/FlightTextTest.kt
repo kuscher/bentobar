@@ -484,6 +484,9 @@ class FlightTextTest {
         assertEquals("", bare.to.words)
         assertEquals("From SFO, 2:40 PM.", bare.from.spoken)
         assertEquals("To Frankfurt, FRA, Sat 10:25 AM.", bare.to.spoken)
+        // An end nobody names a time for is its city and its letters; with no city either, the letters once.
+        assertEquals("To Frankfurt, FRA.", card(lh455(to = fra(planned = null, terminal = null)), morning).to.spoken)
+        assertEquals("FRA", card(lh455(to = fra(planned = null, terminal = null).copy(city = "")), morning).to.spoken)
     }
 
     @Test fun aNumberSoldByAnotherAirlineSaysWhoFliesIt() {
@@ -596,6 +599,7 @@ class FlightTextTest {
     @Test fun theWordsNobodyBuildsAreTheCopyDecks() {
         assertEquals("Flight times come from AirLabs, a flight data service, with a free key of your own. BentoBar sends AirLabs your key and the flight number " +
             "when you track a flight and while it follows it, nothing else. AirLabs sees your IP address and knows which key asked.", FlightVoices.string("flight_consent"))
+        assertEquals("A flight number looks like LH 455 or DLH455.", FlightVoices.string("flight_err_not_number"))
         assertEquals("A lookup uses 1 to 3 of your key's lookups.", FlightVoices.string("flight_lookup_note"))
         assertEquals("Times may be an hour off until the airline confirms them.", FlightVoices.string("flight_note_timetable"))
         assertEquals("Stays on this device. It is never shown again, and never copied with your settings.", FlightVoices.string("flight_key_help"))

@@ -72,6 +72,10 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     /** What the item [id] follows, as far as that is known: the loader's word, or what was taken a moment ago. Null: not read yet. Main thread. */
     internal fun followed(id: String): Tracked? = tracker.peek(id)?.also { fresh.remove(id) } ?: fresh[id]
 
+    /** How many answers were taken since the app started: a menu that waits for one sees by it that one came, whoever took it. Main thread. */
+    internal var takes = 0
+        private set
+
     /** Where each flight's plane was last drawn on its line, by [FlightText.Card.plane]: it only goes forward. Main thread. */
     private val places = HashMap<String, Double>()
 
@@ -259,6 +263,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         search.clear()
         if (id !in ids() || !FlightLoad.take(id, found.tracked, Now.wall())) return false
         fresh[id] = found.tracked
+        takes++
         reread(id)
         // The bar has the flight now, and an open menu draws again.
         Ticker.refresh(type)
@@ -336,6 +341,13 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
 
     /** Once a second while an item of this type is looked at: an answer that came with no menu open to take it is taken here. */
     override fun sample(now: Long) { takeAnswer() }
+
+    /** No Flight item is looked at any more: what was held for items that are gone from the layout is let go. */
+    override fun onIdle() {
+        val items = ids()
+        tracker.keepOnly(items)
+        fresh.keys.retainAll(items)
+    }
 
     /** The service was switched off or its key removed: the loader and the lookup have forgotten already; this is the rest. */
     override fun forgetFetched() {

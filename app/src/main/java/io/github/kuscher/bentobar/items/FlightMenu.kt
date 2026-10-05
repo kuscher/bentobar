@@ -102,11 +102,13 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
     val online by Online.state.collectAsState()
     val asked by FlightItem.search.state.collectAsState()
     // "Track another flight": the field again, while the flight that is followed stays until another is found.
-    var another by remember { mutableStateOf(false) }
+    // It is over once an answer was taken, by this menu or by the item's own tick a moment before it.
+    var anotherSince by remember { mutableStateOf<Int?>(null) }
+    val another = anotherSince == FlightItem.takes
     // What stood in the field when tracking stopped: it is left there.
     var last by remember { mutableStateOf("") }
     // An answer is taken as soon as it is in. (With the menu closed, the item takes it with its next tick.)
-    LaunchedEffect(asked) { if (FlightItem.takeAnswer()) another = false }
+    LaunchedEffect(asked) { FlightItem.takeAnswer() }
     // A message about a lookup that found nothing belongs to the menu it was read in.
     DisposableEffect(item.id) { onDispose { FlightItem.dropFailure(item.id) } }
 
@@ -136,7 +138,8 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
         is Staged.Following -> staged.tracked
         else -> Tracked()
     }
-    val busy = if (staged != null) (staged as? Staged.Looking)?.number else FlightItem.looking(item.id, tracked)
+    // While another flight is being chosen only its own lookup takes the field away, not a retry for the one that stays.
+    val busy = if (staged != null) (staged as? Staged.Looking)?.number else FlightItem.looking(item.id, tracked?.takeUnless { another })
     val missed = when {
         staged is Staged.Failed -> FlightMiss(staged.number, staged.failure, null)
         staged != null -> null
@@ -155,16 +158,16 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
         tracked == null -> MenuCard(Sym.FLIGHT, title, stringResource(R.string.usage_loading)) {}
         card != null && !another -> FollowedCard(card, FlightItem.place(card), refresh = staged == null && FlightItem.mayRefresh(item.id),
             onRefresh = { FlightItem.refresh(item.id) }, onChangeKey = changeKey, onPage = { host.close(); FlightItem.openPage(it) },
-            onAnother = { if (staged == null) another = true else FlightItem.stop(item) },
+            onAnother = { if (staged == null) anotherSince = FlightItem.takes else FlightItem.stop(item) },
             onStop = { last = FlightNumber.shown(tracked.number); FlightItem.stop(item) })
         tracked.following && tracked.flight == null && !another -> WaitingCard(FlightNumber.shown(tracked.number), tracked.failure, v,
-            retry = FlightItem.mayRefresh(item.id), onRetry = { FlightItem.refresh(item.id) }, onChangeKey = changeKey, onAnother = { another = true },
+            retry = FlightItem.mayRefresh(item.id), onRetry = { FlightItem.refresh(item.id) }, onChangeKey = changeKey, onAnother = { anotherSince = FlightItem.takes },
             onStop = { last = FlightNumber.shown(tracked.number); FlightItem.stop(item) })
         else -> {
             // Another flight is being chosen only while there is one that stays meanwhile.
             val staying = FlightNumber.shown(tracked.number).takeIf { another && tracked.following }
             SearchCard(item, v, LocalDate.ofInstant(now, v.zone), initial = missed?.number ?: last, missed = missed, staying = staying, left = FlightLoad.left,
-                onChangeKey = changeKey, onCancel = if (staying != null) { { another = false; FlightItem.dropFailure(item.id) } } else null)
+                onChangeKey = changeKey, onCancel = if (staying != null) { { anotherSince = null; FlightItem.dropFailure(item.id) } } else null)
         }
     }
 }
@@ -178,9 +181,10 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
 private fun SearchCard(item: ItemConfig, v: Voice, today: LocalDate, initial: String, missed: FlightMiss?, staying: String?, left: Int?,
                        onChangeKey: () -> Unit, onCancel: (() -> Unit)?) {
     var text by remember { mutableStateOf(initial) }
-    var day by remember { mutableIntStateOf(0) }
-    var notNumber by remember { mutableStateOf(false) }
     val days = remember(today) { FlightText.days(today) }
+    // The card was away while the number was looked up: it comes back with the number and with the day that was chosen.
+    var day by remember { mutableIntStateOf(missed?.day?.let { days.indexOf(it) }?.coerceAtLeast(0) ?: 0) }
+    var notNumber by remember { mutableStateOf(false) }
     val error = when {
         notNumber -> stringResource(R.string.flight_err_not_number)
         missed != null && FlightText.ofTheField(missed.failure) -> FlightText.error(missed.failure, missed.number, missed.day, v)
@@ -315,8 +319,9 @@ private fun EndWords(words: String, align: TextAlign, modifier: Modifier) {
 /**
  * The line itself. Dots of 3 dp about 8 dp apart, the first and the last on the line's two ends; the
  * part flown a solid 3 dp line up to 4 dp behind the plane; the plane 20 sp, nose to the arrival,
- * its center 10 dp in at the start and 10 dp from the end when it has landed. No dot stands under the
- * plane or within 2 dp of its nose. It moves in steps, as answers and minutes arrive: nothing glides.
+ * its center half its length in at the start (10 dp, at the usual text size) and as far from the end
+ * when it has landed. No dot stands under the plane or within 2 dp of its nose. It moves in steps, as
+ * answers and minutes arrive: nothing glides.
  * Where each of these stands is [FlightLine]'s arithmetic; this only draws it.
  */
 @Composable
@@ -329,7 +334,8 @@ private fun FlightPath(share: Double?, modifier: Modifier) {
     val plane = remember(measurer, density) { measurer.measure(Sym.FLIGHT, TextStyle(fontFamily = Fonts.symbolsFilled, fontSize = 20.sp, lineHeight = 20.sp)) }
     Canvas(modifier) {
         val dot = 3.dp.toPx()
-        val line = FlightLine.of(size.width, share, dot = dot, apart = 8.dp.toPx(), plane = 20.dp.toPx(), behind = 4.dp.toPx(), ahead = 2.dp.toPx())
+        // The plane is a symbol and grows with the text size: the line makes room for it as it is.
+        val line = FlightLine.of(size.width, share, dot = dot, apart = 8.dp.toPx(), plane = 20.sp.toPx(), behind = 4.dp.toPx(), ahead = 2.dp.toPx())
         val y = size.height / 2
         // The line is reckoned from the departure's end, which is on the right where the language reads from there.
         fun x(along: Float) = if (rtl) size.width - along else along

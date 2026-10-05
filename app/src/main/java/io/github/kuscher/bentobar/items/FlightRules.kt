@@ -548,8 +548,8 @@ object FlightRules {
         return shown(f, now) !== f && Instant.ofEpochMilli(t.heardAt).isBefore(landing)
     }
 
-    /** How long after an ask the next one by hand has to wait: two minutes, or ten seconds after a try that reached nobody. */
-    fun byHand(t: Tracked): Long = AirLabs.keep(t.failure).toMillis()
+    /** How long after an ask the next one by hand has to wait: two minutes, ten seconds after a try that found no connection, and never less than a "slow down" asked for. */
+    fun byHand(t: Tracked): Long = maxOf(AirLabs.keep(t.failure).toMillis(), (t.waitSec ?: 0).coerceIn(0, 86_400) * 1000)
 
     /**
      * Whether a new key is what [t] waits for. The old one was refused or used up, which the menu says

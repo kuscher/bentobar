@@ -200,7 +200,8 @@ class FlightRulesTest {
     @Test fun howLongAnAnswerIsKept() {
         assertEquals(Duration.ofMinutes(2), AirLabs.keep(null))
         assertEquals(Duration.ofSeconds(10), AirLabs.keep(Failure.OFFLINE))
-        assertEquals(Duration.ofSeconds(10), AirLabs.keep(Failure.NO_ANSWER))
+        // No answer is no reason to hurry: a "slow down", an error of the service's and a limit for the minute are all that.
+        assertEquals(Duration.ofMinutes(2), AirLabs.keep(Failure.NO_ANSWER))
         // A number nobody flies costs two lookups to find out: it is not asked again for an hour.
         assertEquals(Duration.ofHours(1), AirLabs.keep(Failure.NOT_FOUND))
         assertEquals(Duration.ofHours(1), AirLabs.keep(Failure.NOT_THAT_DAY))
@@ -400,6 +401,18 @@ class FlightRulesTest {
         assertNull(every(t.copy(failure = Failure.USED_UP), "2026-10-02T02:00:00Z"))
         // Nor is a flight the service has gone on from: an item follows one flight, never the next day's of its number.
         assertNull(every(t.copy(ended = true), "2026-10-02T02:00:00Z"))
+    }
+
+    @Test fun aRefreshByHandWaitsTwoMinutesAndAsLongAsASlowDownAskedFor() {
+        val t = tracked(flight("flight-LH455-in-the-air"), "2026-10-02T02:00:00Z")
+        assertEquals(2 * min, FlightRules.byHand(t))
+        // Only a try that found no connection may be repeated in ten seconds.
+        assertEquals(10_000L, FlightRules.byHand(t.copy(failure = Failure.OFFLINE, failures = 1)))
+        assertEquals(2 * min, FlightRules.byHand(t.copy(failure = Failure.NO_ANSWER, failures = 1)))
+        assertEquals(5 * min, FlightRules.byHand(t.copy(failure = Failure.NO_ANSWER, failures = 1, waitSec = 300)))
+        assertEquals(2 * min, FlightRules.byHand(t.copy(failure = Failure.NO_ANSWER, failures = 1, waitSec = 30)))
+        // A wait nobody can mean is kept to for a day at most.
+        assertEquals(24 * hour, FlightRules.byHand(t.copy(failure = Failure.NO_ANSWER, waitSec = Long.MAX_VALUE)))
     }
 
     @Test fun belowTwentyLookupsLeftFollowingStops() {

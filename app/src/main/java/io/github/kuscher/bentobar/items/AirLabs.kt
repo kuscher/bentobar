@@ -235,11 +235,11 @@ object AirLabs {
 
     /** How long what an ask came to stands before the same thing is asked again: by hand, or for a number that was not found. */
     fun keep(failure: Failure?): Duration = when (failure) {
-        // What may be right again in a moment is asked again soon.
-        Failure.OFFLINE, Failure.NO_ANSWER -> Duration.ofSeconds(10)
+        // No connection may be back in a moment, and a try without one reaches nobody.
+        Failure.OFFLINE -> Duration.ofSeconds(10)
         // A number nobody flies, or not on that day, costs two lookups to find out and stays so: an hour.
         Failure.NOT_FOUND, Failure.NOT_THAT_DAY -> Duration.ofHours(1)
-        // An answer, a refused key, a month's lookups used up: two minutes.
+        // An answer, no answer (an error of the service's, a limit for the minute, a "slow down"), a refused key, a month's lookups used up: two minutes.
         else -> Duration.ofMinutes(2)
     }
 

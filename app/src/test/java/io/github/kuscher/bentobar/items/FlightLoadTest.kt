@@ -751,6 +751,14 @@ class FlightLoadTest {
             assertFalse(r.refresh(item, floorMs = FlightRules.byHand(r.peek(item)!!)))
             elapsed += 1_000
             assertTrue(r.refresh(item, floorMs = FlightRules.byHand(r.peek(item)!!)))
+            // Told to slow down, or any other "no answer": two minutes again. Six presses in a minute are no request.
+            net.fails(Why.STATUS, 429)
+            elapsed += 2 * min
+            assertTrue(r.refresh(item, floorMs = FlightRules.byHand(r.peek(item)!!)))
+            assertEquals(Failure.NO_ANSWER, r.peek(item)!!.failure)
+            val before = sent()
+            repeat(6) { elapsed += 10_000; assertFalse(r.refresh(item, floorMs = FlightRules.byHand(r.peek(item)!!))) }
+            assertEquals(before, sent())
         }
     }
 }

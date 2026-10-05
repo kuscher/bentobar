@@ -50,6 +50,8 @@ class OneWayOutTest {
             val place = f.place()
             if (place.startsWith("net/")) continue
             if ("Http.get(" in code(f)) assertTrue("$place calls Http.get: only items/Weather*.kt, items/Flight*.kt and items/AirLabs*.kt may", online(place))
+            // Nor is there a way around the gate in Http.get: the transport is net's own, to ask and to make.
+            for (way in listOf("Http.transport", "HttpTransport(")) assertTrue("$place reaches for the transport: a request goes through Http.get", way !in code(f))
         }
         val declared = sources.filter { Regex("""override\s+val\s+online\b""").containsMatchIn(code(it)) }.map { it.place() }.sorted()
         assertEquals("the item types that name an online service", listOf("items/FlightItem.kt", "items/WeatherItem.kt"), declared)

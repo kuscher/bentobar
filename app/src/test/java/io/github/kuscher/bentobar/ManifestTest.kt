@@ -36,6 +36,20 @@ class ManifestTest {
         ), manifest.all("uses-permission").map { it.attr("name") }.toSet())
     }
 
+    /**
+     * The same of what is built: a library can bring a permission along in a manifest of its own, and
+     * the app's file would not show it. This is the manifest Gradle merged for the build under test.
+     */
+    @Test fun noLibraryBringsAPermissionAlong() {
+        val type = BuildConfig.BUILD_TYPE
+        val merged = File("build/intermediates/merged_manifests/$type/process${type.replaceFirstChar { it.uppercase() }}Manifest/AndroidManifest.xml")
+        assertTrue("the merged manifest is not where it was (a newer Android Gradle Plugin?): ${merged.path}", merged.isFile)
+        val own = manifest.all("uses-permission").map { it.attr("name") }.toSet()
+        // AndroidX adds one of the app's own making, for receivers registered in code that no other app may reach.
+        assertEquals(own + "${manifest.getAttribute("package").ifEmpty { BuildConfig.APPLICATION_ID }}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+            xml(merged.path).all("uses-permission").map { it.attr("name") }.toSet())
+    }
+
     @Test fun theNotificationListenerAsksForNoNotificationsAndIsNotStartedByAndroid() {
         val listener = application.all("service").single { it.attr("name") == ".items.MediaAccess" }
         assertEquals("android.permission.BIND_NOTIFICATION_LISTENER_SERVICE", listener.attr("permission"))

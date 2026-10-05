@@ -230,6 +230,21 @@ object FlightLoad {
         if (keyGone) synchronized(lock) { Kept.own(OWN).clear() }
     }
 
-    /** A new key was saved: how many lookups the old one had left says nothing about it. */
-    fun newKey() { left = null }
+    /**
+     * A new key was saved: how many lookups the old one had left says nothing about it. The count goes
+     * from here and from every answer that is kept, which stays as old as it was. Left in, a flight
+     * that was not asked about for want of lookups would never be asked about again, and its menu
+     * would say "few lookups left" of a key that has a thousand.
+     */
+    fun newKey() {
+        left = null
+        synchronized(lock) {
+            val kept = Kept.fetched(service)
+            for (name in kept.names()) {
+                val entry = kept.read(name) ?: continue
+                val t = decode(entry.text)?.takeIf { it.left != null } ?: continue
+                runCatching { json.encodeToString(Tracked.serializer(), t.copy(left = null)) }.getOrNull()?.let { kept.write(name, it, entry.savedAt) }
+            }
+        }
+    }
 }

@@ -200,6 +200,29 @@ class FlightLoadTest {
         }
     }
 
+    @Test fun aNewKeyStartsWithNoCountOfLookupsAlsoInWhatIsKept() {
+        online { net ->
+            // The old key had twelve lookups left: too few to ask unasked, so the flight was left alone.
+            net.says(AirLabs.FLIGHT to withRequest(reply("flight-LH455-in-the-air"), left = 12))
+            val t = found(FlightLoad.track(question("lh455"), asked)).also { assertTrue(FlightLoad.take(item, it, asked)) }
+            assertEquals(12, t.left)
+            assertNull(FlightRules.every(t, at("2026-10-02T07:35:00Z")))
+            // Replace key.
+            Online.saveKey(AIRLABS, "another-test-key")
+            FlightLoad.newKey()
+            assertNull(FlightLoad.left)
+            // What is kept says nothing of the old key's count any more, and is as old as it was: the flight has its turn again,
+            // now and after a restart, and no menu says "few lookups left" of a key with a thousand.
+            val kept = FlightLoad.kept(item, asked + 5 * min, ids)!!
+            assertEquals(t.copy(left = null), kept.value)
+            assertEquals(5 * min, kept.ageMs)
+            assertNull(FlightLoad.left)
+            assertEquals(30 * min, FlightRules.every(kept.value, at("2026-10-02T07:35:00Z")))
+            // Nobody was asked for any of this.
+            assertEquals(1, sent())
+        }
+    }
+
     @Test fun nothingThatPrintsAValueSaysWhoseFlightItIs() {
         online { net ->
             val t = follow(net)

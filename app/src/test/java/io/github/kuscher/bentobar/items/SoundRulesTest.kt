@@ -95,12 +95,19 @@ class SoundRulesTest {
         assertEquals(0f, SoundRules.slider(on = true, fixed = false, volume = 0, min = 0, max = 15, muted = true, kept = Float.NaN)!!.level, 0f)
     }
 
-    @Test fun thePercentageIsTheOneTheItemAlwaysShowed() {
+    @Test fun thePercentageIsRoundedNotCut() {
         assertEquals(60, SoundRules.percent(9, 15))
         assertEquals(100, SoundRules.percent(15, 15))
         assertEquals(0, SoundRules.percent(0, 15))
         assertEquals(62, SoundRules.percent(93, 150))
-        assertEquals(6, SoundRules.percent(1, 15))
+        // Seen on a device: ten of fifteen steps read 66%, one step 6%.
+        assertEquals(67, SoundRules.percent(10, 15))
+        assertEquals(7, SoundRules.percent(1, 15))
+        assertEquals(33, SoundRules.percent(5, 15))
+        // One step is never "0%", and the step below the top never "100%".
+        assertEquals(1, SoundRules.percent(1, 250))
+        assertEquals(99, SoundRules.percent(249, 250))
+        assertEquals(0, SoundRules.percent(3, 0))
     }
 
     @Test fun theWordsAreTheCopyDecks() {

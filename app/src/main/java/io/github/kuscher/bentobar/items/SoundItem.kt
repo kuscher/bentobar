@@ -147,7 +147,7 @@ object SoundItem : ItemType("sound", R.string.item_sound_title, Sym.VOLUME_UP, R
             val muted = am.isStreamMute(STREAM)
             val volumeLabel = stringResource(R.string.sound_media_volume)
             MenuCard(Sym.VOLUME_UP, stringResource(R.string.item_sound_title),
-                if (muted) stringResource(R.string.sound_muted) else stringResource(R.string.sound_media_volume_pct, (v * 100 / max).toInt())) {
+                if (muted) stringResource(R.string.sound_muted) else stringResource(R.string.sound_media_volume_pct, SoundRules.percent(Math.round(v), max))) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     FilledTonalIconButton(onClick = {
                         am.adjustStreamVolume(STREAM, AudioManager.ADJUST_TOGGLE_MUTE, 0)

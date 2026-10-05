@@ -18,8 +18,16 @@ object SoundRules {
     /** The volume a level stands for, the nearest there is: what is handed to Android. */
     fun volume(level: Float, min: Int, max: Int): Int = min + SliderMath.step(level, steps(min, max))
 
-    /** The percentage the item says, in its text and its spoken description: the same number with and without the slider. */
-    fun percent(volume: Int, max: Int): Int = volume * 100 / max.coerceAtLeast(1)
+    /**
+     * The percentage the item says, in its text, its menu and its spoken description: the same number
+     * with and without the slider. Rounded (ten of fifteen steps is 67%, not 66%), but a step above
+     * silence is never "0%" and a step below the top never "100%".
+     */
+    fun percent(volume: Int, max: Int): Int = when {
+        max <= 0 || volume <= 0 -> 0
+        volume >= max -> 100
+        else -> Math.round(volume * 100.0 / max).toInt().coerceIn(1, 99)
+    }
 
     /**
      * The level to draw while muted. Android reports a volume of 0 for a muted stream, whatever it is

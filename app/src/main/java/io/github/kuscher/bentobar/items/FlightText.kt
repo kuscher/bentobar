@@ -95,7 +95,7 @@ object FlightText {
 
     /** A flight at one moment, with everything the bar and the card both say of it. */
     private class Look(val t: Tracked, heard: Flight, val now: Instant, val v: Voice) {
-        val f = FlightRules.shown(heard, now)
+        val f = FlightRules.shown(heard, now, t.ended)
         val number = FlightNumber.shown(f.number)
         val today: LocalDate = LocalDate.ofInstant(now, v.zone)
         val row = FlightRules.row(f, now)

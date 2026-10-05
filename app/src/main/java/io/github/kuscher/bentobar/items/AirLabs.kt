@@ -210,13 +210,15 @@ object AirLabs {
         val got = r.value
         val again = when {
             got != null && FlightRules.same(was, got) -> Again.Is(got)
+            // A flight with no planned time: nobody can tell which day's it is, so it is no word about this one, and no end of it either.
+            got != null && got.from.planned == null -> Again.Failed
             // Another flight of the number: the one before it (the service is not there yet) or one after it.
             got != null -> if (before(got, was)) Again.NotYet else Again.Gone
             r.failure == Failure.OFFLINE || r.failure == Failure.NO_ANSWER -> Again.Failed
             r.failure == Failure.NOT_FOUND && was.timetable -> Again.NotYet
             else -> Again.Gone
         }
-        return Asked(again, r.left, r.failure)
+        return Asked(again, r.left, r.failure ?: Failure.NO_ANSWER.takeIf { again == Again.Failed })
     }
 
     private fun before(a: Flight, b: Flight): Boolean {

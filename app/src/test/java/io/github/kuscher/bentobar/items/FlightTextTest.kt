@@ -258,6 +258,26 @@ class FlightTextTest {
         assertEquals("LH 455 landed at 10:25 AM", b.desc)
     }
 
+    @Test fun aFlightTheServiceHasGoneOnFromHasLandedOnceItsTimeToLandHasPassed() {
+        // Last heard in the air, to land 10:25 AM. Then the service answered with the next day's flight, and the asking ended.
+        val t = tracked(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T07:30:00Z")
+        val ended = t.copy(ended = true)
+        fun bar(of: Tracked, now: String) = FlightText.bar(of, null, at(now), 24, us)
+        // Until its time it counts down by the clock.
+        assertEquals("25m · 10:25 AM", bar(ended, "2026-10-03T08:00:00Z").text)
+        // Nobody will ever say "landed" of it: its time to land says so. No "1m" for hours, no "Lands in 1 min".
+        val down = bar(ended, "2026-10-03T08:26:00Z")
+        assertEquals("Landed 10:25 AM", down.text)
+        assertEquals(Sym.FLIGHT_LAND, down.icon)
+        val c = FlightText.card(ended, at("2026-10-03T08:26:00Z"), us)!!
+        assertEquals("Landed 1\u00A0min ago", c.headline)
+        assertEquals(1.0, c.share!!, 0.0)
+        // An hour on it is the plane alone, like any flight that landed.
+        assertNull(bar(ended, "2026-10-03T09:26:00Z").text)
+        // A flight that is still asked about goes by the service's word: a minute to go until it says "landed", or three hours pass.
+        assertEquals("1m · 10:25 AM", bar(t, "2026-10-03T08:26:00Z").text)
+    }
+
     @Test fun canceledIsTheCrossedOutPlaneAndAnAlertForAnHour() {
         val gone = lh455(state = FlightState.CANCELED)
         val b = bar(gone, near)

@@ -578,9 +578,14 @@ object FlightRules {
      * nobody said that it did, has landed, whatever was last heard of it: a bar that slept through the
      * landing must not count down to nothing. A timetable's flight is left as it is (nobody knows what
      * became of it), and so is one the service called canceled or diverted.
+     *
+     * [ended]: the asking has ended for it (the service has gone on to another flight of the number),
+     * so nobody will ever say that it landed. Its time to land says so then, at once: it must not
+     * stand at "1 min" for the three hours a flight that is still asked about is given.
      */
-    fun shown(f: Flight, now: Instant): Flight =
-        if (!f.timetable && (f.state == FlightState.PLANNED || f.state == FlightState.IN_AIR) && standing(f, now).stage == Stage.LANDED) f.copy(state = FlightState.LANDED)
+    fun shown(f: Flight, now: Instant, ended: Boolean = false): Flight =
+        if (!f.timetable && (f.state == FlightState.PLANNED || f.state == FlightState.IN_AIR) &&
+            (standing(f, now).stage == Stage.LANDED || (ended && passed(f.to, now)))) f.copy(state = FlightState.LANDED)
         else f
 
     /** When a cancellation or a diversion was first seen: [since] if [f] was already known as one, else [now]; null for a flight that goes its way. */
@@ -602,7 +607,7 @@ object FlightRules {
      * [STALE] old. Until then it is about to leave, for all anyone knows; from then on the item says
      * "no update", as it does for a timetable's flight past its time.
      */
-    fun silent(t: Tracked, now: Instant): Boolean = t.flight?.let { overdue(shown(it, now), now) } == true && stale(t, now)
+    fun silent(t: Tracked, now: Instant): Boolean = t.flight?.let { overdue(shown(it, now, t.ended), now) } == true && stale(t, now)
 
     /**
      * True if nothing in [f] can trip the arithmetic above: every time in a century this app can be

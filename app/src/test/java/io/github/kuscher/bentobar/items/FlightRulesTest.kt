@@ -263,6 +263,18 @@ class FlightRulesTest {
         assertNull(again(air, ok(reply("flight-LH455-landed"))).failure)
     }
 
+    @Test fun aReplyThatNamesNoTimeToLeaveIsNoAnswerAndNotTheEndOfTheAsking() {
+        val air = flight("flight-LH455-in-the-air")
+        // The same flight, with its planned time left empty: nobody can tell which day's flight the reply is about.
+        val bare = reply("flight-LH455-in-the-air").replace(Regex("\"dep_time\": \"[^\"]*\","), "\"dep_time\": null,")
+        assertNull(AirLabs.flight(bare).value!!.from.planned)
+        val asked = again(air, ok(bare))
+        assertEquals(AirLabs.Again.Failed, asked.again)
+        assertEquals(Failure.NO_ANSWER, asked.failure)
+        // Another day's flight of the number is still the end of it: an item follows one flight.
+        assertEquals(AirLabs.Again.Gone, again(air, ok(later(reply("flight-LH455-in-the-air"), 1))).again)
+    }
+
     @Test fun aFollowedPlanFromTheTimetableWaitsForTheServiceToKnowItsDay() {
         val like = flight("flight-LH455-in-the-air")                              // left on 1 October
         val route = AirLabs.routes(reply("routes-LH455")).value!![0]

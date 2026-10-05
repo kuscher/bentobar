@@ -194,6 +194,9 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
         modifier.fillMaxWidth().heightIn(min = if (sub != null) 48.dp else 40.dp).focusRing(focused, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
             .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
             .hoverable(source)
+            // An Enter that is being held when the focus arrives here (a search's results come in and the
+            // first takes the focus) is not this entry's: its repeats are swallowed, so its release presses nothing.
+            .onPreviewKeyEvent { e -> (e.key == Key.Enter || e.key == Key.NumPadEnter) && e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount > 0 }
             .clickable(enabled = enabled, interactionSource = source, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand)
             .padding(horizontal = 8.dp, vertical = 6.dp),

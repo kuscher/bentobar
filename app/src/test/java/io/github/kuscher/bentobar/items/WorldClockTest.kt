@@ -214,8 +214,8 @@ class WorldClockTest {
 
     @Test fun theCopiedLineHasPlainSpacesWhateverTheSystemPutsBeforeAmAndPm() {
         // Android writes "9:00 AM" with a narrow no-break space; pasted into a mail or a chat that should be a space like any other.
-        val narrow = worldClockWords(time = { ms, zone -> DateTimeFormatter.ofPattern("h:mm a", Locale.US).format(Instant.ofEpochMilli(ms).atZone(zone)) })
-        val places = WorldClock.places(la, emptyList(), listOf(city("Europe/Berlin", "Munich West")), monday)
+        val narrow = worldClockWords(time = { ms, zone -> DateTimeFormatter.ofPattern("h:mm\u202Fa", Locale.US).format(Instant.ofEpochMilli(ms).atZone(zone)) })
+        val places = WorldClock.places(la, emptyList(), listOf(city("Europe/Berlin", "Munich\u00A0West")), monday)
         assertEquals("Wed, Oct 7 · 9:00 AM Los Angeles · 6:00 PM Munich West", WorldClock.copyLine(places, wednesday, narrow))
     }
 
@@ -298,6 +298,54 @@ class WorldClockTest {
         assertSame(eight, WorldClock.add(eight, "Pacific/Auckland"))
     }
 
+    @Test fun onlyCitiesThatGetARowFillTheList() {
+        // A pasted layout with eight cities, three of them in zones this device can't place. Those have no row and so no
+        // button to remove them in the menu: if they filled the list, nothing could be added or taken away there.
+        val pasted = cities("Asia/Tokyo", "Mars/Olympus_Mons", "Europe/Berlin", "Mars/Gale_Crater", "America/New_York", "Asia/Kolkata", "", "Europe/London")
+        assertEquals(8, pasted.size)
+        assertEquals(6, WorldClock.places(la, emptyList(), pasted, monday).size)
+        assertFalse(WorldClock.full(pasted))
+        val more = WorldClock.add(pasted, "Pacific/Auckland")
+        assertEquals(pasted + city("Pacific/Auckland"), more)
+        assertEquals(7, WorldClock.places(la, emptyList(), more, monday).size)
+        // Eight cities with a row are the limit, whatever the layout holds besides.
+        val eight = WorldClock.add(WorldClock.add(more, "America/Chicago"), "America/Denver")
+        assertEquals(11, eight.size)
+        assertEquals(9, WorldClock.places(la, emptyList(), eight, monday).size)
+        assertTrue(WorldClock.full(eight))
+        assertSame(eight, WorldClock.add(eight, "Asia/Seoul"))
+        // One removed in the menu, and there is room again.
+        assertFalse(WorldClock.full(WorldClock.remove(eight, "Asia/Tokyo")))
+    }
+
+    @Test fun aZoneThatIsInALayoutSeveralTimesCountsOnce() {
+        val same = List(8) { city("Asia/Tokyo", "Office $it") }
+        assertEquals(listOf("Los Angeles", "Office 0"), WorldClock.places(la, emptyList(), same, monday).map { it.name })
+        assertFalse(WorldClock.full(same))
+        assertTrue(WorldClock.added(same, "Asia/Tokyo"))
+        assertSame(same, WorldClock.add(same, "Asia/Tokyo"))
+        assertEquals(same + city("Europe/Berlin"), WorldClock.add(same, "Europe/Berlin"))
+        // Its one row's button takes all of them away.
+        assertEquals(emptyList<WorldCity>(), WorldClock.remove(same, "Asia/Tokyo"))
+    }
+
+    @Test fun aCityAddedToALayoutLongerThanIsLookedAtStillGetsARow() {
+        // Forty cities nothing can place, typed into a layout by hand: only the first 32 are looked at, so a city put at
+        // the very end would be added and never seen.
+        val unplaced = List(40) { city("Mars/Crater_$it") }
+        assertFalse(WorldClock.full(unplaced))
+        val added = WorldClock.add(unplaced, "Asia/Tokyo")
+        assertEquals(41, added.size)
+        assertEquals(listOf("Los Angeles", "Tokyo"), WorldClock.places(la, emptyList(), added, monday).map { it.name })
+        assertTrue(WorldClock.added(added, "Asia/Tokyo"))
+        assertEquals(unplaced, WorldClock.remove(added, "Asia/Tokyo"))
+        // A city past what is looked at has no row either, so the search doesn't call it added: taking it gives it one.
+        val behind = unplaced + city("Asia/Seoul")
+        val seoul = find("seoul", behind).single()
+        assertFalse(seoul.added)
+        assertEquals(listOf("Los Angeles", "Seoul"), WorldClock.places(la, emptyList(), WorldClock.add(behind, seoul.zone, seoul.nameInList), monday).map { it.name })
+    }
+
     @Test fun aZoneThisDeviceDoesNotKnowIsNotAdded() {
         assertEquals(emptyList<WorldCity>(), WorldClock.add(emptyList(), "Mars/Olympus_Mons"))
         assertEquals(emptyList<WorldCity>(), WorldClock.add(emptyList(), ""))
@@ -363,7 +411,7 @@ class WorldClockTest {
 
     /** What the search finds on a device in Los Angeles that Monday, with these cities in the list and these Clock items in the bar. */
     private fun find(text: String, cities: List<WorldCity> = emptyList(), clocks: List<Clock> = emptyList(), index: WorldClock.Index = everyZone,
-                     limit: Int = WorldClock.RESULTS) = index.search(text, WorldClock.places(la, clocks, cities, monday), cities, monday, limit)
+                     limit: Int = WorldClock.RESULTS) = index.search(text, WorldClock.places(la, clocks, cities, monday), monday, limit)
 
     @Test fun tokListsTokyoAtOnce() {
         val hit = find("tok").first()

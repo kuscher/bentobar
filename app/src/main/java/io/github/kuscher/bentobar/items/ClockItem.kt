@@ -241,7 +241,8 @@ private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now
     // to the entry after it ([next], "Edit cities"); dropped, it would start again at the top of the menu.
     var refocus by remember { mutableStateOf(false) }
     val entry = remember { FocusRequester() }
-    val full = WorldClock.full(cities)
+    // Counted by the cities that have a row, which means looking their zones up: when the list changes, not with every tick.
+    val full = remember(cities) { WorldClock.full(cities) }
     LaunchedEffect(full) { if (full) adding = false }
     if (!adding || full) {
         MenuEntry(Sym.ADD, stringResource(R.string.clock_add_city), enabled = !full, modifier = Modifier.focusRequester(entry)) { adding = true }
@@ -252,7 +253,7 @@ private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now
     }
     var query by remember { mutableStateOf("") }
     // The differences beside the results are those of this minute.
-    val hits = remember(query, cities, places, now / 60_000) { zoneIndex.search(query, places, cities, now) }
+    val hits = remember(query, places, now / 60_000) { zoneIndex.search(query, places, now) }
     val free = WorldClock.firstFree(hits)
     val focus = LocalFocusManager.current
     val field = remember { FocusRequester() }

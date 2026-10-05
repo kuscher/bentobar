@@ -161,9 +161,12 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
         tracked.following && tracked.flight == null && !another -> WaitingCard(FlightNumber.shown(tracked.number), tracked.failure, v,
             retry = FlightItem.mayRefresh(item.id), onRetry = { FlightItem.refresh(item.id) }, onChangeKey = changeKey, onAnother = { another = true },
             onStop = { last = FlightNumber.shown(tracked.number); FlightItem.stop(item) })
-        else -> SearchCard(item, v, LocalDate.ofInstant(now, v.zone), initial = missed?.number ?: last, missed = missed,
-            staying = card?.let { FlightNumber.shown(tracked.number) }, left = FlightLoad.left, onChangeKey = changeKey,
-            onCancel = if (another) { { another = false; FlightItem.dropFailure(item.id) } } else null)
+        else -> {
+            // Another flight is being chosen only while there is one that stays meanwhile.
+            val staying = FlightNumber.shown(tracked.number).takeIf { another && tracked.following }
+            SearchCard(item, v, LocalDate.ofInstant(now, v.zone), initial = missed?.number ?: last, missed = missed, staying = staying, left = FlightLoad.left,
+                onChangeKey = changeKey, onCancel = if (staying != null) { { another = false; FlightItem.dropFailure(item.id) } } else null)
+        }
     }
 }
 
@@ -393,7 +396,9 @@ internal fun FlightKey() {
         } else {
             if (!keyed) {
                 Text(stringResource(R.string.flight_consent), style = MaterialTheme.typography.bodyMedium)
-                TextButton(onClick = { FlightItem.openSignUp() }) { Text(stringResource(R.string.flight_get_key)) }
+                val getKey = stringResource(R.string.flight_get_key)
+                val opens = stringResource(R.string.common_opens_browser, getKey)
+                TextButton(onClick = { FlightItem.openSignUp() }, modifier = Modifier.semantics { contentDescription = opens }) { Text(getKey) }
             }
             KeyField(onSave = { if (FlightItem.saveKey(it)) replacing = false }, onCancel = if (replacing) { { replacing = false } } else null)
             Text(stringResource(R.string.flight_key_help), style = MaterialTheme.typography.bodySmall, color = quiet, modifier = Modifier.padding(start = 4.dp, top = 2.dp))

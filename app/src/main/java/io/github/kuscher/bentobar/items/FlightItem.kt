@@ -42,6 +42,8 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     override val menuWidthDp = 340
     override val online = Online.Service.AIRLABS
     override val canBeActive = true
+    // Which flight someone follows is their own business: the debug hook that prints what an item shows says how long this one's text is, not what it says.
+    override val discreet = true
     override val optionsTitle: Int get() = R.string.flight_key_section
 
     /** How many hours before departure the item comes out. */
@@ -323,13 +325,14 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     }
 
     /**
-     * `flight show NAME [TURN]` shows a sample in the first Flight item's place, as it stands at the
-     * (staged) clock's moment; `flight show` lists the names; `flight off` ends it; `flight` says what is
-     * staged. A sample is a made-up flight: nothing here takes or prints a key, or a number the user
-     * entered.
+     * `flight show NAME [TURN]` shows a sample in the first Flight item's place, made for the (staged)
+     * clock's moment; `flight show` lists the names; `flight off` ends it; `flight` says what is staged
+     * and how it reads now, after the clock was moved. A sample is a made-up flight. Of the real thing
+     * nothing is printed but whether there is a key and a switch: never the key, and never a number the
+     * user entered.
      */
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
-        null -> "staged=${stagedAs ?: "nothing"} items=${ids().size} key=${Online.hasKey(online)} on=${Online.on(online)}"
+        null -> "items=${ids().size} key=${Online.hasKey(online)} on=${Online.on(online)} staged=" + (staged?.let { "${stagedAs.orEmpty()}: ${reads(it)}" } ?: "nothing")
         "off" -> { unstage(); "the real thing again" }
         "show" -> show(args.getOrNull(1), args.getOrNull(2))
         else -> null
@@ -337,22 +340,28 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
 
     private fun show(name: String?, turn: String?): String {
         if (name == null) return FlightSamples.names
-        val item = first() ?: return "no Flight item outside Off: add one first (add flight)"
-        val now = Now.wall()
-        val sample = FlightSamples.of(name, turn, now) ?: return "no sample $name ${turn.orEmpty()}: ${FlightSamples.names}"
+        if (first() == null) return "no Flight item outside Off: add one first (add flight)"
+        val sample = FlightSamples.of(name, turn, Now.wall()) ?: return "no sample $name ${turn.orEmpty()}: ${FlightSamples.names}"
         staged = sample
         stagedAs = listOfNotNull(name, turn).joinToString(" ")
         places.clear()
         Ticker.refresh()
+        return "$stagedAs: ${reads(sample)}"
+    }
+
+    /** How a staged sample reads at the clock's moment: the bar's text and color, and the menu's headline and badge. */
+    private fun reads(sample: Staged): String {
+        val now = Instant.ofEpochMilli(Now.wall())
+        val hours = first()?.let(before::of) ?: before.default
         val v = voice()
-        return "$stagedAs: " + when (sample) {
+        return when (sample) {
             is Staged.Following -> {
-                val b = FlightText.bar(sample.tracked, null, Instant.ofEpochMilli(now), before.of(item), v)
-                val c = FlightText.card(sample.tracked, Instant.ofEpochMilli(now), v)
-                "bar \"${b.text.orEmpty()}\" tone=${b.tone} active=${b.active} | menu \"${c?.headline}\" badge \"${c?.badge.orEmpty()}\""
+                val b = FlightText.bar(sample.tracked, null, now, hours, v)
+                val c = FlightText.card(sample.tracked, now, v)
+                "bar \"${b.text.orEmpty()}\" tone=${b.tone} active=${b.active} | menu \"${c?.headline.orEmpty()}\" badge \"${c?.badge.orEmpty()}\" | ${c?.note.orEmpty()}"
             }
             is Staged.Failed -> "menu \"${FlightText.error(sample.failure, sample.number, null, v)}\""
-            is Staged.Looking -> "bar \"${FlightText.bar(null, sample.number, Instant.ofEpochMilli(now), before.of(item), v).text}\""
+            is Staged.Looking -> "bar \"${FlightText.bar(null, sample.number, now, hours, v).text.orEmpty()}\""
             Staged.Empty -> "no flight tracked"
             Staged.NoKey -> "not set up"
         }

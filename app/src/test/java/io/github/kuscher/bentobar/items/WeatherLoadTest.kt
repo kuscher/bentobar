@@ -300,10 +300,13 @@ class WeatherLoadTest {
         net.fail(Host.OPEN_METEO, "/v1/forecast", Why.STATUS, 500)
         net.reply(Host.OPEN_METEO, "/v1/forecast", forecast)
         val good = load()!!
+        val keptText = Kept.fetched(OPEN_METEO).read(zurich.key)!!.text
         val failed = load(last = good, at = now + 30 * min)!!
         assertEquals(good.copy(failure = Failure.NO_ANSWER, misses = 1), failed)
         assertEquals(now, failed.fetchedAt) // as old as it was: three hours after this moment the number goes
-        // What is kept stays the good reading, without the failure.
+        // What is kept stays the good reading as it was written: a failed try writes nothing.
+        assertEquals(keptText, Kept.fetched(OPEN_METEO).read(zurich.key)!!.text)
+        assertFalse(keptText.contains("NO_ANSWER"))
         assertEquals(good, WeatherLoad.kept(zurich, now + 31 * min)!!.value)
         // And the next good answer clears it all.
         val again = load(last = failed, at = now + 45 * min)!!
@@ -318,6 +321,8 @@ class WeatherLoadTest {
         // Numbers of another place are never passed on as this one's.
         val other = Reading(place = "59.91,10.75", fetchedAt = now, current = Current(now / 1000, 3.0))
         assertEquals(Reading(place = "47.37,8.55", failure = Failure.NO_ANSWER, misses = 1), load(last = other))
+        // Only what the service sent is ever kept: a failure leaves nothing on the device.
+        assertEquals(emptySet<String>(), Kept.fetched(OPEN_METEO).names())
     }
 
     @Test fun notAskedAfterAllIsNothingToSay() = FakeHttp.use { net ->

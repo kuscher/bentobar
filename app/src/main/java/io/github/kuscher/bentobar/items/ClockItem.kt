@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -67,6 +68,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.Locale
+import java.util.TimeZone
 
 // The Clock item and its World clock menu: the places, Plan a time, adding and removing cities. What
 // the menu says is worked out in WorldClock.kt and PlanATime.kt, which are pure and unit-tested.
@@ -107,7 +109,9 @@ object ClockItem : ItemType("clock", R.string.item_clock_title, Sym.SCHEDULE, R.
         val time = formatTime(Instant.ofEpochMilli(now).atZone(zone), is24(item), item.optBool("seconds", true))
         val label = item.opt("label", "")
         return ItemState(icon = Sym.SCHEDULE, text = if (label.isBlank()) time else "$label $time", widthKey = "clock",
-            desc = "${label.ifBlank { WorldClock.cityOf(zone.id) }} $time", active = WorldClock.away(zone, ZoneId.systemDefault(), now))
+            desc = "${label.ifBlank { WorldClock.cityOf(zone.id) }} $time",
+            // Asked only of a clock that has the rule on and a zone of its own: one that follows the device is never away.
+            active = item.whenActive && item.options["zone"] != null && WorldClock.away(zone, ZoneId.systemDefault(), now))
     }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host -> WorldClockMenu(item, host) }
@@ -138,10 +142,15 @@ private fun WorldClockMenu(item: ItemConfig, host: MenuHost) {
     // The layout as it is now: a city added here, or named in settings, shows at once.
     val cfg by Store.config.collectAsState()
     val now = Now.wall()
-    val local = ZoneId.systemDefault()
+    val local = remember(TimeZone.getDefault().id) { ZoneId.systemDefault() }
     val h24 = is24(item)
     val words = remember(h24) { words(h24) }
-    val places = WorldClock.places(local, cfg.items.filter { it.type == "clock" }.map { WorldClock.Clock(zoneOf(it), it.opt("label", "")) }, cfg.cities, now)
+    // The places keep their zones. They are looked up again when the list changes and once a minute (their order is that
+    // of the offsets right now), not for every frame of the slider: Android keeps the rules of only a few zones at hand.
+    val clocks = cfg.items.filter { it.type == "clock" }.map { it.options["zone"] to it.opt("label", "") }
+    val places = remember(local, clocks, cfg.cities, now / 60_000) {
+        WorldClock.places(local, clocks.map { (zone, label) -> WorldClock.Clock(WorldClock.zone(zone) ?: local, label) }, cfg.cities, now)
+    }
     // A plan lives as long as the menu is open: opening it again is the present.
     var plan by remember { mutableStateOf<PlanATime.Plan?>(null) }
     var editing by remember { mutableStateOf(false) }
@@ -260,6 +269,7 @@ private fun AddCity(cities: List<WorldCity>, local: ZoneId, now: Long) {
 @Composable
 private fun CitiesInSettings() {
     val cfg by Store.config.collectAsState()
+    Spacer(Modifier.height(4.dp))
     SectionLabel(stringResource(R.string.clock_cities_section))
     if (cfg.cities.isEmpty()) { Body(stringResource(R.string.clock_cities_empty)); return }
     Body(stringResource(R.string.clock_cities_help))

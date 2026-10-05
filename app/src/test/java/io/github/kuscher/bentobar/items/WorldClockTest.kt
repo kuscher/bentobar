@@ -407,12 +407,13 @@ class WorldClockTest {
 
     @Test fun theResultsReadAsTheDesignDrawsThem() {
         val hits = everyZone.search("to", cities("Asia/Tokyo"), la, monday, limit = 50).associateBy { it.name }
-        assertTrue(hits.getValue("Tokyo").added)
-        assertEquals("+3h", WorldClock.offset(hits.getValue("Toronto").ahead))
-        assertEquals("+3h", WorldClock.offset(hits.getValue("Tortola").ahead))
-        assertEquals("+20h", WorldClock.offset(hits.getValue("Tongatapu").ahead))
-        // The device's own place has no difference: the result then reads "Same time".
-        assertEquals(0, everyZone.search("los angeles", emptyList(), la, monday).first().ahead)
+        fun beside(hit: WorldClock.Hit) = WorldClock.beside(hit, appText("clock_search_added"), appText("clock_same_time"))
+        assertEquals("added", beside(hits.getValue("Tokyo")))
+        assertEquals("+3h", beside(hits.getValue("Toronto")))
+        assertEquals("+3h", beside(hits.getValue("Tortola")))
+        assertEquals("+20h", beside(hits.getValue("Tongatapu")))
+        // The device's own place has no difference.
+        assertEquals("Same time", beside(everyZone.search("los angeles", emptyList(), la, monday).first()))
     }
 
     @Test fun twoResultsWithOneNameGetTheirRegion() {

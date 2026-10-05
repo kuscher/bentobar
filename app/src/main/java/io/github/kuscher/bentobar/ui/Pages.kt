@@ -324,6 +324,11 @@ fun SetupPage(activity: Activity, setup: SetupState, onTurnOn: () -> Unit) {
             Spacer(Modifier.height(4.dp))
             OnlineSwitch(Online.Service.OPEN_METEO, online, stringResource(R.string.setup_online_weather), stringResource(R.string.setup_online_weather_first))
             OnlineSwitch(Online.Service.AIRLABS, online, stringResource(R.string.setup_online_flights), stringResource(R.string.setup_online_flights_first))
+            // The key outlives the Flight item it was typed into: without this, taking it off the device
+            // would mean adding a Flight item again first.
+            if (Online.Service.AIRLABS in online.keyed) TextButton(onClick = { Online.removeKey(Online.Service.AIRLABS); Ticker.refresh() }) {
+                Text(stringResource(R.string.flight_remove_key), color = MaterialTheme.colorScheme.error)
+            }
             Text(stringResource(R.string.setup_online_off_note), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

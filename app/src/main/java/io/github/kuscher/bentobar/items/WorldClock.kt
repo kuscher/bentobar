@@ -24,6 +24,11 @@ object WorldClock {
     const val RESULTS = 6
     /** The search starts from this many letters. */
     const val MIN_LETTERS = 2
+    /**
+     * How many cities of a layout are looked at. The menu adds no more than [MAX_CITIES], but a
+     * pasted layout can hold any number, and each city is a zone to look up.
+     */
+    const val LOOKED_AT = 4 * MAX_CITIES
 
     // ---- zones and names ----
 
@@ -79,7 +84,7 @@ object WorldClock {
         val found = LinkedHashMap<String, Found>()
         found[local.id] = Found(local)
         for (c in clocks) found.getOrPut(c.zone.id) { Found(c.zone) }.run { if (label.isEmpty()) label = clean(c.label) }
-        for (c in cities) {
+        for (c in cities.take(LOOKED_AT)) {
             val zone = zone(c.zone) ?: continue
             found.getOrPut(zone.id) { Found(zone) }.run { if (city == null) city = c }
         }
@@ -209,7 +214,7 @@ object WorldClock {
      */
     fun ordered(cities: List<WorldCity>, now: Long): List<WorldCity> {
         val at = Instant.ofEpochMilli(now)
-        val placed = cities.distinctBy { it.zone }.map { it to zone(it.zone) }
+        val placed = cities.take(LOOKED_AT).distinctBy { it.zone }.map { it to zone(it.zone) }
         val known = placed.mapNotNull { (city, zone) -> zone?.let { Triple(city, it.rules.getOffset(at).totalSeconds, nameOf(city)) } }
             .sortedWith(compareBy<Triple<WorldCity, Int, String>> { it.second }.thenBy(String.CASE_INSENSITIVE_ORDER) { it.third }.thenBy { it.first.zone })
         return known.map { it.first } + placed.filter { it.second == null }.map { it.first }

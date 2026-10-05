@@ -332,6 +332,18 @@ class WorldClockTest {
         assertEquals(listOf("New York", "Munich", "Paris", "Tokyo", "Olympus Mons"), WorldClock.ordered(list, monday).map { WorldClock.nameOf(it) })
     }
 
+    @Test fun ofAPastedLayoutWithHundredsOfCitiesOnlyTheFirstAreLookedAt() {
+        // The menu adds eight at most; a layout typed by hand can hold any number, and each is a zone to look up.
+        val many = List(500) { city(if (it % 2 == 0) "Asia/Tokyo" else "Mars/Crater_$it", "City $it") } + city("Europe/Berlin")
+        assertEquals(32, WorldClock.LOOKED_AT)
+        assertEquals(listOf("Los Angeles", "City 0"), WorldClock.places(la, emptyList(), many, monday).map { it.name })
+        assertEquals(17, WorldClock.ordered(many, monday).size)
+        // Nothing is out of reach for good: with those removed in settings, the next ones are listed there.
+        val rest = WorldClock.ordered(many, monday).fold(many) { list, c -> WorldClock.remove(list, c.zone) }
+        assertEquals(235, rest.size)
+        assertEquals(32, WorldClock.ordered(rest, monday).size)
+    }
+
     @Test fun citiesAddedInTheMenuTravelWithACopiedLayout() {
         val cities = WorldClock.add(WorldClock.add(emptyList(), "Asia/Tokyo"), "Europe/Berlin", "Munich")
         val copied = json.encodeToString(BarConfig.serializer(), BarConfig(cities = cities))

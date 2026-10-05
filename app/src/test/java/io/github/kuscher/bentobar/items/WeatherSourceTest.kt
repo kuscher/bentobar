@@ -56,8 +56,11 @@ class WeatherSourceTest {
         return WeatherSource.make(
             refresher = { every, restore, load -> Refresher(wiring, every, restore, load).also { readings = it } },
             ask = { work -> Ask(wiring, work).also { asking = it } },
-            background = Executor { it.run() }, wall = { wall }, layout = { layout }, staged = staged)
+            background = Executor { backgroundRuns++; it.run() }, wall = { wall }, layout = { layout }, staged = staged, up = { elapsed })
     }
+
+    /** How often something was handed to the background thread that tidies the device. */
+    private var backgroundRuns = 0
 
     /** What the app does when the switch goes off (`Env.wireOnline`): the loader and the search forget. */
     private fun switchOff() { Online.turnOff(OPEN_METEO); readings.forget(); asking.clear() }
@@ -493,6 +496,102 @@ class WeatherSourceTest {
         assertFalse(s.again(item))
     }
 
+    // ---- two clocks ----------------------------------------------------------------------------------
+    // "Three hours old" is read off the clock on the wall (it has to hold after a restart), the loader's half hour
+    // off the time since boot. A clock that is set moves the one and not the other.
+
+    @Test fun aClockSetOnMakesAYoungReadingOldAndItIsAskedAgainAtOnce() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        pass(2 * min)
+        wall += 4 * 60 * min // set four hours on, two minutes after a reading
+        // Its numbers are too old to show now ...
+        assertEquals(Status.Loading, s.status(item, wall))
+        // ... so they are asked for now, not when the loader's own half hour is up: "Loading…" must be loading.
+        s.reading(item)
+        assertEquals(2, net.asked.size)
+        assertTrue(s.status(item, wall) is Status.Live)
+        // Once: the new reading is of the new time.
+        s.watch(item, 20 * min)
+        assertEquals(2, net.asked.size)
+    }
+
+    @Test fun openingTheMenuAfterTheClockWasSetOnAsksToo() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        pass(2 * min)
+        wall += 4 * 60 * min
+        s.opened(item) // within the ten minutes in which opening the menu asks nothing
+        assertEquals(2, net.asked.size)
+        assertTrue(s.status(item, wall) is Status.Live)
+    }
+
+    @Test fun anOldReadingIsAskedForOnceAMinuteAtMostAndNotAtAllOnceATryHasFailed() = FakeHttp.use { net ->
+        net.forecasts()
+        net.fail(Host.OPEN_METEO, "/v1/forecast", Why.STATUS, 500)
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        pass(30 * sec)
+        wall += 4 * 60 * min
+        // Half a minute after the last request: not yet.
+        s.reading(item); s.opened(item)
+        assertEquals(1, net.asked.size)
+        pass(30 * sec)
+        s.reading(item)
+        assertEquals(2, net.asked.size)
+        // That try failed: from here the failure's own pace holds (fifteen minutes), and the state says what is wrong.
+        assertEquals(Status.Missing(Failure.NO_ANSWER), s.status(item, wall))
+        s.watch(item, 14 * min + 50 * sec)
+        s.opened(item)
+        assertEquals(2, net.asked.size)
+    }
+
+    @Test fun aClockSetBackDoesNotKeepAnOldTemperature() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        Http.connected = { false } // offline from here on
+        pass(10 * min)
+        wall -= 5 * 60 * min // and the clock is set five hours back: by it the reading is from the future
+        s.watch(item, 2 * 60 * min + 49 * min)
+        // Two hours and 59 minutes after it was read, by the time since boot: the bar keeps it.
+        assertEquals(18.1, (s.status(item, wall) as Status.Live).reading.current!!.temp!!, 1e-9)
+        s.watch(item, 1 * min)
+        // Three hours: an old temperature is a wrong temperature, whatever the clock on the wall was told.
+        assertEquals(Status.Missing(Failure.OFFLINE), s.status(item, wall))
+        assertEquals(1, net.asked.size)
+    }
+
+    @Test fun aClockSetBackWhileOnlineChangesNothing() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        pass(10 * min)
+        wall -= 5 * 60 * min
+        s.watch(item, 19 * min)
+        assertEquals(1, net.asked.size) // the half hour is the loader's, by the time since boot
+        assertTrue(s.status(item, wall) is Status.Live)
+        s.watch(item, 1 * min)
+        assertEquals(2, net.asked.size)
+    }
+
     // ---- a tester's staged failure ------------------------------------------------------------------
 
     @Test fun aStagedFailureStandsInForTheNextAnswerIsNotSentAndIsRetriedLikeARealOne() = FakeHttp.use { net ->
@@ -579,6 +678,45 @@ class WeatherSourceTest {
         after.watch(item, 1 * min)
         assertEquals(2, net.asked.size)
         assertTrue(after.status(item, wall) is Status.Live)
+    }
+
+    @Test fun anItemTurnedOffLeavesNoReadingSoDeletingItLaterLeavesNoneEither() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        assertEquals(setOf(Kept.safe("47.37,8.55")), Kept.fetched(OPEN_METEO).names())
+        // Turned off. The tick that puts the type to sleep looks at the layout one last time, and that is when the reading goes.
+        val off = item.copy(section = Section.OFF)
+        layout = listOf(off)
+        s.keepOnly(WeatherLoad.places(layout))
+        assertEquals(emptySet<String>(), Kept.fetched(OPEN_METEO).names())
+        assertNull(s.peek(off))
+        // Deleted while off: nothing runs for a type without a live item, and nothing has to.
+        layout = emptyList()
+        assertEquals(emptySet<String>(), Kept.fetched(OPEN_METEO).names())
+        // Turned on again instead, it asks afresh: one request, like an item that is new.
+        layout = listOf(item)
+        s.keepOnly(WeatherLoad.places(layout))
+        assertNotNull(s.reading(item))
+        assertEquals(2, net.asked.size)
+    }
+
+    @Test fun onAnInstallThatNeverSetWeatherUpThereIsNothingToTidy() = FakeHttp.use { net ->
+        val s = source()
+        layout = listOf(added)
+        s.keepOnly(WeatherLoad.places(layout))
+        s.keepOnly(emptySet())
+        // No work for a background thread, no folder made: nothing was ever fetched here.
+        assertEquals(0, backgroundRuns)
+        assertFalse(File(dir, "fetched").exists())
+        sentNothing(net)
+        // Once it was set up, a change of the layout does look.
+        s.turnOn()
+        s.keepOnly(emptySet())
+        assertEquals(1, backgroundRuns)
     }
 
     @Test fun theLastReadingIsDeletedWithTheItem() = FakeHttp.use { net ->

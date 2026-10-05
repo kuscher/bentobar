@@ -30,13 +30,19 @@ class WeatherRulesTest {
     private val c78 = 25.6
     private val c61 = 16.1
 
-    /** One reading of a partly cloudy afternoon, read at 1:20 PM, with a dry forecast: [hours] are (hour of the day, chance, code). */
+    /**
+     * One reading of a partly cloudy afternoon, read at 1:20 PM, with a dry forecast. [hours] are the wet ones:
+     * (the hour of the day in which something is likely to fall, its chance, its code). The service files an
+     * hour's chance under the time that hour ends at, and so does this: rain between 3 and 4 PM is in the entry
+     * of 4 PM.
+     */
     private fun reading(temp: Double? = c72, feels: Double? = c68, code: Int? = 2, day: Boolean = true,
                         hours: List<Triple<Int, Int?, Int?>> = emptyList(), hourTemp: Double? = c72, fetchedAt: Long = at(13, 20)): Reading {
-        val wet = hours.associateBy { it.first }
+        val wet = hours.associateBy { it.first + 1 }
         return Reading(place = "37.77,-122.42", fetchedAt = fetchedAt, zone = "America/Los_Angeles", offsetSec = -7 * 3600,
             current = Current(at = at(13, 15) / 1000, temp = temp, feels = feels, code = code, day = day, windKmh = 14.5),
-            hours = (13..23).map { h -> Hour(at(h) / 1000, hourTemp, if (h in wet) wet.getValue(h).second else 0, if (h in wet) wet.getValue(h).third else 2, day = h < 19) },
+            // An entry an hour from 1 PM to midnight.
+            hours = (13..24).map { h -> Hour(at(13) / 1000 + (h - 13) * 3600L, hourTemp, if (h in wet) wet.getValue(h).second else 0, if (h in wet) wet.getValue(h).third else 2, day = h < 19) },
             days = listOf(Day(at(0) / 1000, 2, c78, c61, 20, at(7, 8) / 1000, at(18, 42) / 1000),
                 Day(at(0, day = 6) / 1000, 63, c78, c61, 60, at(7, 9, 6) / 1000, at(18, 41, 6) / 1000)))
     }
@@ -88,6 +94,27 @@ class WeatherRulesTest {
         assertTrue(b.active)
         // The glyph is what is coming, not the sky of this minute.
         assertEquals(Sym.RAINY, b.icon)
+    }
+
+    @Test fun anHoursChanceIsForTheHourThatEndsAtItsTime() {
+        // As the service files it ("preceding hour"): 80% in the entry of 3 PM means rain is likely between 2 and 3.
+        val r = reading().let { it.copy(hours = it.hours.map { h -> if (h.at == at(15) / 1000) h.copy(chance = 80, code = 61) else h }) }
+        val b = bar(r) // at 1:30 PM
+        assertEquals("72° · Rain 2 PM", b.text)
+        assertEquals("San Francisco: 72 degrees. Partly cloudy. Rain likely at 2 PM.", b.desc)
+        assertTrue(b.active)
+        assertEquals(at(14) / 1000, WeatherRules.begins(WeatherRules.coming(r, at(13, 30), 2)!!))
+        // At 2:10 PM that hour is running. It is the present, which the sky of this minute speaks for: no time is announced for it.
+        val running = bar(r, now = at(14, 10))
+        assertEquals("72°", running.text)
+        assertFalse(running.active)
+        assertEquals("San Francisco: 72 degrees. Partly cloudy.", running.desc)
+        assertNull(WeatherRules.coming(r, at(14, 0), 2))
+        // The rule's two hours are counted to where the wet hour begins: at noon that is two hours off, a minute earlier it is more.
+        val early = r.copy(fetchedAt = at(11, 50))
+        assertTrue(bar(early, now = at(12, 0)).active)
+        assertEquals("72° · Rain 2 PM", bar(early, now = at(12, 0)).text)
+        assertFalse(bar(early, now = at(11, 59)).active)
     }
 
     @Test fun withA24HourClockTheHourIsWrittenThatWay() {
@@ -313,7 +340,7 @@ class WeatherRulesTest {
 
     @Test fun likelyMeansFiftyPercentOrMoreInAnyHourOfTheSpan() {
         assertNull(WeatherRules.coming(reading(hours = listOf(Triple(15, 49, 61))), at(13, 30), 2))
-        assertEquals(at(15) / 1000, WeatherRules.coming(reading(hours = listOf(Triple(15, 50, 61))), at(13, 30), 2)!!.at)
+        assertEquals(at(15) / 1000, WeatherRules.begins(WeatherRules.coming(reading(hours = listOf(Triple(15, 50, 61))), at(13, 30), 2)!!))
         assertEquals("72°", bar(reading(hours = listOf(Triple(15, 49, 61)))).text)
         assertFalse(bar(reading(hours = listOf(Triple(15, 49, 61)))).active)
         assertEquals("72° · Rain 3 PM", bar(reading(hours = listOf(Triple(15, 50, 61)))).text)
@@ -354,7 +381,7 @@ class WeatherRulesTest {
         val r = reading(hours = listOf(Triple(15, 80, 61), Triple(21, 90, 73)))
         val shuffled = r.copy(hours = r.hours.reversed())
         assertEquals("72° · Rain 3 PM", bar(shuffled).text)
-        assertEquals(at(15) / 1000, WeatherRules.coming(shuffled, at(13, 30), 2)!!.at)
+        assertEquals(at(15) / 1000, WeatherRules.begins(WeatherRules.coming(shuffled, at(13, 30), 2)!!))
         // The reply's first place holds the hour it was read in; a later look still finds the right one.
         val evening = shuffled.copy(fetchedAt = at(19, 0))
         assertEquals("72° · Snow 9 PM", bar(evening, now = at(20, 30)).text)
@@ -364,7 +391,7 @@ class WeatherRulesTest {
         // Read at 10:40 PM, shown at 12:20 AM: the reply's first day is yesterday by then.
         val r = Reading(place = "37.77,-122.42", fetchedAt = at(22, 40), zone = "America/Los_Angeles", offsetSec = -7 * 3600,
             current = Current(at(22, 30) / 1000, c61, c61, 3, false, 5.0),
-            hours = (22..23).map { Hour(at(it) / 1000, c61, 0, 3, false) } + (0..9).map { Hour(at(it, day = 6) / 1000, c61, if (it == 2) 80 else 0, if (it == 2) 61 else 3, false) },
+            hours = (22..23).map { Hour(at(it) / 1000, c61, 0, 3, false) } + (0..9).map { Hour(at(it, day = 6) / 1000, c61, if (it == 3) 80 else 0, if (it == 3) 61 else 3, false) }, // likely between 2 and 3 AM: the entry of 3 AM
             days = listOf(Day(at(0) / 1000, 3, c78, c61, 10, at(7, 8) / 1000, at(18, 42) / 1000),
                 Day(at(0, day = 6) / 1000, 61, 20.0, 10.0, 80, at(7, 9, 6) / 1000, at(18, 41, 6) / 1000),
                 Day(at(0, day = 7) / 1000, 0, 21.0, 11.0, 0, at(7, 10, 7) / 1000, at(18, 40, 7) / 1000)))
@@ -398,7 +425,7 @@ class WeatherRulesTest {
         assertEquals(at(13, 30), there(5, 30))
         val r = Reading(place = "35.69,139.69", fetchedAt = at(13, 20), zone = "Asia/Tokyo", offsetSec = 9 * 3600,
             current = Current(there(5, 15) / 1000, c61, c61, 3, false, 5.0),
-            hours = (5..23).map { Hour(there(it) / 1000, c61, if (it == 7) 80 else 0, if (it == 7) 61 else 3, it >= 6) },
+            hours = (5..23).map { Hour(there(it) / 1000, c61, if (it == 8) 80 else 0, if (it == 8) 61 else 3, it >= 6) }, // likely between 7 and 8 AM: the entry of 8 AM
             days = listOf(Day(there(0) / 1000, 61, c72, c61, 80, there(5, 40) / 1000, there(17, 20) / 1000)))
         assertEquals("61° · Rain 7 AM", bar(r, look(city = "Tokyo")).text)
         assertEquals("Tokyo: 61 degrees. Cloudy. Rain likely at 7 AM.", bar(r, look(city = "Tokyo")).desc)
@@ -654,6 +681,42 @@ class WeatherRulesTest {
         assertFalse(WeatherRules.old(r, at(12, 59)))
         assertTrue(WeatherRules.old(r, at(13, 0)))
         assertTrue(WeatherRules.old(Reading(place = "1.00,2.00"), at(13, 0))) // never fetched
+    }
+
+    @Test fun aReadingIsOldWhenEitherClockSaysThreeHoursHavePassed() {
+        // The clock on the wall can be set; the time since boot can't, but it starts again with every boot. A reading
+        // carries both, and is old as soon as one of them says so.
+        val up = 50 * hour
+        val r = reading(fetchedAt = at(10, 0)).copy(fetchedUp = up)
+        assertFalse(WeatherRules.old(r, at(12, 59), up + 3 * hour - min))
+        assertTrue(WeatherRules.old(r, at(13, 0), up + 3 * hour))
+        // The clock was set five hours back while offline: by the wall the reading is from the future, by the time since boot it is old.
+        assertFalse(WeatherRules.old(r, at(5, 30), up + 30 * min))
+        assertTrue(WeatherRules.old(r, at(8, 0), up + 3 * hour))
+        // The clock was set four hours on: by the wall it is old at once.
+        assertTrue(WeatherRules.old(r, at(14, 2), up + 2 * min))
+        // After a restart of the device the time since boot has begun again: it says nothing until it has itself run three hours past the mark.
+        assertFalse(WeatherRules.old(r, at(11, 0), 5 * min))
+        assertTrue(WeatherRules.old(r, at(14, 0), 5 * min))
+        // A reading that carries no such mark (a sample, one kept before there was one) goes by the wall alone.
+        val plain = reading(fetchedAt = at(10, 0))
+        assertFalse(WeatherRules.old(plain, at(12, 59), up + 100 * hour))
+        assertTrue(WeatherRules.old(plain, at(13, 0), 0))
+        // The state follows: old numbers with a failure are no reading, without one they are being asked for.
+        assertEquals(Status.Missing(Failure.OFFLINE), WeatherRules.status(true, true, true, r.copy(failure = Failure.OFFLINE), at(8, 0), up + 3 * hour))
+        assertEquals(Status.Loading, WeatherRules.status(true, true, true, r, at(8, 0), up + 3 * hour))
+        assertEquals(Status.Live(r), WeatherRules.status(true, true, true, r, at(8, 0), up + 3 * hour - min))
+    }
+
+    @Test fun aReadingRemembersBothClocksOfTheMomentItWasRead() {
+        val text = java.io.File("src/test/resources/openmeteo/forecast_zurich.json").readText()
+        val r = WeatherRules.read(text, Place("47.37", "8.55"), now = at(13, 20), up = 7 * hour)!!
+        assertEquals(at(13, 20), r.fetchedAt)
+        assertEquals(7 * hour, r.fetchedUp)
+        // Kept and read back, it still does: a restart of the app is not a restart of the device.
+        assertEquals(r, WeatherRules.kept(WeatherRules.keep(r)))
+        // What a reading kept before the mark existed says of it: nothing.
+        assertEquals(0L, WeatherRules.kept("""{"place":"47.37,8.55","fetchedAt":1}""")!!.fetchedUp)
     }
 
     // ---- which state -------------------------------------------------------------------------

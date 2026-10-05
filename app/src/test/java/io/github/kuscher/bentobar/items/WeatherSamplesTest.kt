@@ -54,7 +54,12 @@ class WeatherSamplesTest {
         assertEquals(Sym.RAINY, b.icon)
         val wet = staged("rain-soon").reading!!.hours.single { (it.chance ?: 0) >= 50 }
         assertEquals(80, wet.chance)
-        assertEquals(now + 90 * 60_000L, wet.at * 1000)
+        assertEquals(now + 90 * 60_000L, WeatherRules.begins(wet) * 1000)
+        // The bar and the menu agree on the hour: the 80% stands under 3 PM, and what is left of today is 80% at its wettest.
+        val m = WeatherRules.menu(staged("rain-soon").reading!!, us, now, w, t)
+        assertEquals(listOf("2 PM", "3 PM", "4 PM", "5 PM", "6 PM", "7 PM"), m.hours.map { it.time })
+        assertEquals(listOf(null, "80%", null, null, null, null), m.hours.map { it.chance })
+        assertTrue(m.rainWind, m.rainWind!!.startsWith("Rain 80%"))
         // Whenever it is staged, the hour lies within the rule's two hours and beyond one.
         for (minute in listOf(0, 1, 29, 59)) {
             val at = ZonedDateTime.of(2026, 10, 5, 9, minute, 0, 0, sf).toInstant().toEpochMilli()
@@ -69,7 +74,7 @@ class WeatherSamplesTest {
         assertFalse(b.active)
         assertEquals(Tone.NORMAL, b.tone)
         val wet = staged("rain-later").reading!!.hours.single { (it.chance ?: 0) >= 50 }
-        assertTrue(wet.at * 1000 - now >= 4 * hour)
+        assertTrue(WeatherRules.begins(wet) * 1000 - now >= 4 * hour)
     }
 
     @Test fun rainingStormAndSnowSayWhatFalls() {
@@ -82,8 +87,12 @@ class WeatherSamplesTest {
         assertEquals("−4° · Snow", bar("snow").text)
         assertEquals(Tone.ACCENT, bar("snow").tone)
         assertEquals(Sym.WEATHER_SNOWY, bar("snow").icon)
-        // On the snow day the menu's chance says "Snow".
-        assertTrue(WeatherRules.menu(staged("snow").reading!!, us, now, w, t).rainWind!!.startsWith("Snow "))
+        // On the snow day the menu's chance says "Snow". While something falls the hours ahead are likely wet too:
+        // a menu that read "Rain 0%" under the rain would contradict itself.
+        assertTrue(WeatherRules.menu(staged("snow").reading!!, us, now, w, t).rainWind!!.startsWith("Snow 90%"))
+        val raining = WeatherRules.menu(staged("raining").reading!!, us, now, w, t)
+        assertTrue(raining.rainWind, raining.rainWind!!.startsWith("Rain 90%"))
+        assertEquals(listOf("80%", "60%", null, null, null, null), raining.hours.map { it.chance })
     }
 
     @Test fun oldIsNoReadingForThreeHours() {

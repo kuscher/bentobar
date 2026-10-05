@@ -199,11 +199,28 @@ class WeatherLoadTest {
             ItemConfig("a", "weather", options = mapOf("lat" to "47.37", "lon" to "8.55", "label" to "ZRH")),
             ItemConfig("b", "weather", options = mapOf("lat" to "47.37", "lon" to "8.55")),
             ItemConfig("c", "weather"),
-            // An item that is turned off keeps its settings, and with them its last reading.
-            ItemConfig("d", "weather", section = Section.OFF, options = mapOf("lat" to "59.91", "lon" to "10.75")),
+            ItemConfig("d", "weather", section = Section.HIDDEN, options = mapOf("lat" to "59.91", "lon" to "10.75")),
             ItemConfig("e", "clock", options = mapOf("lat" to "1", "lon" to "2")),
         )
         assertEquals(setOf(zurich, oslo), WeatherLoad.places(items))
+    }
+
+    @Test fun anItemThatIsTurnedOffHasNoPlaceToKeepAReadingFor() {
+        // An item that is off keeps its settings and nothing else. Nothing looks at the layout for a type without a
+        // live item, so a reading that stayed with an item that is off would outlive the item when that is deleted.
+        val off = ItemConfig("d", "weather", section = Section.OFF, options = mapOf("lat" to "59.91", "lon" to "10.75"))
+        assertEquals(emptySet<Place>(), WeatherLoad.places(listOf(off)))
+        val shown = ItemConfig("a", "weather", options = mapOf("lat" to "47.37", "lon" to "8.55"))
+        assertEquals(setOf(zurich), WeatherLoad.places(listOf(off, shown)))
+        // Off, but another item shows the same city: the reading is that item's.
+        assertEquals(setOf(oslo), WeatherLoad.places(listOf(off, off.copy(id = "e", section = Section.SHOWN))))
+    }
+
+    @Test fun anAnswerThatArrivesAfterItsItemWasTurnedOffIsNotKept() = FakeHttp.use { net ->
+        net.reply(Host.OPEN_METEO, "/v1/forecast", forecast)
+        val off = ItemConfig("a", "weather", section = Section.OFF, options = mapOf("lat" to "47.37", "lon" to "8.55"))
+        assertNotNull(WeatherLoad.load(zurich, null, now) { WeatherLoad.places(listOf(off)) })
+        assertEquals(emptySet<String>(), Kept.fetched(OPEN_METEO).names())
     }
 
     @Test fun switchedOffNothingIsKeptAndAnAnswerOnItsWayIsNotKeptEither() {

@@ -55,15 +55,21 @@ object WeatherSamples {
     private val DAYS = listOf(Next(63, 25.6, 16.1, 60), Next(1, 23.9, 15.0, 0), Next(0, 26.7, 16.7, 5), Next(0, 27.8, 17.2, 10),
         Next(3, 23.3, 15.6, 20), Next(3, 22.0, 15.0, 30))
 
+    /** While something falls, the hour that is running and the two after it are likely wet too. */
+    private val FALLING = listOf(90, 80, 60)
+
     /**
      * One day's reading taken at [now]: the sky is [code] and it is [temp] degrees; with [wet], the
-     * hour that many hours after the one that is running has an 80% chance of rain.
+     * hour that many hours after the one that is running has an 80% chance of rain. As the service
+     * does, an hour's chance (and the code that comes of what fell in it) is filed under the time the
+     * hour ends at: the entry an hour later.
      */
     private fun day(now: Long, zone: ZoneId, code: Int = 2, temp: Double = 22.2, wet: Int = -1): Reading? {
         val here = Instant.ofEpochMilli(now).atZone(zone)
         val firstHour = here.truncatedTo(ChronoUnit.HOURS)
         val today = here.toLocalDate()
         val shift = temp - 22.2
+        val falling = WeatherCodes.falls(code) != null
         fun light(t: ZonedDateTime) = t.toLocalTime().let { it >= SUNRISE && it < SUNSET }
         fun start(date: LocalDate) = date.atStartOfDay(zone).toEpochSecond()
         fun sun(date: LocalDate, time: LocalTime) = date.atTime(time).atZone(zone).toEpochSecond()
@@ -72,7 +78,10 @@ object WeatherSamples {
             current = Current(now / 1000, temp, temp - 2.2, code, light(here), windKmh = 14.5),
             hours = (0 until 24).map { i ->
                 val t = firstHour.plusHours(i.toLong())
-                Hour(t.toEpochSecond(), HOURS.getOrElse(i) { 16.0 } + shift, if (i == wet) 80 else 0, if (i == wet) 61 else code, light(t))
+                // Entry i ends the hour that began i − 1 hours after the start of the running one.
+                val likely = wet >= 0 && i == wet + 1
+                val chance = when { likely -> 80; falling -> FALLING.getOrElse(i - 1) { 0 }; else -> 0 }
+                Hour(t.toEpochSecond(), HOURS.getOrElse(i) { 16.0 } + shift, chance, if (likely) 61 else code, light(t))
             },
             days = listOf(Day(start(today), code, 25.6 + shift, 16.1 + shift, 20, sun(today, SUNRISE), sun(today, SUNSET))) +
                 DAYS.mapIndexed { i, d ->

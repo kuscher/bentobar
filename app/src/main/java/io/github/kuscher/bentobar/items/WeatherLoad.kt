@@ -55,21 +55,28 @@ object WeatherLoad {
     /** The city search: the text of the field and nothing of the user. No language is sent (the consent words name none), so names come in English. */
     fun searchRequest(text: String) = Request(Host.OPEN_METEO_GEOCODING, "/v1/search", listOf("name" to text, "count" to "5", "format" to "json"))
 
-    /** The places the layout's Weather items ask about, wherever the items are: one that is turned off keeps its settings, and its last reading with them. */
-    fun places(items: List<ItemConfig>): Set<Place> = items.filter { it.type == "weather" }.mapNotNullTo(HashSet()) { WeatherRules.place(it) }
+    /**
+     * The places a reading is kept for: those of the layout's Weather items that are not turned off.
+     * An item in Off keeps its settings and nothing else. Its reading goes while the type still has a
+     * live item to look at the layout (the tick that turns it off); kept with an item that is off, it
+     * would outlive the item, since nothing runs for a type whose last item is off when that is deleted.
+     */
+    fun places(items: List<ItemConfig>): Set<Place> =
+        items.filter { it.type == "weather" && it.section != Section.OFF }.mapNotNullTo(HashSet()) { WeatherRules.place(it) }
 
     /**
      * Asks the service about [place]; blocks, so only a background load calls it. A good answer is a
      * new [Reading], kept on the device. A failure is a reading too: [last]'s numbers with what went
      * wrong, so the bar keeps what it shows. Null: it was not asked after all (the switch went off or
-     * the bar hid under the load), which is neither. [places]: the layout's places right now.
+     * the bar hid under the load), which is neither. [now] is the wall clock and [up] the time since
+     * boot, both of this moment; [places]: the layout's places right now.
      */
-    fun load(place: Place, last: Reading?, now: Long, places: () -> Set<Place>): Reading? {
+    fun load(place: Place, last: Reading?, now: Long, up: Long = 0, places: () -> Set<Place>): Reading? {
         val before = Http.sent(Host.OPEN_METEO)
         val reply = Http.get(forecastRequest(place))
         // Without a network the request helper answers by itself and nothing leaves the device.
         val went = Http.sent(Host.OPEN_METEO) != before
-        val good = (reply as? Reply.Ok)?.let { WeatherRules.read(it.text, place, now) }
+        val good = (reply as? Reply.Ok)?.let { WeatherRules.read(it.text, place, now, up) }
         if (good != null) {
             keep(good, places())
             return good
@@ -153,6 +160,9 @@ class WeatherSource(
     private val readings: Refresher<Place, Reading>,
     private val asking: Ask<Query, Found>,
     private val background: Executor,
+    /** The wall clock, and the time since boot: a reading's age is asked of both ([WeatherRules.old]). */
+    private val wall: () -> Long,
+    private val up: () -> Long,
 ) {
     private val service = Online.Service.OPEN_METEO
 
@@ -167,8 +177,24 @@ class WeatherSource(
     fun reading(item: ItemConfig): Reading? {
         if (!Online.on(service)) return null
         val place = WeatherRules.place(item) ?: return null
-        if (item.section != Section.OFF) readings.want(place)
+        if (item.section != Section.OFF) {
+            readings.want(place)
+            askIfOld(place)
+        }
         return readings.peek(place)
+    }
+
+    /**
+     * The loader asks again by the time since boot, half an hour after a reading. "Too old to show"
+     * is also read off the clock on the wall, and that can be set: two minutes after a reading it is
+     * four hours later, the numbers go, and the item says "Loading…" while nothing loads. So a reading
+     * that is too old and has no failure to explain it is asked for now (not within a minute of the
+     * last try, like Refresh). One whose last try failed keeps to the failure's pace.
+     */
+    private fun askIfOld(place: Place) {
+        val reading = readings.peek(place) ?: return
+        if (reading.failure == null && WeatherRules.old(reading, wall(), up()) && !readings.loading(place))
+            readings.refresh(place, floorMs = WeatherRules.AGAIN_MS)
     }
 
     /** What there is for [item]'s place, asking nothing. Any thread. */
@@ -178,7 +204,7 @@ class WeatherSource(
     fun status(item: ItemConfig, now: Long): Status {
         val on = Online.on(service)
         return WeatherRules.status(hasPlace = WeatherRules.place(item) != null, on = on, setUp = Online.setUp(service),
-            reading = if (on) peek(item) else null, now = now)
+            reading = if (on) peek(item) else null, now = now, up = up())
     }
 
     fun loading(item: ItemConfig): Boolean = WeatherRules.place(item)?.let { readings.loading(it) } ?: false
@@ -196,6 +222,8 @@ class WeatherSource(
         when {
             reading == null -> readings.want(place)
             reading.failure != null -> {}
+            // Too old to show (the clock was set on): the menu would say "Loading…", so it is.
+            WeatherRules.old(reading, wall(), up()) -> askIfOld(place)
             else -> readings.refresh(place, floorMs = if (Http.connected()) WeatherRules.MENU_MS else 0)
         }
     }
@@ -246,18 +274,20 @@ class WeatherSource(
 
     /**
      * The layout's places are now [places]: readings of any other place go, from memory at once and
-     * from the device in the background ("deleted with the item"). Main thread.
+     * from the device in the background ("deleted with the item"). On an install that never set
+     * Weather up nothing was ever fetched, so there is nothing to look for. Main thread.
      */
     fun keepOnly(places: Set<Place>) {
         readings.keepOnly(places)
-        background.execute { WeatherLoad.tidy(places) }
+        if (Online.setUp(service)) background.execute { WeatherLoad.tidy(places) }
     }
 
     companion object {
         /**
          * The source with its loader and its search wired to [WeatherLoad]: the app and the tests make
          * it here alike and differ only in where work runs and what time it is. [wall]: the wall
-         * clock; [layout]: the layout's items right now (asked from the background thread).
+         * clock; [up]: the time since boot, which the loader counts by (the app's `Now.elapsed`);
+         * [layout]: the layout's items right now (asked from the background thread).
          * [staged]: a debug build's test hook; when it names a failure, the load that asked is not
          * sent and comes back as that failure, so the pace after an error can be watched on a device.
          */
@@ -266,6 +296,7 @@ class WeatherSource(
             ask: (work: (Query) -> Found) -> Ask<Query, Found>,
             background: Executor,
             wall: () -> Long,
+            up: () -> Long,
             layout: () -> List<ItemConfig>,
             staged: () -> Failure? = { null },
         ): WeatherSource = WeatherSource(
@@ -273,10 +304,10 @@ class WeatherSource(
                 { place, last ->
                     // "No connection" is what nothing-went-out looks like; the other two stand for a try that did.
                     staged()?.let { WeatherLoad.failed(place, last, it, went = it != Failure.OFFLINE) }
-                        ?: WeatherLoad.load(place, last, wall()) { WeatherLoad.places(layout()) }
+                        ?: WeatherLoad.load(place, last, wall(), up()) { WeatherLoad.places(layout()) }
                 }),
             ask { query -> WeatherLoad.search(query.text) },
-            background,
+            background, wall, up,
         )
 
         /** [state] as the field [by] shows it: an answer to another field's question is none of its business. */

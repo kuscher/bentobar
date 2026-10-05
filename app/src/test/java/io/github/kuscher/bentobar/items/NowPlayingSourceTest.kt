@@ -37,4 +37,24 @@ class NowPlayingSourceTest {
         // The one value all of this ends in is made after every new player has been asked.
         assertTrue(adopt.trimEnd().removeSuffix("}").trimEnd().endsWith("changed()"))
     }
+
+    @Test fun whateverComesOfTheListenerReportingInIsPublished() {
+        // On a device that refuses the players' list to the running listener too, the second try ends in "refused". Without a
+        // new value then, "Starting…" stood until something else changed: the music stopping.
+        val connected = body("listenerConnected")
+        assertTrue("the listener reporting in is the moment to try the players' list again", "listen()" in connected)
+        assertTrue("and what came of the try is published, whichever way it went", "publish()" in connected.substringAfter("listen()"))
+    }
+
+    @Test fun startingEndsAfterThreeSecondsHoweverItCameAbout() {
+        // The limit looks at what was published ("Starting…" is on screen), not at the steps that led there: a step that
+        // forgot to publish can then leave it standing for three seconds, not for as long as the music plays.
+        val tick = body("tick")
+        val limit = tick.lines().firstOrNull { "STARTING_MS" in it }
+        assertTrue("tick holds \"Starting…\" to its three seconds", limit != null)
+        assertTrue("by the value that was published", "current.value.starting" in limit!!)
+        assertFalse("whether or not the listener is still being asked for", "askedToBind" in limit)
+        // A staged "Starting…" (a test on a device) stands for as long as it is staged.
+        assertTrue("staged == null" in limit)
+    }
 }

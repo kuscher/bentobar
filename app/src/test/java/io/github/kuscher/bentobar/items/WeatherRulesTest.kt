@@ -683,6 +683,42 @@ class WeatherRulesTest {
         assertTrue(WeatherRules.old(Reading(place = "1.00,2.00"), at(13, 0))) // never fetched
     }
 
+    @Test fun aReadingIsOldWhenEitherClockSaysThreeHoursHavePassed() {
+        // The clock on the wall can be set; the time since boot can't, but it starts again with every boot. A reading
+        // carries both, and is old as soon as one of them says so.
+        val up = 50 * hour
+        val r = reading(fetchedAt = at(10, 0)).copy(fetchedUp = up)
+        assertFalse(WeatherRules.old(r, at(12, 59), up + 3 * hour - min))
+        assertTrue(WeatherRules.old(r, at(13, 0), up + 3 * hour))
+        // The clock was set five hours back while offline: by the wall the reading is from the future, by the time since boot it is old.
+        assertFalse(WeatherRules.old(r, at(5, 30), up + 30 * min))
+        assertTrue(WeatherRules.old(r, at(8, 0), up + 3 * hour))
+        // The clock was set four hours on: by the wall it is old at once.
+        assertTrue(WeatherRules.old(r, at(14, 2), up + 2 * min))
+        // After a restart of the device the time since boot has begun again: it says nothing until it has itself run three hours past the mark.
+        assertFalse(WeatherRules.old(r, at(11, 0), 5 * min))
+        assertTrue(WeatherRules.old(r, at(14, 0), 5 * min))
+        // A reading that carries no such mark (a sample, one kept before there was one) goes by the wall alone.
+        val plain = reading(fetchedAt = at(10, 0))
+        assertFalse(WeatherRules.old(plain, at(12, 59), up + 100 * hour))
+        assertTrue(WeatherRules.old(plain, at(13, 0), 0))
+        // The state follows: old numbers with a failure are no reading, without one they are being asked for.
+        assertEquals(Status.Missing(Failure.OFFLINE), WeatherRules.status(true, true, true, r.copy(failure = Failure.OFFLINE), at(8, 0), up + 3 * hour))
+        assertEquals(Status.Loading, WeatherRules.status(true, true, true, r, at(8, 0), up + 3 * hour))
+        assertEquals(Status.Live(r), WeatherRules.status(true, true, true, r, at(8, 0), up + 3 * hour - min))
+    }
+
+    @Test fun aReadingRemembersBothClocksOfTheMomentItWasRead() {
+        val text = java.io.File("src/test/resources/openmeteo/forecast_zurich.json").readText()
+        val r = WeatherRules.read(text, Place("47.37", "8.55"), now = at(13, 20), up = 7 * hour)!!
+        assertEquals(at(13, 20), r.fetchedAt)
+        assertEquals(7 * hour, r.fetchedUp)
+        // Kept and read back, it still does: a restart of the app is not a restart of the device.
+        assertEquals(r, WeatherRules.kept(WeatherRules.keep(r)))
+        // What a reading kept before the mark existed says of it: nothing.
+        assertEquals(0L, WeatherRules.kept("""{"place":"47.37,8.55","fetchedAt":1}""")!!.fetchedUp)
+    }
+
     // ---- which state -------------------------------------------------------------------------
 
     @Test fun theStatesInTheirOrder() {

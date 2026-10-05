@@ -43,6 +43,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         ask = { work -> Background.ask(type, online, work) },
         background = Background.wiring(type).background,
         wall = Now::wall,
+        up = Now::elapsed,
         layout = { Store.config.value.items },
         staged = { stagedFailure.getAndSet(null) },
     )

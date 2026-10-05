@@ -118,7 +118,10 @@ data class Day(val at: Long, val code: Int? = null, val high: Double? = null, va
  * app's own model, not the reply: this is what is kept on the device for a restart.
  *
  * [fetchedAt]: the wall clock when the numbers were read, in milliseconds; 0 when there never were
- * any. [failure]: the last try failed (the numbers are then the ones from before). [misses]: how many
+ * any. [fetchedUp]: the time since boot at that moment, the clock the loader counts by; 0 when it is
+ * not known (a sample, a reading kept before this mark existed). The wall clock can be set and the
+ * time since boot begins again with every boot, so a reading's age is asked of both ([WeatherRules.old]).
+ * [failure]: the last try failed (the numbers are then the ones from before). [misses]: how many
  * tries in a row went out and failed. [retryAfterSec]: how long the service asked to be left alone.
  */
 @Serializable
@@ -134,6 +137,7 @@ data class Reading(
     val failure: Failure? = null,
     val misses: Int = 0,
     val retryAfterSec: Long = 0,
+    val fetchedUp: Long = 0,
 ) {
     override fun toString() = "a reading"
 }
@@ -337,11 +341,11 @@ object WeatherRules {
         (this as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.length <= 64 && it.all { c -> c.isLetterOrDigit() || c in "/_+-" } }.orEmpty()
 
     /**
-     * A forecast reply as a [Reading] taken at [now], or null for anything that is none: an error's
-     * body, a sign-in page, half a reply. A value that is missing or makes no sense is left out and
-     * the rest is read. It never throws.
+     * A forecast reply as a [Reading] taken at [now] (the wall clock; [up] is the time since boot at
+     * that moment), or null for anything that is none: an error's body, a sign-in page, half a reply.
+     * A value that is missing or makes no sense is left out and the rest is read. It never throws.
      */
-    fun read(text: String, place: Place, now: Long): Reading? = try {
+    fun read(text: String, place: Place, now: Long, up: Long = 0): Reading? = try {
         val root = Json.parseToJsonElement(text) as? JsonObject
         val current = root?.obj("current")?.let { c ->
             Current(c["time"].seconds() ?: (now / 1000), c["temperature_2m"].celsius(), c["apparent_temperature"].celsius(),
@@ -349,7 +353,7 @@ object WeatherRules {
         }
         if (root == null || current == null || root["error"].flag() == true || (current.temp == null && current.code == null)) null
         else Reading(place.key, now, root["timezone"].zoneName(), root["utc_offset_seconds"].number()?.takeIf { abs(it) <= 18 * 3600 }?.toInt() ?: 0,
-            current, hours(root.obj("hourly")), days(root.obj("daily")))
+            current, hours(root.obj("hourly")), days(root.obj("daily")), fetchedUp = up)
     } catch (e: Exception) {
         null
     } catch (e: StackOverflowError) {
@@ -439,18 +443,27 @@ object WeatherRules {
         Failure.OFFLINE -> if (r.misses <= 1) MIN_MS else minOf(RETRY_MS, MIN_MS shl (r.misses - 1).coerceAtMost(4))
     }
 
-    /** No numbers worth showing: there are none, or they were read three hours ago or more. */
-    fun old(r: Reading, now: Long): Boolean = r.fetchedAt == 0L || now - r.fetchedAt >= OLD_MS
+    /**
+     * No numbers worth showing: there are none, or they were read three hours ago or more. That is
+     * asked of two clocks, and one saying so is enough. [now], the wall clock, holds across a restart
+     * of the device but can be set: set back, it alone would keep an old temperature for as long as
+     * it was set back. [up], the time since boot, can't be set but begins again with every boot: it
+     * counts where the reading has its mark ([Reading.fetchedUp]) and has run three hours past it,
+     * which after a new boot it can only have if that long has really passed.
+     */
+    fun old(r: Reading, now: Long, up: Long = 0): Boolean =
+        r.fetchedAt == 0L || now - r.fetchedAt >= OLD_MS || (r.fetchedUp > 0 && up - r.fetchedUp >= OLD_MS)
 
     /**
      * The state of an item. [hasPlace]: it has a city. [on], [setUp]: the service's switch, and
-     * whether it was ever turned on here. [reading]: what is known of the place, or null.
+     * whether it was ever turned on here. [reading]: what is known of the place, or null. [now] is
+     * the wall clock and [up] the time since boot (see [old]).
      */
-    fun status(hasPlace: Boolean, on: Boolean, setUp: Boolean, reading: Reading?, now: Long): Status = when {
+    fun status(hasPlace: Boolean, on: Boolean, setUp: Boolean, reading: Reading?, now: Long, up: Long = 0): Status = when {
         !hasPlace -> Status.NotSetUp
         !on -> Status.Off(everOn = setUp)
         reading == null -> Status.Loading
-        reading.current != null && !old(reading, now) -> Status.Live(reading)
+        reading.current != null && !old(reading, now, up) -> Status.Live(reading)
         reading.failure != null -> Status.Missing(reading.failure)
         else -> Status.Loading
     }

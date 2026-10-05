@@ -98,7 +98,7 @@ class WeatherSourceTest {
         s.watch(added, 60 * min)
         s.opened(added)
         assertFalse(s.again(added))
-        assertFalse(s.mayAgain(added))
+        assertEquals(Again.WAIT, s.againEntry(added))
         sentNothing(net)
         assertFalse(Online.on(OPEN_METEO))
         assertFalse(Online.setUp(OPEN_METEO))
@@ -208,7 +208,7 @@ class WeatherSourceTest {
         s.watch(item, 60 * min)
         s.opened(item)
         assertFalse(s.again(item))
-        assertFalse(s.mayAgain(item))
+        assertEquals(Again.WAIT, s.againEntry(item))
         sentNothing(net)
         assertFalse(Online.on(OPEN_METEO))
         assertEquals(Status.Off(everOn = false), s.status(item, wall))
@@ -379,17 +379,18 @@ class WeatherSourceTest {
         layout = listOf(item)
         s.turnOn()
         s.reading(item)
-        assertFalse(s.mayAgain(item)) // dimmed for sixty seconds after any request
+        // Dimmed for sixty seconds after an answer, the automatic one too, and the entry says why.
+        assertEquals(Again.UP_TO_DATE, s.againEntry(item))
         assertFalse(s.again(item))
         pass(59 * sec)
-        assertFalse(s.mayAgain(item))
+        assertEquals(Again.UP_TO_DATE, s.againEntry(item))
         assertFalse(s.again(item))
         assertEquals(1, net.asked.size)
         pass(1 * sec)
-        assertTrue(s.mayAgain(item))
+        assertEquals(Again.READY, s.againEntry(item))
         assertTrue(s.again(item))
         assertEquals(2, net.asked.size)
-        assertFalse(s.mayAgain(item))
+        assertEquals(Again.UP_TO_DATE, s.againEntry(item))
         repeat(20) { s.again(item) }
         assertEquals(2, net.asked.size)
     }
@@ -416,24 +417,74 @@ class WeatherSourceTest {
         assertEquals(2, net.asked.size)
     }
 
-    @Test fun tryAgainAsksAtOnceButOnceAMinuteAtMost() = FakeHttp.use { net ->
+    @Test fun tryAgainMayBePressedTenSecondsAfterATryThatGotNoAnswer() = FakeHttp.use { net ->
         net.fail(Host.OPEN_METEO, "/v1/forecast", Why.STATUS, 500)
-        net.fail(Host.OPEN_METEO, "/v1/forecast", Why.STATUS, 500)
+        net.fail(Host.OPEN_METEO, "/v1/forecast", Why.TIMEOUT)
         net.forecasts()
         val s = source()
         val item = zurich()
         layout = listOf(item)
         s.turnOn()
         s.reading(item)
+        // The menu says "No answer", and its one retry is not kept from the user for a minute.
+        assertEquals(Status.Missing(Failure.NO_ANSWER), s.status(item, wall))
+        assertEquals(Again.WAIT, s.againEntry(item))
         assertFalse(s.again(item))
-        pass(1 * min)
+        pass(9 * sec)
+        assertEquals(Again.WAIT, s.againEntry(item))
+        assertFalse(s.again(item))
+        assertEquals(1, net.asked.size)
+        pass(1 * sec)
+        assertEquals(Again.READY, s.againEntry(item))
         assertTrue(s.again(item))
         assertEquals(2, net.asked.size)
+        // That one failed too: ten seconds again, counted from when it came back.
         assertEquals(Failure.NO_ANSWER, s.reading(item)!!.failure)
-        pass(1 * min)
+        assertEquals(Again.WAIT, s.againEntry(item))
+        pass(9 * sec)
+        assertFalse(s.again(item))
+        pass(1 * sec)
         assertTrue(s.again(item))
         assertNull(s.reading(item)!!.failure)
         assertEquals(3, net.asked.size)
+        // Now there is an answer: a minute, and the entry says that there is nothing newer.
+        assertEquals(Again.UP_TO_DATE, s.againEntry(item))
+        pass(59 * sec)
+        assertFalse(s.again(item))
+        pass(1 * sec)
+        assertTrue(s.again(item))
+        assertEquals(4, net.asked.size)
+    }
+
+    @Test fun whereTheServiceNamedAWaitTryAgainIsNotThereSooner() = FakeHttp.use { net ->
+        net.fail(Host.OPEN_METEO, "/v1/forecast", Why.STATUS, 429, retryAfterSec = 300)
+        net.fail(Host.OPEN_METEO, "/v1/forecast", Why.STATUS, 429)
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        assertEquals(Status.Missing(Failure.SLOW_DOWN), s.status(item, wall))
+        // "Slow down, five minutes": no press reaches the service before they have passed.
+        repeat(29) {
+            pass(10 * sec)
+            assertEquals(Again.WAIT, s.againEntry(item))
+            assertFalse(s.again(item))
+        }
+        assertEquals(1, net.asked.size)
+        pass(10 * sec)
+        assertEquals(Again.READY, s.againEntry(item))
+        assertTrue(s.again(item))
+        assertEquals(2, net.asked.size)
+        // Told to slow down again, this time with no time named: no answer like any other, so ten seconds.
+        assertEquals(Status.Missing(Failure.SLOW_DOWN), s.status(item, wall))
+        pass(9 * sec)
+        assertFalse(s.again(item))
+        pass(1 * sec)
+        assertTrue(s.again(item))
+        assertEquals(3, net.asked.size)
+        assertTrue(s.status(item, wall) is Status.Live)
     }
 
     @Test fun toldToSlowDownItLeavesTheServiceAloneForAnHour() = FakeHttp.use { net ->
@@ -477,7 +528,7 @@ class WeatherSourceTest {
         assertNull((s.status(item, wall) as Status.Live).reading.failure)
     }
 
-    @Test fun withoutANetworkTryAgainMayBePressedAtOnceBecauseItCostsNothing() = FakeHttp.use { net ->
+    @Test fun withoutANetworkTryAgainMayBePressedTenSecondsAfterATryThatReachedNobody() = FakeHttp.use { net ->
         net.forecasts()
         val s = source()
         val item = zurich()
@@ -485,15 +536,71 @@ class WeatherSourceTest {
         s.turnOn()
         Http.connected = { false }
         assertEquals(Failure.OFFLINE, s.reading(item)!!.failure)
-        assertTrue(s.mayAgain(item))
+        assertEquals(Status.Missing(Failure.OFFLINE), s.status(item, wall))
+        assertEquals(Again.WAIT, s.againEntry(item))
+        assertFalse(s.again(item))
+        pass(9 * sec)
+        assertEquals(Again.WAIT, s.againEntry(item))
+        pass(1 * sec)
+        assertEquals(Again.READY, s.againEntry(item))
+        assertTrue(s.again(item))
+        // Still no network, and pressed again as soon as it may be: nothing goes out for any of it.
+        assertFalse(s.again(item))
+        pass(10 * sec)
         assertTrue(s.again(item))
         sentNothing(net)
         Http.connected = { true }
+        pass(9 * sec)
+        assertFalse(s.again(item))
+        pass(1 * sec)
         assertTrue(s.again(item))
         assertEquals(1, net.asked.size)
-        // That one went out: now the minute holds.
-        assertFalse(s.mayAgain(item))
+        // That one was answered: now the minute holds.
+        assertEquals(Again.UP_TO_DATE, s.againEntry(item))
         assertFalse(s.again(item))
+    }
+
+    @Test fun aReadingThatIsNotLiveMayBeRefreshedTenSecondsAfterTheTryThatFailed() = FakeHttp.use { net ->
+        net.forecasts()
+        net.fail(Host.OPEN_METEO, "/v1/forecast", Why.STATUS, 503)
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        s.turnOn()
+        s.reading(item)
+        pass(1 * min)
+        assertTrue(s.again(item))
+        // The numbers stay (the note says "no answer"), and Refresh is dimmed without claiming they are up to date.
+        assertEquals(Failure.NO_ANSWER, (s.status(item, wall) as Status.Live).reading.failure)
+        assertEquals(Again.WAIT, s.againEntry(item))
+        pass(9 * sec)
+        assertEquals(Again.WAIT, s.againEntry(item))
+        pass(1 * sec)
+        assertEquals(Again.READY, s.againEntry(item))
+        assertTrue(s.again(item))
+        assertEquals(3, net.asked.size)
+        assertNull((s.status(item, wall) as Status.Live).reading.failure)
+    }
+
+    @Test fun anItemThatMayAskNothingHasNoRefreshToPressAndNothingToSayOfIt() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = zurich()
+        layout = listOf(item)
+        // Nothing yet, and the switch off: a layout that came with a city.
+        assertEquals(Again.WAIT, s.againEntry(item))
+        assertEquals(Again.WAIT, s.againEntry(added))
+        s.turnOn()
+        // On, and nothing known yet: a press asks.
+        assertEquals(Again.READY, s.againEntry(item))
+        s.reading(item)
+        assertEquals(Again.UP_TO_DATE, s.againEntry(item))
+        // The same reading seen from an item that is turned off, or with the switch off: not "up to date", nothing.
+        assertEquals(Again.WAIT, s.againEntry(item.copy(section = Section.OFF)))
+        Online.turnOff(OPEN_METEO)
+        assertEquals(Again.WAIT, s.againEntry(item))
+        assertEquals(1, net.asked.size)
     }
 
     // ---- two clocks ----------------------------------------------------------------------------------

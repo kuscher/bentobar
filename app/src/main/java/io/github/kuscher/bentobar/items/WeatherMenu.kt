@@ -125,7 +125,7 @@ internal fun DayRow(line: DayLine) {
 /** The item's menu: one card for each state the item can be in. */
 @Composable
 internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
-    // Redrawn with the tick: a reading that came in, the minute passing, Refresh's sixty seconds.
+    // Redrawn with the tick: a reading that came in, the minute passing, Refresh's wait running out.
     rememberTick()
     // The switch can change under an open menu: turned on here, or off in Setup's window beside it.
     val online by Online.state.collectAsState()
@@ -140,11 +140,11 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
     var changing by remember(item.id) { mutableStateOf(false) }
     // A press of Refresh shows at once (the entry dims), not at the next tick.
     var pressed by remember { mutableIntStateOf(0) }
-    val mayAgain = pressed >= 0 && !staged && source.mayAgain(item)
-    val again: () -> Unit = { source.again(item); pressed++ }
+    val entry = if (pressed >= 0) WeatherItem.againEntry(item) else Again.WAIT
+    val again: () -> Unit = { WeatherItem.again(item); pressed++ }
 
     val name = stringResource(R.string.item_weather_title)
-    val city = WeatherRules.city(item) ?: name
+    val city = WeatherRules.city(item) ?: if (staged) WeatherSamples.CITY else name
     val by = "menu:" + item.id
     val pick: (City, String?) -> Unit = { found, region ->
         Store.updateItem(item.id) { WeatherRules.picked(it, found, region) }
@@ -179,7 +179,8 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
             MenuCard(Sym.CLOUD, city, stringResource(if (offline) R.string.common_no_connection else R.string.weather_no_answer)) {
                 if (!offline) Text(stringResource(if (status.failure == Failure.SLOW_DOWN) R.string.weather_no_answer_hour else R.string.weather_no_answer_15),
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
-                MenuEntry(Sym.REFRESH, stringResource(R.string.common_try_again), enabled = mayAgain, onClick = again)
+                // Dimmed for ten seconds after the try that failed (longer if the service asked for that), with no word of its own: the card says what went wrong.
+                MenuEntry(Sym.REFRESH, stringResource(R.string.common_try_again), enabled = entry == Again.READY, onClick = again)
                 changeCity()
             }
         }
@@ -188,7 +189,9 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
             MenuCard(f.glyph, city, f.subtitle) {
                 ForecastBody(f)
                 MenuDivider()
-                MenuEntry(Sym.REFRESH, stringResource(R.string.common_refresh), enabled = mayAgain, onClick = again)
+                // Dimmed for a minute after an answer (an automatic one too), and then it says why.
+                MenuEntry(Sym.REFRESH, stringResource(R.string.common_refresh),
+                    detail = if (entry == Again.UP_TO_DATE) stringResource(R.string.weather_up_to_date) else null, enabled = entry == Again.READY, onClick = again)
                 changeCity()
                 val site = stringResource(R.string.weather_open_site)
                 val opens = stringResource(R.string.common_opens_browser, site)

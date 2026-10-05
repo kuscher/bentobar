@@ -42,6 +42,7 @@ enum class W(val res: String, val plural: Boolean = false) {
     BAR_SOON("weather_bar_soon"), BAR_NOW("weather_bar_now"), BAR_HIGH_LOW("weather_bar_high_low"), BAR_LABEL("weather_bar_label"),
     TOOLTIP("weather_tooltip"),
     DESC("weather_desc"), DESC_SHORT("weather_desc_short"), DESC_SOON("weather_desc_soon"), DESC_NOW("weather_desc_now"),
+    DESC_THIS_HOUR("weather_likely_now_desc"),
     DESC_NOT_SET_UP("weather_desc_not_set_up"), DESC_LOADING("weather_desc_loading"), DESC_OFF("weather_desc_off"),
     DESC_NO_READING("weather_desc_no_reading"), DEGREES("weather_degrees", plural = true),
     SUBTITLE("weather_subtitle"), SUBTITLE_THERE("weather_subtitle_there"), HIGH_LOW("weather_high_low"),
@@ -159,6 +160,16 @@ sealed interface Status {
     data class Live(val reading: Reading) : Status
 }
 
+/** Refresh, or Try again, as the menu draws it ([WeatherRules.again]). */
+enum class Again {
+    /** A press asks now. */
+    READY,
+    /** Dimmed, and the entry says why: an answer came less than a minute ago, there is nothing newer to fetch. */
+    UP_TO_DATE,
+    /** Dimmed with nothing to add: a request is on its way, or a try just failed and the menu says so above the entry. */
+    WAIT,
+}
+
 /** What the bar shows; the item turns it into its state. */
 class Bar(val icon: String, val filled: Boolean, val text: String? = null, val desc: String, val active: Boolean = false,
           val tone: Tone = Tone.NORMAL, val tooltip: String? = null)
@@ -187,8 +198,10 @@ object WeatherRules {
     const val FRESH_MS = 30 * MIN_MS
     /** Opening the menu asks again if the reading is older than this. */
     const val MENU_MS = 10 * MIN_MS
-    /** Refresh and Try again: once a minute at most. */
+    /** Refresh after an answer: once a minute at most. */
     const val AGAIN_MS = MIN_MS
+    /** Try again after a try that reached nobody or got no answer ([againAfter]). */
+    const val SOON_MS = 10_000L
     /** After no answer. */
     const val RETRY_MS = 15 * MIN_MS
     /** After being told to slow down, unless the service named a longer time. */
@@ -444,6 +457,25 @@ object WeatherRules {
     }
 
     /**
+     * How long after a try came back the next one by hand (Refresh, Try again) has to wait. A minute
+     * after an answer: there is nothing newer to fetch. Ten seconds after a try that reached nobody
+     * or got no answer: the menu then says what went wrong, and the retry is the one thing it offers.
+     * And never less than the service asked for, where it named a time.
+     */
+    fun againAfter(r: Reading): Long = maxOf(if (r.failure == null) AGAIN_MS else SOON_MS, r.retryAfterSec * 1000)
+
+    /**
+     * Refresh, or Try again, as the menu draws it. [age]: how long ago the last try for [r] came
+     * back, in milliseconds; null when there was none. [loading]: a request is on its way.
+     */
+    fun again(r: Reading?, age: Long?, loading: Boolean): Again = when {
+        loading -> Again.WAIT
+        r == null || age == null || age >= againAfter(r) -> Again.READY
+        r.failure == null -> Again.UP_TO_DATE
+        else -> Again.WAIT
+    }
+
+    /**
      * No numbers worth showing: there are none, or they were read three hours ago or more. That is
      * asked of two clocks, and one saying so is enough. [now], the wall clock, holds across a restart
      * of the device but can be set: set back, it alone would keep an old temperature for as long as
@@ -495,15 +527,19 @@ object WeatherRules {
     fun begins(entry: Hour): Long = entry.at - HOUR_SEC
 
     /**
-     * The entry of the first hour that begins within the next [hours] hours and in which rain or
-     * snow is likely (a chance of 50% or more), or null. Its hour is the one before its time
-     * ([begins]), and that is the hour the bar names. Hours are found by their time: one that has
-     * begun is the present, which the sky of this minute speaks for.
+     * The entry of the first hour in which rain or snow is likely (a chance of 50% or more), among
+     * the hour that is running and those that begin within the next [hours] hours; or null. Its hour
+     * is the one before its time ([begins]), and that is the hour the bar names. "Likely within N
+     * hours" includes the hour that is running: a warning that went the moment its hour began would
+     * go just when rain is nearest. An hour that is over counts for nothing. Found by their time.
      */
-    fun coming(r: Reading, now: Long, hours: Int): Hour? {
+    fun likely(r: Reading, now: Long, hours: Int): Hour? {
         val until = now + hours * HOUR_MS
-        return r.hours.filter { begins(it) * 1000 > now && begins(it) * 1000 <= until && (it.chance ?: 0) >= LIKELY }.minByOrNull { it.at }
+        return r.hours.filter { it.at * 1000 > now && begins(it) * 1000 <= until && (it.chance ?: 0) >= LIKELY }.minByOrNull { it.at }
     }
+
+    /** The hour [entry]'s chance is for has begun (and, for an entry [likely] found, is not over): it is the present. */
+    private fun running(entry: Hour, now: Long): Boolean = begins(entry) * 1000 <= now
 
     // ---- the bar ---------------------------------------------------------------------------------
 
@@ -525,14 +561,15 @@ object WeatherRules {
         val number = lead?.let { Units.degrees(it) }
 
         val falling = WeatherCodes.falls(cur.code)
-        val next = if (falling == null) coming(r, now, look.rainHours) else null
+        val next = if (falling == null) likely(r, now, look.rainHours) else null
         // What falls in a likely hour is told by the code of the entry that holds its chance: the code at the hour's
         // end comes of what fell in it. The chance comes from many forecasts and the code from one, so a likely
         // hour whose code names nothing that falls is rain, or snow when it freezes.
         val falls = falling ?: next?.let { WeatherCodes.falls(it.code) ?: if ((it.temp ?: cur.temp ?: 1.0) <= 0.0) Falls.SNOW else Falls.RAIN }
         val word = falls?.let { w.say(it.word) }
-        // The hour that is named is the one the chance is for: it begins an hour before the entry's time.
-        val time = next?.let { t.hour(begins(it) * 1000, zone) }
+        // The hour that is named is the one the chance is for: it begins an hour before the entry's time. One that
+        // is running is the present and has no time to announce: the bar says what is likely, as it does for what falls.
+        val time = next?.takeIf { !running(it, now) }?.let { t.hour(begins(it) * 1000, zone) }
 
         // Something falling or coming is said in words, whatever Show says: that is why the item came out.
         val short = when {
@@ -559,10 +596,12 @@ object WeatherRules {
             sky != null -> w.say(W.DESC_SHORT, city, sky)
             else -> null
         }
+        // "Rain now." is said only of what the sky of this minute does; of an hour that is running it is "likely this hour".
         val then = when {
-            falling != null && word != null -> w.say(W.DESC_NOW, word)
-            word != null && time != null -> w.say(W.DESC_SOON, word, time)
-            else -> null
+            word == null -> null
+            falling != null -> w.say(W.DESC_NOW, word)
+            time != null -> w.say(W.DESC_SOON, word, time)
+            else -> w.say(W.DESC_THIS_HOUR, word)
         }
         return Bar(
             icon = if (next != null) (if (WeatherCodes.falls(next.code) != null) WeatherCodes.glyph(next.code, next.day) else WeatherCodes.glyph(falls))

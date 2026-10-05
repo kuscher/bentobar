@@ -68,6 +68,22 @@ class WeatherSamplesTest {
         }
     }
 
+    @Test fun rainThisHourIsLikelyInTheHourThatIsRunning() {
+        val b = bar("rain-this-hour")
+        assertEquals("72° · Rain", b.text)
+        assertEquals("San Francisco: 72 degrees. Partly cloudy. Rain likely this hour.", b.desc)
+        assertEquals(Tone.ACCENT, b.tone)
+        assertTrue(b.active)
+        assertEquals(Sym.RAINY, b.icon)
+        // Staged at 1:30 PM, the hour is the one from 1 to 2: at 2 PM it is over.
+        assertEquals("72° · Rain", bar("rain-this-hour", seen = now + 29 * 60_000L).text)
+        assertEquals("72°", bar("rain-this-hour", seen = now + 30 * 60_000L).text)
+        // And rain-soon, left staged, becomes it: at 3 PM its hour begins and its time goes.
+        assertEquals("72° · Rain 3 PM", bar("rain-soon", seen = now + 89 * 60_000L).text)
+        assertEquals("72° · Rain", bar("rain-soon", seen = now + 90 * 60_000L).text)
+        assertEquals("72°", bar("rain-soon", seen = now + 150 * 60_000L).text)
+    }
+
     @Test fun rainLaterLeavesTheItemHidden() {
         val b = bar("rain-later")
         assertEquals("72°", b.text)
@@ -157,5 +173,29 @@ class WeatherSamplesTest {
         }
         val tokyo = ZoneId.of("Asia/Tokyo")
         assertEquals(tokyo, WeatherRules.zone(WeatherSamples.of("clear", now, tokyo)!!.reading!!))
+        // The menu's title for an item that has no city yet is the one the design draws; it is a title and nothing else.
+        assertEquals("San Francisco", WeatherSamples.CITY)
+    }
+
+    @Test fun aStagedFailuresRetryIsThereAfterTenSecondsAndAStagedReadingsRefreshAfterAMinute() {
+        // Counted from the moment a sample is staged, as from a try that just came back. No sample has a wait of the service's.
+        val sec = 1_000L
+        val failed = listOf("old", "error", "slow-down", "offline", "offline-new", "no-answer")
+        val answered = listOf("clear", "rain-soon", "rain-this-hour", "rain-later", "raining", "storm", "snow")
+        for (name in failed) {
+            val r = staged(name).reading
+            assertEquals(name, Again.WAIT, WeatherRules.again(r, age = 0, loading = false))
+            assertEquals(name, Again.WAIT, WeatherRules.again(r, age = 10 * sec - 1, loading = false))
+            assertEquals(name, Again.READY, WeatherRules.again(r, age = 10 * sec, loading = false))
+        }
+        for (name in answered) {
+            val r = staged(name).reading
+            assertEquals(name, Again.UP_TO_DATE, WeatherRules.again(r, age = 0, loading = false))
+            assertEquals(name, Again.UP_TO_DATE, WeatherRules.again(r, age = 60 * sec - 1, loading = false))
+            assertEquals(name, Again.READY, WeatherRules.again(r, age = 60 * sec, loading = false))
+        }
+        // Every sample is one of the two, or the one without a reading (whose menu has no such entry).
+        assertEquals(WeatherSamples.names.toSet(), (failed + answered + "loading").toSet())
+        assertNull(staged("loading").reading)
     }
 }

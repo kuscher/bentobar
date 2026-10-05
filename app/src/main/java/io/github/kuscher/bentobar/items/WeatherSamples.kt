@@ -10,15 +10,18 @@ import java.time.temporal.ChronoUnit
 /**
  * Made-up readings for testing on a device (debug builds: `./bento debug weather stage rain-soon`).
  * Each stands for a row of the product's table and is built from the moment it is staged at, so its
- * hours and days are the right ones whenever that is. Nothing is asked for a sample, and it names no
- * real place. Pure, so a unit test checks that every sample reads as its row is written.
+ * hours and days are the right ones whenever that is. Nothing is asked for a sample, and its place
+ * is none. Pure, so a unit test checks that every sample reads as its row is written.
  */
 object WeatherSamples {
     /** Where the samples are: nowhere. Never sent, never kept. */
     const val PLACE = "0.00,0.00"
 
-    val names = listOf("clear", "rain-soon", "rain-later", "raining", "storm", "snow", "old", "error", "slow-down", "offline", "offline-new",
-        "no-answer", "loading")
+    /** The title of a sample's menu while the item has no city of its own: the one the design draws. A title and nothing else. */
+    const val CITY = "San Francisco"
+
+    val names = listOf("clear", "rain-soon", "rain-this-hour", "rain-later", "raining", "storm", "snow", "old", "error", "slow-down", "offline",
+        "offline-new", "no-answer", "loading")
 
     /** [reading]: what is shown instead of the real one; null is "still loading". */
     class Sample(val name: String, val reading: Reading?)
@@ -26,6 +29,8 @@ object WeatherSamples {
     /** The sample called [name], as if read at [now] in [zone]; null for a name that is none. */
     fun of(name: String, now: Long, zone: ZoneId): Sample? = when (name) {
         "clear" -> day(now, zone, code = 0)
+        // An 80% chance of rain in the hour that is running, under a sky that is still dry: the item is out, and names no time.
+        "rain-this-hour" -> day(now, zone, wet = 0)
         // An 80% chance of rain in the hour after next: between one and two hours off, so the rule's two hours reach it and one hour doesn't.
         "rain-soon" -> day(now, zone, wet = 2)
         // The same four to five hours off: the item stays hidden.

@@ -12,8 +12,8 @@ account Fika Labs (7424304467248438473).
 | Short description | [listing/en-US/short-description.txt](listing/en-US/short-description.txt) | 80 characters |
 | Full description | [listing/en-US/full-description.txt](listing/en-US/full-description.txt) | 4,000 characters |
 | Release notes ("What's new") | [listing/en-US/release-notes.txt](listing/en-US/release-notes.txt) | 500 characters |
-| App icon | [graphics/icon-512.png](graphics/icon-512.png) | 512 × 512 PNG, full square (Play rounds the corners), drawn from the launcher icon's layers |
-| Feature graphic | [graphics/feature-graphic.png](graphics/feature-graphic.png) | 1024 × 500, 24-bit PNG |
+| App icon | [graphics/icon-512.png](graphics/icon-512.png) | 512 × 512 PNG, full square (Play rounds the corners), drawn from the launcher icon's layers (`tools/logo.py`: mint on deep teal since 1.0.2; Play took 1.0's rice, salmon, tamago and edamame on blue for a third party's) |
+| Feature graphic | [graphics/feature-graphic.png](graphics/feature-graphic.png) | 1024 × 500, 24-bit PNG; `graphics.mjs` with `"color": "#133F43"`, `"ink": "#FFFFFF"`, the icon above and the CPU menu capture as `docs/images/hero.png` was on 30 September (commit 7db4559) |
 | Screenshots | [graphics/large-screen/](graphics/large-screen) (4) | 1920 × 1080 (16:9), 24-bit PNG. Used for phone, 7-inch, 10-inch and Chromebook |
 | Store settings, contact, category | [forms/store-settings.md](forms/store-settings.md) | |
 | Privacy policy | https://googlebook.studio/privacy/bentobar | public, outside googlebook.studio's invite gate |
@@ -23,7 +23,8 @@ account Fika Labs (7424304467248438473).
 
 The listing text avoids what Play's metadata policy rules out: rankings or superlatives, promotional words, testimonials,
 emoji, calls to action and other companies' app names. The screenshots are BentoBar's own README images with a caption,
-made with `scripts/play/graphics.mjs` in kuscher/googlebook-tech.
+made with `scripts/play/graphics.mjs` in kuscher/googlebook-tech. No store image shows the Googlebook's own wallpaper or
+another company's artwork: a capture for one is taken on a plain wallpaper.
 
 ## Steps
 

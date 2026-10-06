@@ -7,25 +7,25 @@
     <path android:fillType="evenOdd" android:pathData="M35.00,30.00H73.00A6.00,6.00 0 0 1 79.00,36.00V36.00A6.00,6.00 0 0 1 73.00,42.00H35.00A6.00,6.00 0 0 1 29.00,36.00V36.00A6.00,6.00 0 0 1 35.00,30.00ZM36.75,31.75L33.35,35.15A1.20,1.20 0 0 0 33.35,36.85L36.75,40.25A1.20,1.20 0 0 0 38.45,38.55L35.90,36.00L38.45,33.45A1.20,1.20 0 0 0 36.75,31.75ZM58.90,36.00a2.10,2.10 0 1,0 4.20,0a2.10,2.10 0 1,0 -4.20,0ZM65.40,36.00a2.10,2.10 0 1,0 4.20,0a2.10,2.10 0 1,0 -4.20,0ZM71.90,36.00a2.10,2.10 0 1,0 4.20,0a2.10,2.10 0 1,0 -4.20,0Z">
       <aapt:attr name="android:fillColor">
         <gradient android:type="linear" android:startX="0" android:startY="30" android:endX="0" android:endY="78"
-            android:startColor="#FFFFFDF7" android:endColor="#FFF1EBDD"/>
+            android:startColor="#FFF2FAF7" android:endColor="#FFF2FAF7"/>
       </aapt:attr>
     </path>
     <path android:fillType="evenOdd" android:pathData="M35.00,46.00H46.00A6.00,6.00 0 0 1 52.00,52.00V72.00A6.00,6.00 0 0 1 46.00,78.00H35.00A6.00,6.00 0 0 1 29.00,72.00V52.00A6.00,6.00 0 0 1 35.00,46.00Z">
       <aapt:attr name="android:fillColor">
         <gradient android:type="linear" android:startX="0" android:startY="30" android:endX="0" android:endY="78"
-            android:startColor="#FFFF7E5F" android:endColor="#FFF4533F"/>
+            android:startColor="#FFCDE7DE" android:endColor="#FFCDE7DE"/>
       </aapt:attr>
     </path>
     <path android:fillType="evenOdd" android:pathData="M62.00,46.00H73.00A6.00,6.00 0 0 1 79.00,52.00V54.00A6.00,6.00 0 0 1 73.00,60.00H62.00A6.00,6.00 0 0 1 56.00,54.00V52.00A6.00,6.00 0 0 1 62.00,46.00Z">
       <aapt:attr name="android:fillColor">
         <gradient android:type="linear" android:startX="0" android:startY="30" android:endX="0" android:endY="78"
-            android:startColor="#FFFFD25A" android:endColor="#FFFDB62F"/>
+            android:startColor="#FFA6D3C6" android:endColor="#FFA6D3C6"/>
       </aapt:attr>
     </path>
     <path android:fillType="evenOdd" android:pathData="M62.00,64.00H73.00A6.00,6.00 0 0 1 79.00,70.00V72.00A6.00,6.00 0 0 1 73.00,78.00H62.00A6.00,6.00 0 0 1 56.00,72.00V70.00A6.00,6.00 0 0 1 62.00,64.00Z">
       <aapt:attr name="android:fillColor">
         <gradient android:type="linear" android:startX="0" android:startY="30" android:endX="0" android:endY="78"
-            android:startColor="#FF74CC6E" android:endColor="#FF4DB05A"/>
+            android:startColor="#FF82BEAE" android:endColor="#FF82BEAE"/>
       </aapt:attr>
     </path>
   </group>

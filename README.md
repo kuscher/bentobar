@@ -17,10 +17,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Googlebook_OS-Android_17-34397E" alt="Googlebook OS, Android 17">
+  <img src="https://img.shields.io/badge/Googlebook_OS-Android_17-133F43" alt="Googlebook OS, Android 17">
   <img src="https://img.shields.io/badge/goes_online-only_for_Weather_and_Flight-2E7D32" alt="Goes online only for Weather and Flight">
   <img src="https://img.shields.io/badge/license-MIT-555555" alt="MIT license">
-  <img src="https://img.shields.io/badge/developed_on-a_Googlebook-F4533F" alt="Developed on a Googlebook">
+  <img src="https://img.shields.io/badge/developed_on-a_Googlebook-1F6F66" alt="Developed on a Googlebook">
 </p>
 
 <p align="center"><sub>A personal hobby project by Fika Labs, proudly developed on a Googlebook.

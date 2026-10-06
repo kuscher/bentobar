@@ -33,12 +33,17 @@ line; an item shown as text alone has no line and is exactly as in 0.9.
   `SliderMath.route` is the geometry; `RouteTrack` in `bar/BarUi.kt` draws it beside the volume track, with no
   pointer code; `StripLook.route` has the colors, each giving way to the text color under 3:1 on an opaque bar.
   One new string, ", on time", for the spoken sentence where the line is green.
-- **Checked**: unit tests only: the rule, the words with and without the line for every saved reply and every
-  sample, the geometry, the colors on black, on white, in the alert pill and on mid-tone bars.
-- **Not checked**: anything on a screen. No emulator and no device were used for this branch. Still to look at:
-  the plane on its line beside the system's icons and the Sound slider, each color on a light, a dark and a
-  black bar, the alert pill with its line, the three text sizes, right to left. Every state can be staged for it:
-  `./bento debug flight show` lists the samples, `./bento debug look color light|dark` forces the bar's two looks.
+- **Checked**: unit tests (the rule, the words with and without the line for every saved reply and every
+  sample, the geometry, the colors on black, on white, in the alert pill and on mid-tone bars), and pictures of
+  the strip drawn on a computer from the app's own composables (Compose's preview screenshots, in a throwaway
+  copy of the sources; nothing of that is in the repo): every state on a light, a dark and a black bar, the
+  three ways to show the item, the three text sizes, right to left, three opaque bars of other colors. There the
+  chip with its line is exactly 50 dp wider than with its glyph.
+- **Not checked**: on an emulator or a device. Those pictures have the computer's fonts and no status bar around
+  them. Still to look at: the plane on its line beside the system's icons and the real Sound slider, the hover
+  box, a click on the line (it opens the menu like a click anywhere on the item). Every state can be staged for
+  it: `./bento debug flight show` lists the samples, `./bento debug look color light|dark` forces the bar's two
+  looks.
 - **Decided where the design did not say**: in the air with no time it left by there is no line, as with no time
   of landing (nobody can say how far it is); an answer over an hour old claims nothing for a landed flight
   either; a line that is green because the flight is early adds no "on time" to a sentence that says "early"; a

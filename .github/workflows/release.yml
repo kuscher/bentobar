@@ -1,6 +1,7 @@
 # Pushing a tag like v0.6 builds, signs and publishes that release: the APK as a GitHub release, the
 # bundle as a draft on Google Play's closed-testing track (see docs/RELEASING.md).
 # "Run workflow" on the Actions tab is a dry run: the same signed build and checks, nothing published.
+# A release for GitHub alone: the repository variable PLAY_UPLOAD set to "off" skips the Play job.
 #
 # The signing key and the Play key are secrets of the environments "release" and "play", which only
 # main and v* tags can use; forks and pull requests never get them. The job that holds the signing
@@ -110,6 +111,7 @@ jobs:
 
   play:
     needs: build
+    if: vars.PLAY_UPLOAD != 'off'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: play

@@ -191,7 +191,10 @@ object AirLabs {
         return Candidates(if (several.size > 1) several.take(MOST_CANDIDATES) else listOf(one), null, heard.answer.left)
     }
 
-    /** The flights of [day] to choose from, as [candidates] says them. A flight the service answered with that leaves on that day is one of them, whether the timetable has its line or not. */
+    /**
+     * The flights of [day] to choose from, as [candidates] says them. A flight the service answered
+     * with that leaves on that day is one of them, whether the timetable has its line or not.
+     */
     private fun thatDay(lines: List<Route>, like: Flight, live: List<Flight>, day: LocalDate, zone: ZoneId?, now: Instant): List<Flight> =
         ordered(offered(lines.mapNotNull { on(it, like, day, zone) }, live, now) + live.filter { leaves(it, day, zone) })
 
@@ -210,7 +213,10 @@ object AirLabs {
         return listOfNotNull(first?.let { if (plan == null) it else filled(it, plan) }) + rest
     }
 
-    /** [plans] of the timetable as flights to choose from: where the service itself answered with one of them ([live]), that flight in the plan's place, with what it lacks from the plan. */
+    /**
+     * [plans] of the timetable as flights to choose from: where the service itself answered with one
+     * of them ([live]), that flight in the plan's place, with what it lacks from the plan.
+     */
     private fun offered(plans: List<Flight>, live: List<Flight>, now: Instant): List<Flight> =
         plans.map { p -> live.firstOrNull { FlightRules.same(p, it) }?.let { filled(it, p) } ?: dated(p, now) }
 

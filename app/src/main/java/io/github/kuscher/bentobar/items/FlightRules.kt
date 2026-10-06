@@ -501,9 +501,9 @@ object FlightRules {
         /** How long a "slow down" asked to be left alone, in seconds. */
         val waitSec: Long? = null,
         /**
-         * The airport that flight leaves from (SFO). A number can fly more than once on one day, from one airport after
-         * another, and an item follows one of them: with [number] and [day] this says which. Null: nothing is followed,
-         * or it was kept before a flight could be chosen among several.
+         * The airport that flight leaves from (SFO). A number can fly more than once on one day, from
+         * one airport after another, and an item follows one of those flights: with [number] and [day]
+         * this says which. Null: nothing is followed, or it was kept before there was such a choice.
          */
         val from: String? = null,
     ) {

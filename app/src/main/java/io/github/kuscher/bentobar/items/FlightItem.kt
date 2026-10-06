@@ -473,9 +473,8 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
      * and how it reads now, after the clock was moved. `flight show several` and `several-next` stage
      * the flights of a number that flies three times a day, to choose from in the item's menu (closing
      * the menu drops them, as it does the real ones); a row's number after either is that flight,
-     * followed. A sample is a made-up flight. Of the real thing
-     * nothing is printed but whether there is a key and a switch: never the key, and never a number the
-     * user entered.
+     * followed. A sample is a made-up flight. Of the real thing nothing is printed but whether there is
+     * a key and a switch: never the key, and never a number the user entered.
      */
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> "items=${ids().size} key=${Online.hasKey(online)} on=${Online.on(online)} staged=" + (staged?.let { "${stagedAs.orEmpty()}: ${reads(it)}" } ?: "nothing")
@@ -517,8 +516,10 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
             }
             is Staged.Failed -> "menu \"${FlightText.error(sample.failure, sample.number, null, v)}\""
             is Staged.Looking -> "bar \"${FlightText.bar(null, sample.number, now, hours, v).text.orEmpty()}\""
-            is Staged.Several -> "bar \"${FlightText.bar(null, sample.number, now, hours, v).text.orEmpty()}\" | menu \"${FlightText.several(sample.number, sample.day, sample.flights.size, v)}\" | " +
-                sample.flights.mapNotNull { it.flight }.joinToString(" | ") { f -> FlightText.choice(f, now, v).let { "${it.title}, ${it.detail}" } }
+            is Staged.Several -> {
+                val rows = sample.flights.mapNotNull { it.flight }.joinToString(" | ") { f -> FlightText.choice(f, now, v).let { "${it.title}, ${it.detail}" } }
+                "bar \"${FlightText.bar(null, sample.number, now, hours, v).text.orEmpty()}\" | menu \"${FlightText.several(sample.number, sample.day, sample.flights.size, v)}\" | $rows"
+            }
             Staged.Empty -> "no flight tracked"
             Staged.NoKey -> "not set up"
         }

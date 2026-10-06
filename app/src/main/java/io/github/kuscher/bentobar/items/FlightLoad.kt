@@ -23,9 +23,10 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * What is kept, by the item's id and outside the layout (so in no backup and no copied settings):
  * what the item follows (the number, the day that flight leaves and the airport it leaves from) as
- * the feature's own note, and the last answer as [Tracked] with what the service sent. Switching the service off deletes the
- * answers and keeps the notes; removing the key deletes both. The key itself is `Online`'s: it is read
- * here for the one request that needs it and goes into nothing that is kept, shown or said.
+ * the feature's own note, and the last answer as [Tracked] with what the service sent. Switching the
+ * service off deletes the answers and keeps the notes; removing the key deletes both. The key itself
+ * is `Online`'s: it is read here for the one request that needs it and goes into nothing that is
+ * kept, shown or said.
  */
 object FlightLoad {
     private const val OWN = "flight"
@@ -216,9 +217,9 @@ object FlightLoad {
     /**
      * Asks again about what [item] follows: one request about the one flight ([AirLabs.again]). With
      * nothing heard of it yet (the service was switched off and on again, which deletes the answer and
-     * keeps the note) it is the lookup for that number on its day from its airport: it finds the flight
-     * that was followed and never asks which. [last]: what was known. The answer
-     * is a [Tracked] whatever came of it: a failed ask keeps the flight and says why.
+     * keeps the note) it is the lookup for that number on its day from its airport, which finds the
+     * flight that was followed and never asks which. [last]: what was known. The answer is a [Tracked]
+     * whatever came of it: a failed ask keeps the flight and says why.
      *
      * Null: nothing to say. The request was not sent (no key, switched off, the bar gone), or the item
      * follows something else by now.

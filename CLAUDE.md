@@ -158,12 +158,20 @@ private projects and paths into their repos, and where signing keys are backed u
   the strip stayed white: the bar kept the lock screen's light icons after the strip was back, the
   reading 250 ms in and the one 800 ms later both saw them, and nothing asked again. So a cause is
   followed by readings spread over the time the bar may take, each taken whatever the one before
-  showed (`bar/ColorWatch.kt`): two after a change of windows, six over ten seconds when the strip
-  comes back on screen (an unlock, a wake, a full-screen app or a panel gone) or the theme, the
-  wallpaper or the display changed; a look that still differed at the last one is read once more.
+  showed (`bar/ColorWatch.kt`): two after a change of windows or of the wallpaper, six over ten
+  seconds when the strip comes back on screen (an unlock, a wake, a full-screen app or a panel gone)
+  or the theme or the display changed; a look that still differed at the last one is read once more.
   Every reading is logged (`read text=… (same|changed|nothing), next in … ms`). No Googlebook could be
   unlocked from a test, so this was reproduced with `BarFlipActivity` on an emulator (the unlock hook
   above): 0.9 ends white there, this ends dark.
+  More readings per cause must not become many readings when a cause keeps coming (a live wallpaper
+  reporting colours every second, an app that cycles its screens, something that hides and shows the
+  strip again and again): after a dozen readings within a minute a cause's first reading waits two
+  seconds behind the last one and what follows it comes four seconds later, where the next cause of
+  the stream takes its place. That holds every such stream to one reading in two seconds, which is
+  what 0.9 allowed a stream of windows, and the last cause still gets its readings. The watch is told
+  when a screenshot is asked for, not when its answer comes: a cause in between is not served by a
+  screenshot taken before it, and two are never asked for within 400 ms (Android refuses the second).
 - **The window list can end early.** With a dialog on top, or some apps' own windows, the
   accessibility window list holds that window and nothing below it: no home screen, no other app.
   A window missing from the list has not left. `BarNeighbours` reads only what is listed: the home

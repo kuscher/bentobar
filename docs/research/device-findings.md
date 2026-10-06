@@ -122,6 +122,7 @@ Checked over adb with the throwaway probe in `probe/` (package local.bentobar.pr
   than the readings was staged with `BarFlipActivity` (light icons until 3 s after the unlock): 0.9 read at
   0.27 s (white) and 1.05 s (white) and stayed white. Readings are now spread over ten seconds
   (`bar/ColorWatch.kt`).
-- **Android refuses a window screenshot within a third of a second of the last one** (error 3), so two
-  readings are never asked for closer than 400 ms.
+- **Android refuses a window screenshot within a third of a second of the last one** (error 3, counted
+  from when the screenshot is asked for), so two are never asked for closer than 400 ms: the watch is told
+  when one is asked for, and a cause that arrives before its answer waits behind it.
 

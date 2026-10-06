@@ -52,6 +52,7 @@ class BarFlipActivity : Activity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent) // a window made anew (a resize) reads the latest command, not the first
         read(intent)
     }
 

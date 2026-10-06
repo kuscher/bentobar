@@ -4,7 +4,7 @@
         <item name="android:windowActionBar">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">#FF262A62</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#FF133F43</item>
     </style>
 
     <!-- The "BentoBar menu" entry (for a keyboard shortcut): no window of its own, it only opens the bar's menu. -->

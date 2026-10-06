@@ -3,8 +3,8 @@
 """Draws BentoBar's icons as Android vector drawables.
 
 The mark is a bento box seen from above: a long compartment on top that is a status bar (a ‹ and
-three item dots cut out of it), and three compartments below for the items it holds. Rice,
-salmon, tamago and edamame in an ink-blue box. The ‹ and dots are real holes (evenOdd), so the
+three item dots cut out of it), and three compartments below for the items it holds. Mint
+compartments in a deep-teal box. The ‹ and dots are real holes (evenOdd), so the
 single-colour versions (themed icon, header, Quick Settings tile) keep them. Everything sits
 inside the adaptive icon's 66 dp safe zone.
 
@@ -27,9 +27,10 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RES = ROOT / "app/src/main/res/drawable"
-INK = ("#FF34397E", "#FF181B45")  # box, top left to bottom right
-# Compartments top to bottom: bar (rice), tall (salmon), small (tamago), small (edamame).
-FOOD = [("#FFFFFDF7", "#FFF1EBDD"), ("#FFFF7E5F", "#FFF4533F"), ("#FFFFD25A", "#FFFDB62F"), ("#FF74CC6E", "#FF4DB05A")]
+INK = ("#FF133F43", "#FF133F43")  # box: deep teal, flat (it was an ink-blue gradient until 1.0.2)
+# Compartments top to bottom: the bar, the tall one, two small ones. One hue, mint on teal: no set of colours
+# that reads as another brand (Play took 1.0's rice, salmon, tamago and edamame on blue for a third party's).
+FOOD = [("#FFF2FAF7", "#FFF2FAF7"), ("#FFCDE7DE", "#FFCDE7DE"), ("#FFA6D3C6", "#FFA6D3C6"), ("#FF82BEAE", "#FF82BEAE")]
 # The grid on the 108 dp canvas, drawn at 0.92 around the centre for breathing room in round masks.
 X0, X1, Y0, Y1, GAP, BAR, R, SCALE = 29, 79, 30, 78, 4, 12, 6, 0.92
 

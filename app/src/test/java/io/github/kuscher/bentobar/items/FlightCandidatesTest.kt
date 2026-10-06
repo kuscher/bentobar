@@ -189,6 +189,37 @@ class FlightCandidatesTest {
         assertEquals(Failure.NOT_FOUND, none.failure)
     }
 
+    // ---- a flight that is followed is asked about again, and stays the one it is
+
+    /** The service's answer about another of Tuesday's flights: made here from the timetable's times, with a gate. */
+    private fun leg(from: String, to: String, leaves: String, leavesUtc: String, lands: String, landsUtc: String, gate: String) = """{"response":{"flight_iata":"UA1227","flight_icao":"UAL1227",
+        "airline_name":"United Airlines","status":"scheduled","dep_iata":"$from","dep_gate":"$gate","dep_time":"$leaves","dep_time_utc":"$leavesUtc","arr_iata":"$to","arr_time":"$lands","arr_time_utc":"$landsUtc"}}"""
+    private val fromNewark = leg("EWR", "SFO", "2026-10-06 13:20", "2026-10-06 17:20", "2026-10-06 16:19", "2026-10-06 23:19", "C92")
+    private val fromSanFrancisco = leg("SFO", "PDX", "2026-10-06 19:05", "2026-10-07 02:05", "2026-10-06 21:00", "2026-10-07 04:00", "F14")
+
+    @Test fun followingTheThirdFlightOfTheDayStaysOnItWhileTheServiceAnswersWithTheFirstAndTheSecond() {
+        val flights = press(thatEvening(), tuesday).flights
+        val third = flights[2]
+        fun again(text: String, was: Flight = third) = AirLabs.again(ua1227, "k", was) { Reply.Ok(text) }!!.again
+        // The service answers with the morning's flight from Orlando (the saved reply), then with the one from Newark: each leaves
+        // before the one that is followed. Not yet: the plan stands, and it is asked about again when it is due.
+        assertEquals(AirLabs.Again.NotYet, again(flight))
+        assertEquals(AirLabs.Again.NotYet, again(fromNewark))
+        // Monday evening's flight from San Francisco, which landed: the same airport, and another day's flight. Not yet either.
+        assertEquals(AirLabs.Again.NotYet, again(landed))
+        // Tuesday evening's own: that is the flight, with its gate.
+        assertEquals("F14", (again(fromSanFrancisco) as AirLabs.Again.Is).flight.from.gate)
+        // Wednesday's first: the service has gone on to a later flight of the number, and the asking ends.
+        val wednesday = Regex("\\d{4}-\\d{2}-\\d{2}").replace(flight) { LocalDate.parse(it.value).plusDays(1).toString() }
+        assertEquals(AirLabs.Again.Gone, again(wednesday))
+        // The second is followed the same way: not yet while the first is the answer, itself when it is, over when the third is.
+        assertEquals(AirLabs.Again.NotYet, again(flight, flights[1]))
+        assertEquals("C92", (again(fromNewark, flights[1]) as AirLabs.Again.Is).flight.from.gate)
+        assertEquals(AirLabs.Again.Gone, again(fromSanFrancisco, flights[1]))
+        // And whichever is followed is one flight to the rule, and none of the others.
+        for (a in flights) for (b in flights) assertEquals(a === b, FlightRules.same(a, b))
+    }
+
     // ---- the flights a press of Track can mean
 
     @Test fun tomorrowSeenFromLosAngelesIsItsThreeFlightsInTheOrderTheyLeave() {

@@ -113,6 +113,8 @@ private fun flightChoice(number: String, day: LocalDate?, flights: List<Tracked>
 internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
     val tick = rememberTick()
     val online by Online.state.collectAsState()
+    // Before the menu reads what a press of Track came to: flights found while it was closed are let go.
+    remember(item.id) { FlightItem.menuOpens(item.id) }
     val asked by FlightItem.search.state.collectAsState()
     // "Track another flight": the field again, while the flight that is followed stays until another is found.
     // It is over once an answer was taken, by this menu or by the item's own tick a moment before it.

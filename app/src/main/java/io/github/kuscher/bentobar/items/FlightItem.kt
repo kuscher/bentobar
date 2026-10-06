@@ -289,15 +289,25 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
      *
      * Several flights are no answer to take: the item's menu asks which ([choose]). With that menu
      * closed (it was closed while the number was looked up) there is nobody to ask, and none of them
-     * is taken ([FlightLoad.Outcome.unattended]): the question is dropped, and nothing is followed or
-     * kept for it.
+     * is taken: the question is dropped, and nothing is followed or kept for it. Which of the three
+     * it is, is [FlightLoad.turn]'s to say.
      */
     internal fun takeAnswer(): Boolean {
-        val done = search.state.value as? Ask.State.Done ?: return false
-        val id = done.question.item
-        if (done.answer.unattended(menuOpen = Ticker.focusItem == id)) { drop(); return false }
-        val found = done.answer as? FlightLoad.Outcome.Found ?: return false
-        return take(id, found.tracked)
+        val state = search.state.value
+        return when (FlightLoad.turn(state, Ticker.focusItem)) {
+            FlightLoad.Turn.KEEP -> false
+            FlightLoad.Turn.DROP -> { drop(); false }
+            FlightLoad.Turn.TAKE -> (state as Ask.State.Done).let { take(it.question.item, (it.answer as FlightLoad.Outcome.Found).tracked) }
+        }
+    }
+
+    /**
+     * The menu of the item [id] opens. Several flights found for it while the menu was closed are not
+     * asked about now: a hidden item has no tick that would have let them go, and a list from an
+     * earlier look is nobody's question. Before the menu reads what there is to show. Main thread.
+     */
+    internal fun menuOpens(id: String) {
+        if (FlightLoad.turn(search.state.value, focused = id, opening = true) == FlightLoad.Turn.DROP) drop()
     }
 
     /**
@@ -311,7 +321,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
             return true
         }
         val done = search.state.value as? Ask.State.Done ?: return false
-        val chosen = (done.answer as? FlightLoad.Outcome.Several)?.flights?.getOrNull(index)?.takeIf { done.question.item == item.id } ?: return false
+        val chosen = done.answer.chosen(index)?.takeIf { done.question.item == item.id } ?: return false
         return take(item.id, chosen)
     }
 

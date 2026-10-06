@@ -654,14 +654,31 @@ class FlightLoadTest {
         assertTrue(one.waits)
         assertTrue(three.waits)
         assertEquals(listOf(false, false, false), others.map { it.waits })
-        // The menu was closed while the number was looked up, and several came back: nobody is there to say which, so none is taken.
-        assertTrue(three.unattended(menuOpen = false))
-        assertFalse(three.unattended(menuOpen = true))
-        // One flight is never left for want of a menu: the item takes it with its next tick, and the lookups it cost are not lost.
-        assertFalse(one.unattended(menuOpen = false))
-        assertFalse(one.unattended(menuOpen = true))
-        // What went wrong waits for the menu to say it.
-        for (o in others) for (open in listOf(true, false)) assertFalse(o.unattended(open))
+        val asked = FlightLoad.Question("flight-1", FlightNumber.read("UA1227")!!)
+        fun turn(answer: Outcome, focused: String?, opening: Boolean = false) = FlightLoad.turn(Ask.State.Done(asked, answer), focused, opening)
+        // Several flights are a question for the menu of their item, while it is open.
+        assertEquals(FlightLoad.Turn.KEEP, turn(three, focused = "flight-1"))
+        // The menu was closed while the number was looked up: nobody is there to say which, so none is taken. Another item's menu is nobody either.
+        assertEquals(FlightLoad.Turn.DROP, turn(three, focused = null))
+        assertEquals(FlightLoad.Turn.DROP, turn(three, focused = "flight-2"))
+        // A list found waiting when the menu opens again is from an earlier look (a hidden item has no tick that would have let it go).
+        assertEquals(FlightLoad.Turn.DROP, turn(three, focused = "flight-1", opening = true))
+        // One flight is never left for want of a menu: it is taken whoever looks, and the lookups it cost are not lost.
+        for (focused in listOf(null, "flight-1", "flight-2")) for (opening in listOf(false, true)) assertEquals(FlightLoad.Turn.TAKE, turn(one, focused, opening))
+        // What went wrong waits for the menu to say it, and a lookup on its way is left alone.
+        for (o in others) for (focused in listOf(null, "flight-1")) for (opening in listOf(false, true)) assertEquals(FlightLoad.Turn.KEEP, turn(o, focused, opening))
+        assertEquals(FlightLoad.Turn.KEEP, FlightLoad.turn(Ask.State.Busy(asked), "flight-1", opening = true))
+        assertEquals(FlightLoad.Turn.KEEP, FlightLoad.turn(Ask.State.Idle, null))
+    }
+
+    @Test fun theFlightThatIsChosenIsTheOneInThatPlaceOfTheList() {
+        val flights = listOf("MCO", "EWR", "SFO").map { Tracked("UA1227", "2026-10-06", from = it) }
+        val three = Outcome.Several(flights)
+        assertEquals(listOf("MCO", "EWR", "SFO"), (0..2).map { three.chosen(it)?.from })
+        assertNull(three.chosen(3))
+        assertNull(three.chosen(-1))
+        // One flight is no list to choose from.
+        assertNull(Outcome.Found(flights[0]).chosen(0))
     }
 
     @Test fun oneFlightThatDayIsFollowedWithNoQuestionAndItsAirportIsKeptToo() {

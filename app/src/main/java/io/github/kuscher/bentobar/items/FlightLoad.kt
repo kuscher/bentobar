@@ -71,13 +71,32 @@ object FlightLoad {
          */
         val waits: Boolean get() = this is Found || this is Several
 
-        /**
-         * True where this is a question and nobody is there to answer it: several flights, and the
-         * item's menu not open (it was closed while the number was looked up). None of them is taken
-         * then, and the question is let go. One flight is taken whether the menu is open or not, so
-         * that the lookups it cost are not lost; what went wrong waits for the menu to say it.
-         */
-        fun unattended(menuOpen: Boolean): Boolean = this is Several && !menuOpen
+        /** One of the several flights a press of Track found, by its place in the list; null where this is no list, or it has no such place. */
+        fun chosen(index: Int): Tracked? = (this as? Several)?.flights?.getOrNull(index)
+    }
+
+    /** What is done with what a press of Track came to, when its turn comes ([turn]). */
+    enum class Turn { TAKE, DROP, KEEP }
+
+    /**
+     * What becomes of the one press of Track there is at a time ([state]) when a tick or a menu looks
+     * at it. [focused]: the item whose menu is open, null for none. [opening]: that menu opens just
+     * now, so whatever is here was found while it was closed.
+     *
+     * A flight that was found is taken, whoever looks: one flight is never left for want of a menu,
+     * and the lookups it cost are not lost. Several flights are a question for the menu of their
+     * item, for as long as it stays open: with it closed nobody is there to say which, and a list
+     * found waiting when the menu opens again is from an earlier look (a hidden item has no tick
+     * that would have let it go), so none is taken and the question is dropped. Anything else stays:
+     * a lookup on its way, and what went wrong, which waits for the menu to say it.
+     */
+    fun turn(state: Ask.State<Question, Outcome>, focused: String?, opening: Boolean = false): Turn {
+        val done = state as? Ask.State.Done ?: return Turn.KEEP
+        return when (done.answer) {
+            is Outcome.Found -> Turn.TAKE
+            is Outcome.Several -> if (focused == done.question.item && !opening) Turn.KEEP else Turn.DROP
+            else -> Turn.KEEP
+        }
     }
 
     /** How many lookups the key has left this month, as the last reply said; null: no reply has yet. It is the key's: another key starts with none. */

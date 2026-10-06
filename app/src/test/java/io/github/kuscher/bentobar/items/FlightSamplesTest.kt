@@ -197,6 +197,26 @@ class FlightSamplesTest {
         assertEquals(BarRoute(0f, Stands.NO_CLAIM), route("codeshare"))
     }
 
+    @Test fun oneFlightCanBeLookedAtAllAlongItsWay() {
+        // Before it leaves the plane waits at the start.
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), route("soon"))
+        // Just left: a little way in, with nothing drawn behind it yet. The figure counts to the landing now.
+        assertEquals("10h 44m · 7:04 PM", lined("air-just-left").text)
+        assertEquals(BarRoute(0.02f, Stands.GOOD), route("air-just-left"))
+        // Half way, and 45 minutes out, where only a last bit of the line is ahead.
+        assertEquals("5h 23m · 1:43 PM", lined("air-halfway").text)
+        assertEquals(BarRoute((322.0 / 645.0).toFloat(), Stands.GOOD), route("air-halfway"))
+        assertEquals("45m · 9:05 AM", lined("air-nearly-there").text)
+        assertEquals(BarRoute((600.0 / 645.0).toFloat(), Stands.GOOD), route("air-nearly-there"))
+        // And down: the far end.
+        assertEquals(BarRoute(1f, Stands.GOOD), route("landed"))
+        for (name in listOf("air-just-left", "air-halfway", "air-nearly-there")) {
+            assertTrue(name, " $name " in " ${FlightSamples.names} ")
+            assertEquals(name, "On time", card(name).badge)
+            assertEquals(name, Tone.NORMAL, bar(name).tone)
+        }
+    }
+
     @Test fun theStatesWithoutALineCanBeStagedAndStayAsTheyWere() {
         // Far off, a plan nobody counts down to, no update, in the air with no time of landing, landed over an hour ago.
         for ((name, later) in listOf("ahead" to 0L, "tomorrow" to 0L, "loose" to 0L, "timetable" to 0L, "air-no-landing" to 0L, "landed" to 41L, "landed-late" to 41L)) {
@@ -214,7 +234,7 @@ class FlightSamplesTest {
 
     @Test fun withTheLineEverySampleSaysWhatItSaysWithoutIt() {
         val flights = FlightSamples.names.substringBefore(" | ").split(" ").filter { staged(it) is Staged.Following }
-        assertEquals(17, flights.size)
+        assertEquals(20, flights.size)
         for (name in flights) for (turn in listOf(null, "old")) for (later in listOf(0L, 61L)) {
             val plain = bar(name, turn, later)
             val line = lined(name, turn, later)

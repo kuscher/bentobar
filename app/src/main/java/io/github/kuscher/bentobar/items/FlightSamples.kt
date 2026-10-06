@@ -59,6 +59,10 @@ object FlightSamples {
         "air-very-late" to { now -> lh455(left(now, 575), fra(local(now, 70, FRA), expected = local(now, 125, FRA), gate = "Z69"), FlightState.IN_AIR) },
         // "2h 05m · −18m", 18 min early.
         "air-early" to { now -> lh455(left(now, 502), fra(local(now, 143, FRA), expected = local(now, 125, FRA), gate = "Z69"), FlightState.IN_AIR) },
+        // On time, at three more places along its way: a minute after it left ("10h 44m"), half way ("5h 23m"), and 45 minutes out.
+        "air-just-left" to { now -> lh455(left(now, 1), fra(local(now, 644, FRA), expected = local(now, 644, FRA), gate = "Z69"), FlightState.IN_AIR) },
+        "air-halfway" to { now -> lh455(left(now, 322), fra(local(now, 323, FRA), expected = local(now, 323, FRA), gate = "Z69"), FlightState.IN_AIR) },
+        "air-nearly-there" to { now -> lh455(left(now, 600), fra(local(now, 45, FRA), expected = local(now, 45, FRA), gate = "Z69"), FlightState.IN_AIR) },
         // "In the air" and nothing to count: the service names no time of landing.
         "air-no-landing" to { now -> lh455(left(now, 300), FlightEnd("FRA", "Frankfurt", offset = FRA, terminal = "1"), FlightState.IN_AIR) },
         // "Landed · Belt 21", Landed 20 min ago, On time.

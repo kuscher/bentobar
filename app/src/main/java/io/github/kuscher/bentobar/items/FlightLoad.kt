@@ -62,6 +62,21 @@ object FlightLoad {
         class Failed(val failure: Failure) : Outcome
         /** Nothing was asked (no key, the service switched off, the bar gone under the lookup): there is nothing to say. */
         data object Unasked : Outcome
+
+        /**
+         * While this waits to be acted on, the bar shows the number as it does while it is looked up: a
+         * flight until it is taken, which is the next thing to happen, and several for as long as the
+         * menu asks which.
+         */
+        val waits: Boolean get() = this is Found || this is Several
+
+        /**
+         * True where this is a question and nobody is there to answer it: several flights, and the
+         * item's menu not open (it was closed while the number was looked up). None of them is taken
+         * then, and the question is let go. One flight is taken whether the menu is open or not, so
+         * that the lookups it cost are not lost; what went wrong waits for the menu to say it.
+         */
+        fun unattended(menuOpen: Boolean): Boolean = this is Several && !menuOpen
     }
 
     /** How many lookups the key has left this month, as the last reply said; null: no reply has yet. It is the key's: another key starts with none. */

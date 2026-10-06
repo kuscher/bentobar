@@ -646,6 +646,24 @@ class FlightLoadTest {
         }
     }
 
+    @Test fun severalFlightsWaitForTheOpenMenuAndAreLetGoWithoutOneWhileOneFlightIsTakenEitherWay() {
+        val one = Outcome.Found(Tracked("LH455", "2026-10-01"))
+        val three = Outcome.Several(List(3) { Tracked("UA1227", "2026-10-06") })
+        val others = listOf(Outcome.Failed(Failure.NOT_FOUND), Outcome.Failed(Failure.OFFLINE), Outcome.Unasked)
+        // While it waits the bar shows the number, as it does while it is looked up: a flight until it is taken, several while the menu asks which.
+        assertTrue(one.waits)
+        assertTrue(three.waits)
+        assertEquals(listOf(false, false, false), others.map { it.waits })
+        // The menu was closed while the number was looked up, and several came back: nobody is there to say which, so none is taken.
+        assertTrue(three.unattended(menuOpen = false))
+        assertFalse(three.unattended(menuOpen = true))
+        // One flight is never left for want of a menu: the item takes it with its next tick, and the lookups it cost are not lost.
+        assertFalse(one.unattended(menuOpen = false))
+        assertFalse(one.unattended(menuOpen = true))
+        // What went wrong waits for the menu to say it.
+        for (o in others) for (open in listOf(true, false)) assertFalse(o.unattended(open))
+    }
+
     @Test fun oneFlightThatDayIsFollowedWithNoQuestionAndItsAirportIsKeptToo() {
         online { net ->
             net.says(AirLabs.FLIGHT to reply("flight-LH455-in-the-air"), AirLabs.ROUTES to reply("routes-LH455"))

@@ -256,7 +256,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     internal fun looking(id: String, t: Tracked?): String? {
         val asked = when (val s = search.state.value) {
             is Ask.State.Busy -> s.question
-            is Ask.State.Done -> s.question.takeIf { s.answer is FlightLoad.Outcome.Found || s.answer is FlightLoad.Outcome.Several }
+            is Ask.State.Done -> s.question.takeIf { s.answer.waits }
             else -> null
         }
         return asked?.takeIf { it.item == id }?.number?.shown
@@ -288,12 +288,13 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
      *
      * Several flights are no answer to take: the item's menu asks which ([choose]). With that menu
      * closed (it was closed while the number was looked up) there is nobody to ask, and none of them
-     * is taken: the question is dropped, and nothing is followed or kept for it.
+     * is taken ([FlightLoad.Outcome.unattended]): the question is dropped, and nothing is followed or
+     * kept for it.
      */
     internal fun takeAnswer(): Boolean {
         val done = search.state.value as? Ask.State.Done ?: return false
         val id = done.question.item
-        if (done.answer is FlightLoad.Outcome.Several && Ticker.focusItem != id) { drop(); return false }
+        if (done.answer.unattended(menuOpen = Ticker.focusItem == id)) { drop(); return false }
         val found = done.answer as? FlightLoad.Outcome.Found ?: return false
         return take(id, found.tracked)
     }

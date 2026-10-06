@@ -12,8 +12,8 @@ android {
         applicationId = "io.github.kuscher.bentobar"
         minSdk = 34
         targetSdk = 37
-        versionCode = 11
-        versionName = "1.0"
+        versionCode = 12
+        versionName = "1.0.1"
     }
 
     // Release signing from ~/.config/bentobar (never committed). Absent -> unsigned release build.

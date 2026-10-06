@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.1 (2026-10-06)
+
+- **Flight: delays of a number that flies several times a day.** Following one of the day's flights
+  of such a number (UA 1227: Orlando to Newark, Newark to San Francisco, San Francisco to Portland),
+  the chip could stop updating and never show that your flight was late. AirLabs' answer about "the"
+  flight of a number is not always the one you follow, and on such a day it can even mix two of them;
+  BentoBar took another of the day's flights for the end of yours and stopped asking. From ten hours
+  before departure it now reads your flight from AirLabs' list of the coming hours, which has each
+  flight as it is, and it keeps asking until your flight has landed. Still one lookup per update.
+- **Flight: right from the start.** A flight you track within ten hours of its departure is checked
+  once more straight away, so a delay shows within seconds instead of at the next update, up to half
+  an hour later. That press of Track uses one lookup more (none when fewer than 20 are left).
+
 ## 1.0 (2026-10-06)
 
 - **Flight: a line with the plane on it.** From three hours before departure until an hour after

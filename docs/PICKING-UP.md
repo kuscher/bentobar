@@ -19,6 +19,24 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 1.0.1 (2026-10-06): a followed flight's delay shows again where its number flies more than once a day
+Released on GitHub only (tag `v1.0.1`, version code 12), with the Play job switched off for the tag
+(`docs/RELEASING.md`, "A release for GitHub alone"): nothing of 1.0.1 is on Google Play.
+Reported the day 1.0 came out: UA 1227 Newark to San Francisco was followed, ran late, and the chip showed
+no update. AirLabs' one-flight question (`flight`) is not the nearest flight of a number that flies more
+than once a day: at 17:34 UTC it answered with San Francisco to Portland while Newark's was due and late,
+and at 19:47 UTC, with Newark's in the air, with Newark's airports and San Francisco's times. 1.0 refreshed
+a followed flight with that question alone and read San Francisco's later flight as the end of Newark's
+(`Again.Gone`), so the asking stopped. Now `AirLabs.again` reads the coming hours' list (`schedules`, which
+had each flight right, in the air too) from ten hours before departure until an hour after landing
+(`FlightRules.listed`), and falls back to `flight` outside that, for codeshares, or where the list lacks the
+flight. Only a later day's flight from the same airport ends the asking, or any other flight once the followed
+one's time to land has passed. A flight Track found within those ten hours is asked about at once
+(`FlightRules.askAtOnce`). Tests use that day's real replies. Known limits, from the review: a NotYet answer
+marks a live flight as heard (`heardAt`) though nothing was; the at-once ask is lost if a load for the item is
+running when Track's answer is taken; "Next flight" can take the one-flight question's mixed-up record, whose
+day is kept as the followed day.
+
 ## 1.0 (2026-10-06): the flight as a line, a choice among a number's flights, and colors that follow after an unlock
 Three pull requests, merged in this order and released as 1.0 (version code 11) from the tag `v1.0`; the next
 release needs a new version: #18 (the strip stayed white after an unlock), #19 (a route line in the Flight

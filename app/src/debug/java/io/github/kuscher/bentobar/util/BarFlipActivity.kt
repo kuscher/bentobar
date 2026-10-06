@@ -23,6 +23,7 @@ import io.github.kuscher.bentobar.bar.BarService
  *   … --ez dark false --ei after 1500     the icons turn light 1.5 s from now
  *   … --ez dark true --ei unlock 3000     from screen off the icons are light (a lock screen's look) and
  *                                         stay light until 3 s after the unlock, then turn dark
+ *   … --ez close true                     closes the window (on a desktop the Back key doesn't)
  *
  * Only the shell can start it (android.permission.DUMP, like [DebugReceiver]).
  */
@@ -64,6 +65,7 @@ class BarFlipActivity : Activity() {
 
     private fun read(i: Intent) {
         main.removeCallbacksAndMessages(null)
+        if (i.getBooleanExtra("close", false)) return finishAndRemoveTask()
         val to = i.getBooleanExtra("dark", true)
         unlockMs = i.getIntExtra("unlock", -1)
         val after = i.getIntExtra("after", 0)

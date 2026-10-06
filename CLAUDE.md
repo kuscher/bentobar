@@ -116,7 +116,9 @@ private projects and paths into their repos, and where signing keys are backed u
   For color tests a debug build has a window that lies under the bar and turns its icons dark or light
   on command, with no event of any kind: `adb shell am start -n io.github.kuscher.bentobar/.util.BarFlipActivity
   --ez dark true` (now), `--ez dark false --ei after 1500` (in 1.5 s), `--ez dark true --ei unlock 3000`
-  (light from screen off until 3 s after the unlock: a bar that keeps the lock screen's look).
+  (light from screen off until 3 s after the unlock: a bar that keeps the lock screen's look),
+  `--ez close true` (closes it: on a desktop the Back key doesn't). On a Googlebook it only reaches the
+  bar from full screen (the keyboard's full-screen key, sent to it while it has the focus).
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
   the settings window. Menu crops include the menu's shadow margin, which can show other windows
   behind it, so don't publish them.

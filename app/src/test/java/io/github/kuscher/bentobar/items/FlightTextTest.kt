@@ -650,6 +650,32 @@ class FlightTextTest {
         assertEquals(", on time", FlightVoices.british().say(FlightText.Word.FLIGHT_DESC_ON_TIME))
     }
 
+    @Test fun aLineThatIsLateAlwaysStandsBesideItsFigure() {
+        // Color is never the only thing that says it: before a flight leaves and while it flies, a line in the color of
+        // late or very late has "+25m" in the words beside it, and a line without that color has no such figure.
+        for (late in -30L..150L) {
+            val leaving = lined(lh455(sfo(planned = time("2026-10-02T14:40").minusMinutes(late).toString(), expected = "2026-10-02T14:40")), near)
+            val landing = lined(inAir(fra(planned = time("2026-10-03T10:45").minusMinutes(late).toString(), expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z")
+            for (b in listOf(leaving, landing)) {
+                val colored = b.route!!.stands == Stands.LATE || b.route!!.stands == Stands.VERY_LATE
+                assertEquals("$late: ${b.text}", colored, b.text!!.contains(" · +"))
+                assertEquals("$late: ${b.desc}", colored, b.desc.contains(" late"))
+            }
+            // In the air a green line has "−18m" beside it, or else "on time" in its sentence.
+            if (landing.route!!.stands == Stands.GOOD) assertTrue("$late: ${landing.desc}", landing.text!!.contains(" · −") || landing.desc.endsWith(", on time"))
+        }
+    }
+
+    @Test fun theItemHandsTheLineToTheBarUnlessItIsShownAsTextAlone() {
+        // Read as text, like the table of the words: what the item passes on to the strip shows on a device and nowhere else.
+        val item = java.io.File("src/main/java/io/github/kuscher/bentobar/items/FlightItem.kt").readText()
+        assertTrue(item.contains("line = item.display != Display.TEXT"))
+        assertTrue(item.contains("route = bar.route"))
+        // And the strip draws none for an item shown as text, whoever hands it one.
+        val strip = java.io.File("src/main/java/io/github/kuscher/bentobar/bar/BarUi.kt").readText()
+        assertTrue(strip.contains("s.route?.takeIf { display != Display.TEXT }"))
+    }
+
     @Test fun theBarAndTheMenuNameAFlightsPlaneAlike() {
         // One plane for both lines: what either has drawn, the other goes on from.
         val t = tracked(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T06:20:00Z")

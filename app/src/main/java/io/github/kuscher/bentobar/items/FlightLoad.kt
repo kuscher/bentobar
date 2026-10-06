@@ -22,8 +22,8 @@ import java.util.concurrent.ConcurrentHashMap
  * the request code would refuse too.
  *
  * What is kept, by the item's id and outside the layout (so in no backup and no copied settings):
- * what the item follows (the number, and the day that flight leaves) as the feature's own note, and
- * the last answer as [Tracked] with what the service sent. Switching the service off deletes the
+ * what the item follows (the number, the day that flight leaves and the airport it leaves from) as
+ * the feature's own note, and the last answer as [Tracked] with what the service sent. Switching the service off deletes the
  * answers and keeps the notes; removing the key deletes both. The key itself is `Online`'s: it is read
  * here for the one request that needs it and goes into nothing that is kept, shown or said.
  */
@@ -34,9 +34,14 @@ object FlightLoad {
     /** The answer for an item and its note are read and written under this, so that a load that comes back late can't put an old flight over a new one. */
     private val lock = Any()
 
-    /** What an item was told to follow: the number as it was entered, closed up, and the day that flight leaves at its own airport. */
+    /**
+     * What an item was told to follow: the number as it was entered, closed up, the day that flight
+     * leaves at its own airport, and that airport. A number can fly more than once a day, and the
+     * airport says which of its flights this is. (None in a note from before there was a choice: any
+     * airport's then, as it was.)
+     */
     @Serializable
-    private class Following(val number: String, val day: String? = null)
+    private class Following(val number: String, val day: String? = null, val from: String? = null)
 
     /** One press of Track: which item asks, the number, the day that was chosen (null: the next flight), and where: a day chip is a day of the device's ([zone]). */
     data class Question(val item: String, val number: FlightNumber, val day: LocalDate? = null, val zone: ZoneId? = null) {
@@ -48,6 +53,12 @@ object FlightLoad {
     sealed interface Outcome {
         /** The flight, as it is kept once the answer is taken. */
         class Found(val tracked: Tracked) : Outcome
+        /**
+         * The number flies more than once on the day that was asked for: the flights to choose from, in
+         * the order they leave, each as it is kept once it is the one chosen. Nothing is followed, and
+         * nothing kept, until then.
+         */
+        class Several(val flights: List<Tracked>) : Outcome
         class Failed(val failure: Failure) : Outcome
         /** Nothing was asked (no key, the service switched off, the bar gone under the lookup): there is nothing to say. */
         data object Unasked : Outcome
@@ -77,17 +88,18 @@ object FlightLoad {
     private fun mayAsk(key: String) = key.isNotEmpty() && Online.on(service)
 
     /**
-     * Finds the flight for a press of Track: one request in the usual case, three at most. A number
-     * that was not found in the last hour is not asked for again.
+     * Finds the flight for a press of Track, or the flights where the number flies more than once on
+     * the day that was asked for: two requests in the usual case (the one flight, and the timetable,
+     * which says how often the number flies), three at most. A number that was not found in the last
+     * hour is not asked for again.
      */
     fun track(q: Question, now: Long): Outcome {
         val key = Online.key(service)
         if (!mayAsk(key)) return Outcome.Unasked
         notFoundLately(q, now)?.let { return Outcome.Failed(it) }
-        val a = AirLabs.lookup(q.number, q.day, key, Instant.ofEpochMilli(now), q.zone) { Http.get(it) } ?: return Outcome.Unasked
+        val a = AirLabs.candidates(q.number, q.day, key, Instant.ofEpochMilli(now), q.zone) { Http.get(it) } ?: return Outcome.Unasked
         said(a.left)
-        val f = a.flight
-        if (f == null) {
+        if (a.flights.isEmpty()) {
             val failure = a.failure ?: Failure.NO_ANSWER
             if (failure == Failure.NOT_FOUND || failure == Failure.NOT_THAT_DAY) {
                 if (missed.size >= 32) missed.clear()
@@ -95,19 +107,23 @@ object FlightLoad {
             }
             return Outcome.Failed(failure)
         }
-        return Outcome.Found(Tracked(q.number.code, day(f), f, askedAt = now, heardAt = now, left = a.left, alertSince = FlightRules.alertSince(f, null, now)))
+        val found = a.flights.map { f ->
+            Tracked(q.number.code, day(f), f, askedAt = now, heardAt = now, left = a.left, alertSince = FlightRules.alertSince(f, null, now), from = f.from.code)
+        }
+        return found.singleOrNull()?.let { Outcome.Found(it) } ?: Outcome.Several(found)
     }
 
     /** The day [f] leaves, at its own airport: what an item follows is that day's flight. */
     private fun day(f: Flight): String? = (f.from.planned ?: f.from.time)?.toLocalDate()?.toString()
 
     /**
-     * The answer to a press of Track becomes what [item] follows, in place of what it followed
-     * before. Main thread, when the answer is taken, never in the lookup itself: an answer that
-     * nobody takes (a newer question overtook it) changes nothing. False if it could not be kept.
+     * The answer to a press of Track, or the one of several that was chosen, becomes what [item]
+     * follows, in place of what it followed before. Main thread, when the answer is taken, never in
+     * the lookup itself: an answer that nobody takes (a newer question overtook it, or nobody chose)
+     * changes nothing. False if it could not be kept.
      */
     fun take(item: String, found: Tracked, now: Long): Boolean = synchronized(lock) {
-        val note = runCatching { json.encodeToString(Following.serializer(), Following(found.number, found.day)) }.getOrNull() ?: return false
+        val note = runCatching { json.encodeToString(Following.serializer(), Following(found.number, found.day, found.from)) }.getOrNull() ?: return false
         if (!Kept.own(OWN).write(item, note, now)) return false
         store(item, found, now)
         true
@@ -126,7 +142,8 @@ object FlightLoad {
         return asked
     }
 
-    private fun Following.isFor(t: Tracked) = number == t.number && day == t.day
+    /** (The airport too: another flight of the same number on the same day is not this one.) */
+    private fun Following.isFor(t: Tracked) = number == t.number && day == t.day && from == t.from
 
     /** Nothing a file holds is taken on trust either: a flight the rules could trip over is no flight. */
     private fun decode(text: String): Tracked? =
@@ -184,7 +201,8 @@ object FlightLoad {
     /**
      * Asks again about what [item] follows: one request about the one flight ([AirLabs.again]). With
      * nothing heard of it yet (the service was switched off and on again, which deletes the answer and
-     * keeps the note) it is the lookup for that number on its day. [last]: what was known. The answer
+     * keeps the note) it is the lookup for that number on its day from its airport: it finds the flight
+     * that was followed and never asks which. [last]: what was known. The answer
      * is a [Tracked] whatever came of it: a failed ask keeps the flight and says why.
      *
      * Null: nothing to say. The request was not sent (no key, switched off, the bar gone), or the item
@@ -199,7 +217,7 @@ object FlightLoad {
         if (number == null || (was != null && FlightRules.cleared(was, Instant.ofEpochMilli(now)))) {
             // It is put away, unless the item was told to follow something else this very moment: then that is another load's business.
             return synchronized(lock) {
-                if (following(item)?.let { it.number == asked.number && it.day == asked.day } == true) { stop(item); Tracked() } else null
+                if (following(item)?.let { it.number == asked.number && it.day == asked.day && it.from == asked.from } == true) { stop(item); Tracked() } else null
             }
         }
         val flight = was?.flight
@@ -211,11 +229,11 @@ object FlightLoad {
 
     private fun lookUp(asked: Following, number: FlightNumber, was: Tracked?, key: String, now: Long): Tracked? {
         val day = asked.day?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-        val a = AirLabs.lookup(number, day, key, Instant.ofEpochMilli(now)) { Http.get(it) } ?: return null
+        val a = AirLabs.lookup(number, day, asked.from, key, Instant.ofEpochMilli(now)) { Http.get(it) } ?: return null
         said(a.left)
         val left = a.left ?: was?.left
-        val f = a.flight ?: return Tracked(asked.number, asked.day, failure = a.failure ?: Failure.NO_ANSWER, failures = (was?.failures ?: 0) + 1, askedAt = now, left = left)
-        return Tracked(asked.number, asked.day, f, askedAt = now, heardAt = now, left = left, alertSince = FlightRules.alertSince(f, null, now))
+        val f = a.flight ?: return Tracked(asked.number, asked.day, failure = a.failure ?: Failure.NO_ANSWER, failures = (was?.failures ?: 0) + 1, askedAt = now, left = left, from = asked.from)
+        return Tracked(asked.number, asked.day, f, askedAt = now, heardAt = now, left = left, alertSince = FlightRules.alertSince(f, null, now), from = asked.from)
     }
 
     private fun again(number: FlightNumber, was: Tracked, flight: Flight, key: String, now: Long): Tracked? {

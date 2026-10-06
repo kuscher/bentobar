@@ -380,6 +380,45 @@ class FlightRowTest {
         assertNull(share(plan, at("2026-10-04T09:00:00Z")))
     }
 
+    // ---- the route line in the bar
+
+    @Test fun everySavedReplyHasItsLineInTheBarAndTheWordsItHadWithoutOne() {
+        val us = FlightVoices.us()
+        val ms = asked.toEpochMilli()
+        fun bar(f: Flight, line: Boolean) = FlightText.bar(FlightRules.Tracked(f.number, f.from.planned?.toLocalDate()?.toString(), f, askedAt = ms, heardAt = ms, left = 940,
+            alertSince = FlightRules.alertSince(f, null, ms)), null, asked, 24, us, line = line)
+        // Where the plane stands and how the flight does; null: the bar has no line for it.
+        val lines = mapOf(
+            "flight-LH454-planned" to BarRoute(0f, Stands.NO_CLAIM),                              // leaves in 56 minutes, only the plan known
+            "flight-LH152-delayed" to BarRoute(0f, Stands.VERY_LATE),                             // leaves in six, 45 behind
+            "flight-LH455-in-the-air" to BarRoute(582f / 614f, Stands.GOOD),                      // 24 minutes early
+            "flight-LH9152-codeshare" to BarRoute(30f / 554f, Stands.GOOD),                       // 13 behind is on time
+            "flight-SQ26-second-leg" to BarRoute(27f / 475f, Stands.GOOD),
+            "flight-LH96-landed" to BarRoute(1f, Stands.GOOD),                                    // down for 16 minutes
+            "flight-LH455-landed" to BarRoute(1f, Stands.GOOD),
+            "flight-JL101-landed-nine-hours-ago" to null,                                         // its hour in the bar is long over
+            "flight-LH1184-cancelled" to BarRoute(0f, Stands.WILL_NOT_ARRIVE, struck = true, whole = true),
+        )
+        val saved = java.io.File("src/test/resources/airlabs").list()!!.filter { it.startsWith("flight-") }.map { it.removeSuffix(".json") }
+        assertEquals(saved.sorted(), lines.keys.sorted())
+        for ((name, line) in lines) {
+            val plain = bar(flight(name), line = false)
+            val lined = bar(flight(name), line = true)
+            assertNull(name, plain.route)
+            assertEquals(name, line?.copy(share = 0f), lined.route?.copy(share = 0f))
+            if (line != null) assertEquals(name, line.share, lined.route!!.share, 1e-6f)
+            // The line takes the glyph's place in the bar and changes no word. The glyph stays what a menu lists the item by.
+            assertEquals(name, plain.text, lined.text)
+            assertEquals(name, plain.icon, lined.icon)
+            assertEquals(name, plain.active, lined.active)
+            assertEquals(name, plain.tooltip, lined.tooltip)
+            // The words keep the bar's color beside a line; only the alert of a cancellation stays.
+            assertEquals(name, if (plain.tone == Tone.ALERT) Tone.ALERT else Tone.NORMAL, lined.tone)
+        }
+        // Without the line the delayed one's words are a warning, as they were.
+        assertEquals(Tone.WARN, bar(flight("flight-LH152-delayed"), line = false).tone)
+    }
+
     // ---- what is read off the reply for it
 
     @Test fun theAircraftsTypeIsReadWhereTheServiceNamesIt() {

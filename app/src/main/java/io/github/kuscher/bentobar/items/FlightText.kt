@@ -300,9 +300,14 @@ object FlightText {
         val inItsHour = since < FlightRules.LANDED_SHOWN
         // For its hour in the bar the plane stands at the far end of its line, all of it flown.
         val route = if (inItsHour) l.route(1.0) else null
-        // The words say nothing of how it landed against its plan: where the line is green, the sentence says that it was on time.
-        val desc = (at?.let { v.say(Word.FLIGHT_DESC_LANDED, l.number, v.time(it, TimeForm.TIME)) } ?: l.tooltip) +
-            (if (route?.stands == Stands.GOOD) v.say(Word.FLIGHT_DESC_ON_TIME) else "") + belt?.let { v.say(Word.FLIGHT_DESC_BELT, it) }.orEmpty()
+        // The words say nothing of how it landed against its plan, and the line says it in a color only: the sentence
+        // says that it was on time where the line is green, and by how much it was late where it is yellow or red.
+        val how = when (route?.stands) {
+            Stands.GOOD -> v.say(Word.FLIGHT_DESC_ON_TIME)
+            Stands.LATE, Stands.VERY_LATE -> FlightRules.badge(l.f, l.now)?.minutes?.takeIf { it > 0 }?.let { v.say(Word.FLIGHT_DESC_LATE, spoken(it.toLong(), v)) }.orEmpty()
+            else -> ""
+        }
+        val desc = (at?.let { v.say(Word.FLIGHT_DESC_LANDED, l.number, v.time(it, TimeForm.TIME)) } ?: l.tooltip) + how + belt?.let { v.say(Word.FLIGHT_DESC_BELT, it) }.orEmpty()
         if (!inItsHour) return Bar(Sym.FLIGHT, desc = desc, tooltip = l.tooltip)
         val plain = v.say(Word.FLIGHT_LANDED)
         val timed = at?.let { v.say(Word.FLIGHT_BAR_LANDED_AT, v.time(it, TimeForm.TIME)) } ?: plain

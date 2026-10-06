@@ -624,14 +624,19 @@ class FlightTextTest {
         val down = lh455(left, fra(actual = "2026-10-03T10:01", belt = "21"), FlightState.LANDED)
         assertEquals("LH 455 landed at 10:01 AM, on time, belt 21", lined(down, "2026-10-03T08:21:00Z").desc)
         assertEquals("LH 455 landed at 10:30 AM, on time", lined(lh455(left, fra(actual = "2026-10-03T10:30"), FlightState.LANDED), "2026-10-03T08:40:00Z").desc)
-        // Where the line is not green the sentence is what it was: late, not live, only the plan known, landed late, before it leaves.
+        // Landed late, the line is yellow or red and the words say "Landed" and the belt: the sentence says by how much.
+        val downLate = lh455(left, fra(actual = "2026-10-03T10:50", belt = "21"), FlightState.LANDED)
+        assertEquals("LH 455 landed at 10:50 AM, 25 minutes late, belt 21", lined(downLate, "2026-10-03T09:00:00Z").desc)
+        assertEquals("LH 455 landed at 11:25 AM, 1 hour late", lined(lh455(left, fra(actual = "2026-10-03T11:25"), FlightState.LANDED), "2026-10-03T09:40:00Z").desc)
+        // Without the line the sentence is the one it was.
+        assertEquals("LH 455 landed at 10:50 AM, belt 21", bar(downLate, "2026-10-03T09:00:00Z").desc)
+        // Where the line is not green and no later than its plan says, the sentence is what it was: late, not live, only the plan known, before it leaves.
         val late = inAir(fra(expected = "2026-10-03T10:45"))
         val quiet = listOf(
             Triple(late, "2026-10-03T06:40:00Z", "2026-10-03T06:40:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes, 20 minutes late",
             Triple(late, "2026-10-03T06:40:00Z", "2026-10-03T05:00:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes, not live, updated 10:00 PM",
             Triple(onTime, "2026-10-03T06:20:00Z", "2026-10-03T05:00:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes, not live, updated 10:00 PM",
             Triple(inAir(fra()), "2026-10-03T06:20:00Z", "2026-10-03T06:20:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes",
-            Triple(lh455(left, fra(actual = "2026-10-03T10:50", belt = "21"), FlightState.LANDED), "2026-10-03T09:00:00Z", "2026-10-03T09:00:00Z") to "LH 455 landed at 10:50 AM, belt 21",
             Triple(lh455(left, fra(), FlightState.LANDED), "2026-10-03T08:30:00Z", "2026-10-03T08:30:00Z") to "LH 455 landed at 10:25 AM",
             Triple(lh455(sfo(expected = "2026-10-02T14:40")), near, near) to "LH 455 to Frankfurt leaves in 1 hour 37 minutes, gate G13",
             Triple(lh455(state = FlightState.CANCELED), near, near) to "LH 455 is canceled",

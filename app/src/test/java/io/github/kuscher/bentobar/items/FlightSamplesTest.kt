@@ -246,9 +246,12 @@ class FlightSamplesTest {
             assertNull(what, plain.route)
             // The words take the bar's color beside a line, and keep their own where there is none.
             assertEquals(what, if (line.route == null || plain.tone == Tone.ALERT) plain.tone else Tone.NORMAL, line.tone)
-            // The spoken sentence is the same but for a green line's "on time".
+            // The spoken sentence is the same but for what the line says in a color alone: a green line's "on time",
+            // and by how much a flight landed late (the sample: 25 minutes).
             val onTime = line.route?.stands == Stands.GOOD && !plain.desc.endsWith(" early")
-            assertEquals(what, if (onTime) plain.desc.replaceFirst(Regex("(, belt .*)?$"), ", on time$1") else plain.desc, line.desc)
+            val landedLate = line.route?.stands == Stands.LATE && " landed at " in plain.desc
+            val added = when { onTime -> ", on time"; landedLate -> ", 25 minutes late"; else -> "" }
+            assertEquals(what, plain.desc.replaceFirst(Regex("(, belt .*)?$"), "$added$1"), line.desc)
         }
     }
 

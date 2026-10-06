@@ -298,7 +298,10 @@ object FlightText {
         else -> Tone.NORMAL
     }
 
-    /** Landed: for an hour the belt, else when it landed. Then the plain plane, while the menu keeps the flight. */
+    /**
+     * Landed: for an hour the belt, else when it landed; and where it landed late, by how much instead
+     * ("Landed · +25 min": the belt is in the menu then). Then the plain plane, while the menu keeps the flight.
+     */
     private fun landed(l: Look): Bar {
         val v = l.v
         val at = l.f.to.time
@@ -307,19 +310,27 @@ object FlightText {
         val inItsHour = since < FlightRules.LANDED_SHOWN
         // For its hour in the bar the plane stands at the far end of its line, all of it flown.
         val route = if (inItsHour) l.route(1.0) else null
-        // The words say nothing of how it landed against its plan, and the line says it in a color only: the sentence
-        // says that it was on time where the line is green, and by how much it was late where it is yellow or red.
-        val how = when (route?.stands) {
-            Stands.GOOD -> v.say(Word.FLIGHT_DESC_ON_TIME)
-            Stands.LATE, Stands.VERY_LATE -> FlightRules.badge(l.f, l.now)?.minutes?.takeIf { it > 0 }?.let { v.say(Word.FLIGHT_DESC_LATE, spoken(it.toLong(), v)) }.orEmpty()
+        // How late it landed, by the rule its line is colored by (so not of an answer over an hour old): said in the
+        // words and in the sentence, with a line and without one. A color is never the only thing that says it.
+        val late = FlightRules.stands(l.f, l.now, l.stale).takeIf { inItsHour }
+            ?.takeIf { it == Stands.LATE || it == Stands.VERY_LATE }?.let { FlightRules.badge(l.f, l.now)?.minutes?.toLong() }?.takeIf { it > 0 }
+        // On time is said where the line is green: without a line the words claim nothing of it, as they never did.
+        val how = when {
+            late != null -> v.say(Word.FLIGHT_DESC_LATE, spoken(late, v))
+            route?.stands == Stands.GOOD -> v.say(Word.FLIGHT_DESC_ON_TIME)
             else -> ""
         }
         val desc = (at?.let { v.say(Word.FLIGHT_DESC_LANDED, l.number, v.time(it, TimeForm.TIME)) } ?: l.tooltip) + how + belt?.let { v.say(Word.FLIGHT_DESC_BELT, it) }.orEmpty()
         if (!inItsHour) return Bar(Sym.FLIGHT, desc = desc, tooltip = l.tooltip)
         val plain = v.say(Word.FLIGHT_LANDED)
         val timed = at?.let { v.say(Word.FLIGHT_BAR_LANDED_AT, v.time(it, TimeForm.TIME)) } ?: plain
-        return Bar(Sym.FLIGHT_LAND, if (belt == null) fit(timed, plain) else fit(v.say(Word.FLIGHT_BAR_LANDED_BELT, belt), timed, plain), active = true, desc = desc, tooltip = l.tooltip)
-            .lined(route)
+        val words = when {
+            // As a headline writes it, and with the bar's own short figure where that would be too long for the bar.
+            late != null -> fit(l.join(plain, v.say(Word.FLIGHT_BAR_LATE, written(late, v))), l.join(plain, v.say(Word.FLIGHT_BAR_LATE, figure(late))), plain)
+            belt == null -> fit(timed, plain)
+            else -> fit(v.say(Word.FLIGHT_BAR_LANDED_BELT, belt), timed, plain)
+        }
+        return Bar(Sym.FLIGHT_LAND, words, active = true, desc = desc, tooltip = l.tooltip).lined(route)
     }
 
     /** The headline as the card writes it, or ([aloud]) as it is spoken. An hour after landing it is "Landed" and counts no more. */

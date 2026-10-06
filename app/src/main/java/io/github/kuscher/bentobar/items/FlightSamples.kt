@@ -67,7 +67,7 @@ object FlightSamples {
         "air-no-landing" to { now -> lh455(left(now, 300), FlightEnd("FRA", "Frankfurt", offset = FRA, terminal = "1"), FlightState.IN_AIR) },
         // "Landed · Belt 21", Landed 20 min ago, On time.
         "landed" to { now -> lh455(left(now, 665), fra(local(now, -23, FRA), actual = local(now, -20, FRA), gate = "Z69", belt = "21"), FlightState.LANDED) },
-        // The same, 25 min late.
+        // The same, 25 min late: "Landed · +25 min".
         "landed-late" to { now -> lh455(left(now, 690), fra(local(now, -45, FRA), actual = local(now, -20, FRA), gate = "Z69", belt = "21"), FlightState.LANDED) },
         // "LH 455 canceled": the crossed-out plane, an alert for an hour.
         "canceled" to { now -> lh455(sfo(local(now, 120, SFO)), fra(local(now, 120 + FLIGHT, FRA)), FlightState.CANCELED) },

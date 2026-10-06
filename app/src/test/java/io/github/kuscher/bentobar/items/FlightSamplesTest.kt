@@ -146,7 +146,7 @@ class FlightSamplesTest {
     @Test fun theSamplesThatCameWithTheLineReadAsTheirRows() {
         assertEquals(listOf("1h 37m · +1h 25m", Sym.FLIGHT_TAKEOFF, Tone.WARN, "Leaves in 1 h 37 min", "Delayed 1 h 25 min"), shown("soon-very-late"))
         assertEquals(listOf("2h 05m · +55m", Sym.FLIGHT_LAND, Tone.WARN, "Lands in 2 h 05 min", "Delayed 55 min"), shown("air-very-late"))
-        assertEquals(listOf("Landed · Belt 21", Sym.FLIGHT_LAND, Tone.NORMAL, "Landed 20 min ago", "25 min late"), shown("landed-late"))
+        assertEquals(listOf("Landed · +25\u00A0min", Sym.FLIGHT_LAND, Tone.NORMAL, "Landed 20 min ago", "25 min late"), shown("landed-late"))
         // In the air, and the service names no time of landing: nothing to count, and no plane on the menu's line.
         assertEquals(listOf("In the air", Sym.FLIGHT_LAND, Tone.NORMAL, "In the air", null), shown("air-no-landing"))
         assertNull(card("air-no-landing").share)
@@ -246,12 +246,9 @@ class FlightSamplesTest {
             assertNull(what, plain.route)
             // The words take the bar's color beside a line, and keep their own where there is none.
             assertEquals(what, if (line.route == null || plain.tone == Tone.ALERT) plain.tone else Tone.NORMAL, line.tone)
-            // The spoken sentence is the same but for what the line says in a color alone: a green line's "on time",
-            // and by how much a flight landed late (the sample: 25 minutes).
+            // The spoken sentence is the same but for a green line's "on time".
             val onTime = line.route?.stands == Stands.GOOD && !plain.desc.endsWith(" early")
-            val landedLate = line.route?.stands == Stands.LATE && " landed at " in plain.desc
-            val added = when { onTime -> ", on time"; landedLate -> ", 25 minutes late"; else -> "" }
-            assertEquals(what, plain.desc.replaceFirst(Regex("(, belt .*)?$"), "$added$1"), line.desc)
+            assertEquals(what, if (onTime) plain.desc.replaceFirst(Regex("(, belt .*)?$"), ", on time$1") else plain.desc, line.desc)
         }
     }
 

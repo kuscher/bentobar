@@ -49,9 +49,9 @@ line; an item shown as text alone has no line and is exactly as in 0.9.
   either; a line that is green because the flight is early adds no "on time" to a sentence that says "early"; a
   diverted flight's plane stays where it was last drawn only while the app runs, and stands in the middle after
   a restart.
-- **Left open**: a flight that landed late has a yellow or red line and no word for it in the bar (the words
-  were to stay as they are; the menu's badge says it, and so does the spoken sentence: "landed at 10:50 AM,
-  25 minutes late, belt 21"). The changelog, the release notes and the README's picture come with a release.
+- **Changed after the first look**: a flight that landed late says so in its words, "Landed · +25 min" (the
+  belt is in the menu then), with a line and without one, and in its spoken sentence ("landed at 10:50 AM,
+  25 minutes late, belt 21"). Before that its line's color was the only thing that said it.
 
 ## 0.9 (2026-10-05): six new things for the bar, and the internet permission for two of them
 Merged as pull request #17 and released as 0.9 (version code 10) from the tag `v0.9`; the next release needs a new version.

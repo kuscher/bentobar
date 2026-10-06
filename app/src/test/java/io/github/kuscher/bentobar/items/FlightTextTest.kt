@@ -625,12 +625,11 @@ class FlightTextTest {
         val down = lh455(left, fra(actual = "2026-10-03T10:01", belt = "21"), FlightState.LANDED)
         assertEquals("LH 455 landed at 10:01 AM, on time, belt 21", lined(down, "2026-10-03T08:21:00Z").desc)
         assertEquals("LH 455 landed at 10:30 AM, on time", lined(lh455(left, fra(actual = "2026-10-03T10:30"), FlightState.LANDED), "2026-10-03T08:40:00Z").desc)
-        // Landed late, the line is yellow or red and the words say "Landed" and the belt: the sentence says by how much.
+        // Landed late, the sentence says by how much, with the line and without it (the words do too).
         val downLate = lh455(left, fra(actual = "2026-10-03T10:50", belt = "21"), FlightState.LANDED)
         assertEquals("LH 455 landed at 10:50 AM, 25 minutes late, belt 21", lined(downLate, "2026-10-03T09:00:00Z").desc)
         assertEquals("LH 455 landed at 11:25 AM, 1 hour late", lined(lh455(left, fra(actual = "2026-10-03T11:25"), FlightState.LANDED), "2026-10-03T09:40:00Z").desc)
-        // Without the line the sentence is the one it was.
-        assertEquals("LH 455 landed at 10:50 AM, belt 21", bar(downLate, "2026-10-03T09:00:00Z").desc)
+        assertEquals("LH 455 landed at 10:50 AM, 25 minutes late, belt 21", bar(downLate, "2026-10-03T09:00:00Z").desc)
         // Where the line is not green and no later than its plan says, the sentence is what it was: late, not live, only the plan known, before it leaves.
         val late = inAir(fra(expected = "2026-10-03T10:45"))
         val quiet = listOf(
@@ -657,12 +656,14 @@ class FlightTextTest {
     }
 
     @Test fun aLineThatIsLateAlwaysStandsBesideItsFigure() {
-        // Color is never the only thing that says it: before a flight leaves and while it flies, a line in the color of
-        // late or very late has "+25m" in the words beside it, and a line without that color has no such figure.
+        // Color is never the only thing that says it: before a flight leaves, while it flies and for its hour after
+        // landing, a line in the color of late or very late has "+25m" or "+25 min" in the words beside it, and a line
+        // without that color has no such figure.
         for (late in -30L..150L) {
             val leaving = lined(lh455(sfo(planned = time("2026-10-02T14:40").minusMinutes(late).toString(), expected = "2026-10-02T14:40")), near)
             val landing = lined(inAir(fra(planned = time("2026-10-03T10:45").minusMinutes(late).toString(), expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z")
-            for (b in listOf(leaving, landing)) {
+            val down = lined(lh455(left, fra(planned = time("2026-10-03T10:45").minusMinutes(late).toString(), actual = "2026-10-03T10:45", belt = "21"), FlightState.LANDED), "2026-10-03T09:00:00Z")
+            for (b in listOf(leaving, landing, down)) {
                 val colored = b.route!!.stands == Stands.LATE || b.route.stands == Stands.VERY_LATE
                 assertEquals("$late: ${b.text}", colored, b.text!!.contains(" · +"))
                 assertEquals("$late: ${b.desc}", colored, b.desc.contains(" late"))
@@ -670,6 +671,26 @@ class FlightTextTest {
             // In the air a green line has "−18m" beside it, or else "on time" in its sentence.
             if (landing.route!!.stands == Stands.GOOD) assertTrue("$late: ${landing.desc}", landing.text!!.contains(" · −") || landing.desc.endsWith(", on time"))
         }
+    }
+
+    /** The words "Landed · Belt 21" said nothing of a late landing, and its line said it in a color only. */
+    @Test fun aFlightThatLandedLateSaysByHowMuchInItsWords() {
+        fun words(b: FlightText.Bar) = b.text?.replace('\u00A0', ' ')
+        fun down(actual: String, belt: String? = "21") = lh455(left, fra(actual = actual, belt = belt), FlightState.LANDED)
+        // 25 minutes behind its plan (10:25): as a headline would write it, with the line and without it. The belt is in the menu.
+        assertEquals("Landed · +25 min", words(lined(down("2026-10-03T10:50"), "2026-10-03T09:00:00Z")))
+        assertEquals("Landed · +25 min", words(bar(down("2026-10-03T10:50"), "2026-10-03T09:00:00Z")))
+        assertEquals("Landed · +25 min", words(lined(down("2026-10-03T10:50", belt = null), "2026-10-03T09:00:00Z")))
+        // From 15 minutes, as everywhere; under that the words are the ones they were.
+        assertEquals("Landed · +15 min", words(lined(down("2026-10-03T10:40"), "2026-10-03T08:50:00Z")))
+        assertEquals("Landed · Belt 21", words(lined(down("2026-10-03T10:39"), "2026-10-03T08:50:00Z")))
+        // An hour and more: still within the bar's twenty characters, and the short figure where it would not be.
+        assertEquals("Landed · +1 h 00 min", words(lined(down("2026-10-03T11:25"), "2026-10-03T09:40:00Z")))
+        assertEquals("Landed · +10h 05m", words(lined(down("2026-10-03T20:30"), "2026-10-03T18:40:00Z")))
+        // An answer over an hour old claims nothing, in color or in words.
+        assertEquals("Landed · Belt 21", words(lined(down("2026-10-03T10:50"), "2026-10-03T09:10:00Z", heard = "2026-10-03T08:00:00Z")))
+        // After its hour in the bar the plain plane, as before.
+        assertNull(lined(down("2026-10-03T10:50"), "2026-10-03T10:00:00Z").text)
     }
 
     @Test fun anItemShownAsTextAloneHasNoLine() {

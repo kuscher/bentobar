@@ -322,9 +322,15 @@ class FlightCandidatesTest {
     }
 
     @Test fun aFlightThatWasCanceledIsFirstAmongTheNextAsItHasNotLeft() {
-        val c = press(service("flight" to flight.replace("\"scheduled\"", "\"cancelled\""), "routes" to table))
+        val canceled = flight.replace("\"scheduled\"", "\"cancelled\"")
+        val c = press(service("flight" to canceled, "routes" to table))
         assertEquals(listOf("MCO-EWR 2026-10-06T08:45", "EWR-SFO 2026-10-06T13:20", "SFO-PDX 2026-10-06T19:05"), legs(c))
         assertEquals(FlightState.CANCELED, c.flights[0].state)
+        // An hour after it was to leave it is still the service's answer, and still first: whoever asks should hear of it.
+        // The timetable would offer tomorrow's from Orlando in its place, and call it planned.
+        val after = press(service("flight" to canceled, "routes" to table), now = at("2026-10-06T13:45:00Z"))
+        assertEquals(legs(c), legs(after))
+        assertEquals(FlightState.CANCELED, after.flights[0].state)
     }
 
     // ---- one flight is no question

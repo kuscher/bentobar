@@ -114,3 +114,15 @@ Checked over adb with the throwaway probe in `probe/` (package local.bentobar.pr
 - **Not caught, on purpose**: a full-screen app that changes its own status bar icons from dark to
   light in the same window. No window event says so; only a timer would catch it, and a timer taking
   screenshots is what Play Protect's threat detection looks for.
+- **After an unlock the bar can keep the lock screen's look for a while** (reported from a Googlebook: the
+  strip stayed white; the status bar there is SystemUI's usual light-bar logic, which takes its icons from
+  the window under the bar and from the lock screen's scrim, `dumpsys activity service
+  com.android.systemui/.SystemUIService dumpables`, "LightBarController"). On the emulator the strip comes back
+  about 1.2 s after the lock screen is dismissed, when the bar has its final look; a bar that changes later
+  than the readings was staged with `BarFlipActivity` (light icons until 3 s after the unlock): 0.9 read at
+  0.27 s (white) and 1.05 s (white) and stayed white. Readings are now spread over ten seconds
+  (`bar/ColorWatch.kt`).
+- **Android refuses a window screenshot within a third of a second of the last one** (error 3, counted
+  from when the screenshot is asked for), so two are never asked for closer than 400 ms: the watch is told
+  when one is asked for, and a cause that arrives before its answer waits behind it.
+

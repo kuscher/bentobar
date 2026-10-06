@@ -19,6 +19,29 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## After 0.9: the strip that stayed white after an unlock (branch `colour-watch`, not released)
+Reported from a Googlebook: after an unlock the strip sometimes stays white while the system's icons are dark.
+0.9 read the bar 250 ms after the strip came back and at most once more 800 ms later; a bar that keeps the lock
+screen's look longer than that was never read again. `bar/ColorWatch.kt` now decides when the bar is read: every
+cause is followed by readings spread over the time the bar may take (two after a change of windows or of the
+wallpaper, six over ten seconds when the strip comes back or the theme or display changed), and every reading is
+logged. Causes that keep coming are held to a budget: after a dozen readings within a minute, one in two seconds.
+- **Checked**: unit tests (`ColorWatchTest`, 25: single causes, causes that meet, a screenshot on its way,
+  streams of causes, and a random storm that never asks for two screenshots within 400 ms or for more than 45
+  in a minute), a second reading of the branch by a reviewer whose findings are in, and an emulator with a window
+  that keeps light icons for 3 s and for 8 s after the unlock (`BarFlipActivity`, debug builds; CLAUDE.md has
+  the commands): 0.9 ends white, this ends dark.
+- **On a Googlebook**: with the test window in full screen (it then lies under the bar), the strip hidden,
+  the bar given light icons that turn dark three seconds later with no event, and the strip shown again:
+  read white at 0.26, 1.0 and 2.0 s, dark at 3.5 s (half a second after the bar turned), the same at 6 and
+  10 s, and no more. 0.9 would have stopped at the second white. Going in and out of full screen: two
+  readings each, the strip follows.
+- **Not checked**: the unlock itself on a Googlebook. None could be unlocked from a test (the lock screen wants
+  its password), so how long the bar really keeps the lock screen's look there is not measured. After an unlock
+  on a device, `adb logcat -d -s BentoBar` shows `bar shown` and then each `read … (same|changed|nothing)`.
+- **Left as it was**: the first readings of window changes still keep two seconds apart, a bar that turns more
+  than ten seconds after the strip came back waits for the next cause, and an app in full screen that flips its
+  own icons in the same window is still not noticed until the next cause.
 ## After 0.9: a route line in the Flight chip (branch `flight-route`, not released)
 Asked for after 0.9: while a flight is near or under way, the glyph in front of the Flight item's words is a line
 the plane flies along, left to right, colored by how the flight stands. It is the Sound slider's line (64 by

@@ -399,6 +399,8 @@ class FlightRowTest {
             "flight-JL101-landed-nine-hours-ago" to null,                                         // its hour in the bar is long over
             "flight-LH1184-cancelled" to BarRoute(0f, Stands.WILL_NOT_ARRIVE, struck = true, whole = true),
             "flight-UA1227-first-leg-planned" to null,                                            // asked for four days later: seen from here, a plan days off
+            "flight-UA1227-third-leg-planned" to null,                                            // the same
+            "flight-UA1227-second-leg-in-the-air-with-the-thirds-times" to BarRoute(0.02f, Stands.NO_CLAIM), // "in the air" by its word, days off by its times: just off the start, claiming nothing
         )
         val saved = java.io.File("src/test/resources/airlabs").list()!!.filter { it.startsWith("flight-") }.map { it.removeSuffix(".json") }
         assertEquals(saved.sorted(), lines.keys.sorted())

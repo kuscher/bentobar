@@ -14,6 +14,9 @@ import io.github.kuscher.bentobar.net.Request
 import io.github.kuscher.bentobar.net.Transport
 import io.github.kuscher.bentobar.net.Why
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -57,12 +60,32 @@ class FlightLoadTest {
         Online.init(File(dir, "empty"))
     }
 
-    /** The service as the test says it is right now: it answers by a request's path, and remembers what it was asked. */
+    /**
+     * The service as the test says it is right now: it answers by a request's path, and remembers what it was asked.
+     * Where a test gives the one-flight question's answer and not the coming hours' list's, the list says the same: that
+     * flight as its one row, or the same error. That is the service for a number that flies once a day; a test about
+     * one that flies more often gives the list itself. (A test that answers every path with one reply gets it as the
+     * list's one row too.)
+     */
     private class Service : Transport {
         val asked = ArrayList<Request>()
         var answer: (Request) -> Reply = { Reply.Failed(Why.STATUS, 404) }
-        override fun get(request: Request): Reply { asked += request; return answer(request) }
-        fun says(vararg byPath: Pair<String, String>) { val texts = byPath.toMap(); answer = { r -> texts[r.path]?.let { Reply.Ok(it) } ?: Reply.Failed(Why.STATUS, 404) } }
+        override fun get(request: Request): Reply {
+            asked += request
+            val reply = answer(request)
+            return if (request.path == AirLabs.SCHEDULES && reply is Reply.Ok) Reply.Ok(oneRow(reply.text)) else reply
+        }
+        fun says(vararg byPath: Pair<String, String>) {
+            val texts = byPath.toMap().toMutableMap()
+            texts[AirLabs.FLIGHT]?.let { texts.putIfAbsent(AirLabs.SCHEDULES, it) }
+            answer = { r -> texts[r.path]?.let { Reply.Ok(it) } ?: Reply.Failed(Why.STATUS, 404) }
+        }
+        /** A one-flight reply as a list of one: the same object with its `response` in an array; anything else as it is. */
+        private fun oneRow(one: String): String = runCatching {
+            val o = Json.parseToJsonElement(one).jsonObject
+            val r = o["response"] as? JsonObject ?: return one
+            JsonObject(o + ("response" to JsonArray(listOf(r)))).toString()
+        }.getOrDefault(one)
         fun fails(why: Why, status: Int = 0, retryAfterSec: Long? = null) { answer = { Reply.Failed(why, status, retryAfterSec) } }
         val paths: List<String> get() = asked.map { it.path }
     }
@@ -469,8 +492,8 @@ class FlightLoadTest {
             val t = follow(net)
             net.says(AirLabs.FLIGHT to reply("flight-LH455-landed"))
             val next = FlightLoad.load(item, t, asked + 30 * min, ids)!!
-            // (The first two are the press of Track's.)
-            assertEquals(listOf("/api/v9/flight", "/api/v9/routes", "/api/v9/flight"), net.paths)
+            // (The first two are the press of Track's.) In the air, it is the coming hours' list that is asked.
+            assertEquals(listOf("/api/v9/flight", "/api/v9/routes", "/api/v9/schedules"), net.paths)
             assertEquals(listOf("flight_iata" to "LH455", "api_key" to key), net.asked.last().query)
             assertEquals(FlightState.LANDED, next.flight!!.state)
             assertNull(next.failure); assertEquals(0, next.failures); assertFalse(next.ended)
@@ -773,15 +796,20 @@ class FlightLoadTest {
             assertEquals(third.flight, early.flight)
             assertFalse(early.ended); assertNull(early.failure)
             assertEquals(ms("2026-10-06T11:00:00Z"), early.heardAt)
-            // Then, the first one down, with the one from Newark: the same.
-            net.says(AirLabs.FLIGHT to fromNewark)
+            // Then, the first one down and Newark's in the air, eight hours before it leaves: the coming hours' list is asked. It has
+            // the evening's flight as it is (as it said at 19:47 UTC that day), whatever the one-flight question says, which by
+            // then mixed Newark's airports with this one's times. The plan becomes the flight, with its gate.
+            net.says(AirLabs.FLIGHT to reply("flight-UA1227-second-leg-in-the-air-with-the-thirds-times"),
+                AirLabs.SCHEDULES to reply("schedules-UA1227-second-leg-late-in-the-air"))
             val midday = FlightLoad.load(item, early, ms("2026-10-06T18:00:00Z"), ids)!!
-            assertEquals(third.flight, midday.flight)
+            assertFalse(midday.flight!!.timetable)
+            assertEquals("SFO" to "PDX", midday.flight.from.code to midday.flight.to.code)
+            assertEquals("E7", midday.flight.from.gate)
             assertFalse(midday.ended); assertNull(midday.failure)
             assertEquals("SFO", midday.from)
-            // Each of those was the one question, and none of them went to the timetable.
-            assertEquals(listOf("/api/v9/flight", "/api/v9/flight"), net.paths.drop(2))
-            // In the evening the service answers with the flight itself: the plan becomes the flight, with its gate.
+            // The first was the one question, more than ten hours before it leaves, the second the list; neither went to the timetable.
+            assertEquals(listOf("/api/v9/flight", "/api/v9/schedules"), net.paths.drop(2))
+            // In the evening it has another gate: the flight as it is now.
             net.says(AirLabs.FLIGHT to fromSanFrancisco)
             val live = FlightLoad.load(item, midday, ms("2026-10-07T00:30:00Z"), ids)!!
             assertFalse(live.flight!!.timetable)
@@ -896,9 +924,10 @@ class FlightLoadTest {
             // After landing: none, for as long as the bar stays up.
             assertEquals(emptyList<String>(), watch(r, "2026-10-03T19:00:00Z"))
             assertEquals(2 + 3 + 30, sent())
-            // The press of Track asked for the one flight and the timetable; every one after it asked the one question. All about the one number.
+            // The press of Track asked for the one flight and the timetable. After it, the first ask, more than ten hours before
+            // it leaves, asked the one-flight question; every one from ten hours before, the coming hours' list. All about the one number.
             assertEquals(listOf("/api/v9/flight", "/api/v9/routes"), net.paths.take(2))
-            assertEquals(setOf("/api/v9/flight"), net.paths.drop(2).toSet())
+            assertEquals(listOf("/api/v9/flight") + List(32) { "/api/v9/schedules" }, net.paths.drop(2))
             assertEquals(setOf(listOf("flight_iata" to "LH454", "api_key" to key)), net.asked.map { it.query }.toSet())
             // A day after it landed it is put away, which asks nobody.
             assertEquals(emptyList<String>(), watch(r, "2026-10-03T20:00:00Z"))

@@ -48,7 +48,9 @@ class FlightRulesTest {
     }
 
     private fun lookup(n: FlightNumber, now: Instant, day: LocalDate? = null, get: (Request) -> Reply): AirLabs.Answer = AirLabs.lookup(n, day, "k", now, get = get)!!
-    private fun again(was: Flight, get: (Request) -> Reply): AirLabs.Asked = AirLabs.again(lh455, "k", was, get)!!
+    /** [was] asked about again a day before it is to leave: more than ten hours, so the one-flight question's turn, which these tests read. */
+    private fun again(was: Flight, get: (Request) -> Reply): AirLabs.Asked = AirLabs.again(lh455, "k", was, dayBefore(was), get)!!
+    private fun dayBefore(f: Flight): Instant = f.from.moment(f.from.planned!!).minus(Duration.ofDays(1))
     private fun ok(text: String): (Request) -> Reply = { Reply.Ok(text) }
 
     private fun line(from: String, to: String, leaves: String, utc: String, lands: String, landsUtc: String, minutes: Int, days: String) =
@@ -302,14 +304,19 @@ class FlightRulesTest {
 
     @Test fun aFlightFoundAmongTheComingHoursWaitsForTheServiceToo() {
         // "The next flight" was found in the coming ten hours' list while the one-flight question still answered with the
-        // flight before it. Asked again a moment later (a press of Refresh), it answers with that one once more: the
-        // flight that is followed is still to come, so that is "not yet", never the end of asking.
-        val soon = AirLabs.schedules("""{"response":[{"flight_iata":"JL101","dep_iata":"HND","arr_iata":"ITM","status":"scheduled",
-            "dep_time":"2026-10-03 06:30","dep_time_utc":"2026-10-02 21:30","arr_time":"2026-10-03 07:35","arr_time_utc":"2026-10-02 22:35"}]}""").value!![0]
+        // flight before it. Where that question is asked about it, it answers with that one once more: the flight that is
+        // followed is still to come, so that is "not yet", never the end of asking.
+        val list = """{"response":[{"flight_iata":"JL101","dep_iata":"HND","arr_iata":"ITM","status":"scheduled",
+            "dep_time":"2026-10-03 06:30","dep_time_utc":"2026-10-02 21:30","arr_time":"2026-10-03 07:35","arr_time_utc":"2026-10-02 22:35"}]}"""
+        val soon = AirLabs.schedules(list).value!![0]
         assertFalse(soon.timetable)
         assertEquals(AirLabs.Again.NotYet, again(soon, ok(reply("flight-JL101-landed-nine-hours-ago"))).again)
         // A flight after it is another flight: gone.
         assertEquals(AirLabs.Again.Gone, again(soon, ok(later(reply("flight-JL101-landed-nine-hours-ago"), 2))).again)
+        // Asked again a moment later (a press of Refresh), within ten hours of its leaving: the list is asked, and has it.
+        val s = Service(mapOf("schedules" to list, "flight" to reply("flight-JL101-landed-nine-hours-ago")))
+        assertTrue(AirLabs.again(lh455, "k", soon, at("2026-10-02T21:00:00Z"), s::get)!!.again is AirLabs.Again.Is)
+        assertEquals(listOf("schedules"), s.asked)
     }
 
     @Test fun howOftenAFollowerAsksInTheUsualCase() {

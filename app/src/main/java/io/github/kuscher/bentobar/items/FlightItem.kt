@@ -332,6 +332,8 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         fresh[id] = found
         takes++
         reread(id)
+        // What Track found is the one-flight question's word or the timetable's plan; the coming hours' list has the flight as it is.
+        if (FlightRules.askAtOnce(found, Instant.ofEpochMilli(Now.wall()))) tracker.refresh(id, afterRunning = true)
         // The bar has the flight now, and an open menu draws again.
         Ticker.refresh(type)
         return true

@@ -465,6 +465,24 @@ object FlightRules {
         }
     }
 
+    /** True if the service's list of the coming hours can have [f] at [now]: it was to leave at most [KNOWN] from now, or has left. */
+    fun listed(f: Flight, now: Instant): Boolean {
+        val leaves = (f.from.planned ?: f.from.time)?.let(f.from::moment) ?: return false
+        return !leaves.isAfter(now.plus(KNOWN))
+    }
+
+    /**
+     * True if the flight [t] holds, just found by a press of Track, is asked about again at once
+     * rather than when it is due: the coming hours' list can have it ([listed]), there is something to
+     * ask ([pace]), and lookups to spare ([FEW]). What Track found is the one-flight question's word,
+     * which for a number that flies more than once a day can be another flight's times, or the
+     * timetable's plan, which knows no delay: one ask of the list puts it right.
+     */
+    fun askAtOnce(t: Tracked, now: Instant): Boolean {
+        val f = t.flight ?: return false
+        return (t.left == null || t.left >= FEW) && pace(f, now) != null && listed(f, now)
+    }
+
     /** True if [got] is the flight [was] is, heard of again: it starts at the same airport on the same planned day. Another day's flight of the number is another flight. */
     fun same(was: Flight, got: Flight): Boolean =
         was.from.code == got.from.code && was.from.planned != null && was.from.planned.toLocalDate() == got.from.planned?.toLocalDate()
@@ -496,7 +514,7 @@ object FlightRules {
         val left: Int? = null,
         /** When a cancellation or a diversion was first seen: the alert lasts an hour from then. */
         val alertSince: Long? = null,
-        /** The service has gone on to another flight of the number, or knows this one no more: asking has ended. */
+        /** The service has gone on to a later day's flight of the number, or knows this one no more: asking has ended. */
         val ended: Boolean = false,
         /** How long a "slow down" asked to be left alone, in seconds. */
         val waitSec: Long? = null,
@@ -623,7 +641,7 @@ object FlightRules {
      * landing must not count down to nothing. A timetable's flight is left as it is (nobody knows what
      * became of it), and so is one the service called canceled or diverted.
      *
-     * [ended]: the asking has ended for it (the service has gone on to another flight of the number),
+     * [ended]: the asking has ended for it (the service has gone on to a later day's flight of the number),
      * so nobody will ever say that it landed. Its time to land says so then, at once: it must not
      * stand at "1 min" for the three hours a flight that is still asked about is given.
      */

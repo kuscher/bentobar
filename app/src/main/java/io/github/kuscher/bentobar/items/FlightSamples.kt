@@ -2,6 +2,7 @@ package io.github.kuscher.bentobar.items
 
 import io.github.kuscher.bentobar.items.AirLabs.Failure
 import io.github.kuscher.bentobar.items.FlightRules.Tracked
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
@@ -11,7 +12,8 @@ import java.time.ZoneOffset
  * that it reads as its name says then; the staged clock (`./bento debug now +30m`) moves it on from
  * there. Nothing of a sample is asked of the flight service, and none needs a key.
  *
- * The flight is the examples' LH 455, San Francisco to Frankfurt, with made-up times.
+ * The flight is the examples' LH 455, San Francisco to Frankfurt, with made-up times. Where several
+ * flights are to choose from it is UA 1227, which flies three times a day, with its timetable's times.
  */
 object FlightSamples {
     /** What the first Flight item shows in place of the real thing. */
@@ -22,6 +24,12 @@ object FlightSamples {
         class Failed(val number: String, val failure: Failure) : Staged
         /** A lookup that is on its way. */
         class Looking(val number: String) : Staged
+        /**
+         * A press of Track that found the number flying more than once: the number as it is shown, the
+         * day that was chosen (null: the next flight), and the flights to choose from, each as it is
+         * followed once it is the one.
+         */
+        class Several(val number: String, val day: LocalDate?, val flights: List<Tracked>) : Staged
         /** Nothing followed: the field, the day chips, the note. */
         data object Empty : Staged
         /** No key saved: the words, and the way to the item's settings. */
@@ -90,6 +98,39 @@ object FlightSamples {
         "no-answer" to Staged.Failed(SHOWN, Failure.NO_ANSWER),
     )
 
+    /** UA 1227 and its airports' clocks in summer: Orlando and Newark four hours behind UTC, San Francisco and Portland seven. */
+    private const val UA = "UA1227"
+    private const val UA_SHOWN = "UA 1227"
+    private const val EAST = -240
+    private const val WEST = -420
+
+    /**
+     * The three flights of UA 1227 from the one that leaves Orlando at [first], an Eastern time, each as
+     * long after it as its timetable has it: Orlando to Newark, Newark to San Francisco four hours 35
+     * minutes later, San Francisco to Portland that evening. The first as the service says a flight
+     * (cities, a gate), the two after it as the timetable does: a plan, and no city the first did not name.
+     */
+    private fun ua1227(first: LocalDateTime): List<Flight> {
+        fun flight(from: FlightEnd, to: FlightEnd, timetable: Boolean) = Flight(UA, "United Airlines", from, to, FlightState.PLANNED, timetable = timetable, callsign = "UAL1227")
+        // (The same moment reads three hours less on the West Coast's clock than on the East Coast's.)
+        val west = (WEST - EAST).toLong()
+        val newark = first.plusMinutes(275)
+        val sanFrancisco = first.plusMinutes(800 + west)
+        return listOf(
+            flight(FlightEnd("MCO", "Orlando", first, offset = EAST, terminal = "B", gate = "48"), FlightEnd("EWR", "Newark", first.plusMinutes(161), offset = EAST, terminal = "A", gate = "20", belt = "3"), timetable = false),
+            flight(FlightEnd("EWR", "Newark", newark, offset = EAST), FlightEnd("SFO", "", newark.plusMinutes(359 + west), offset = WEST), timetable = true),
+            flight(FlightEnd("SFO", "", sanFrancisco, offset = WEST), FlightEnd("PDX", "", sanFrancisco.plusMinutes(115), offset = WEST), timetable = true),
+        )
+    }
+
+    /** A number that flies more than once, by name: its flights to choose from. */
+    private val several: Map<String, (Long) -> Staged.Several> = linkedMapOf(
+        // "Tomorrow" was chosen (San Francisco's): "UA 1227 flies 3 times on Tue, Oct 6", each at its timetable's time.
+        "several" to { now -> local(now, 0, WEST).toLocalDate().plusDays(1).let { day -> Staged.Several(UA_SHOWN, day, ua1227(day.atTime(8, 45)).map { tracked(it, now) }) } },
+        // "Next flight": they leave in seven, eleven and a half and twenty hours. "UA 1227: 3 flights in the next 24 hours".
+        "several-next" to { now -> Staged.Several(UA_SHOWN, null, ua1227(local(now, 417, EAST)).map { tracked(it, now) }) },
+    )
+
     /** What can be said after a flight's name: how the last ask about it went. */
     private val turns: Map<String, (Tracked, Long) -> Tracked> = linkedMapOf(
         // The last answer is 61 minutes old: "not live" within three hours of leaving and in the air.
@@ -101,10 +142,15 @@ object FlightSamples {
         "few" to { t, _ -> t.copy(left = 12) },
     )
 
-    /** Every name `flight show` takes, and what may follow a flight's. */
-    val names: String get() = (flights.keys + failures.keys + listOf("looking", "none", "no-key")).joinToString(" ") + " | after a flight: " + turns.keys.joinToString(" ")
+    /** Every name `flight show` takes, what may follow a flight's, and what may follow where several are to choose from. */
+    val names: String get() = (flights.keys + failures.keys + listOf("looking", "none", "no-key") + several.keys).joinToString(" ") + " | after a flight: " + turns.keys.joinToString(" ") +
+        " | after " + several.keys.joinToString(" or ") + ": 1 2 3"
 
-    /** The sample called [name] as it stands at [now] (wall clock, milliseconds); [turn]: how its last ask went. Null: no such sample. */
+    /**
+     * The sample called [name] as it stands at [now] (wall clock, milliseconds). [turn]: after a flight's
+     * name, how its last ask went; after `several` or `several-next`, the number of one of the flights
+     * to choose from, which is then that flight, followed: what choosing it comes to. Null: no such sample.
+     */
     fun of(name: String, turn: String?, now: Long): Staged? {
         failures[name]?.let { return it.takeIf { turn == null } }
         when (name) {
@@ -112,10 +158,14 @@ object FlightSamples {
             "none" -> return Staged.Empty.takeIf { turn == null }
             "no-key" -> return Staged.NoKey.takeIf { turn == null }
         }
-        val f = flights[name]?.invoke(now) ?: return null
-        val t = Tracked(f.number, (f.from.planned ?: f.from.time)?.toLocalDate()?.toString(), f, askedAt = now, heardAt = now, left = 940, alertSince = FlightRules.alertSince(f, null, now))
+        several[name]?.invoke(now)?.let { s -> return if (turn == null) s else turn.toIntOrNull()?.let { s.flights.getOrNull(it - 1) }?.let { Staged.Following(it) } }
+        val t = tracked(flights[name]?.invoke(now) ?: return null, now)
         return Staged.Following(if (turn == null) t else (turns[turn] ?: return null)(t, now))
     }
+
+    /** [f] as an item holds it that has just heard of it: its number, the day it leaves at its own airport, that airport. */
+    private fun tracked(f: Flight, now: Long) = Tracked(f.number, (f.from.planned ?: f.from.time)?.toLocalDate()?.toString(), f, askedAt = now, heardAt = now, left = 940,
+        alertSince = FlightRules.alertSince(f, null, now), from = f.from.code)
 
     /**
      * An airport's own time [minutes] after [now], counted from the minute that [now] is in: a countdown

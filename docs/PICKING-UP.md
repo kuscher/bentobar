@@ -25,6 +25,9 @@ release needs a new version: #18 (the strip stayed white after an unlock), #19 (
 chip), #20 (which flight, where a number flies more than once a day). Each has its section below, as it was
 written on its branch. No new permission; Play's Data safety answers and the declaration's video stand as they
 are for 0.9 (a press of Track sends the same two things, once more).
+Sent to Google Play the same night, for closed testing and production: one edit with 1.0 (11) as the release on
+both tracks, which took the place of 0.9 in review (0.9 had not been approved yet and was never published).
+Managed publishing is on, so an approval waits for a press of Publish in the Play Console.
 
 ### Which flight, where a number flies more than once a day (pull request #20)
 Asked for after 0.9: "If several flights have the same number on the same day, can you give me a disambig when

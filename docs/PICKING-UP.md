@@ -19,6 +19,16 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 1.0.2 (2026-10-06): a new icon, after Play's rejection of 1.0's listing
+Play rejected 1.0's store listing under the Impersonation policy ("copyrighted or proprietary assets … from a
+third-party"), naming the hi-res icon and the title. The icon's rice, salmon, tamago and edamame on blue read as
+another brand's colours. Alex chose a new palette from five ("E · Deep teal"): `tools/logo.py` draws the same box in
+mint on deep teal (#133F43); the drawables, the splash background, `docs/images/icon.png`, the store's
+`icon-512.png` and `feature-graphic.png` were made anew (the feature graphic from the September capture, which has a
+plain wallpaper: no store image shows the Googlebook's own wallpaper). The title stays as it was. Version code 13;
+the tag uploads the bundle to closed testing as a draft, as usual, and the listing and review go through the Console
+with a note to the reviewer that the icon is original.
+
 ## 1.0.1 (2026-10-06): a followed flight's delay shows again where its number flies more than once a day
 Released on GitHub only (tag `v1.0.1`, version code 12), with the Play job switched off for the tag
 (`docs/RELEASING.md`, "A release for GitHub alone"): nothing of 1.0.1 is on Google Play.

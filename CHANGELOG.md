@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2 (2026-10-06)
+
+- **A new icon.** The same bento box seen from above, the status bar on top and three compartments
+  below, now in mint on deep teal. The launcher, the themed icon, the splash screen and the store
+  listing all have it; the one-colour marks in the app and in Quick Settings keep their shape.
+- Everything in 1.0.1: a followed flight's delay shows where its number flies more than once a day.
+
 ## 1.0.1 (2026-10-06)
 
 - **Flight: delays of a number that flies several times a day.** Following one of the day's flights

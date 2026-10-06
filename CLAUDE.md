@@ -117,6 +117,10 @@ private projects and paths into their repos, and where signing keys are backed u
   `weather fail …`, `weather off`; `flight show NAME [TURN]` (`flight show` lists the names; every look of the
   route line has one, with `old` after a name for an answer over an hour old and `now +61m` for a
   cancellation or a diversion after its alert; bare `flight` then says which line the bar has), `flight off`;
+  `flight show several` and `flight show several-next` (the flights of a number that flies three times a
+  day, to choose from in the item's menu: tomorrow's, and the next within a day; the bar shows the number
+  meanwhile, closing the menu drops them as it does the real ones, and `several 2` is the second of them,
+  followed; bare `flight` prints the question and the rows);
   `sound fixed on|off`. Each type's bare name prints what it knows (`media`, `devices`, `heat`, `flight`).
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
   the settings window. Menu crops include the menu's shadow margin, which can show other windows
@@ -192,6 +196,16 @@ private projects and paths into their repos, and where signing keys are backed u
   request threw, and keep a key out of every state, description and debug line. Its count of lookups
   left (`request.key.limits_total`) lags: the same figure after three lookups in a row, so the app
   says "about".
+- **A flight number is not one flight a day.** UA 1227 flies Orlando to Newark, Newark to San Francisco
+  and San Francisco to Portland every day, and the service's one-flight question answers with whichever
+  is nearest to now. A flight is its number, the day it leaves and the airport it leaves from
+  (`FlightRules.same`), and what is kept of one names all three, so that it is found again
+  (`AirLabs.lookup` with an airport). A press of Track asks for the timetable too, which is what says how
+  often a number flies (`AirLabs.candidates`: two lookups where there was one), and the menu asks which
+  flight where there are several. "The next flight" is one for each route: a rule worded as "every line's
+  next departure within 24 hours" asks about every daily flight while it is in the air (tomorrow's is
+  less than a day off), so the flight the service answers with stands for its route, and a route with a
+  timetable line for each kind of day counts once.
 - **A weather service's hourly chance of rain is for the hour that ends at its time** (Open-Meteo:
   "preceding hour"), while the temperature and the weather code are of that instant. The rain rule
   names the hour the chance is for, and an hour's cell takes its chance from the entry after it.

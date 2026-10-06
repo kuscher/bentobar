@@ -51,13 +51,14 @@ the number and closing the menu drop the question, and nothing is followed for i
   service answers with stands for its route while it is in the air, late or still to leave (a canceled one too),
   so the same route's flight of the day after is not listed and a number that flies once a day never asks; a
   flight that landed is not among the next ones. Two flights that are one to `FlightRules.same` (the same
-  airport, the same planned day) are offered once, since they could not be followed apart. A flight the service
-  answers with that leaves on the chosen day is among that day's even where the timetable has no line for it.
-  The entries have two lines, as the city search's results have: one line cuts longer city names at the menu's
-  width. While the list is shown the day chips and the lookup note are not. The question is the card's subtitle
-  and is not read out unasked; a screen reader hears the first flight when the list takes the focus, in a
-  sentence with the weekday's whole name. If the second request is not sent at all (the switch went off, the bar
-  hid), the press comes to nothing, as every lookup does whose later request was not sent.
+  airport, the same planned day) are offered once, since they could not be followed apart, and no more than
+  twelve are offered whatever a timetable says. A flight the service answers with that leaves on the chosen day
+  is among that day's even where the timetable has no line for it. The entries have two lines, as the city
+  search's results have: one line cuts longer city names at the menu's width. While the list is shown the day
+  chips and the lookup note are not. The question is the card's subtitle and is not read out unasked; a screen
+  reader hears the first flight when the list takes the focus, in a sentence with the weekday's whole name. If
+  the second request is not sent at all (the switch went off, the bar hid), the press comes to nothing, as every
+  lookup does whose later request was not sent.
 - **Left open**: "Today" late in the day lists flights that have left, as plans from the timetable (the rule is
   every line that leaves on that day, and the lookup took such a flight before too). Pressing Track again after
   Cancel asks the service again. A note kept before this names no airport and is looked up as it always was.

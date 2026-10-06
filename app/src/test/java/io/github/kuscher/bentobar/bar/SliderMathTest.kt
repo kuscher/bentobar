@@ -171,7 +171,7 @@ class SliderMathTest {
         // The clearing behind the plane still reaches past the line's start: there is no room for a part there.
         assertNull(r.flown)
         assertEquals(17.98f, r.ahead!!.start, 1e-4f)
-        assertEquals(64f, r.ahead!!.endInclusive, 0f)
+        assertEquals(64f, r.ahead.endInclusive, 0f)
         // A part appears behind it once the clearing has left the start: 2 along the 49 that the plane travels.
         assertNull(route(1.9f / 49f).flown)
         assertEquals(0.49f, route(2.49f / 49f).flown!!.endInclusive, 1e-4f)
@@ -188,7 +188,7 @@ class SliderMathTest {
         val r = route(0.98f)
         assertEquals(55.52f, r.center, 1e-4f)
         assertEquals(0f, r.flown!!.start, 0f)
-        assertEquals(46.02f, r.flown!!.endInclusive, 1e-4f)
+        assertEquals(46.02f, r.flown.endInclusive, 1e-4f)
         // Its nose is short of the end by less than the clearing: nothing of the line is left ahead of it.
         assertTrue(r.center + 7.5f < 64f)
         assertNull(r.ahead)

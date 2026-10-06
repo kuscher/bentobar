@@ -437,9 +437,9 @@ class FlightTextTest {
         // LH 455 left at 9:47 PM UTC. Expected at its planned 8:25 AM: 513 of 638 minutes are flown.
         val onTime = lined(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T06:20:00Z")
         assertEquals(Stands.GOOD, onTime.route!!.stands)
-        assertEquals(513f / 638f, onTime.route!!.share, 1e-6f)
-        assertFalse(onTime.route!!.struck)
-        assertFalse(onTime.route!!.whole)
+        assertEquals(513f / 638f, onTime.route.share, 1e-6f)
+        assertFalse(onTime.route.struck)
+        assertFalse(onTime.route.whole)
         assertEquals("2h 05m · 10:25 AM", onTime.text)
         // Early is good news too, and the words say by how much.
         val early = lined(inAir(fra(expected = "2026-10-03T10:07")), "2026-10-03T06:02:00Z")
@@ -448,7 +448,7 @@ class FlightTextTest {
         // Twenty minutes behind, 533 of 658 minutes flown: the line is late, and the words keep the bar's color.
         val late = lined(inAir(fra(expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z")
         assertEquals(Stands.LATE, late.route!!.stands)
-        assertEquals(533f / 658f, late.route!!.share, 1e-6f)
+        assertEquals(533f / 658f, late.route.share, 1e-6f)
         assertEquals("2h 05m · +20m", late.text)
         assertEquals(Tone.NORMAL, late.tone)
         val veryLate = lined(inAir(fra(expected = "2026-10-03T11:20")), "2026-10-03T07:15:00Z")
@@ -468,12 +468,12 @@ class FlightTextTest {
         val old = lined(inAir(fra(expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z", heard = "2026-10-03T05:00:00Z")
         assertEquals("2h 05m · not live", old.text)
         assertEquals(Stands.NO_CLAIM, old.route!!.stands)
-        assertEquals(533f / 658f, old.route!!.share, 1e-6f)
+        assertEquals(533f / 658f, old.route.share, 1e-6f)
         // Only the plan of its landing is known: no good news about a time the service never gave.
         val planOnly = lined(inAir(fra()), "2026-10-03T06:20:00Z")
         assertEquals("2h 05m · 10:25 AM", planOnly.text)
         assertEquals(Stands.NO_CLAIM, planOnly.route!!.stands)
-        assertEquals(513f / 638f, planOnly.route!!.share, 1e-6f)
+        assertEquals(513f / 638f, planOnly.route.share, 1e-6f)
         // Before it leaves the same: a delay heard of over an hour ago colors nothing.
         val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
         assertEquals("1h 37m · not live", lined(late, near, heard = "2026-10-02T16:40:00Z").text)
@@ -657,7 +657,7 @@ class FlightTextTest {
             val leaving = lined(lh455(sfo(planned = time("2026-10-02T14:40").minusMinutes(late).toString(), expected = "2026-10-02T14:40")), near)
             val landing = lined(inAir(fra(planned = time("2026-10-03T10:45").minusMinutes(late).toString(), expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z")
             for (b in listOf(leaving, landing)) {
-                val colored = b.route!!.stands == Stands.LATE || b.route!!.stands == Stands.VERY_LATE
+                val colored = b.route!!.stands == Stands.LATE || b.route.stands == Stands.VERY_LATE
                 assertEquals("$late: ${b.text}", colored, b.text!!.contains(" · +"))
                 assertEquals("$late: ${b.desc}", colored, b.desc.contains(" late"))
             }

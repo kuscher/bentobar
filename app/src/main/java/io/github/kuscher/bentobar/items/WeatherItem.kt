@@ -183,7 +183,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
             val first = firstShown()
             val reading = first?.let { source.peek(it) }
             "staged=${stagedReading?.name ?: "none"} here=${if (WeatherHere.place != null) "known" else WeatherHere.why} search=${if (stagedSearch == null) "real" else "staged"} fail=${stagedFailure.get() ?: "none"}" +
-                " items=${items.size} places=${WeatherLoad.places(items).size}" +
+                " items=${items.size} places=${WeatherLoad.places(items, WeatherHere.place).size}" +
                 " on=${Online.on(online)} setUp=${Online.setUp(online)}" + (first?.let {
                     " first=${status(it, Now.wall()).javaClass.simpleName} loading=${source.loading(it)} failure=${reading?.failure ?: "none"}" +
                         " again=${againEntry(it)}" +

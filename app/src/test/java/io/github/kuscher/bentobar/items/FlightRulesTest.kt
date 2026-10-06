@@ -558,4 +558,93 @@ class FlightRulesTest {
         assertFalse(FlightRules.sound(air.copy(to = air.to.copy(expected = time("9999-01-01T00:00")))))
         assertFalse(FlightRules.sound(air.copy(to = air.to.copy(planned = time("1066-10-14T09:00")))))
     }
+
+    // ---- how a flight stands, which is the color of its line in the bar
+
+    /** When the saved replies were asked for. */
+    private val saved = at("2026-10-02T07:29:00Z")
+    private fun stands(f: Flight, now: Instant = saved, stale: Boolean = false) = FlightRules.stands(f, now, stale)
+
+    @Test fun lateIsFromFifteenMinutesBehindThePlanAndVeryLateFromFortyFiveAtBothEnds() {
+        assertEquals(15, FlightRules.ON_TIME)
+        assertEquals(45, FlightRules.VERY_LATE)
+        val minutes = listOf(14L, 15L, 44L, 45L)
+        // Before it leaves, by when it is expected to.
+        val planned = flight("flight-LH454-planned")                              // leaves 08:25 UTC
+        fun leaving(late: Long) = stands(planned.copy(from = planned.from.copy(expected = planned.from.planned!!.plusMinutes(late))))
+        assertEquals(listOf(Stands.NO_CLAIM, Stands.LATE, Stands.LATE, Stands.VERY_LATE), minutes.map { leaving(it) })
+        // In the air, by when it is expected to land.
+        val air = flight("flight-LH455-in-the-air")                               // planned to land 08:25 UTC
+        fun landing(late: Long) = stands(air.copy(to = air.to.copy(expected = air.to.planned!!.plusMinutes(late))))
+        assertEquals(listOf(Stands.GOOD, Stands.LATE, Stands.LATE, Stands.VERY_LATE), minutes.map { landing(it) })
+        // Landed, by when it did.
+        val down = flight("flight-LH96-landed")
+        fun landed(late: Long) = stands(down.copy(to = down.to.copy(actual = down.to.planned!!.plusMinutes(late))))
+        assertEquals(listOf(Stands.GOOD, Stands.LATE, Stands.LATE, Stands.VERY_LATE), minutes.map { landed(it) })
+        // Hours behind is very late and nothing worse, and the saved reply that runs 45 minutes behind is the first of them.
+        assertEquals(Stands.VERY_LATE, leaving(300))
+        assertEquals(Stands.VERY_LATE, landing(300))
+        assertEquals(Stands.VERY_LATE, stands(flight("flight-LH152-delayed")))
+    }
+
+    @Test fun theDepartureCountsUntilItHasLeftAndTheLandingAfter() {
+        // LH 455 left seven minutes late and is expected 24 minutes early.
+        val air = flight("flight-LH455-in-the-air")
+        assertEquals(Stands.GOOD, stands(air))
+        // However late it left: an hour behind at the gate and ahead of its plan at the far end is good news now.
+        assertEquals(Stands.GOOD, stands(air.copy(from = air.from.copy(planned = air.from.actual!!.minusMinutes(60)))))
+        // And one that left to the minute and is expected an hour behind is very late.
+        assertEquals(Stands.VERY_LATE, stands(air.copy(from = air.from.copy(planned = air.from.actual), to = air.to.copy(expected = air.to.planned!!.plusMinutes(60)))))
+        // Before it has left it is the other way round: what is expected of the landing says nothing yet.
+        val planned = flight("flight-LH454-planned")
+        val lateIn = planned.copy(from = planned.from.copy(expected = planned.from.planned), to = planned.to.copy(expected = planned.to.planned!!.plusMinutes(60)))
+        assertEquals(Stands.NO_CLAIM, stands(lateIn))
+        val lateOut = planned.copy(from = planned.from.copy(expected = planned.from.planned!!.plusMinutes(60)), to = planned.to.copy(expected = planned.to.planned))
+        assertEquals(Stands.VERY_LATE, stands(lateOut))
+        // From the moment the service says it has left, the landing is what counts.
+        assertEquals(Stands.GOOD, stands(lateOut.copy(state = FlightState.IN_AIR, from = lateOut.from.copy(actual = lateOut.from.expected))))
+    }
+
+    @Test fun earlyIsGoodOnceItFliesAndBeforeItLeavesNothingIsClaimed() {
+        assertEquals(Stands.GOOD, stands(flight("flight-LH455-in-the-air")))      // expected 24 minutes before its plan
+        assertEquals(Stands.GOOD, stands(flight("flight-LH455-landed")))          // down 29 minutes before it
+        assertEquals(Stands.GOOD, stands(flight("flight-LH9152-codeshare")))      // 13 minutes behind its plan is on time
+        assertEquals(Stands.GOOD, stands(flight("flight-LH96-landed")))           // and so is three
+        // Before it leaves, "on time" is a plan like any other: good news starts when it flies.
+        val planned = flight("flight-LH454-planned")
+        fun leaving(late: Long) = stands(planned.copy(from = planned.from.copy(expected = planned.from.planned!!.plusMinutes(late))))
+        assertEquals(Stands.NO_CLAIM, leaving(0))
+        assertEquals(Stands.NO_CLAIM, leaving(-20))
+    }
+
+    @Test fun onlyThePlanOrAnAnswerOverAnHourOldClaimsNothing() {
+        // Only the plan is known: before it leaves, in the air and after it landed.
+        assertEquals(Stands.NO_CLAIM, stands(flight("flight-LH454-planned")))
+        val air = flight("flight-LH455-in-the-air")
+        assertEquals(Stands.NO_CLAIM, stands(air.copy(to = air.to.copy(expected = null))))
+        val down = flight("flight-LH96-landed")
+        assertEquals(Stands.NO_CLAIM, stands(down.copy(to = down.to.copy(expected = null, actual = null))))
+        // Not live: what the last answer said of late and early may be wrong by now, the good news and the bad.
+        assertEquals(Stands.NO_CLAIM, stands(air, stale = true))
+        assertEquals(Stands.NO_CLAIM, stands(flight("flight-LH152-delayed"), stale = true))
+        assertEquals(Stands.NO_CLAIM, stands(air.copy(to = air.to.copy(expected = air.to.planned!!.plusMinutes(90))), stale = true))
+        assertEquals(Stands.NO_CLAIM, stands(flight("flight-LH96-landed"), stale = true))
+        // A timetable's flight is a plan, and nobody knows what became of it once its time has passed.
+        val plan = AirLabs.planned(AirLabs.routes(reply("routes-LH455")).value!![0], air, LocalDate.of(2026, 10, 3))!!   // leaves 21:40 UTC
+        assertEquals(Stands.NO_CLAIM, stands(plan))
+        assertEquals(Stands.NO_CLAIM, stands(plan, at("2026-10-04T00:00:00Z")))
+        // Past its time to leave with no word that it left, "on time" is nobody's to say. A delay that was known is still true.
+        val planned = flight("flight-LH454-planned")
+        assertEquals(Stands.NO_CLAIM, stands(planned.copy(from = planned.from.copy(expected = planned.from.planned)), at("2026-10-02T08:26:00Z")))
+        assertEquals(Stands.VERY_LATE, stands(flight("flight-LH152-delayed"), at("2026-10-02T07:40:00Z")))
+    }
+
+    @Test fun aFlightThatIsCanceledOrDivertedWillNotArriveHoweverOldTheAnswer() {
+        val gone = flight("flight-LH1184-cancelled")
+        assertEquals(Stands.WILL_NOT_ARRIVE, stands(gone))
+        assertEquals(Stands.WILL_NOT_ARRIVE, stands(gone, stale = true))
+        val diverted = flight("flight-LH455-in-the-air").copy(state = FlightState.DIVERTED)
+        assertEquals(Stands.WILL_NOT_ARRIVE, stands(diverted))
+        assertEquals(Stands.WILL_NOT_ARRIVE, stands(diverted, stale = true))
+    }
 }

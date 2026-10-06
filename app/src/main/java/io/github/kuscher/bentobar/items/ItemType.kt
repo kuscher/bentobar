@@ -10,6 +10,13 @@ import io.github.kuscher.bentobar.data.Online
 enum class Tone { NORMAL, ACCENT, WARN, ALERT }
 
 /**
+ * How a flight stands for someone who glances at it: nobody has said (no claim is made of it), it
+ * goes to plan, it is late, very late, or it will not arrive as planned. The bar colors a flight's
+ * line by it.
+ */
+enum class Stands { NO_CLAIM, GOOD, LATE, VERY_LATE, WILL_NOT_ARRIVE }
+
+/**
  * A slider drawn in the bar in the text's place (the Sound item's "Slider in the bar"). The strip
  * draws it and reports where it is dragged ([ItemType.onSlide]); the item says what there is to draw.
  */

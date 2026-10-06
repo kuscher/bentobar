@@ -176,6 +176,11 @@ object FlightRules {
      * and the exact time stands under the line either way.)
      */
     const val ON_TIME = 15
+    /**
+     * From this many minutes behind its plan a flight is very late, and its line in the bar says so.
+     * A judgment, where [ON_TIME] is the airlines' own line.
+     */
+    const val VERY_LATE = 45
     /** After this long on the ground a flight is over, and "the next flight" is the one after it. */
     val OVER: Duration = Duration.ofHours(3)
 
@@ -296,6 +301,26 @@ object FlightRules {
         minutes >= ON_TIME -> Badge(late, minutes)
         minutes <= -ON_TIME -> Badge(Verdict.EARLY, -minutes)
         else -> Badge(Verdict.ON_TIME)
+    }
+
+    /**
+     * How [f] stands at [now]: what its line in the bar is colored by. It goes by the [badge], so by
+     * the departure until the flight has left and by the landing from then on: late from [ON_TIME]
+     * minutes behind the plan, very late from [VERY_LATE]. Good news is the landing's alone: before a
+     * flight leaves, "on time" is a plan like any other and claims nothing. Nothing is claimed either
+     * where the badge has nothing to say (only the plan is known), nor of an answer that is over an
+     * hour old ([stale]: what it said of late and early may be wrong by now). A flight that is
+     * canceled or diverted will not arrive as planned, however old the answer.
+     */
+    fun stands(f: Flight, now: Instant, stale: Boolean): Stands {
+        val phase = phase(f, now)
+        if (phase == Phase.CANCELED || phase == Phase.DIVERTED) return Stands.WILL_NOT_ARRIVE
+        val badge = badge(f, now).takeUnless { stale } ?: return Stands.NO_CLAIM
+        return when (badge.verdict) {
+            Verdict.PLANNED -> Stands.NO_CLAIM
+            Verdict.ON_TIME, Verdict.EARLY -> if (phase == Phase.IN_AIR || phase == Phase.LANDED) Stands.GOOD else Stands.NO_CLAIM
+            Verdict.DELAYED, Verdict.LATE -> if (badge.minutes >= VERY_LATE) Stands.VERY_LATE else Stands.LATE
+        }
     }
 
     /**

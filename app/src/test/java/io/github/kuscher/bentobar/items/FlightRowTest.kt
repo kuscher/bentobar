@@ -95,8 +95,8 @@ class FlightRowTest {
         assertEquals(Badge(Verdict.EARLY, 24), FlightRules.badge(air, asked))
         // Every reply that was saved has its clocks at both ends: none of them is marked, in `flight` or in `schedules`.
         for (name in listOf("flight-JL101-landed-nine-hours-ago", "flight-LH1184-cancelled", "flight-LH152-delayed", "flight-LH454-planned", "flight-LH455-in-the-air",
-            "flight-LH455-landed", "flight-LH9152-codeshare", "flight-LH96-landed", "flight-SQ26-second-leg")) assertTrue(name, !flight(name).loose)
-        for (name in listOf("schedules-LH455", "schedules-SQ26-two-legs")) assertTrue(name, AirLabs.schedules(reply(name)).value!!.none { it.loose })
+            "flight-LH455-landed", "flight-LH9152-codeshare", "flight-LH96-landed", "flight-SQ26-second-leg", "flight-UA1227-first-leg-planned")) assertTrue(name, !flight(name).loose)
+        for (name in listOf("schedules-LH455", "schedules-SQ26-two-legs", "schedules-UA1227")) assertTrue(name, AirLabs.schedules(reply(name)).value!!.none { it.loose })
     }
 
     @Test fun pastItsTimeAndStillCalledPlannedNobodySaysOnTime() {
@@ -398,6 +398,7 @@ class FlightRowTest {
             "flight-LH455-landed" to BarRoute(1f, Stands.GOOD),
             "flight-JL101-landed-nine-hours-ago" to null,                                         // its hour in the bar is long over
             "flight-LH1184-cancelled" to BarRoute(0f, Stands.WILL_NOT_ARRIVE, struck = true, whole = true),
+            "flight-UA1227-first-leg-planned" to null,                                            // asked for four days later: seen from here, a plan days off
         )
         val saved = java.io.File("src/test/resources/airlabs").list()!!.filter { it.startsWith("flight-") }.map { it.removeSuffix(".json") }
         assertEquals(saved.sorted(), lines.keys.sorted())

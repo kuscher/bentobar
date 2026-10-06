@@ -110,7 +110,7 @@ class WeatherStringsTest {
     /**
      * What this item adds to the deck for cases it leaves open: a reading without a condition, and parts spoken as
      * one line. And what was decided after it: the spoken line while the hour that is running is the likely one,
-     * and why Refresh is dimmed after an answer.
+     * and why Refresh is dimmed after an answer; and the bar's words for the sky.
      */
     private val added = mapOf(
         "weather_desc_short" to "%1\$s: %2\$s.",
@@ -119,6 +119,9 @@ class WeatherStringsTest {
         "weather_day_high_low" to "high %1\$s, low %2\$s",
         "weather_likely_now_desc" to "%1\$s likely this hour.",
         "weather_up_to_date" to "up to date",
+        // Show "with conditions": the sky's word in the bar, and "Windy" where a strong wind is the news.
+        "weather_show_sky" to "With conditions",
+        "weather_windy" to "Windy",
     )
 
     @Test fun everyStringOfTheCopyDeckIsThereToTheCharacter() {

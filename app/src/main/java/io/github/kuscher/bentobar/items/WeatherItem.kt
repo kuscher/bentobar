@@ -246,6 +246,7 @@ fun weatherRes(word: W): Int = when (word) {
     W.SNOW_SHOWERS -> R.string.weather_snow_showers
     W.THUNDERSTORM -> R.string.weather_thunderstorm
     W.THUNDERSTORM_HAIL -> R.string.weather_thunderstorm_hail
+    W.WINDY -> R.string.weather_windy
     W.BAR_RAIN -> R.string.weather_bar_rain
     W.BAR_SNOW -> R.string.weather_bar_snow
     W.BAR_STORM -> R.string.weather_bar_storm

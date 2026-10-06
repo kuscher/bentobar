@@ -38,6 +38,7 @@ enum class W(val res: String, val plural: Boolean = false) {
     RAIN("weather_rain"), HEAVY_RAIN("weather_heavy_rain"), FREEZING_RAIN("weather_freezing_rain"), LIGHT_SNOW("weather_light_snow"),
     SNOW("weather_snow"), HEAVY_SNOW("weather_heavy_snow"), SHOWERS("weather_showers"), HEAVY_SHOWERS("weather_heavy_showers"),
     SNOW_SHOWERS("weather_snow_showers"), THUNDERSTORM("weather_thunderstorm"), THUNDERSTORM_HAIL("weather_thunderstorm_hail"),
+    WINDY("weather_windy"),
     BAR_RAIN("weather_bar_rain"), BAR_SNOW("weather_bar_snow"), BAR_STORM("weather_bar_storm"),
     BAR_SOON("weather_bar_soon"), BAR_NOW("weather_bar_now"), BAR_HIGH_LOW("weather_bar_high_low"), BAR_LABEL("weather_bar_label"),
     TOOLTIP("weather_tooltip"),
@@ -191,6 +192,8 @@ object WeatherRules {
     const val SHOW_TEMP = "temp"
     const val SHOW_HIGH_LOW = "highlow"
     const val SHOW_FEELS = "feels"
+    /** The temperature and a word for the sky: "72° · Partly cloudy". */
+    const val SHOW_SKY = "sky"
 
     private const val MIN_MS = 60_000L
     private const val HOUR_MS = 60 * MIN_MS
@@ -561,6 +564,9 @@ object WeatherRules {
         val number = lead?.let { Units.degrees(it) }
 
         val falling = WeatherCodes.falls(cur.code)
+        // The word for the sky of this minute, as the menu says it; a strong wind where nothing falls is "Windy".
+        val windy = WeatherCodes.windy(cur.code, cur.windKmh)
+        val sky = if (windy) w.say(W.WINDY) else WeatherCodes.sky(cur.code)?.let { w.say(it.word) }
         val next = if (falling == null) likely(r, now, look.rainHours) else null
         // What falls in a likely hour is told by the code of the entry that holds its chance: the code at the hour's
         // end comes of what fell in it. The chance comes from many forecasts and the code from one, so a likely
@@ -579,15 +585,19 @@ object WeatherRules {
             else -> number
         }
         val full = if (short != null && word != null && number != null && time != null) w.say(W.BAR_SOON, number, word, time) else short
-        // Longer than twenty characters: first the time goes, then the label.
+        // Show "with conditions": the sky's own word beside the number ("72° · Partly cloudy", "54° · Light rain" where
+        // the bar would say "Rain"). Rain or snow that is coming keeps its hour instead: that is why the item came out.
+        val rich = if (look.show != SHOW_SKY || number == null || sky == null || (word != null && falling == null)) null
+            else w.say(W.BAR_NOW, number, sky)
+        // Longer than twenty characters: first the sky's word or the time goes, then the label.
         val text = if (short == null || full == null) null else {
             val label = look.label
-            val forms = if (label == null) listOf(full, short) else listOf(w.say(W.BAR_LABEL, label, full), w.say(W.BAR_LABEL, label, short), short)
+            val forms = if (label == null) listOfNotNull(rich, full, short)
+                else listOfNotNull(rich?.let { w.say(W.BAR_LABEL, label, it) }, w.say(W.BAR_LABEL, label, full), w.say(W.BAR_LABEL, label, short), short)
             forms.firstOrNull(::fits) ?: short
         }
 
         val city = look.city ?: w.say(W.TITLE)
-        val sky = WeatherCodes.sky(cur.code)?.let { w.say(it.word) }
         // "−4 degrees": the number as it is written, the form by its size.
         val spoken = lead?.let { w.count(W.DEGREES, abs(it), Units.degrees(it).dropLast(1)) }
         val nowIs = when {
@@ -605,7 +615,7 @@ object WeatherRules {
         }
         return Bar(
             icon = if (next != null) (if (WeatherCodes.falls(next.code) != null) WeatherCodes.glyph(next.code, next.day) else WeatherCodes.glyph(falls))
-                else WeatherCodes.glyph(cur.code, cur.day),
+                else if (windy) Sym.AIR else WeatherCodes.glyph(cur.code, cur.day),
             filled = true,
             text = text,
             desc = listOfNotNull(nowIs, then).joinToString(" ").ifEmpty { w.say(W.DESC_NO_READING) },

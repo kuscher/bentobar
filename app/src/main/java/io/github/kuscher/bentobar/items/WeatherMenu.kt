@@ -326,7 +326,8 @@ internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
         }
     }
     ChoiceRow(stringResource(R.string.option_show), listOf(WeatherRules.SHOW_TEMP to stringResource(R.string.weather_show_temp),
-        WeatherRules.SHOW_HIGH_LOW to stringResource(R.string.weather_show_high_low), WeatherRules.SHOW_FEELS to stringResource(R.string.weather_show_feels)),
+        WeatherRules.SHOW_HIGH_LOW to stringResource(R.string.weather_show_high_low), WeatherRules.SHOW_FEELS to stringResource(R.string.weather_show_feels),
+        WeatherRules.SHOW_SKY to stringResource(R.string.weather_show_sky)),
         item.opt("show", WeatherRules.SHOW_TEMP)) { set(item.with("show", it)) }
     // Converted on the device: switching redraws the bar and the menu at once, and nothing is asked.
     ChoiceRow(stringResource(R.string.option_temperature_unit), listOf("system" to stringResource(R.string.option_like_system),

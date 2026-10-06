@@ -31,6 +31,11 @@ private projects and paths into their repos, and where signing keys are backed u
     neither a click nor a drag). Its arithmetic and the rules of a press (`SliderGesture`: a click, a
     drag, a finger's tap, swipe and long hold, a press that is taken away) are in `bar/SliderMath.kt`,
     pure and unit-tested; change the rules there, not in the pointer loop.
+    The route line an item can have in its icon's place is the same line with a plane on it and no
+    pointer (`ItemState.route`: `RouteTrack` draws it, `SliderMath.route` says where its parts stand,
+    `StripLook.route` what color they take). The Flight item has one from its countdown until an hour
+    after landing, by `FlightRules.stands`; shown as text alone it has none, and its words keep their
+    tones (`FlightText.bar`'s `line`).
   - `bar/Menus.kt`: the menu card, the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
     visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
@@ -109,7 +114,9 @@ private projects and paths into their repos, and where signing keys are backed u
   live|noaccess|starting|long|wide|emoji|rtl|off`; `devices stage mouse=15 keyboard=40c stylus=unknown`
   and `devices off`; `heat stage 0..6`, `heat level 0.84`, `heat temp 41.3`, `heat off`; `weather stage
   clear|rain-soon|rain-this-hour|rain-later|raining|storm|snow|old|error|slow-down|offline|offline-new|no-answer|loading`, `weather search …`,
-  `weather fail …`, `weather off`; `flight show NAME [TURN]` (`flight show` lists the names), `flight off`;
+  `weather fail …`, `weather off`; `flight show NAME [TURN]` (`flight show` lists the names; every look of the
+  route line has one, with `old` after a name for an answer over an hour old and `now +61m` for a
+  cancellation or a diversion after its alert; bare `flight` then says which line the bar has), `flight off`;
   `sound fixed on|off`. Each type's bare name prints what it knows (`media`, `devices`, `heat`, `flight`).
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
   the settings window. Menu crops include the menu's shadow margin, which can show other windows

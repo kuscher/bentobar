@@ -153,6 +153,8 @@ object AirLabs {
 
     /** "The next flight" of a number that flies more than once is one of those that leave within this long. */
     val DAY_AHEAD: Duration = Duration.ofHours(24)
+    /** No number flies more often in a day than this, and no menu lists more: of a timetable that says otherwise, the first to leave. */
+    const val MOST_CANDIDATES = 12
 
     /**
      * The flights of [n] that a press of Track can mean: one, mostly, and several where the number
@@ -178,7 +180,7 @@ object AirLabs {
      * earlier: the app could not tell them apart once one of them is followed.
      *
      * Fewer than two to choose from, or no timetable to be had: the one flight, as [lookup] finds it.
-     * Null, and every failure: as for [lookup].
+     * Never more than [MOST_CANDIDATES]. Null, and every failure: as for [lookup].
      */
     fun candidates(n: FlightNumber, day: LocalDate?, key: String, now: Instant, zone: ZoneId? = null, get: (Request) -> Reply): Candidates? {
         val heard = hear(n, day, null, key, now, zone, withTimetable = true, get) ?: return null
@@ -186,7 +188,7 @@ object AirLabs {
         val like = heard.nearest ?: unnamed(n)
         val live = listOfNotNull(heard.nearest) + heard.coming.map { named(it, like) }
         val several = if (day != null) thatDay(heard.lines, like, live, day, zone, now) else ahead(heard.lines, like, live, one, now)
-        return Candidates(if (several.size > 1) several else listOf(one), null, heard.answer.left)
+        return Candidates(if (several.size > 1) several.take(MOST_CANDIDATES) else listOf(one), null, heard.answer.left)
     }
 
     /** The flights of [day] to choose from, as [candidates] says them. A flight the service answered with that leaves on that day is one of them, whether the timetable has its line or not. */

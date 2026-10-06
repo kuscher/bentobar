@@ -433,6 +433,23 @@ class FlightCandidatesTest {
         for (a in c.flights) for (b in c.flights) assertEquals(a === b, FlightRules.same(a, b))
     }
 
+    @Test fun aTimetableThatSaysTheNumberFliesFortyTimesADayIsNotBelievedBeyondAMenusLength() {
+        // Nothing of a reply is trusted to be short: forty lines from forty airports, one every half hour, are a list no menu shows.
+        val forty = (0 until 40).joinToString(",", """{"response":[""", "]}") { i ->
+            val from = "A" + ('A' + i / 26) + ('A' + i % 26)
+            val time = "%02d:%02d".format(i / 2, i % 2 * 30)
+            """{"flight_iata":"XX12","dep_iata":"$from","arr_iata":"ZZZ","dep_time":"$time","dep_time_utc":"$time","arr_time":"23:59","arr_time_utc":"23:59","duration":20}"""
+        }
+        assertEquals(40, AirLabs.routes(forty).value!!.size)
+        for (day in listOf(tuesday, null)) {
+            val c = press(service("flight" to unknown, "routes" to forty), day, ZoneId.of("UTC"), at("2026-10-05T23:59:00Z"), FlightNumber("XX", 12))
+            // The first to leave, in their order.
+            assertEquals("$day", AirLabs.MOST_CANDIDATES, c.flights.size)
+            assertEquals("$day", listOf("AAA-ZZZ 2026-10-06T00:00", "AAB-ZZZ 2026-10-06T00:30", "AAC-ZZZ 2026-10-06T01:00"), legs(c).take(3))
+        }
+        assertEquals(12, AirLabs.MOST_CANDIDATES)
+    }
+
     // ---- what went wrong, and what a press costs
 
     @Test fun whenTheTimetableCannotBeHadTheFlightThatWasFoundIsTheAnswer() {

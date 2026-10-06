@@ -273,6 +273,18 @@ class FlightCandidatesTest {
         assertEquals(listOf("48", "A", "20", "3"), listOf(first.from.gate, first.to.terminal, first.to.gate, first.to.belt))
     }
 
+    @Test fun aFlightTheTimetableHasNoLineForIsAmongThemAllTheSame() {
+        // The timetable without its line from Orlando: the service's flight from there leaves on that day, and is one of the day's.
+        val rows = Json.parseToJsonElement(table).jsonObject.getValue("response").jsonArray
+        val without = """{"response":[${rows[0]},${rows[2]},${rows[3]}]}"""
+        assertEquals(3, AirLabs.routes(without).value!!.size)
+        for (day in listOf(tuesday, null)) {
+            val c = press(service("flight" to flight, "routes" to without), day)
+            assertEquals("$day", listOf("MCO-EWR 2026-10-06T08:45", "EWR-SFO 2026-10-06T13:20", "SFO-PDX 2026-10-06T19:05"), legs(c))
+            assertEquals("$day", AirLabs.flight(flight).value, c.flights[0])
+        }
+    }
+
     @Test fun hoursAfterAFlightLandedTheComingHoursFlightIsFirstAsItself() {
         // An hour later the one-flight question answers with the evening's flight, which landed over three hours ago:
         // the next is among the coming hours' flights, and the timetable is asked for besides. Three requests, the most there are.

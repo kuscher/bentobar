@@ -14,5 +14,13 @@
                 <action android:name="io.github.kuscher.bentobar.DEBUG" />
             </intent-filter>
         </receiver>
+        <!-- A window that turns the status bar's icons dark or light on command, for colour tests. -->
+        <activity
+            android:name=".util.BarFlipActivity"
+            android:exported="true"
+            android:label="Bar flip (test)"
+            android:launchMode="singleTop"
+            android:permission="android.permission.DUMP"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" />
     </application>
 </manifest>

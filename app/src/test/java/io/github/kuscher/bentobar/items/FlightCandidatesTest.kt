@@ -210,16 +210,19 @@ class FlightCandidatesTest {
         assertEquals(AirLabs.Again.NotYet, again(landed))
         // Tuesday evening's own: that is the flight, with its gate.
         assertEquals("F14", (again(fromSanFrancisco) as AirLabs.Again.Is).flight.from.gate)
-        // Wednesday's first: the service has gone on to a later flight of the number, and the asking ends.
+        // Wednesday's first: another airport's flight, which says nothing while Tuesday evening's has yet to fly. Asked once its
+        // time to land has passed (04:00 UTC on Wednesday), nobody will say more of it: the asking ends.
         val wednesday = Regex("\\d{4}-\\d{2}-\\d{2}").replace(flight) { LocalDate.parse(it.value).plusDays(1).toString() }
-        assertEquals(AirLabs.Again.Gone, again(wednesday))
+        assertEquals(AirLabs.Again.NotYet, again(wednesday))
+        assertEquals(AirLabs.Again.Gone, AirLabs.again(ua1227, "k", third, at("2026-10-07T08:00:00Z")) { Reply.Ok(wednesday) }!!.again)
         // The second is followed the same way: not yet while the first is the answer, itself when it is. And not over when the
         // third is: another airport's flight of the same day says nothing of this one (1.0 took it for the end and stopped asking).
         assertEquals(AirLabs.Again.NotYet, again(flight, flights[1]))
         assertEquals("C92", (again(fromNewark, flights[1]) as AirLabs.Again.Is).flight.from.gate)
         assertEquals(AirLabs.Again.NotYet, again(fromSanFrancisco, flights[1]))
-        // Wednesday's first is a later day's flight, whichever airport it leaves from: that one is over.
-        assertEquals(AirLabs.Again.Gone, again(wednesday, flights[1]))
+        // Nor when Wednesday's first is: another airport's flight, and Newark's has not landed. (A later leg can leave after
+        // midnight, local or not: Singapore 23:55 to Frankfurt, then Frankfurt 08:35 to New York the next day.)
+        assertEquals(AirLabs.Again.NotYet, again(wednesday, flights[1]))
         // And whichever is followed is one flight to the rule, and none of the others.
         for (a in flights) for (b in flights) assertEquals(a === b, FlightRules.same(a, b))
     }
@@ -289,6 +292,43 @@ class FlightCandidatesTest {
         assertEquals(listOf("schedules"), refused.asked)
         // Switched off on the way: nothing to say.
         assertNull(AirLabs.again(ua1227, "k", was, inTheAir) { Reply.Failed(Why.OFF) })
+    }
+
+    @Test fun theListIsAskedForTheNumberAsItWasEnteredAndNothingElse() {
+        val sent = ArrayList<Request>()
+        fun keep(text: String): (Request) -> Reply = { r -> sent += r; Reply.Ok(text) }
+        AirLabs.again(ua1227, "k", fromNewarkPlan(), inTheAir, keep(secondLate))
+        // A callsign is asked for in the ticket's form the followed flight has: the list was not seen to take a callsign.
+        AirLabs.again(FlightNumber("UAL", 1227), "k", fromNewarkPlan(), inTheAir, keep(secondLate))
+        assertEquals(List(2) { AirLabs.SCHEDULES to listOf("flight_iata" to "UA1227", "api_key" to "k") }, sent.map { it.path to it.query })
+    }
+
+    @Test fun theListIsAskedFromTenHoursBeforeItLeavesUntilAnHourAfterItLanded() {
+        // Newark's plan: leaves 17:20, lands 23:19 UTC. The list was seen to keep a landed flight for an hour and more.
+        val plan = fromNewarkPlan()
+        assertTrue(FlightRules.listed(plan, at("2026-10-07T00:19:00Z")))
+        assertFalse(FlightRules.listed(plan, at("2026-10-07T00:20:00Z")))
+        // By the time it is now expected to land, where the service said one: Newark's landed at 16:21, two minutes late.
+        val heard = AirLabs.schedules(secondLate).value!![0]
+        assertTrue(FlightRules.listed(heard, at("2026-10-07T00:21:00Z")))
+        assertFalse(FlightRules.listed(heard, at("2026-10-07T00:22:00Z")))
+        // Not a codeshare's number (the list was not seen to have one by the number it is sold as), and not a flight with no
+        // planned time (that is what finds it there): those are asked about with the one-flight question, as before.
+        val sold = AirLabs.flight(reply("flight-LH9152-codeshare")).value!!
+        assertTrue(sold.flownAs != null)
+        assertFalse(FlightRules.listed(sold, sold.from.moment(sold.from.planned!!)))
+        assertFalse(FlightRules.listed(plan.copy(from = plan.from.copy(planned = null, expected = plan.from.planned)), inTheAir))
+    }
+
+    @Test fun wokenLongAfterItWasToLandOneQuestionAndAnotherAirportsFlightEndIt() {
+        // The lid was closed through the landing. Two hours after it, the list has let it go: the one-flight question alone, and
+        // San Francisco's flight. Newark's is over by the clock and nobody will say more of it: the end, which shows it landed.
+        val heard = AirLabs.schedules(secondLate).value!![0]
+        val s = service("flight" to thirdPlanned, "schedules" to secondLate)
+        val asked = AirLabs.again(ua1227, "k", heard, at("2026-10-07T01:30:00Z"), s::get)!!
+        assertEquals(listOf("flight"), s.asked)
+        assertEquals(AirLabs.Again.Gone, asked.again)
+        assertNull(asked.failure)
     }
 
     @Test fun aFlightFoundByTrackIsAskedAboutAtOnceWhereTheComingHoursListCanHaveIt() {

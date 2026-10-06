@@ -331,9 +331,9 @@ object AirLabs {
     sealed interface Again {
         /** The same flight, as the service says it now. */
         data class Is(val flight: Flight) : Again
-        /** The service has nothing more to say about it: it answers with a later day's flight of the number, knows none, or will not answer this key. Asking ends. */
+        /** The service has nothing more to say about it: it answers with a later day's flight from its airport (or with another flight once it was to have landed), knows none, or will not answer this key. Asking ends. */
         data object Gone : Again
-        /** No word about it yet (the service answers with the flight before, or another airport's of the same day): the plan stands, and the next ask comes when it is due. */
+        /** No word about it yet (the service answers with the flight before, or another airport's): the plan stands, and the next ask comes when it is due. */
         data object NotYet : Again
         /** No answer this time (no connection, a reply nobody can read): worth another try soon. */
         data object Failed : Again
@@ -347,23 +347,24 @@ object AirLabs {
      * before it leaves ([FlightRules.listed]) that is the coming hours' list (`schedules`), which has
      * each flight of the number as it is, and the flight is the one of its airport and its day there.
      * The one-flight question (`flight`) cannot be trusted with that for a number that flies more than
-     * once a day (see above). It is asked further off, and where the list has no such flight (a
-     * codeshare's number, a flight flown hours ago): one request more then.
+     * once a day (see above). It is asked further off, from an hour after the landing, for a codeshare,
+     * and where the list has no such flight: one request more then.
      *
      * A bar item follows one flight, not "the next" of its number: when the service has gone on to a
-     * later day's flight, that is the end of the asking, never a new flight to count down to. An earlier
-     * flight, or another airport's of the same day, is no word about this one: the service is not there
-     * yet, or speaks of another of the day's flights. The plan stands, and when it is over is the
-     * clock's to say ([FlightRules.shown]). (1.0 took San Francisco's evening flight for the end of
-     * Newark's afternoon one, stopped asking, and never showed that it was late.)
+     * later day's flight from the same airport, that is the end of the asking, never a new flight to
+     * count down to. Another airport's flight, or an earlier one, is no word about this one: the service
+     * is not there yet, or speaks of another flight of the trip. The plan stands, until this one's time
+     * to land has passed; then nobody will say more of it, and that is the end too. (1.0 took San
+     * Francisco's evening flight for the end of Newark's afternoon one, stopped asking, and never
+     * showed that it was late.)
      *
      * Null: the request was not sent at all, as for [lookup].
      */
     fun again(n: FlightNumber, key: String, was: Flight, now: Instant, get: (Request) -> Reply): Asked? {
         var listLeft: Int? = null
         if (FlightRules.listed(was, now)) {
-            // Asked for by the ticket's number, as the flight that is followed names it, not by a callsign.
-            val ticket = FlightNumber.read(was.number)?.takeUnless { it.callsign } ?: n
+            // Asked for by the number as it was entered; a callsign by the ticket's number the flight that is followed has.
+            val ticket = if (n.callsign) FlightNumber.read(was.number)?.takeUnless { it.callsign } ?: n else n
             val list = when (val reply = send(request(SCHEDULES, ticket, key), get)) {
                 is Reply.Ok -> schedules(reply.text)
                 is Reply.Failed -> return if (reply.why == Why.OFF) null else Asked(Again.Failed, null, failure(reply), reply.retryAfterSec)
@@ -386,8 +387,9 @@ object AirLabs {
             got != null && FlightRules.same(was, got) -> Again.Is(got)
             // A flight with no planned time: nobody can tell which day's it is, so it is no word about this one, and no end of it either.
             got != null && got.from.planned == null -> Again.Failed
-            // Another flight of the number: a later day's (this one is over), else no word about this one.
-            got != null -> if (laterDay(got, was)) Again.Gone else Again.NotYet
+            // Another flight of the number. From the same airport on a later day: this one is over. Another airport's, or an earlier
+            // one: no word about this one, unless its time to land has passed, so that nobody will say more of it.
+            got != null -> if (laterFromThere(got, was) || FlightRules.pastLanding(was, now)) Again.Gone else Again.NotYet
             r.failure == Failure.OFFLINE || r.failure == Failure.NO_ANSWER -> Again.Failed
             r.failure == Failure.NOT_FOUND && was.timetable -> Again.NotYet
             else -> Again.Gone
@@ -395,8 +397,12 @@ object AirLabs {
         return Asked(again, r.left ?: listLeft, r.failure ?: Failure.NO_ANSWER.takeIf { again == Again.Failed })
     }
 
-    /** True if [a] is a later day's flight than [b], each day its airport's own. */
-    private fun laterDay(a: Flight, b: Flight): Boolean {
+    /**
+     * True if [a] leaves from [b]'s airport on a later day. (Another airport's later date says nothing: a
+     * later leg of the same trip can leave after midnight, Singapore 23:55 to Frankfurt, then on to New York.)
+     */
+    private fun laterFromThere(a: Flight, b: Flight): Boolean {
+        if (a.from.code != b.from.code) return false
         val x = a.from.planned?.toLocalDate() ?: return false
         val y = b.from.planned?.toLocalDate() ?: return false
         return x.isAfter(y)

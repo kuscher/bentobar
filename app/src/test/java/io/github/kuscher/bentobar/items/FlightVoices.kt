@@ -56,6 +56,7 @@ object FlightVoices {
                 TimeForm.TIME -> time
                 TimeForm.DAY -> "EEE"
                 TimeForm.DAY_TIME -> "EEE $time"
+                TimeForm.WEEKDAY_TIME -> "EEEE $time"
                 TimeForm.DATE -> "MMM d"
                 TimeForm.DATE_TIME -> "MMM d, $time"
                 TimeForm.DAY_DATE -> "EEE, MMM d"

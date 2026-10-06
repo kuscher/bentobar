@@ -544,8 +544,8 @@ class FlightCandidatesTest {
         // The cities where the service named them, else the airport's letters.
         assertEquals(listOf("Orlando → Newark", "Newark → SFO", "SFO → PDX"), rows.map { it.title })
         assertEquals(listOf("Tue 8:45 AM – 11:26 AM", "Tue 1:20 PM – 4:19 PM", "Tue 7:05 PM – 9:00 PM"), rows.map { it.detail })
-        // A screen reader gets one sentence for each.
-        assertEquals(listOf("Orlando to Newark, leaves Tue 8:45 AM, lands 11:26 AM", "Newark to SFO, leaves Tue 1:20 PM, lands 4:19 PM", "SFO to PDX, leaves Tue 7:05 PM, lands 9:00 PM"),
+        // A screen reader gets one sentence for each, with the day's whole name: "Tue" is not a word everyone's reader says as one.
+        assertEquals(listOf("Orlando to Newark, leaves Tuesday 8:45 AM, lands 11:26 AM", "Newark to SFO, leaves Tuesday 1:20 PM, lands 4:19 PM", "SFO to PDX, leaves Tuesday 7:05 PM, lands 9:00 PM"),
             rows.map { it.spoken })
         // "Next flight" at that moment is the same three, and reads the same.
         assertEquals(rows, press(thatEvening()).flights.map { FlightText.choice(it, evening, us) })
@@ -555,10 +555,12 @@ class FlightCandidatesTest {
         assertEquals("Orlando to Newark, leaves 8:45 AM, lands 11:26 AM", today[0].spoken)
         // With 24 hours on the device.
         assertEquals("Tue 19:05 – 21:00", FlightText.choice(flights[2], evening, FlightVoices.us(la, h24 = true)).detail)
+        assertEquals("SFO to PDX, leaves Tuesday 19:05, lands 21:00", FlightText.choice(flights[2], evening, FlightVoices.us(la, h24 = true)).spoken)
+        assertEquals("Tuesday 8:45 AM", us.time(time("2026-10-06T08:45"), FlightText.TimeForm.WEEKDAY_TIME))
         // Nobody named a city: the letters, for both ends.
         val bare = press(service("flight" to unknown, "routes" to table), tuesday).flights.map { FlightText.choice(it, evening, us) }
         assertEquals(listOf("MCO → EWR", "EWR → SFO", "SFO → PDX"), bare.map { it.title })
-        assertEquals("MCO to EWR, leaves Tue 8:45 AM, lands 11:26 AM", bare[0].spoken)
+        assertEquals("MCO to EWR, leaves Tuesday 8:45 AM, lands 11:26 AM", bare[0].spoken)
     }
 
     @Test fun theDayInFrontIsTheAirportsOwnWhereItIsNotTheDevicesToday() {
@@ -584,7 +586,7 @@ class FlightCandidatesTest {
         // No time of landing: when it leaves, alone.
         val open = first.copy(to = first.to.copy(planned = null))
         assertEquals("Tue 8:45 AM", FlightText.choice(open, evening, us).detail)
-        assertEquals("Orlando to Newark, leaves Tue 8:45 AM", FlightText.choice(open, evening, us).spoken)
+        assertEquals("Orlando to Newark, leaves Tuesday 8:45 AM", FlightText.choice(open, evening, us).spoken)
         // No time to leave: no times, for a time of landing alone would read as the other.
         val blank = first.copy(from = first.from.copy(planned = null))
         assertEquals("", FlightText.choice(blank, evening, us).detail)

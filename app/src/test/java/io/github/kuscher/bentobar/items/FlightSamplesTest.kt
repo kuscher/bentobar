@@ -286,7 +286,7 @@ class FlightSamplesTest {
         // The first as the service says a flight, with its cities; the two after it as the timetable does.
         assertEquals(listOf("Orlando → Newark", "Newark → SFO", "SFO → PDX"), rows.map { it.title })
         assertEquals(listOf("Thu 8:45 AM – 11:26 AM", "Thu 1:20 PM – 4:19 PM", "Thu 7:05 PM – 9:00 PM"), rows.map { it.detail })
-        assertEquals("Orlando to Newark, leaves Thu 8:45 AM, lands 11:26 AM", rows[0].spoken)
+        assertEquals("Orlando to Newark, leaves Thursday 8:45 AM, lands 11:26 AM", rows[0].spoken)
         assertEquals(listOf(false, true, true), s.flights.map { it.flight!!.timetable })
         // Each is as it would be kept: the number, its day at its own airport, that airport.
         assertEquals(listOf("MCO", "EWR", "SFO"), s.flights.map { it.from })

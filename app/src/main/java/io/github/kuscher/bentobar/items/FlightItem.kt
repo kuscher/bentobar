@@ -118,6 +118,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
                     TimeForm.TIME -> time
                     TimeForm.DAY -> "EEE"
                     TimeForm.DAY_TIME -> "EEE$time"
+                    TimeForm.WEEKDAY_TIME -> "EEEE$time"
                     TimeForm.DATE -> "MMMd"
                     TimeForm.DATE_TIME -> "MMMd$time"
                     TimeForm.DAY_DATE -> "EEEMMMd"

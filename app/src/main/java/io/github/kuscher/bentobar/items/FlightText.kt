@@ -48,8 +48,11 @@ object FlightText {
     /** A plural of the app's resources, named the same way. */
     enum class Count { COMMON_HOURS, COMMON_MINUTES, FLIGHT_LOOKUPS_LEFT, FLIGHT_CHOICE_TIMES, FLIGHT_CHOICE_FLIGHTS }
 
-    /** How a time is written: "2:40 PM", "Fri", "Fri 2:40 PM", "Dec 24", "Dec 24, 2:40 PM", "Sat, Oct 10". With the system's 12 or 24 hours. */
-    enum class TimeForm { TIME, DAY, DAY_TIME, DATE, DATE_TIME, DAY_DATE }
+    /**
+     * How a time is written: "2:40 PM", "Fri", "Fri 2:40 PM", "Dec 24", "Dec 24, 2:40 PM", "Sat, Oct 10";
+     * and, for a sentence that is only ever spoken, "Friday 2:40 PM". With the system's 12 or 24 hours.
+     */
+    enum class TimeForm { TIME, DAY, DAY_TIME, DATE, DATE_TIME, DAY_DATE, WEEKDAY_TIME }
 
     /**
      * The words and the clock of whoever reads this: [word] gives a resource's text as it is written
@@ -150,9 +153,16 @@ object FlightText {
         fun flying(share: Double): BarRoute? = route(FlightRules.forward(shown, share) ?: share)
     }
 
-    /** [time], an airport's own, as it is written for someone whose day is [today]: with its weekday within six days of that, with its date further off. */
-    private fun at(time: LocalDateTime, today: LocalDate, v: Voice): String =
-        v.time(time, when (FlightRules.dayForm(time, today)) { DayForm.NONE -> TimeForm.TIME; DayForm.WEEKDAY -> TimeForm.DAY_TIME; DayForm.DATE -> TimeForm.DATE_TIME })
+    /**
+     * [time], an airport's own, as it is written for someone whose day is [today]: with its weekday
+     * within six days of that, with its date further off. [aloud]: for a sentence that is spoken, where
+     * the weekday has its whole name.
+     */
+    private fun at(time: LocalDateTime, today: LocalDate, v: Voice, aloud: Boolean = false): String = v.time(time, when (FlightRules.dayForm(time, today)) {
+        DayForm.NONE -> TimeForm.TIME
+        DayForm.WEEKDAY -> if (aloud) TimeForm.WEEKDAY_TIME else TimeForm.DAY_TIME
+        DayForm.DATE -> TimeForm.DATE_TIME
+    })
 
     /** A length of time in the bar: "45m", "1h 37m", "2h 05m". */
     private fun figure(minutes: Long): String = Fmt.duration(minutes * 60_000L)
@@ -470,16 +480,18 @@ object FlightText {
 
     /**
      * [f], one of the flights to choose from, as it reads at [now]: "Orlando → Newark" and "Tue 8:45 AM –
-     * 11:26 AM". The times are the ones its card will show once it is followed (what is expected, else
-     * the plan). With no time to leave there are none: a time of landing alone would read as the other.
+     * 11:26 AM", spoken "Orlando to Newark, leaves Tuesday 8:45 AM, lands 11:26 AM". The times are the
+     * ones its card will show once it is followed (what is expected, else the plan). With no time to
+     * leave, none is written: a time of landing alone would read as the other.
      */
     fun choice(f: Flight, now: Instant, v: Voice): Choice {
-        val leaves = f.from.time?.let { at(it, LocalDate.ofInstant(now, v.zone), v) }
+        val today = LocalDate.ofInstant(now, v.zone)
+        val leaves = f.from.time?.let { at(it, today, v) }
         val lands = f.to.time?.let { v.time(it, TimeForm.TIME) }
         return Choice(
             title = v.say(Word.FLIGHT_ROUTE, f.from.place, f.to.place),
             detail = if (leaves != null && lands != null) v.say(Word.FLIGHT_CHOICE_SPAN, leaves, lands) else leaves.orEmpty(),
-            spoken = v.say(Word.FLIGHT_DESC_CHOICE, f.from.place, f.to.place) + leaves?.let { v.say(Word.FLIGHT_DESC_CHOICE_LEAVES, it) }.orEmpty() +
+            spoken = v.say(Word.FLIGHT_DESC_CHOICE, f.from.place, f.to.place) + f.from.time?.let { v.say(Word.FLIGHT_DESC_CHOICE_LEAVES, at(it, today, v, aloud = true)) }.orEmpty() +
                 lands?.let { v.say(Word.FLIGHT_DESC_CHOICE_LANDS, it) }.orEmpty(),
         )
     }

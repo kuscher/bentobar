@@ -19,7 +19,14 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
-## After 0.9: which flight, where a number flies more than once a day (branch `flight-pick`, on `flight-route`, not released)
+## 1.0 (2026-10-06): the flight as a line, a choice among a number's flights, and colors that follow after an unlock
+Three pull requests, merged in this order and released as 1.0 (version code 11) from the tag `v1.0`; the next
+release needs a new version: #18 (the strip stayed white after an unlock), #19 (a route line in the Flight
+chip), #20 (which flight, where a number flies more than once a day). Each has its section below, as it was
+written on its branch. No new permission; Play's Data safety answers and the declaration's video stand as they
+are for 0.9 (a press of Track sends the same two things, once more).
+
+### Which flight, where a number flies more than once a day (pull request #20)
 Asked for after 0.9: "If several flights have the same number on the same day, can you give me a disambig when
 adding it." UA 1227 flies Orlando to Newark, Newark to San Francisco and San Francisco to Portland every day, and
 a press of Track took whichever the service answered with. Now the search card asks. Its subtitle says what is
@@ -41,12 +48,11 @@ the number and closing the menu drop the question, and nothing is followed for i
   flight and no question, no timetable to be had, a number only the timetable knows, the airport bringing a
   lookup back to the flight that was chosen, the third flight of the day followed while the service answers with
   the first and the second, and what was kept before reading as it did. The debug build assembles.
-- **Not checked**: on a screen, anywhere: the list has never been drawn. To look at, with no key:
-  `./bento debug flight show several` (and `several-next`), then the item's menu. The entries' two lines at the
-  menu's width; the focus on the first flight when the list comes (Enter chooses it, the arrow keys go to the
-  others, Up goes back to the field, Track and Enter in the field go to the list); what a screen reader says;
-  Cancel, a change of the number and closing the menu; "UA 1227 …" in the bar meanwhile; and
-  `flight show several 2` for a flight that was chosen.
+- **On an emulator** (Android 17, staged with `./bento debug flight show several` and `several-next`): the
+  list for a day and for the next flights, "UA 1227 …" in the bar meanwhile, a tap on a row (the item follows
+  that flight, in its card and in the bar), Cancel, and closing the menu without choosing.
+- **Not checked**: a real press of Track with a key on a device; the keyboard in the list (the focus on the
+  first flight when the list comes, Enter, the arrow keys, Up back to the field); what a screen reader says.
 - **Decided where the design did not say**: "Next flight" offers one flight for each route. The flight the
   service answers with stands for its route while it is in the air, late or still to leave (a canceled one too),
   so the same route's flight of the day after is not listed and a number that flies once a day never asks; a
@@ -65,7 +71,7 @@ the number and closing the menu drop the question, and nothing is followed for i
   The eighteen saved AirLabs replies under `app/src/test/resources/airlabs/` are real replies without their
   `request` part. The changelog and the release notes come with a release.
 
-## After 0.9: the strip that stayed white after an unlock (branch `colour-watch`, not released)
+### The strip that stayed white after an unlock (pull request #18)
 Reported from a Googlebook: after an unlock the strip sometimes stays white while the system's icons are dark.
 0.9 read the bar 250 ms after the strip came back and at most once more 800 ms later; a bar that keeps the lock
 screen's look longer than that was never read again. `bar/ColorWatch.kt` now decides when the bar is read: every
@@ -88,7 +94,7 @@ logged. Causes that keep coming are held to a budget: after a dozen readings wit
 - **Left as it was**: the first readings of window changes still keep two seconds apart, a bar that turns more
   than ten seconds after the strip came back waits for the next cause, and an app in full screen that flips its
   own icons in the same window is still not noticed until the next cause.
-## After 0.9: a route line in the Flight chip (branch `flight-route`, not released)
+### A route line in the Flight chip (pull request #19)
 Asked for after 0.9: while a flight is near or under way, the glyph in front of the Flight item's words is a line
 the plane flies along, left to right, colored by how the flight stands. It is the Sound slider's line (64 by
 4 dp), there from the countdown (three hours before the flight leaves) until an hour after it landed, and for as
@@ -108,11 +114,11 @@ line; an item shown as text alone has no line and is exactly as in 0.9.
   copy of the sources; nothing of that is in the repo): every state on a light, a dark and a black bar, the
   three ways to show the item, the three text sizes, right to left, three opaque bars of other colors. There the
   chip with its line is exactly 50 dp wider than with its glyph.
-- **Not checked**: on an emulator or a device. Those pictures have the computer's fonts and no status bar around
-  them. Still to look at: the plane on its line beside the system's icons and the real Sound slider, the hover
-  box, a click on the line (it opens the menu like a click anywhere on the item). Every state can be staged for
-  it: `./bento debug flight show` lists the samples, `./bento debug look color light|dark` forces the bar's two
-  looks.
+- **On an emulator** (Android 17): every state staged over a light app and over a dark wallpaper, 24 in all,
+  as the design has them; the three ways to show the item; a tap on the line opens the menu, whose own line has
+  the plane at the same place. `./bento debug flight show` lists the samples.
+- **Not checked**: a Googlebook (the black bar of a maximized window, the pointer's hover box), and a real
+  flight followed with a key.
 - **Decided where the design did not say**: in the air with no time it left by there is no line, as with no time
   of landing (nobody can say how far it is); an answer over an hour old claims nothing for a landed flight
   either; a line that is green because the flight is early adds no "on time" to a sentence that says "early"; a

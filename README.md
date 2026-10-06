@@ -79,7 +79,7 @@ hides when an app goes full screen or the screen locks.
 | **Device batteries** | the lowest of your mouse, keyboard, stylus or controller, when it's low | every device that reports a battery |
 | **Heat** | a word when Android slows a hot device | heat level, battery temperature |
 | **Weather** *(online)* | conditions and temperature of a city you pick; rain or snow that is coming | the next hours and days, sunrise and sunset. From [Open-Meteo](https://open-meteo.com) |
-| **Flight** *(online)* | a countdown to departure with the gate, then to landing, and delays | times at both airports, terminal, gate, baggage belt. From AirLabs, with a free key of your own |
+| **Flight** *(online)* | a line with the plane where the flight is, a countdown to departure with the gate, then to landing, and delays | times at both airports, terminal, gate, baggage belt; a choice where a number flies more than once a day. From AirLabs, with a free key of your own |
 | **Tools** | toolbox | screenshot, lock, overview, all apps, power, settings shortcuts |
 | **App folder** / **App shortcut** | your apps | a grid of apps / one click to open |
 | **Text or emoji**, **Spacer** | anything you like | optional link |

@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0 (2026-10-06)
+
+- **Flight: a line with the plane on it.** From three hours before departure until an hour after
+  landing, the chip shows a line the plane flies along, where the glyph stood. Green: in the air and
+  on time. Yellow: 15 minutes late or more. Red: 45 minutes or more, canceled or diverted. The words
+  keep the bar's color and still say by how much, and a flight that landed late now reads
+  "Landed · +25 min". Shown as text alone, the item has no line and looks as it did.
+- **Flight: which flight?** A number can fly several times a day (UA 1227: Orlando to Newark, Newark
+  to San Francisco, San Francisco to Portland). When it does on the day you ask for, BentoBar lists
+  the flights and follows the one you pick, where it used to take the first. To know that there is a
+  choice, a press of Track now also asks for the number's timetable: 2 or 3 of your key's lookups,
+  where it was 1 to 3. Still only the flight number and your key go to AirLabs.
+- **Colors after an unlock.** The strip could stay white after an unlock while the system's icons had
+  turned dark, until the next change of windows. BentoBar now reads the status bar several times over
+  the seconds it may take to settle: after an unlock, a wake, a full-screen app or a change of theme.
+  Readings still follow something that happened and end; none is taken on a timer.
+- Smaller things: a flight still in the air after the time it was to land is no longer called on
+  time; a screen reader hears "on time" where the line is green, and how late a flight landed.
+
 ## 0.9 (2026-10-05)
 
 - **Now playing.** A new item shows what's playing and pops out only while it plays; its menu has the

@@ -37,6 +37,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
@@ -62,6 +63,7 @@ import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import io.github.kuscher.bentobar.util.Fmt
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -76,8 +78,10 @@ import io.github.kuscher.bentobar.data.Display
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Pill
 import io.github.kuscher.bentobar.data.TextSize
+import io.github.kuscher.bentobar.items.BarRoute
 import io.github.kuscher.bentobar.items.BarSlider
 import io.github.kuscher.bentobar.items.ItemState
+import io.github.kuscher.bentobar.items.Stands
 import io.github.kuscher.bentobar.items.Tone
 import io.github.kuscher.bentobar.util.Fonts
 import io.github.kuscher.bentobar.util.Sym
@@ -106,6 +110,26 @@ data class StripLook(
     val alertBg: Color get() = if (lightText) Color(0xFFFFB4AB) else Color(0xFFB3261E)
     val alertFg: Color get() = if (lightText) Color(0xFF690005) else Color.White
 
+    // The route line's colors, for a flight that goes to plan, is late, or is very late. A line is a graphic, and
+    // needs 3:1 on the bar where words need 4.5:1; on a bar where a color wouldn't reach that (a mid-tone color),
+    // the text color is used instead. Late is the warning color as it is.
+    val routeGood: Color get() = Contrast.orElse(if (lightText) Color(0xFF6DD58C) else Color(0xFF146C2E), background, fg, min = 3f)
+    val routeLate: Color get() = Contrast.orElse(if (lightText) Color(0xFFFFD27A) else Color(0xFF8A5100), background, fg, min = 3f)
+    val routeVeryLate: Color get() = Contrast.orElse(if (lightText) Color(0xFFFF897D) else Color(0xFFB3261E), background, fg, min = 3f)
+
+    /**
+     * What a route line's plane and the part flown are drawn in, by how the flight [stands]: the text
+     * color where nothing is claimed of it, and for one that will not arrive the red of one that is
+     * very late. In the alert pill ([alert]) it is the pill's ink, whatever the flight does: the pill
+     * is as red as the reds are.
+     */
+    fun route(stands: Stands, alert: Boolean = false): Color = if (alert) alertFg else when (stands) {
+        Stands.NO_CLAIM -> fg
+        Stands.GOOD -> routeGood
+        Stands.LATE -> routeLate
+        Stands.VERY_LATE, Stands.WILL_NOT_ARRIVE -> routeVeryLate
+    }
+
     /**
      * How strongly the text color is drawn for the slider's empty track: 0.38 on a dark bar and 0.50
      * on a light one (3.4:1 and 3.2:1 against black and white), raised in steps of 0.1 on a bar of
@@ -128,7 +152,10 @@ data class StripLook(
     val sliderMuted: Color get() = fg.copy(alpha = (sliderTrackAlpha + 0.24f).coerceAtMost(1f))
 }
 
-/** The slider in the bar: the track, the zone that takes the pointer for it (the track and the item's end), its handle. */
+/**
+ * The slider in the bar: the track, the zone that takes the pointer for it (the track and the item's end), its handle.
+ * The route line is the same track, as long and as high, so that the two read as one family.
+ */
 val SLIDER_TRACK = 64.dp
 private val SLIDER_ZONE = 70.dp
 private val SLIDER_HEIGHT = 4.dp
@@ -358,11 +385,14 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     // A slider takes the text's place ("Icon and text" draws icon and slider, "Text" the slider alone);
     // shown as an icon only, the item has none.
     val slider = s.slider?.takeIf { display != Display.ICON }
+    // A route line takes the icon's place ("Icon and text" draws line and words, "Icon" the line alone);
+    // shown as text only, the item has none.
+    val route = s.route?.takeIf { display.line }
     // While the pointer holds the slider: the level under it. Otherwise the item's own, which is the real one.
     var held by remember { mutableStateOf<Float?>(null) }
     val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == LayoutDirection.Rtl
     val context by rememberUpdatedState { events.context(entry.item, bounds) }
-    val showIcon = display != Display.TEXT || s.text.isNullOrEmpty()
+    val showIcon = route == null && (display != Display.TEXT || s.text.isNullOrEmpty())
     val showText = slider == null && display != Display.ICON && !s.text.isNullOrEmpty()
     Row(
         Modifier.fillMaxHeight()
@@ -428,6 +458,11 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
+        if (route != null) {
+            RouteTrack(route, look, alert, rtl)
+            // 6 dp to the words, as much as the item has at its two ends: the line is no glyph that belongs to them.
+            if (showText || slider != null) Spacer(Modifier.width(6.dp))
+        }
         if (showIcon) {
             val img = s.image
             if (img != null) {
@@ -449,7 +484,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
             val template = if (s.widthKey != null) Fmt.widthTemplate(s.text!!) else null
             val slot = template?.let { tpl -> remember(tpl, textStyle) { measurer.measure(tpl, textStyle, maxLines = 1).size.width } }
             // With an icon, the number stays next to it and the spare room trails; text alone sits at the end.
-            val iconShown = showIcon && (s.image != null || !s.icon.isNullOrEmpty())
+            val iconShown = route != null || (showIcon && (s.image != null || !s.icon.isNullOrEmpty()))
             // An item that promises a length is held to it in width too: 8.5 dp a character at the usual text
             // size. The count decides what is said; this only catches scripts whose characters are wide.
             val cap = if (s.textLimit > 0) (8.5f * s.textLimit * look.textSp.value / 14f).dp else Dp.Unspecified
@@ -513,6 +548,44 @@ private fun VolumeTrack(slider: BarSlider, held: Float?, handle: Boolean, look: 
             val hh = SLIDER_HANDLE_HEIGHT.toPx()
             drawRoundRect(mark, Offset(x(center) - hw / 2, (size.height - hh) / 2), Size(hw, hh), CornerRadius(hw / 2))
         }
+    }
+}
+
+/**
+ * The route line an item can have where its icon would be (the Flight item's, see [BarRoute]): the
+ * slider's line, [SLIDER_TRACK] wide and 4 dp high, with a plane on it and 2 dp of nothing on each
+ * side of the plane. The plane and the part flown take the color of how the flight stands; the part
+ * ahead is the slider's quiet track, unless the line is one color from end to end. The plane is the
+ * flight glyph at the icons' size, measured as text and turned so that its nose points along the line
+ * (the Flight menu's line draws it the same way); the struck one stands upright.
+ *
+ * Not a control: it takes no pointer, so a click, a right-click and a drag on it are the item's own,
+ * and hovering shows the item's usual box and no handle. Nothing glides either: the plane is drawn
+ * where the item says it stands, each time the item is drawn again.
+ * Where each part stands is [SliderMath.route]'s arithmetic; this only draws it.
+ */
+@Composable
+private fun RouteTrack(route: BarRoute, look: StripLook, alert: Boolean, rtl: Boolean) {
+    val ink = look.route(route.stands, alert)
+    // In the alert pill the bar's own track would be lost, as its colors would: the pill's ink there, as strong as the track is.
+    val ahead = if (route.whole) ink else if (alert) look.alertFg.copy(alpha = look.sliderTrackAlpha) else look.sliderTrack
+    val glyph = if (route.struck) Sym.AIRPLANEMODE_INACTIVE else Sym.FLIGHT
+    val measurer = rememberTextMeasurer()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val plane = remember(measurer, density, glyph, look.iconSp) { measurer.measure(glyph, TextStyle(fontFamily = Fonts.symbolsFilled, fontSize = look.iconSp, lineHeight = look.iconSp)) }
+    Canvas(Modifier.width(SLIDER_TRACK).fillMaxHeight()) {
+        val h = SLIDER_HEIGHT.toPx()
+        val top = (size.height - h) / 2
+        val radius = CornerRadius(h / 2)
+        // The plane is a symbol and grows with the text size: the line makes room for it as it is.
+        val line = SliderMath.route(size.width, route.share, plane = look.iconSp.toPx(), gap = 2.dp.toPx(), rtl = rtl) ?: return@Canvas
+        line.flown?.let { drawRoundRect(ink, Offset(it.start, top), Size(it.endInclusive - it.start, h), radius) }
+        line.ahead?.let { drawRoundRect(ahead, Offset(it.start, top), Size(it.endInclusive - it.start, h), radius) }
+        val middle = Offset(line.center, size.height / 2)
+        val topLeft = Offset(middle.x - plane.size.width / 2f, middle.y - plane.size.height / 2f)
+        // The glyph points up: a quarter turn puts its nose towards the arrival, which is on the left where the language reads from the right.
+        if (route.struck) drawText(plane, color = ink, topLeft = topLeft)
+        else rotate(if (rtl) -90f else 90f, middle) { drawText(plane, color = ink, topLeft = topLeft) }
     }
 }
 

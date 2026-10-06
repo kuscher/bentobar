@@ -19,10 +19,11 @@ import java.time.ZoneId
 import java.util.Locale
 
 /**
- * What the Flight item says: its text in the bar, the sentence a screen reader gets, and every line of
- * its menu's card. Pure: the words come in as [Voice] (the app's resources in the item, the same
- * files read as text in the tests), and so does the way a time is written. What a flight is doing is
- * [FlightRules]' to say; this file only puts it into words, and into 20 characters where it is the bar.
+ * What the Flight item says: its text in the bar and the route line in front of it, the sentence a
+ * screen reader gets, and every line of its menu's card. Pure: the words come in as [Voice] (the
+ * app's resources in the item, the same files read as text in the tests), and so does the way a time
+ * is written. What a flight is doing is [FlightRules]' to say; this file only puts it into words, and
+ * into 20 characters where it is the bar.
  */
 object FlightText {
     /** The most characters the bar's text has. What is longer loses its least important part, in the order each phase gives. */
@@ -38,7 +39,7 @@ object FlightText {
         FLIGHT_TERMINAL, FLIGHT_BELT, FLIGHT_OPERATED_AS, FLIGHT_NOTE, FLIGHT_STATUS_REFUSED, FLIGHT_STATUS_USED_UP, FLIGHT_STATUS_FEW,
         FLIGHT_COPY_HEAD, FLIGHT_COPY_LEFT, FLIGHT_COPY_LANDS,
         FLIGHT_ERR_NOT_FOUND, FLIGHT_ERR_NOT_THAT_DAY, FLIGHT_ERR_REFUSED, FLIGHT_ERR_USED_UP, FLIGHT_ERR_NO_ANSWER,
-        FLIGHT_DESC_LEAVES_AT, FLIGHT_DESC_LEAVES_IN, FLIGHT_DESC_LANDS_IN, FLIGHT_DESC_LANDED, FLIGHT_DESC_LATE, FLIGHT_DESC_EARLY, FLIGHT_DESC_GATE, FLIGHT_DESC_BELT,
+        FLIGHT_DESC_LEAVES_AT, FLIGHT_DESC_LEAVES_IN, FLIGHT_DESC_LANDS_IN, FLIGHT_DESC_LANDED, FLIGHT_DESC_LATE, FLIGHT_DESC_EARLY, FLIGHT_DESC_ON_TIME, FLIGHT_DESC_GATE, FLIGHT_DESC_BELT,
         FLIGHT_DESC_CANCELED, FLIGHT_DESC_DIVERTED, FLIGHT_DESC_NO_UPDATE, FLIGHT_DESC_NOT_LIVE, FLIGHT_DESC_LOOKING, FLIGHT_DESC_HEADLINE_BADGE,
         FLIGHT_ROUTE_FROM, FLIGHT_ROUTE_TO, FLIGHT_ROUTE_FROM_CODE, FLIGHT_ROUTE_TO_CODE, FLIGHT_TIME_WAS,
     }
@@ -62,8 +63,13 @@ object FlightText {
         fun time(t: LocalDateTime, form: TimeForm): String = clock(t, form)
     }
 
-    /** What the item shows in the bar. [text] null: the glyph alone. */
-    data class Bar(val icon: String, val text: String? = null, val tone: Tone = Tone.NORMAL, val active: Boolean = false, val desc: String, val tooltip: String? = null)
+    /**
+     * What the item shows in the bar. [text] null: the glyph alone. [route]: the line the bar draws in
+     * the glyph's place, with the flight's plane on it; null: none, and the glyph is drawn. The glyph
+     * stays what a menu lists the item by.
+     */
+    data class Bar(val icon: String, val text: String? = null, val tone: Tone = Tone.NORMAL, val active: Boolean = false, val desc: String, val tooltip: String? = null,
+                   val route: BarRoute? = null)
 
     /** One end of the route line: the airport, its time ([struck]: it will not happen), the small words under it, and the end as a sentence. */
     data class End(val code: String, val time: String, val struck: Boolean, val words: String, val spoken: String)
@@ -93,8 +99,11 @@ object FlightText {
     /** The first of [tries] that fits the bar; the last if none does (it is the shortest there is to say). */
     private fun fit(vararg tries: String): String = tries.firstOrNull { length(it) <= LIMIT } ?: tries.last()
 
-    /** A flight at one moment, with everything the bar and the card both say of it. */
-    private class Look(val t: Tracked, heard: Flight, val now: Instant, val v: Voice) {
+    /**
+     * A flight at one moment, with everything the bar and the card both say of it. [line]: the bar
+     * draws the flight's route line; [shown]: where its plane was last drawn on one, null: nowhere yet.
+     */
+    private class Look(val t: Tracked, heard: Flight, val now: Instant, val v: Voice, private val line: Boolean = false, val shown: Double? = null) {
         val f = FlightRules.shown(heard, now, t.ended)
         val number = FlightNumber.shown(f.number)
         val today: LocalDate = LocalDate.ofInstant(now, v.zone)
@@ -115,6 +124,21 @@ object FlightText {
 
         /** When the service last answered about this flight, on the device's clock. */
         val updated: String get() = at(LocalDateTime.ofInstant(Instant.ofEpochMilli(t.heardAt), v.zone))
+
+        /**
+         * The route line with the plane at [share] of its way, in the color of how the flight stands
+         * (an answer that is not live claims nothing); null where the bar draws no line. Only a flight
+         * that will not arrive as planned has a line of one color from end to end. [struck]: its plane
+         * is the crossed-out one.
+         */
+        fun route(share: Double, struck: Boolean = false): BarRoute? {
+            if (!line) return null
+            val stands = FlightRules.stands(f, now, stale)
+            return BarRoute(share.toFloat(), stands, struck, whole = stands == Stands.WILL_NOT_ARRIVE)
+        }
+
+        /** The line of a flight that goes its way: its plane where the times put it ([share]), and never behind where it was last drawn. */
+        fun flying(share: Double): BarRoute? = route(FlightRules.forward(shown, share) ?: share)
     }
 
     /** A length of time in the bar: "45m", "1h 37m", "2h 05m". */
@@ -137,8 +161,16 @@ object FlightText {
      * The item in the bar at [now]. [t]: what the item follows, as last heard; [looking]: the number
      * being looked up, as it is shown, while nothing is followed yet. [beforeHours]: the rule's hours,
      * from which the item counts as having something to say.
+     *
+     * [line]: the item draws a route line in its glyph's place (it is shown as an icon, or as icon and
+     * text). The bar then has a [Bar.route] from the countdown, three hours before the flight leaves,
+     * until an hour after it landed, and for as long as a cancellation or a diversion is shown. Its
+     * words are what they are without the line, in the bar's own color: how the flight stands is the
+     * line's to say, and only the alert stays. Without [line], which is the item shown as text alone,
+     * all is as it was before there was a line. [shown]: where this flight's plane was last drawn, in
+     * the bar or on the menu's line ([plane] names it): it only goes forward.
      */
-    fun bar(t: Tracked?, looking: String?, now: Instant, beforeHours: Int, v: Voice): Bar {
+    fun bar(t: Tracked?, looking: String?, now: Instant, beforeHours: Int, v: Voice, line: Boolean = false, shown: Double? = null): Bar {
         val heard = if (t == null || FlightRules.cleared(t, now)) null else t.flight
         if (t == null || heard == null) return when {
             looking != null -> Bar(Sym.FLIGHT, v.say(Word.FLIGHT_BAR_LOOKING, looking), desc = v.say(Word.FLIGHT_DESC_LOOKING, looking))
@@ -146,13 +178,15 @@ object FlightText {
             t != null && t.following && t.flight == null -> Bar(Sym.FLIGHT, desc = v.say(Word.FLIGHT_DESC_NO_UPDATE, FlightNumber.shown(t.number)))
             else -> Bar(Sym.FLIGHT, desc = v.say(Word.FLIGHT_NONE))
         }
-        val l = Look(t, heard, now, v)
+        val l = Look(t, heard, now, v, line, shown)
         return when (l.row.phase) {
             // What will not happen as planned stays in the bar until the flight is cleared; its alert is for the first hour.
+            // On the line its struck plane stands at the start, wherever a plane of this flight was drawn before: it never leaves.
             Phase.CANCELED -> Bar(Sym.AIRPLANEMODE_INACTIVE, fit(v.say(Word.FLIGHT_BAR_CANCELED, l.number), v.say(Word.FLIGHT_BAR_CANCELED, l.f.number)),
-                alert(l), active = true, desc = v.say(Word.FLIGHT_DESC_CANCELED, l.number), tooltip = l.tooltip)
+                alert(l), active = true, desc = v.say(Word.FLIGHT_DESC_CANCELED, l.number), tooltip = l.tooltip).lined(l.route(0.0, struck = true))
+            // Nobody knows where a diverted flight is going: its plane stays where it was last drawn, and stands in the middle if it never was.
             Phase.DIVERTED -> Bar(Sym.FLIGHT, fit(v.say(Word.FLIGHT_BAR_DIVERTED, l.number), v.say(Word.FLIGHT_BAR_DIVERTED, l.f.number)),
-                alert(l), active = true, desc = v.say(Word.FLIGHT_DESC_DIVERTED, l.number), tooltip = l.tooltip)
+                alert(l), active = true, desc = v.say(Word.FLIGHT_DESC_DIVERTED, l.number), tooltip = l.tooltip).lined(l.route(l.shown ?: 0.5))
             Phase.TIMETABLE -> noUpdate(l)
             Phase.AHEAD -> ahead(l, beforeHours)
             Phase.SOON -> if (l.silent) noUpdate(l) else soon(l)
@@ -162,6 +196,25 @@ object FlightText {
     }
 
     private fun alert(l: Look) = if (FlightRules.alert(l.t, l.now)) Tone.ALERT else Tone.NORMAL
+
+    /**
+     * This bar with its route line, where there is one to draw. The words stay as they are and take
+     * the bar's own color: how the flight stands is the line's to say now. Only the alert stays.
+     */
+    private fun Bar.lined(route: BarRoute?): Bar = if (route == null) this else copy(tone = if (tone == Tone.ALERT) tone else Tone.NORMAL, route = route)
+
+    /**
+     * The name the plane of [t]'s flight is remembered by: the bar and the menu's card draw one plane,
+     * which only ever goes forward ([Card.plane]). Null: [t] holds no flight.
+     */
+    fun plane(t: Tracked): String? = t.flight?.let { listOf(t.number, t.day.orEmpty(), it.from.code).joinToString(" ") }
+
+    /**
+     * Where the plane of [route] has flown to, to be remembered for its next drawing; null where the line
+     * says nothing of that: there is none, or the flight will not arrive (where its plane stands on a
+     * line that is over is no place it has flown to).
+     */
+    fun flown(route: BarRoute?): Double? = route?.takeUnless { it.whole }?.share?.toDouble()
 
     /** A plan whose time passed with no word: the plain plane and "no update", until the flight is cleared or the service speaks. */
     private fun noUpdate(l: Look): Bar = Bar(Sym.FLIGHT, fit(l.v.say(Word.FLIGHT_BAR_NO_UPDATE, l.number), l.v.say(Word.FLIGHT_BAR_NO_UPDATE, l.f.number), l.number),
@@ -203,7 +256,8 @@ object FlightText {
         }
         val desc = v.say(Word.FLIGHT_DESC_LEAVES_IN, l.number, l.f.to.place, spoken(minutes, v)) + if (l.stale) v.say(Word.FLIGHT_DESC_NOT_LIVE, l.updated)
             else late?.let { v.say(Word.FLIGHT_DESC_LATE, spoken(it, v)) }.orEmpty() + gate?.let { v.say(Word.FLIGHT_DESC_GATE, it) }.orEmpty()
-        return Bar(Sym.FLIGHT_TAKEOFF, text, counting(l.stale, late != null, minutes), active = true, desc = desc, tooltip = l.tooltip)
+        // On the line the plane waits at the start: nothing is flown until the service says it has left.
+        return Bar(Sym.FLIGHT_TAKEOFF, text, counting(l.stale, late != null, minutes), active = true, desc = desc, tooltip = l.tooltip).lined(l.row.share?.let(l::flying))
     }
 
     /** In the air: the time to landing, then how late or early; on time, when it lands. */
@@ -223,13 +277,17 @@ object FlightText {
             lands != null -> fit(l.join(figure, v.time(lands, TimeForm.TIME)), figure)
             else -> figure
         }
+        // A line only where the plane has a place on it: with no time it left by, the minutes to landing still count, and how far it is nobody can say.
+        val route = l.row.share?.let(l::flying)
         val desc = v.say(Word.FLIGHT_DESC_LANDS_IN, l.number, l.f.to.place, spoken(minutes, v)) + when {
             l.stale -> v.say(Word.FLIGHT_DESC_NOT_LIVE, l.updated)
             late -> v.say(Word.FLIGHT_DESC_LATE, spoken(off, v))
             early -> v.say(Word.FLIGHT_DESC_EARLY, spoken(off, v))
+            // A green line is for the eye, and no figure in the words goes with it: the sentence says what it means.
+            route?.stands == Stands.GOOD -> v.say(Word.FLIGHT_DESC_ON_TIME)
             else -> ""
         }
-        return Bar(Sym.FLIGHT_LAND, text, counting(l.stale, late, minutes), active = true, desc = desc, tooltip = l.tooltip)
+        return Bar(Sym.FLIGHT_LAND, text, counting(l.stale, late, minutes), active = true, desc = desc, tooltip = l.tooltip).lined(route)
     }
 
     /** A countdown's color: a warning while it runs late, else the accent in its last half hour. Not live, it claims neither. */
@@ -240,17 +298,39 @@ object FlightText {
         else -> Tone.NORMAL
     }
 
-    /** Landed: for an hour the belt, else when it landed. Then the plain plane, while the menu keeps the flight. */
+    /**
+     * Landed: for an hour the belt, else when it landed; and where it landed late, by how much instead
+     * ("Landed · +25 min": the belt is in the menu then). Then the plain plane, while the menu keeps the flight.
+     */
     private fun landed(l: Look): Bar {
         val v = l.v
         val at = l.f.to.time
         val belt = l.where.belt
-        val desc = (at?.let { v.say(Word.FLIGHT_DESC_LANDED, l.number, v.time(it, TimeForm.TIME)) } ?: l.tooltip) + belt?.let { v.say(Word.FLIGHT_DESC_BELT, it) }.orEmpty()
         val since = Duration.between(at?.let(l.f.to::moment) ?: Instant.ofEpochMilli(l.t.heardAt), l.now)
-        if (since >= FlightRules.LANDED_SHOWN) return Bar(Sym.FLIGHT, desc = desc, tooltip = l.tooltip)
+        val inItsHour = since < FlightRules.LANDED_SHOWN
+        // For its hour in the bar the plane stands at the far end of its line, all of it flown.
+        val route = if (inItsHour) l.route(1.0) else null
+        // How late it landed, by the rule its line is colored by (so not of an answer over an hour old): said in the
+        // words and in the sentence, with a line and without one. A color is never the only thing that says it.
+        val late = FlightRules.stands(l.f, l.now, l.stale).takeIf { inItsHour }
+            ?.takeIf { it == Stands.LATE || it == Stands.VERY_LATE }?.let { FlightRules.badge(l.f, l.now)?.minutes?.toLong() }?.takeIf { it > 0 }
+        // On time is said where the line is green: without a line the words claim nothing of it, as they never did.
+        val how = when {
+            late != null -> v.say(Word.FLIGHT_DESC_LATE, spoken(late, v))
+            route?.stands == Stands.GOOD -> v.say(Word.FLIGHT_DESC_ON_TIME)
+            else -> ""
+        }
+        val desc = (at?.let { v.say(Word.FLIGHT_DESC_LANDED, l.number, v.time(it, TimeForm.TIME)) } ?: l.tooltip) + how + belt?.let { v.say(Word.FLIGHT_DESC_BELT, it) }.orEmpty()
+        if (!inItsHour) return Bar(Sym.FLIGHT, desc = desc, tooltip = l.tooltip)
         val plain = v.say(Word.FLIGHT_LANDED)
         val timed = at?.let { v.say(Word.FLIGHT_BAR_LANDED_AT, v.time(it, TimeForm.TIME)) } ?: plain
-        return Bar(Sym.FLIGHT_LAND, if (belt == null) fit(timed, plain) else fit(v.say(Word.FLIGHT_BAR_LANDED_BELT, belt), timed, plain), active = true, desc = desc, tooltip = l.tooltip)
+        val words = when {
+            // As a headline writes it, and with the bar's own short figure where that would be too long for the bar.
+            late != null -> fit(l.join(plain, v.say(Word.FLIGHT_BAR_LATE, written(late, v))), l.join(plain, v.say(Word.FLIGHT_BAR_LATE, figure(late))), plain)
+            belt == null -> fit(timed, plain)
+            else -> fit(v.say(Word.FLIGHT_BAR_LANDED_BELT, belt), timed, plain)
+        }
+        return Bar(Sym.FLIGHT_LAND, words, active = true, desc = desc, tooltip = l.tooltip).lined(route)
     }
 
     /** The headline as the card writes it, or ([aloud]) as it is spoken. An hour after landing it is "Landed" and counts no more. */
@@ -334,7 +414,7 @@ object FlightText {
             operatedAs = f.flownAs?.let { v.say(Word.FLIGHT_OPERATED_AS, FlightNumber.shown(it)) },
             loose = f.loose && f.timetable && before, note = v.say(Word.FLIGHT_NOTE, status),
             copy = copied(l, headline, badge), callsign = f.callsign, changeKey = t.failure == Failure.REFUSED,
-            plane = listOf(t.number, t.day.orEmpty(), f.from.code).joinToString(" "),
+            plane = plane(t).orEmpty(),
         )
     }
 

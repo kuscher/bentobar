@@ -137,6 +137,121 @@ class FlightSamplesTest {
         assertEquals("LH 9152 · Lufthansa", card("codeshare").title)
     }
 
+    // ---- the route line in the bar, which every state of its design can be staged for
+
+    /** A sample in the bar of an item that draws the line, [later] minutes after it was staged. */
+    private fun lined(name: String, turn: String? = null, later: Long = 0) = FlightText.bar(tracked(name, turn), null, now.plusSeconds(later * 60), 24, us, line = true)
+    private fun route(name: String, turn: String? = null, later: Long = 0) = lined(name, turn, later).route
+
+    @Test fun theSamplesThatCameWithTheLineReadAsTheirRows() {
+        assertEquals(listOf("1h 37m · +1h 25m", Sym.FLIGHT_TAKEOFF, Tone.WARN, "Leaves in 1 h 37 min", "Delayed 1 h 25 min"), shown("soon-very-late"))
+        assertEquals(listOf("2h 05m · +55m", Sym.FLIGHT_LAND, Tone.WARN, "Lands in 2 h 05 min", "Delayed 55 min"), shown("air-very-late"))
+        assertEquals(listOf("Landed · +25\u00A0min", Sym.FLIGHT_LAND, Tone.NORMAL, "Landed 20 min ago", "25 min late"), shown("landed-late"))
+        // In the air, and the service names no time of landing: nothing to count, and no plane on the menu's line.
+        assertEquals(listOf("In the air", Sym.FLIGHT_LAND, Tone.NORMAL, "In the air", null), shown("air-no-landing"))
+        assertNull(card("air-no-landing").share)
+        for (name in listOf("soon-very-late", "air-very-late", "landed-late", "air-no-landing")) {
+            assertTrue(name, staged(name) != null && " $name " in " ${FlightSamples.names} ")
+            assertTrue(name, bar(name).active)
+        }
+        // They start on their figures too, whatever the second.
+        for (second in listOf("00", "29", "59")) {
+            val at = Instant.parse("2026-10-08T06:20:${second}Z")
+            assertEquals(second, "1h 37m · +1h 25m", FlightText.bar(tracked("soon-very-late", at = at), null, at, 24, us).text)
+            assertEquals(second, "2h 05m · +55m", FlightText.bar(tracked("air-very-late", at = at), null, at, 24, us).text)
+            assertEquals(second, "25 min late", FlightText.card(tracked("landed-late", at = at), at, us)!!.badge)
+        }
+    }
+
+    @Test fun everyStateThatHasALineCanBeStaged() {
+        // Within three hours of leaving the plane waits at the start: in the text's color, late, very late.
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), route("soon"))
+        assertEquals(BarRoute(0f, Stands.LATE), route("soon-late"))
+        assertEquals(BarRoute(0f, Stands.VERY_LATE), route("soon-very-late"))
+        // In the air it stands where the clock puts it: on time and early, late, very late.
+        assertEquals(BarRoute((520.0 / 645.0).toFloat(), Stands.GOOD), route("air"))
+        assertEquals(BarRoute((502.0 / 627.0).toFloat(), Stands.GOOD), route("air-early"))
+        assertEquals(BarRoute((540.0 / 665.0).toFloat(), Stands.LATE), route("air-late"))
+        assertEquals(BarRoute((575.0 / 700.0).toFloat(), Stands.VERY_LATE), route("air-very-late"))
+        // Nobody has said how it stands: the last answer is over an hour old ("old" after a flight's name).
+        assertEquals(BarRoute((520.0 / 645.0).toFloat(), Stands.NO_CLAIM), route("air", "old"))
+        assertEquals("2h 05m · not live", lined("air", "old").text)
+        assertEquals(BarRoute((575.0 / 700.0).toFloat(), Stands.NO_CLAIM), route("air-very-late", "old"))
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), route("soon-late", "old"))
+        // Landed, for its hour: on time, late, and with an answer too old to say.
+        assertEquals(BarRoute(1f, Stands.GOOD), route("landed"))
+        assertEquals(BarRoute(1f, Stands.LATE), route("landed-late"))
+        assertEquals(BarRoute(1f, Stands.NO_CLAIM), route("landed", "old"))
+        // Canceled and diverted: in the alert pill for their first hour, and after it (the staged clock, 61 minutes on).
+        val canceled = BarRoute(0f, Stands.WILL_NOT_ARRIVE, struck = true, whole = true)
+        assertEquals(canceled, route("canceled"))
+        assertEquals(Tone.ALERT, lined("canceled").tone)
+        assertEquals(canceled, route("canceled", later = 61))
+        assertEquals(Tone.NORMAL, lined("canceled", later = 61).tone)
+        val diverted = BarRoute(0.5f, Stands.WILL_NOT_ARRIVE, struck = false, whole = true)
+        assertEquals(diverted, route("diverted"))
+        assertEquals(Tone.ALERT, lined("diverted").tone)
+        assertEquals(diverted, route("diverted", later = 61))
+        assertEquals(Tone.NORMAL, lined("diverted", later = 61).tone)
+        // A number sold by another airline is a countdown like any other.
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), route("codeshare"))
+    }
+
+    @Test fun oneFlightCanBeLookedAtAllAlongItsWay() {
+        // Before it leaves the plane waits at the start.
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), route("soon"))
+        // Just left: a little way in, with nothing drawn behind it yet. The figure counts to the landing now.
+        assertEquals("10h 44m · 7:04 PM", lined("air-just-left").text)
+        assertEquals(BarRoute(0.02f, Stands.GOOD), route("air-just-left"))
+        // Half way, and 45 minutes out, where only a last bit of the line is ahead.
+        assertEquals("5h 23m · 1:43 PM", lined("air-halfway").text)
+        assertEquals(BarRoute((322.0 / 645.0).toFloat(), Stands.GOOD), route("air-halfway"))
+        assertEquals("45m · 9:05 AM", lined("air-nearly-there").text)
+        assertEquals(BarRoute((600.0 / 645.0).toFloat(), Stands.GOOD), route("air-nearly-there"))
+        // And down: the far end.
+        assertEquals(BarRoute(1f, Stands.GOOD), route("landed"))
+        for (name in listOf("air-just-left", "air-halfway", "air-nearly-there")) {
+            assertTrue(name, " $name " in " ${FlightSamples.names} ")
+            assertEquals(name, "On time", card(name).badge)
+            assertEquals(name, Tone.NORMAL, bar(name).tone)
+        }
+    }
+
+    @Test fun theStatesWithoutALineCanBeStagedAndStayAsTheyWere() {
+        // Far off, a plan nobody counts down to, no update, in the air with no time of landing, landed over an hour ago.
+        for ((name, later) in listOf("ahead" to 0L, "tomorrow" to 0L, "loose" to 0L, "timetable" to 0L, "air-no-landing" to 0L, "landed" to 41L, "landed-late" to 41L)) {
+            assertNull(name, route(name, later = later))
+            assertEquals(name, bar(name, later = later), lined(name, later = later))
+        }
+        // Nothing followed, a lookup on its way: the plane alone, and the number.
+        assertNull(FlightText.bar(null, null, now, 24, us, line = true).route)
+        assertNull(FlightText.bar(null, (staged("looking") as Staged.Looking).number, now, 24, us, line = true).route)
+        // The line comes and goes with the staged clock: "soon" was to leave in 97 minutes, "landed" came down 20 minutes ago.
+        assertNull(route("tomorrow", later = 22 * 60 - 1))
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), route("tomorrow", later = 22 * 60))
+        assertEquals(BarRoute(1f, Stands.GOOD), route("landed", later = 39))
+    }
+
+    @Test fun withTheLineEverySampleSaysWhatItSaysWithoutIt() {
+        val flights = FlightSamples.names.substringBefore(" | ").split(" ").filter { staged(it) is Staged.Following }
+        assertEquals(20, flights.size)
+        for (name in flights) for (turn in listOf(null, "old")) for (later in listOf(0L, 61L)) {
+            val plain = bar(name, turn, later)
+            val line = lined(name, turn, later)
+            val what = "$name ${turn.orEmpty()} +$later"
+            assertEquals(what, plain.text, line.text)
+            assertEquals(what, plain.icon, line.icon)
+            assertEquals(what, plain.active, line.active)
+            assertEquals(what, plain.tooltip, line.tooltip)
+            assertNull(what, plain.route)
+            // The words take the bar's color beside a line, and keep their own where there is none.
+            assertEquals(what, if (line.route == null || plain.tone == Tone.ALERT) plain.tone else Tone.NORMAL, line.tone)
+            // The spoken sentence is the same but for a green line's "on time".
+            val onTime = line.route?.stands == Stands.GOOD && !plain.desc.endsWith(" early")
+            assertEquals(what, if (onTime) plain.desc.replaceFirst(Regex("(, belt .*)?$"), ", on time$1") else plain.desc, line.desc)
+        }
+    }
+
     @Test fun whatIsUnderTheLineForTheSamples() {
         assertEquals("Gate G13 · Terminal 1", card("soon").from.words)
         assertEquals("Terminal 1", card("soon").to.words)

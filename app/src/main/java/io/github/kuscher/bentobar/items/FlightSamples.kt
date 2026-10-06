@@ -49,14 +49,26 @@ object FlightSamples {
         "soon" to { now -> lh455(sfo(local(now, 97, SFO), expected = local(now, 97, SFO)), fra(local(now, 97 + FLIGHT, FRA)), FlightState.PLANNED) },
         // "1h 37m · +25m · G13", Delayed 25 min.
         "soon-late" to { now -> lh455(sfo(local(now, 72, SFO), expected = local(now, 97, SFO)), fra(local(now, 72 + FLIGHT, FRA), expected = local(now, 97 + FLIGHT, FRA)), FlightState.PLANNED) },
+        // "1h 37m · +1h 25m", Delayed 1 h 25 min: very late, and no room for the gate.
+        "soon-very-late" to { now -> lh455(sfo(local(now, 12, SFO), expected = local(now, 97, SFO)), fra(local(now, 12 + FLIGHT, FRA), expected = local(now, 97 + FLIGHT, FRA)), FlightState.PLANNED) },
         // "2h 05m" and when it lands, On time.
         "air" to { now -> lh455(left(now, 520), fra(local(now, 125, FRA), expected = local(now, 125, FRA), gate = "Z69"), FlightState.IN_AIR) },
         // "2h 05m · +20m", Delayed 20 min.
         "air-late" to { now -> lh455(left(now, 540), fra(local(now, 105, FRA), expected = local(now, 125, FRA), gate = "Z69"), FlightState.IN_AIR) },
+        // "2h 05m · +55m", Delayed 55 min: very late.
+        "air-very-late" to { now -> lh455(left(now, 575), fra(local(now, 70, FRA), expected = local(now, 125, FRA), gate = "Z69"), FlightState.IN_AIR) },
         // "2h 05m · −18m", 18 min early.
         "air-early" to { now -> lh455(left(now, 502), fra(local(now, 143, FRA), expected = local(now, 125, FRA), gate = "Z69"), FlightState.IN_AIR) },
+        // On time, at three more places along its way: a minute after it left ("10h 44m"), half way ("5h 23m"), and 45 minutes out.
+        "air-just-left" to { now -> lh455(left(now, 1), fra(local(now, 644, FRA), expected = local(now, 644, FRA), gate = "Z69"), FlightState.IN_AIR) },
+        "air-halfway" to { now -> lh455(left(now, 322), fra(local(now, 323, FRA), expected = local(now, 323, FRA), gate = "Z69"), FlightState.IN_AIR) },
+        "air-nearly-there" to { now -> lh455(left(now, 600), fra(local(now, 45, FRA), expected = local(now, 45, FRA), gate = "Z69"), FlightState.IN_AIR) },
+        // "In the air" and nothing to count: the service names no time of landing.
+        "air-no-landing" to { now -> lh455(left(now, 300), FlightEnd("FRA", "Frankfurt", offset = FRA, terminal = "1"), FlightState.IN_AIR) },
         // "Landed · Belt 21", Landed 20 min ago, On time.
         "landed" to { now -> lh455(left(now, 665), fra(local(now, -23, FRA), actual = local(now, -20, FRA), gate = "Z69", belt = "21"), FlightState.LANDED) },
+        // The same, 25 min late: "Landed · +25 min".
+        "landed-late" to { now -> lh455(left(now, 690), fra(local(now, -45, FRA), actual = local(now, -20, FRA), gate = "Z69", belt = "21"), FlightState.LANDED) },
         // "LH 455 canceled": the crossed-out plane, an alert for an hour.
         "canceled" to { now -> lh455(sfo(local(now, 120, SFO)), fra(local(now, 120 + FLIGHT, FRA)), FlightState.CANCELED) },
         // "LH 455 diverted": an alert for an hour.

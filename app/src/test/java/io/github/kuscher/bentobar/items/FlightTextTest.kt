@@ -5,6 +5,7 @@ import io.github.kuscher.bentobar.items.FlightRules.Kind
 import io.github.kuscher.bentobar.items.FlightRules.Tracked
 import io.github.kuscher.bentobar.items.FlightText.Voice
 import io.github.kuscher.bentobar.util.Sym
+import io.github.kuscher.bentobar.data.Display
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -387,6 +388,349 @@ class FlightTextTest {
         // Where the service names no city: the airport's letters.
         val bare = lh455(sfo().copy(city = ""), fra().copy(city = ""))
         assertEquals("LH 455 · SFO → FRA", bar(bare, near).tooltip)
+    }
+
+    // ---- the route line, which the item draws in its glyph's place unless it is shown as text alone
+
+    /** [f] in the bar of an item that draws the line. [shown]: where the flight's plane was last drawn; null: nowhere yet. */
+    private fun lined(f: Flight, now: String, heard: String = now, shown: Double? = null) = FlightText.bar(tracked(f, heard), null, at(now), 24, us, line = true, shown = shown)
+
+    @Test fun withinThreeHoursOfLeavingThePlaneWaitsAtTheStartInTheTextsColor() {
+        // On time by the service's word, or with only the plan: nothing is flown, and nothing is claimed.
+        val onTime = lined(lh455(sfo(expected = "2026-10-02T14:40")), near)
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), onTime.route)
+        assertEquals("1h 37m · Gate G13", onTime.text)
+        assertEquals(Tone.NORMAL, onTime.tone)
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), lined(lh455(), near).route)
+        // A timetable's plan is counted down to as well, and has its line.
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), lined(lh455(sfo(gate = null, terminal = null), timetable = true), near).route)
+        // The line comes with the countdown, three hours before: a minute earlier the chip is the glyph and its words.
+        assertNull(lined(lh455(), "2026-10-02T18:39:00Z").route)
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), lined(lh455(), "2026-10-02T18:40:00Z").route)
+        // In the last half hour the words keep the bar's color: the accent is for the chip without the line.
+        assertEquals(Tone.ACCENT, bar(lh455(), "2026-10-02T21:10:00Z").tone)
+        assertEquals(Tone.NORMAL, lined(lh455(), "2026-10-02T21:10:00Z").tone)
+        // Past its time to leave it is still at the start: nothing is flown until the service says it has left.
+        val past = lined(lh455(sfo(expected = "2026-10-02T14:40")), "2026-10-02T21:55:00Z", heard = "2026-10-02T21:20:00Z")
+        assertEquals("1m · Gate G13", past.text)
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), past.route)
+    }
+
+    @Test fun lateBeforeItLeavesThePlaneTakesTheColorAndTheWordsKeepTheBars() {
+        val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
+        assertEquals(BarRoute(0f, Stands.LATE), lined(late, near).route)
+        assertEquals("1h 37m · +25m · G13", lined(late, near).text)
+        assertEquals(Tone.NORMAL, lined(late, near).tone)
+        val veryLate = lh455(sfo(planned = "2026-10-02T13:15", expected = "2026-10-02T14:40"))
+        assertEquals(BarRoute(0f, Stands.VERY_LATE), lined(veryLate, near).route)
+        assertEquals("1h 37m · +1h 25m", lined(veryLate, near).text)
+        assertEquals(Tone.NORMAL, lined(veryLate, near).tone)
+        // 44 minutes behind is late, 45 is very late.
+        assertEquals(Stands.LATE, lined(lh455(sfo(planned = "2026-10-02T13:56", expected = "2026-10-02T14:40")), near).route!!.stands)
+        assertEquals(Stands.VERY_LATE, lined(lh455(sfo(planned = "2026-10-02T13:55", expected = "2026-10-02T14:40")), near).route!!.stands)
+        // Shown as text alone, the item has no line, and its words are a warning as they always were.
+        assertNull(bar(late, near).route)
+        assertEquals(Tone.WARN, bar(late, near).tone)
+        assertEquals(Tone.WARN, bar(veryLate, near).tone)
+    }
+
+    @Test fun inTheAirThePlaneStandsWhereTheClockPutsItInTheColorOfItsLanding() {
+        // LH 455 left at 9:47 PM UTC. Expected at its planned 8:25 AM: 513 of 638 minutes are flown.
+        val onTime = lined(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T06:20:00Z")
+        assertEquals(Stands.GOOD, onTime.route!!.stands)
+        assertEquals(513f / 638f, onTime.route.share, 1e-6f)
+        assertFalse(onTime.route.struck)
+        assertFalse(onTime.route.whole)
+        assertEquals("2h 05m · 10:25 AM", onTime.text)
+        // Early is good news too, and the words say by how much.
+        val early = lined(inAir(fra(expected = "2026-10-03T10:07")), "2026-10-03T06:02:00Z")
+        assertEquals(Stands.GOOD, early.route!!.stands)
+        assertEquals("2h 05m · −18m", early.text)
+        // Twenty minutes behind, 533 of 658 minutes flown: the line is late, and the words keep the bar's color.
+        val late = lined(inAir(fra(expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z")
+        assertEquals(Stands.LATE, late.route!!.stands)
+        assertEquals(533f / 658f, late.route.share, 1e-6f)
+        assertEquals("2h 05m · +20m", late.text)
+        assertEquals(Tone.NORMAL, late.tone)
+        val veryLate = lined(inAir(fra(expected = "2026-10-03T11:20")), "2026-10-03T07:15:00Z")
+        assertEquals(Stands.VERY_LATE, veryLate.route!!.stands)
+        assertEquals("2h 05m · +55m", veryLate.text)
+        assertEquals(Tone.NORMAL, veryLate.tone)
+        // In its last half hour the words keep the bar's color here too.
+        assertEquals(Tone.ACCENT, bar(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T07:55:00Z").tone)
+        assertEquals(Tone.NORMAL, lined(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T07:55:00Z").tone)
+        // It stands a little way in from the moment it has left, and never touches the far end while it flies, whatever the clock says.
+        assertEquals(0.02f, lined(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-02T21:48:00Z").route!!.share, 0f)
+        assertEquals(0.98f, lined(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T09:00:00Z").route!!.share, 0f)
+    }
+
+    @Test fun whereNobodyHasSaidHowItStandsTheLineHasTheTextsColorAndThePlaneStillGoesByTheClock() {
+        // The last answer is over an hour old: twenty minutes late then, and anybody's guess now.
+        val old = lined(inAir(fra(expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z", heard = "2026-10-03T05:00:00Z")
+        assertEquals("2h 05m · not live", old.text)
+        assertEquals(Stands.NO_CLAIM, old.route!!.stands)
+        assertEquals(533f / 658f, old.route.share, 1e-6f)
+        // Only the plan of its landing is known: no good news about a time the service never gave.
+        val planOnly = lined(inAir(fra()), "2026-10-03T06:20:00Z")
+        assertEquals("2h 05m · 10:25 AM", planOnly.text)
+        assertEquals(Stands.NO_CLAIM, planOnly.route!!.stands)
+        assertEquals(513f / 638f, planOnly.route.share, 1e-6f)
+        // Before it leaves the same: a delay heard of over an hour ago colors nothing.
+        val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
+        assertEquals("1h 37m · not live", lined(late, near, heard = "2026-10-02T16:40:00Z").text)
+        assertEquals(BarRoute(0f, Stands.NO_CLAIM), lined(late, near, heard = "2026-10-02T16:40:00Z").route)
+    }
+
+    @Test fun landedThePlaneStandsAtTheFarEndForItsHourInTheBar() {
+        val down = lh455(left, fra(actual = "2026-10-03T10:01", belt = "21"), FlightState.LANDED)      // landed 08:01 UTC, 24 minutes before its plan
+        val b = lined(down, "2026-10-03T08:21:00Z")
+        assertEquals(BarRoute(1f, Stands.GOOD), b.route)
+        assertEquals("Landed · Belt 21", b.text)
+        assertEquals(Tone.NORMAL, b.tone)
+        // By when it landed against its plan of 10:25 AM: up to fourteen minutes behind is good, then it is late, and very late from 45.
+        fun landed(at: String, now: String) = lined(lh455(left, fra(actual = at), FlightState.LANDED), now).route
+        assertEquals(BarRoute(1f, Stands.GOOD), landed("2026-10-03T10:39", "2026-10-03T08:45:00Z"))
+        assertEquals(BarRoute(1f, Stands.LATE), landed("2026-10-03T10:40", "2026-10-03T08:45:00Z"))
+        assertEquals(BarRoute(1f, Stands.LATE), landed("2026-10-03T11:09", "2026-10-03T09:15:00Z"))
+        assertEquals(BarRoute(1f, Stands.VERY_LATE), landed("2026-10-03T11:10", "2026-10-03T09:15:00Z"))
+        // No time of landing is known against the plan: the text's color.
+        assertEquals(BarRoute(1f, Stands.NO_CLAIM), lined(lh455(left, fra(), FlightState.LANDED), "2026-10-03T08:30:00Z").route)
+        // After its hour the chip is the plain plane again.
+        assertEquals(BarRoute(1f, Stands.GOOD), lined(down, "2026-10-03T09:00:59Z").route)
+        assertEquals(bar(down, "2026-10-03T09:01:00Z"), lined(down, "2026-10-03T09:01:00Z"))
+        assertNull(lined(down, "2026-10-03T09:01:00Z").route)
+    }
+
+    @Test fun canceledTheStruckPlaneStandsAtTheStartOfALineThatIsOneColorFromEndToEnd() {
+        val gone = lh455(state = FlightState.CANCELED)
+        val news = lined(gone, near)
+        assertEquals(BarRoute(0f, Stands.WILL_NOT_ARRIVE, struck = true, whole = true), news.route)
+        assertEquals("LH 455 canceled", news.text)
+        // The alert stays for its hour; after it the words have the bar's color and the line stays as it is.
+        assertEquals(Tone.ALERT, news.tone)
+        val later = lined(gone, "2026-10-02T21:03:00Z", heard = near)
+        assertEquals(Tone.NORMAL, later.tone)
+        assertEquals(news.route, later.route)
+        // The crossed-out glyph is still what a menu lists the item by.
+        assertEquals(Sym.AIRPLANEMODE_INACTIVE, news.icon)
+        // Wherever a plane of this flight was drawn before: one that never leaves stands at the start.
+        assertEquals(news.route, lined(gone, near, shown = 0.6).route)
+        // The line is there until the flight is cleared, a day after it was to land.
+        assertEquals(news.route, lined(gone, "2026-10-04T08:24:00Z", heard = near).route)
+        assertNull(lined(gone, "2026-10-04T08:25:00Z", heard = near).route)
+    }
+
+    @Test fun divertedThePlaneStaysWhereItWasLastDrawnAndStandsInTheMiddleIfItNeverWas() {
+        val diverted = inAir(fra(expected = "2026-10-03T10:25")).copy(state = FlightState.DIVERTED)
+        val news = lined(diverted, "2026-10-03T06:20:00Z")
+        assertEquals(BarRoute(0.5f, Stands.WILL_NOT_ARRIVE, struck = false, whole = true), news.route)
+        assertEquals("LH 455 diverted", news.text)
+        assertEquals(Tone.ALERT, news.tone)
+        assertEquals(Tone.NORMAL, lined(diverted, "2026-10-03T07:20:00Z", heard = "2026-10-03T06:20:00Z").tone)
+        // Nobody knows where it is going: it neither flies on with the clock nor goes back.
+        assertEquals(0.8f, lined(diverted, "2026-10-03T06:20:00Z", shown = 0.8).route!!.share, 0f)
+        assertEquals(0.8f, lined(diverted, "2026-10-03T08:00:00Z", heard = "2026-10-03T06:20:00Z", shown = 0.8).route!!.share, 0f)
+        assertEquals(0.1f, lined(diverted, "2026-10-03T06:20:00Z", shown = 0.1).route!!.share, 0f)
+    }
+
+    @Test fun onTheLineThePlaneOnlyGoesForward() {
+        // Where the times put it, wherever it was drawn further back: 513 of 638 minutes.
+        val f = inAir(fra(expected = "2026-10-03T10:25"))
+        assertEquals(513f / 638f, lined(f, "2026-10-03T06:20:00Z", shown = 0.5).route!!.share, 1e-6f)
+        // The service now expects it an hour later, and by the times it is at 513 of 698: the plane waits where it was drawn.
+        val slower = inAir(fra(expected = "2026-10-03T11:25"))
+        assertEquals(513f / 698f, lined(slower, "2026-10-03T06:20:00Z").route!!.share, 1e-6f)
+        assertEquals(513f / 638f, lined(slower, "2026-10-03T06:20:00Z", shown = 513.0 / 638.0).route!!.share, 1e-6f)
+        // Once the clock has caught up it goes on from there.
+        assertEquals(583f / 698f, lined(slower, "2026-10-03T07:30:00Z", shown = 513.0 / 638.0).route!!.share, 1e-6f)
+        // Landed, it is at the far end, whatever was drawn.
+        val down = lh455(left, fra(actual = "2026-10-03T10:01"), FlightState.LANDED)
+        assertEquals(1f, lined(down, "2026-10-03T08:21:00Z", shown = 0.3).route!!.share, 0f)
+    }
+
+    @Test fun whereThereIsNoLineTheChipIsTheGlyphAndItsWordsAsItAlwaysWas() {
+        // Nothing to follow, looking up, a flight that was asked for and not heard of yet.
+        for (t in listOf(null, Tracked(), Tracked("LH455", "2026-10-02", null, failure = Failure.OFFLINE, failures = 1))) for (looking in listOf(null, "LH 455"))
+            assertEquals(FlightText.bar(t, looking, at(morning), 24, us), FlightText.bar(t, looking, at(morning), 24, us, line = true, shown = 0.4))
+        fun same(f: Flight, now: String, heard: String = now) {
+            assertEquals(now, bar(f, now, heard), lined(f, now, heard))
+            assertNull(now, lined(f, now, heard).route)
+        }
+        // More than three hours before it leaves, and a plan whose clocks may be out, which is never counted down to.
+        same(lh455(), morning)
+        same(lh455(sfo(expected = "2026-10-02T14:40")).copy(loose = true), near)
+        // In the air with no time of landing, with clocks that cannot be read, with no time it left by, or with a landing
+        // that would be before it left: a plane on a line would claim a place nobody can vouch for.
+        same(inAir(fra(planned = null)), "2026-10-03T06:20:00Z")
+        same(inAir(fra(expected = "2026-10-03T10:25")).copy(loose = true), "2026-10-03T06:20:00Z")
+        val noStart = lh455(sfo(planned = null), fra(expected = "2026-10-03T10:45"), FlightState.IN_AIR)
+        same(noStart, "2026-10-03T06:40:00Z")
+        assertEquals("2h 05m · +20m", lined(noStart, "2026-10-03T06:40:00Z").text)
+        assertEquals(Tone.WARN, lined(noStart, "2026-10-03T06:40:00Z").tone)      // with no line to say it, the words still do
+        same(inAir(fra(expected = "2026-10-02T23:00")), "2026-10-02T22:00:00Z")
+        // No update: a timetable's plan past its time, and a flight still called planned an hour after its time with no word.
+        same(lh455(sfo(gate = null, terminal = null), timetable = true), "2026-10-02T22:40:00Z", heard = morning)
+        same(lh455(sfo(expected = "2026-10-02T14:40")), "2026-10-02T22:21:00Z", heard = "2026-10-02T21:20:00Z")
+        // Landed more than an hour ago, slept through its landing, and cleared.
+        val down = lh455(left, fra(actual = "2026-10-03T10:01", belt = "21"), FlightState.LANDED)
+        same(down, "2026-10-03T12:00:00Z")
+        same(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T15:30:00Z", heard = "2026-10-03T06:00:00Z")
+        same(down, "2026-10-04T08:01:00Z")
+    }
+
+    @Test fun withTheLineTheWordsTheGlyphAndTheTooltipAreWhatTheyAreWithoutIt() {
+        val late = lh455(sfo(planned = "2026-10-02T14:15", expected = "2026-10-02T14:40"))
+        val down = lh455(left, fra(actual = "2026-10-03T10:50", belt = "21"), FlightState.LANDED)      // landed 08:50 UTC, 25 minutes behind
+        val states = listOf(
+            Triple(lh455(sfo(expected = "2026-10-02T14:40")), near, near),
+            Triple(lh455(sfo(gate = null)), near, near),
+            Triple(lh455(), "2026-10-02T21:10:00Z", "2026-10-02T21:10:00Z"),
+            Triple(late, near, near),
+            Triple(late, near, "2026-10-02T16:40:00Z"),
+            Triple(lh455(sfo(planned = "2026-10-02T13:15", expected = "2026-10-02T14:40")), near, near),
+            Triple(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T06:20:00Z", "2026-10-03T06:20:00Z"),
+            Triple(inAir(fra(expected = "2026-10-03T10:07")), "2026-10-03T06:02:00Z", "2026-10-03T06:02:00Z"),
+            Triple(inAir(fra(expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z", "2026-10-03T06:40:00Z"),
+            Triple(inAir(fra(expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z", "2026-10-03T05:00:00Z"),
+            Triple(down, "2026-10-03T09:00:00Z", "2026-10-03T09:00:00Z"),
+            Triple(lh455(left, fra(actual = "2026-10-03T10:50"), FlightState.LANDED), "2026-10-03T09:00:00Z", "2026-10-03T09:00:00Z"),
+            Triple(lh455(state = FlightState.CANCELED), near, near),
+            Triple(lh455(state = FlightState.CANCELED), "2026-10-02T21:03:00Z", near),
+            Triple(inAir(fra(expected = "2026-10-03T10:25")).copy(state = FlightState.DIVERTED), "2026-10-03T06:20:00Z", "2026-10-03T06:20:00Z"),
+        )
+        for ((f, now, heard) in states) {
+            val plain = bar(f, now, heard)
+            val line = lined(f, now, heard)
+            val what = "${plain.text} at $now"
+            assertTrue(what, line.route != null && plain.route == null)
+            assertEquals(what, plain.text, line.text)
+            assertEquals(what, plain.icon, line.icon)
+            assertEquals(what, plain.active, line.active)
+            assertEquals(what, plain.tooltip, line.tooltip)
+            // Their color is the bar's, whatever it is without the line; only the alert stays.
+            assertEquals(what, if (plain.tone == Tone.ALERT) Tone.ALERT else Tone.NORMAL, line.tone)
+        }
+        // Every tone the chip has without the line was among them.
+        assertEquals(Tone.entries.toSet(), states.map { (f, now, heard) -> bar(f, now, heard).tone }.toSet())
+    }
+
+    @Test fun whereTheLineIsGreenTheSpokenSentenceSaysOnTime() {
+        // In the air and expected within fifteen minutes of its plan: no figure in the words says so, and the green is for the eye.
+        val onTime = inAir(fra(expected = "2026-10-03T10:25"))
+        assertEquals("LH 455 to Frankfurt lands in 2 hours 5 minutes, on time", lined(onTime, "2026-10-03T06:20:00Z").desc)
+        assertEquals("LH 455 to Frankfurt lands in 2 hours 5 minutes, on time", lined(inAir(fra(expected = "2026-10-03T10:39")), "2026-10-03T06:34:00Z").desc)
+        // Early is green too, and already says by how much.
+        assertEquals("LH 455 to Frankfurt lands in 2 hours 5 minutes, 18 minutes early", lined(inAir(fra(expected = "2026-10-03T10:07")), "2026-10-03T06:02:00Z").desc)
+        // Landed within fifteen minutes of its plan, or before it: on time, and then the belt.
+        val down = lh455(left, fra(actual = "2026-10-03T10:01", belt = "21"), FlightState.LANDED)
+        assertEquals("LH 455 landed at 10:01 AM, on time, belt 21", lined(down, "2026-10-03T08:21:00Z").desc)
+        assertEquals("LH 455 landed at 10:30 AM, on time", lined(lh455(left, fra(actual = "2026-10-03T10:30"), FlightState.LANDED), "2026-10-03T08:40:00Z").desc)
+        // Landed late, the sentence says by how much, with the line and without it (the words do too).
+        val downLate = lh455(left, fra(actual = "2026-10-03T10:50", belt = "21"), FlightState.LANDED)
+        assertEquals("LH 455 landed at 10:50 AM, 25 minutes late, belt 21", lined(downLate, "2026-10-03T09:00:00Z").desc)
+        assertEquals("LH 455 landed at 11:25 AM, 1 hour late", lined(lh455(left, fra(actual = "2026-10-03T11:25"), FlightState.LANDED), "2026-10-03T09:40:00Z").desc)
+        assertEquals("LH 455 landed at 10:50 AM, 25 minutes late, belt 21", bar(downLate, "2026-10-03T09:00:00Z").desc)
+        // Where the line is not green and no later than its plan says, the sentence is what it was: late, not live, only the plan known, before it leaves.
+        val late = inAir(fra(expected = "2026-10-03T10:45"))
+        val quiet = listOf(
+            Triple(late, "2026-10-03T06:40:00Z", "2026-10-03T06:40:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes, 20 minutes late",
+            Triple(late, "2026-10-03T06:40:00Z", "2026-10-03T05:00:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes, not live, updated 10:00 PM",
+            Triple(onTime, "2026-10-03T06:20:00Z", "2026-10-03T05:00:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes, not live, updated 10:00 PM",
+            Triple(inAir(fra()), "2026-10-03T06:20:00Z", "2026-10-03T06:20:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes",
+            Triple(lh455(left, fra(), FlightState.LANDED), "2026-10-03T08:30:00Z", "2026-10-03T08:30:00Z") to "LH 455 landed at 10:25 AM",
+            Triple(lh455(sfo(expected = "2026-10-02T14:40")), near, near) to "LH 455 to Frankfurt leaves in 1 hour 37 minutes, gate G13",
+            Triple(lh455(state = FlightState.CANCELED), near, near) to "LH 455 is canceled",
+        )
+        for ((state, sentence) in quiet) {
+            val (f, now, heard) = state
+            assertEquals(sentence, lined(f, now, heard).desc)
+            assertEquals(sentence, bar(f, now, heard).desc)
+        }
+        // Without the line nothing is green, and after its hour in the bar a landed flight has no line: the sentence as it was.
+        assertEquals("LH 455 to Frankfurt lands in 2 hours 5 minutes", bar(onTime, "2026-10-03T06:20:00Z").desc)
+        assertEquals("LH 455 landed at 10:01 AM, belt 21", bar(down, "2026-10-03T08:21:00Z").desc)
+        assertEquals("LH 455 landed at 10:01 AM, belt 21", lined(down, "2026-10-03T09:01:00Z").desc)
+        // The two words, as they follow a sentence.
+        assertEquals(", on time", us.say(FlightText.Word.FLIGHT_DESC_ON_TIME))
+        assertEquals(", on time", FlightVoices.british().say(FlightText.Word.FLIGHT_DESC_ON_TIME))
+    }
+
+    @Test fun aLineThatIsLateAlwaysStandsBesideItsFigure() {
+        // Color is never the only thing that says it: before a flight leaves, while it flies and for its hour after
+        // landing, a line in the color of late or very late has "+25m" or "+25 min" in the words beside it, and a line
+        // without that color has no such figure.
+        for (late in -30L..150L) {
+            val leaving = lined(lh455(sfo(planned = time("2026-10-02T14:40").minusMinutes(late).toString(), expected = "2026-10-02T14:40")), near)
+            val landing = lined(inAir(fra(planned = time("2026-10-03T10:45").minusMinutes(late).toString(), expected = "2026-10-03T10:45")), "2026-10-03T06:40:00Z")
+            val down = lined(lh455(left, fra(planned = time("2026-10-03T10:45").minusMinutes(late).toString(), actual = "2026-10-03T10:45", belt = "21"), FlightState.LANDED), "2026-10-03T09:00:00Z")
+            for (b in listOf(leaving, landing, down)) {
+                val colored = b.route!!.stands == Stands.LATE || b.route.stands == Stands.VERY_LATE
+                assertEquals("$late: ${b.text}", colored, b.text!!.contains(" · +"))
+                assertEquals("$late: ${b.desc}", colored, b.desc.contains(" late"))
+            }
+            // In the air a green line has "−18m" beside it, or else "on time" in its sentence.
+            if (landing.route!!.stands == Stands.GOOD) assertTrue("$late: ${landing.desc}", landing.text!!.contains(" · −") || landing.desc.endsWith(", on time"))
+        }
+    }
+
+    /** The words "Landed · Belt 21" said nothing of a late landing, and its line said it in a color only. */
+    @Test fun aFlightThatLandedLateSaysByHowMuchInItsWords() {
+        fun words(b: FlightText.Bar) = b.text?.replace('\u00A0', ' ')
+        fun down(actual: String, belt: String? = "21") = lh455(left, fra(actual = actual, belt = belt), FlightState.LANDED)
+        // 25 minutes behind its plan (10:25): as a headline would write it, with the line and without it. The belt is in the menu.
+        assertEquals("Landed · +25 min", words(lined(down("2026-10-03T10:50"), "2026-10-03T09:00:00Z")))
+        assertEquals("Landed · +25 min", words(bar(down("2026-10-03T10:50"), "2026-10-03T09:00:00Z")))
+        assertEquals("Landed · +25 min", words(lined(down("2026-10-03T10:50", belt = null), "2026-10-03T09:00:00Z")))
+        // From 15 minutes, as everywhere; under that the words are the ones they were.
+        assertEquals("Landed · +15 min", words(lined(down("2026-10-03T10:40"), "2026-10-03T08:50:00Z")))
+        assertEquals("Landed · Belt 21", words(lined(down("2026-10-03T10:39"), "2026-10-03T08:50:00Z")))
+        // An hour and more: still within the bar's twenty characters, and the short figure where it would not be.
+        assertEquals("Landed · +1 h 00 min", words(lined(down("2026-10-03T11:25"), "2026-10-03T09:40:00Z")))
+        assertEquals("Landed · +10h 05m", words(lined(down("2026-10-03T20:30"), "2026-10-03T18:40:00Z")))
+        // An answer over an hour old claims nothing, in color or in words.
+        assertEquals("Landed · Belt 21", words(lined(down("2026-10-03T10:50"), "2026-10-03T09:10:00Z", heard = "2026-10-03T08:00:00Z")))
+        // After its hour in the bar the plain plane, as before.
+        assertNull(lined(down("2026-10-03T10:50"), "2026-10-03T10:00:00Z").text)
+    }
+
+    @Test fun anItemShownAsTextAloneHasNoLine() {
+        // The line stands in the icon's place: beside the words or alone, and never where only words are shown.
+        // The item asks for a line by this, and the strip draws one by it.
+        assertTrue(Display.ICON_AND_TEXT.line)
+        assertTrue(Display.ICON.line)
+        assertFalse(Display.TEXT.line)
+    }
+
+    @Test fun aPlaneIsRememberedWhereItFlewAndNotWhereItStandsOnALineThatIsOver() {
+        // In the air: where it was drawn is where the next drawing goes on from.
+        assertEquals(0.5, FlightText.flown(BarRoute(0.5f, Stands.GOOD))!!, 1e-6)
+        assertEquals(0.0, FlightText.flown(BarRoute(0f, Stands.LATE))!!, 1e-6)
+        // Canceled or diverted, the plane stands at the start or where it was: no place it has flown to.
+        assertNull(FlightText.flown(BarRoute(0.5f, Stands.WILL_NOT_ARRIVE, whole = true)))
+        assertNull(FlightText.flown(BarRoute(0f, Stands.WILL_NOT_ARRIVE, struck = true, whole = true)))
+        assertNull(FlightText.flown(null))
+    }
+
+    @Test fun inTheAirPastItsLandingTimeTheSentenceNoLongerSaysOnTime() {
+        val onTime = inAir(fra(expected = "2026-10-03T10:25"))
+        val before = lined(onTime, "2026-10-03T08:20:00Z")
+        assertEquals(Stands.GOOD, before.route?.stands)
+        assertTrue(before.desc, before.desc.endsWith(", on time"))
+        // Fifteen minutes past the time it was to land, and the service has not said that it has.
+        val past = lined(onTime, "2026-10-03T08:40:00Z")
+        assertEquals(Stands.NO_CLAIM, past.route?.stands)
+        assertFalse(past.desc, past.desc.contains("on time"))
+        assertEquals(bar(onTime, "2026-10-03T08:40:00Z").desc, past.desc)
+    }
+
+    @Test fun theBarAndTheMenuNameAFlightsPlaneAlike() {
+        // One plane for both lines: what either has drawn, the other goes on from.
+        val t = tracked(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T06:20:00Z")
+        assertEquals("LH455 2026-10-02 SFO", FlightText.plane(t))
+        assertEquals(FlightText.plane(t), FlightText.card(t, at("2026-10-03T06:20:00Z"), us)!!.plane)
+        // Nothing followed, or nothing heard of it yet: there is no plane to name.
+        assertNull(FlightText.plane(Tracked()))
+        assertNull(FlightText.plane(Tracked("LH455", "2026-10-02", null)))
     }
 
     // ---- the rule: from so many hours before it leaves until an hour after it landed

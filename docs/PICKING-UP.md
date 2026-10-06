@@ -42,6 +42,39 @@ logged. Causes that keep coming are held to a budget: after a dozen readings wit
 - **Left as it was**: the first readings of window changes still keep two seconds apart, a bar that turns more
   than ten seconds after the strip came back waits for the next cause, and an app in full screen that flips its
   own icons in the same window is still not noticed until the next cause.
+## After 0.9: a route line in the Flight chip (branch `flight-route`, not released)
+Asked for after 0.9: while a flight is near or under way, the glyph in front of the Flight item's words is a line
+the plane flies along, left to right, colored by how the flight stands. It is the Sound slider's line (64 by
+4 dp), there from the countdown (three hours before the flight leaves) until an hour after it landed, and for as
+long as a cancellation or a diversion is shown. Green: in the air or down, and within 15 minutes of its plan or
+earlier by the service's own time. Yellow: 15 to 44 minutes behind. Red: 45 or more (`FlightRules.VERY_LATE`, a
+judgment), canceled, diverted. The text's own color: nothing is claimed (before it leaves unless it is late, only
+the plan known, an answer over an hour old). The words are what they were and take the bar's color beside the
+line; an item shown as text alone has no line and is exactly as in 0.9.
+- **How it is made**: `FlightRules.stands` says how a flight stands; `FlightText.bar` fills `Bar.route` for an
+  item that draws a line; `FlightItem` keeps the plane forward only (one plane for the bar and the menu's line);
+  `SliderMath.route` is the geometry; `RouteTrack` in `bar/BarUi.kt` draws it beside the volume track, with no
+  pointer code; `StripLook.route` has the colors, each giving way to the text color under 3:1 on an opaque bar.
+  One new string, ", on time", for the spoken sentence where the line is green.
+- **Checked**: unit tests (the rule, the words with and without the line for every saved reply and every
+  sample, the geometry, the colors on black, on white, in the alert pill and on mid-tone bars), and pictures of
+  the strip drawn on a computer from the app's own composables (Compose's preview screenshots, in a throwaway
+  copy of the sources; nothing of that is in the repo): every state on a light, a dark and a black bar, the
+  three ways to show the item, the three text sizes, right to left, three opaque bars of other colors. There the
+  chip with its line is exactly 50 dp wider than with its glyph.
+- **Not checked**: on an emulator or a device. Those pictures have the computer's fonts and no status bar around
+  them. Still to look at: the plane on its line beside the system's icons and the real Sound slider, the hover
+  box, a click on the line (it opens the menu like a click anywhere on the item). Every state can be staged for
+  it: `./bento debug flight show` lists the samples, `./bento debug look color light|dark` forces the bar's two
+  looks.
+- **Decided where the design did not say**: in the air with no time it left by there is no line, as with no time
+  of landing (nobody can say how far it is); an answer over an hour old claims nothing for a landed flight
+  either; a line that is green because the flight is early adds no "on time" to a sentence that says "early"; a
+  diverted flight's plane stays where it was last drawn only while the app runs, and stands in the middle after
+  a restart.
+- **Changed after the first look**: a flight that landed late says so in its words, "Landed · +25 min" (the
+  belt is in the menu then), with a line and without one, and in its spoken sentence ("landed at 10:50 AM,
+  25 minutes late, belt 21"). Before that its line's color was the only thing that said it.
 
 ## 0.9 (2026-10-05): six new things for the bar, and the internet permission for two of them
 Merged as pull request #17 and released as 0.9 (version code 10) from the tag `v0.9`; the next release needs a new version.

@@ -3,7 +3,8 @@ package io.github.kuscher.bentobar.bar
 /**
  * The arithmetic of the slider in the bar, apart from its drawing and its pointer events so that it
  * is unit-tested on the JVM (`SliderMathTest`). Pure Kotlin. A level is 0 to 1; a slider with steps
- * (15 for a volume of 0 to 15) only ever stands on k / steps.
+ * (15 for a volume of 0 to 15) only ever stands on k / steps. The route line is the same line with a
+ * plane on it and no pointer: where its parts stand is [route].
  */
 object SliderMath {
     /**
@@ -47,6 +48,32 @@ object SliderMath {
     fun handleCenter(level: Float, track: Float, edge: Float): Float {
         val l = if (level.isNaN()) 0f else level.coerceIn(0f, 1f)
         return if (track <= 2 * edge) track / 2 else (l * track).coerceIn(edge, track - edge)
+    }
+
+    /**
+     * A route line as the canvas draws it, in its own pixels from its left edge. [center]: the middle
+     * of the plane. [flown], [ahead]: the part of the line behind the plane and the part before it,
+     * each from its left edge to its right; null: there is no such part.
+     */
+    class Route(val center: Float, val flown: ClosedFloatingPointRange<Float>?, val ahead: ClosedFloatingPointRange<Float>?)
+
+    /**
+     * The route line an item can have in its icon's place, which is the slider's line with a plane on
+     * it: for a line [track] wide and a plane [plane] long that has [share] of its way behind it (0 to
+     * 1), where the plane stands and where the two parts of the line are. The plane keeps within the
+     * line: its middle is half its length in at the start, and as far from the end when it has arrived.
+     * The part flown ends [gap] behind the plane and the part ahead begins [gap] past its nose, so the
+     * plane stands in a clearing; a part that has no room is not there. On a line shorter than the
+     * plane there is no way to go: it stands in the middle. Right to left ([rtl]) the line starts at
+     * the right, and what comes back is mirrored already. Null: a line nobody can draw on.
+     */
+    fun route(track: Float, share: Float, plane: Float, gap: Float, rtl: Boolean = false): Route? {
+        // (Written so that a width that is not a number comes out as nothing too.)
+        if (!(track > 0f)) return null
+        val s = if (share.isNaN()) 0f else share.coerceIn(0f, 1f)
+        val center = if (track <= plane) track / 2 else plane / 2 + s * (track - plane)
+        fun part(from: Float, to: Float) = if (to <= from) null else if (rtl) (track - to)..(track - from) else from..to
+        return Route(if (rtl) track - center else center, part(0f, center - plane / 2 - gap), part(center + plane / 2 + gap, track))
     }
 }
 

@@ -8,7 +8,12 @@ enum class Section { SHOWN, HIDDEN, OFF }
 
 /** How an item draws in the bar. */
 @Serializable
-enum class Display { ICON_AND_TEXT, TEXT, ICON }
+enum class Display {
+    ICON_AND_TEXT, TEXT, ICON;
+
+    /** A route line stands in the icon's place: an item shown as text alone has none. The item asks for one by this, and the strip draws one by it. */
+    val line: Boolean get() = this != TEXT
+}
 
 /** Where BentoBar's strip sits in the status bar's free space. */
 @Serializable

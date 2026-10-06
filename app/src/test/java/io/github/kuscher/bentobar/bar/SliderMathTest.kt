@@ -5,11 +5,17 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 import io.github.kuscher.bentobar.data.Pill
 import io.github.kuscher.bentobar.data.TextSize
+import io.github.kuscher.bentobar.items.Stands
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The slider in the bar: which level a pointer stands for, and colors that can be told from the bar. */
+/**
+ * The slider in the bar: which level a pointer stands for, and colors that can be told from the bar.
+ * And the route line, which is the slider's line with a plane on it: where the plane and the two parts
+ * of the line stand.
+ */
 class SliderMathTest {
     // A track 64 px wide that starts 10 px in.
     private fun at(x: Float, steps: Int = 0, rtl: Boolean = false) = SliderMath.level(x, left = 10f, width = 64f, steps = steps, rtl = rtl)
@@ -145,5 +151,137 @@ class SliderMathTest {
         }
         // Four of the 302 today (a mid gray, a green, a magenta, a pink). More would mean the rule changed.
         assertTrue("$short bars with a track under 3:1", short <= 4)
+    }
+
+    // ---- the route line: the slider's line with a plane on it
+
+    /** The line as it is designed, in dp (the canvas gives pixels; the rules are the same): 64 long, a plane of 15 with 2 clear on each side of it. */
+    private fun route(share: Float, track: Float = 64f, rtl: Boolean = false) = SliderMath.route(track, share, plane = 15f, gap = 2f, rtl = rtl)!!
+
+    @Test fun beforeItLeavesThePlaneStandsAtTheLinesStartAndAllTheRestIsAhead() {
+        val r = route(0f)
+        assertEquals(7.5f, r.center, 0f)
+        assertNull(r.flown)
+        assertEquals(17f..64f, r.ahead)
+    }
+
+    @Test fun rightAfterItHasLeftThePlaneIsALittleWayInAndNothingIsFlownYet() {
+        val r = route(0.02f)
+        assertEquals(8.48f, r.center, 1e-4f)
+        // The clearing behind the plane still reaches past the line's start: there is no room for a part there.
+        assertNull(r.flown)
+        assertEquals(17.98f, r.ahead!!.start, 1e-4f)
+        assertEquals(64f, r.ahead.endInclusive, 0f)
+        // A part appears behind it once the clearing has left the start: 2 along the 49 that the plane travels.
+        assertNull(route(1.9f / 49f).flown)
+        assertEquals(0.49f, route(2.49f / 49f).flown!!.endInclusive, 1e-4f)
+    }
+
+    @Test fun halfWayThePlaneIsInTheMiddleWithAsMuchFlownAsAhead() {
+        val r = route(0.5f)
+        assertEquals(32f, r.center, 0f)
+        assertEquals(0f..22.5f, r.flown)
+        assertEquals(41.5f..64f, r.ahead)
+    }
+
+    @Test fun nearlyThereThePlaneDoesNotTouchTheFarEnd() {
+        val r = route(0.98f)
+        assertEquals(55.52f, r.center, 1e-4f)
+        assertEquals(0f, r.flown!!.start, 0f)
+        assertEquals(46.02f, r.flown.endInclusive, 1e-4f)
+        // Its nose is short of the end by less than the clearing: nothing of the line is left ahead of it.
+        assertTrue(r.center + 7.5f < 64f)
+        assertNull(r.ahead)
+        // 45 minutes out of a flight of 645: a last bit of the line is still ahead.
+        val out = route(600f / 645f).ahead!!
+        assertEquals(64f, out.endInclusive, 0f)
+        assertEquals(1.42f, out.endInclusive - out.start, 0.01f)
+    }
+
+    @Test fun landedThePlaneStandsAtTheFarEndAndTheWholeLineIsFlown() {
+        val r = route(1f)
+        assertEquals(56.5f, r.center, 0f)
+        assertEquals(0f..47f, r.flown)
+        assertNull(r.ahead)
+    }
+
+    @Test fun thePlaneMovesEvenlyWithTheShareAndKeepsItsClearing() {
+        var last = -1f
+        for (i in 0..1000) {
+            val share = i / 1000f
+            val r = route(share)
+            // 49 of the 64 are the plane's way: its middle is 7.5 in at the start and as far from the end when it has landed.
+            assertEquals("$share", 7.5f + share * 49f, r.center, 1e-3f)
+            assertTrue("$share", r.center > last)
+            last = r.center
+            r.flown?.let { assertTrue("$share", it.start == 0f && it.endInclusive > 0f && it.endInclusive <= r.center - 9.5f + 1e-3f) }
+            r.ahead?.let { assertTrue("$share", it.endInclusive == 64f && it.start < 64f && it.start >= r.center + 9.5f - 1e-3f) }
+        }
+    }
+
+    @Test fun aShareThatIsNoNumberOrOutOfRangeIsTheNearestEnd() {
+        assertEquals(7.5f, route(Float.NaN).center, 0f)
+        assertNull(route(Float.NaN).flown)
+        assertEquals(17f..64f, route(Float.NaN).ahead)
+        assertEquals(7.5f, route(-3f).center, 0f)
+        assertEquals(56.5f, route(7f).center, 0f)
+        assertEquals(0f..47f, route(Float.POSITIVE_INFINITY).flown)
+    }
+
+    @Test fun onALineShorterThanThePlaneItStandsInTheMiddleAndNothingElseIsDrawn() {
+        for (share in listOf(0f, 0.5f, 1f)) for (track in listOf(4f, 10f, 15f)) {
+            val r = route(share, track)
+            assertEquals("$track", track / 2, r.center, 0f)
+            assertNull("$track", r.flown)
+            assertNull("$track", r.ahead)
+        }
+        // With a little more room than the plane takes, it has a way to go, and what is left of the line is drawn.
+        assertEquals(17f..20f, route(0f, track = 20f).ahead)
+        assertEquals(0f..3f, route(1f, track = 20f).flown)
+        assertEquals(10f, route(0.5f, track = 20f).center, 0f)
+        assertEquals(0f..0.5f, route(0.5f, track = 20f).flown)
+        assertEquals(19.5f..20f, route(0.5f, track = 20f).ahead)
+        // No width at all, less than none, not a number: nothing to draw on, and nothing fails.
+        for (track in listOf(0f, -5f, Float.NaN)) assertNull("$track", SliderMath.route(track, 0.5f, plane = 15f, gap = 2f))
+    }
+
+    @Test fun rightToLeftTheLineStartsAtTheRightAndThePlaneFliesToTheLeft() {
+        val start = route(0f, rtl = true)
+        assertEquals(56.5f, start.center, 0f)
+        assertNull(start.flown)
+        assertEquals(0f..47f, start.ahead)
+        val half = route(0.5f, rtl = true)
+        assertEquals(32f, half.center, 0f)
+        assertEquals(41.5f..64f, half.flown)
+        assertEquals(0f..22.5f, half.ahead)
+        val landed = route(1f, rtl = true)
+        assertEquals(7.5f, landed.center, 0f)
+        assertEquals(17f..64f, landed.flown)
+        assertNull(landed.ahead)
+        // It is the mirror image all the way, with each part still given from its left edge to its right.
+        for (i in 0..100) {
+            val ltr = route(i / 100f)
+            val mirrored = route(i / 100f, rtl = true)
+            assertEquals("$i", 64f - ltr.center, mirrored.center, 1e-4f)
+            assertEquals("$i", ltr.flown?.let { 64f - it.endInclusive }, mirrored.flown?.start)
+            assertEquals("$i", ltr.flown?.let { 64f - it.start }, mirrored.flown?.endInclusive)
+            assertEquals("$i", ltr.ahead?.let { 64f - it.endInclusive }, mirrored.ahead?.start)
+            assertEquals("$i", ltr.ahead?.let { 64f - it.start }, mirrored.ahead?.endInclusive)
+        }
+        // On a line shorter than the plane the middle is the middle from either side.
+        assertEquals(5f, route(0f, track = 10f, rtl = true).center, 0f)
+    }
+
+    @Test fun thePlanesPlaceIsMarkedByItsClearingNotByTheStepInColor() {
+        // The part ahead is the slider's quiet track. A colored part flown stands out from it far less than the slider's
+        // fill does (5:1 and more): by 2.0:1 at the least and 4.3:1 at the most. So the plane and the nothing on each side
+        // of it say where it is, and the color only says how the flight stands.
+        val dark = StripLook(Color.White, true, TextSize.DEFAULT, 12.dp, Pill.NONE)
+        val light = StripLook(Contrast.DARK_TEXT, false, TextSize.DEFAULT, 12.dp, Pill.NONE)
+        fun against(look: StripLook, stands: Stands) = Contrast.ratio(look.route(stands), look.sliderTrack.compositeOver(look.background))
+        val colored = listOf(dark, light).flatMap { look -> listOf(Stands.GOOD, Stands.LATE, Stands.VERY_LATE).map { against(look, it) } }
+        assertEquals(2.0f, colored.min(), 0.05f)
+        assertEquals(4.3f, colored.max(), 0.1f)
+        for (look in listOf(dark, light)) assertTrue(against(look, Stands.NO_CLAIM) >= 5f)
     }
 }

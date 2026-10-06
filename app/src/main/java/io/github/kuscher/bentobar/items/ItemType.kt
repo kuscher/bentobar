@@ -10,6 +10,13 @@ import io.github.kuscher.bentobar.data.Online
 enum class Tone { NORMAL, ACCENT, WARN, ALERT }
 
 /**
+ * How a flight stands for someone who glances at it: nobody has said (no claim is made of it), it
+ * goes to plan, it is late, very late, or it will not arrive as planned. The bar colors a flight's
+ * line by it.
+ */
+enum class Stands { NO_CLAIM, GOOD, LATE, VERY_LATE, WILL_NOT_ARRIVE }
+
+/**
  * A slider drawn in the bar in the text's place (the Sound item's "Slider in the bar"). The strip
  * draws it and reports where it is dragged ([ItemType.onSlide]); the item says what there is to draw.
  */
@@ -21,6 +28,23 @@ data class BarSlider(
     val steps: Int = 0,
     /** Muted: the kept level is drawn dimmed. */
     val dimmed: Boolean = false,
+)
+
+/**
+ * A route line drawn in the bar in the icon's place (the Flight item's, while its flight is near or
+ * under way): the slider's line with a plane on it. Not a control: the strip only draws it, and the
+ * item says where the plane stands and how the flight does.
+ */
+@androidx.compose.runtime.Immutable
+data class BarRoute(
+    /** How much of the way lies behind the plane, 0 to 1: where it stands on the line. */
+    val share: Float,
+    /** What the plane and the part flown are colored by. */
+    val stands: Stands = Stands.NO_CLAIM,
+    /** The plane is the crossed-out one, and stands upright: the flight is canceled. */
+    val struck: Boolean = false,
+    /** The part ahead takes the color too, so the line is one color from end to end: the flight will not arrive as planned. */
+    val whole: Boolean = false,
 )
 
 /** What one item shows right now. Immutable (never mutate [image]), so Compose can skip unchanged items. */
@@ -53,6 +77,11 @@ data class ItemState(
     val widthKey: String? = null,
     /** A slider in the bar instead of [text]; the text stays what menus list and what [desc] says. Null: none. */
     val slider: BarSlider? = null,
+    /**
+     * A route line in the bar instead of [icon]; the icon stays what menus list. Null: none. An item
+     * that is shown as text alone has none to give: its words then keep their own [tone].
+     */
+    val route: BarRoute? = null,
     /** The tooltip, instead of the type's name: a track's whole title and artist, which flight this is. */
     val tooltip: String? = null,
     /**

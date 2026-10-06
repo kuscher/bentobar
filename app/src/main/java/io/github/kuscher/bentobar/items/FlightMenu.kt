@@ -32,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -90,9 +92,20 @@ import java.time.LocalDate
 private class FlightMiss(val number: String, val failure: Failure, val day: LocalDate?)
 
 /**
+ * A press of Track that found the number flying more than once, for the entries under the field: the
+ * number as it is shown, the day that was chosen, what the card asks, and the flights to choose from,
+ * each in the place it is chosen by.
+ */
+private class FlightChoice(val number: String, val day: LocalDate?, val asks: String, val flights: List<FlightText.Choice?>)
+
+private fun flightChoice(number: String, day: LocalDate?, flights: List<Tracked>, now: Instant, v: Voice) =
+    FlightChoice(number, day, FlightText.several(number, day, flights.size, v), flights.map { t -> t.flight?.let { FlightText.choice(it, now, v) } })
+
+/**
  * The Flight item's menu. Which card it is follows from what is known, never from a step the user
  * is on: no key (the words, and the way to the settings), switched off (the words, and Turn on),
- * looking up, a flight that is followed, or nothing followed (the field, the day chips, the note).
+ * looking up, a flight that is followed, or nothing followed (the field, the day chips, the note);
+ * and where a press of Track found several flights of the number, the field's card asks which.
  * Everything it says of a flight is worked out by [FlightText]; it redraws with the ticker, so the
  * figures count by the clock between two answers.
  */
@@ -100,6 +113,8 @@ private class FlightMiss(val number: String, val failure: Failure, val day: Loca
 internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
     val tick = rememberTick()
     val online by Online.state.collectAsState()
+    // Before the menu reads what a press of Track came to: flights found while it was closed are let go.
+    remember(item.id) { FlightItem.menuOpens(item.id) }
     val asked by FlightItem.search.state.collectAsState()
     // "Track another flight": the field again, while the flight that is followed stays until another is found.
     // It is over once an answer was taken, by this menu or by the item's own tick a moment before it.
@@ -138,8 +153,21 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
         is Staged.Following -> staged.tracked
         else -> Tracked()
     }
+    // A press of Track that found several flights of the number: the search card asks which. (With a sample staged, the sample's.)
+    val choice = when {
+        staged is Staged.Several -> flightChoice(staged.number, staged.day, staged.flights, now, v)
+        staged != null -> null
+        else -> (asked as? Ask.State.Done)?.takeIf { it.question.item == item.id }?.let { done ->
+            (done.answer as? FlightLoad.Outcome.Several)?.let { flightChoice(done.question.number.shown, done.question.day, it.flights, now, v) }
+        }
+    }
     // While another flight is being chosen only its own lookup takes the field away, not a retry for the one that stays.
-    val busy = if (staged != null) (staged as? Staged.Looking)?.number else FlightItem.looking(item.id, tracked?.takeUnless { another })
+    val busy = when {
+        // (The lookup is over when its flights wait to be chosen from, though the bar still shows the number.)
+        choice != null -> null
+        staged != null -> (staged as? Staged.Looking)?.number
+        else -> FlightItem.looking(item.id, tracked?.takeUnless { another })
+    }
     val missed = when {
         staged is Staged.Failed -> FlightMiss(staged.number, staged.failure, null)
         staged != null -> null
@@ -156,19 +184,21 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
         busy != null -> MenuCard(Sym.FLIGHT, title, v.say(Word.FLIGHT_LOOKING_UP, busy)) {}
         // Not read yet (the menu was opened in the item's first moment): what is kept is a moment away.
         tracked == null -> MenuCard(Sym.FLIGHT, title, stringResource(R.string.usage_loading)) {}
-        card != null && !another -> FollowedCard(card, FlightItem.place(card), refresh = staged == null && FlightItem.mayRefresh(item.id),
+        // (The question of which flight comes before the flight that stays meanwhile: it is asked on the search card.)
+        card != null && !another && choice == null -> FollowedCard(card, FlightItem.place(card), refresh = staged == null && FlightItem.mayRefresh(item.id),
             upToDate = staged == null && FlightItem.upToDate(item.id),
             onRefresh = { FlightItem.refresh(item.id) }, onChangeKey = changeKey, onPage = { host.close(); FlightItem.openPage(it) },
             onAnother = { if (staged == null) anotherSince = FlightItem.takes else FlightItem.stop(item) },
             onStop = { last = FlightNumber.shown(tracked.number); FlightItem.stop(item) })
-        tracked.following && tracked.flight == null && !another -> WaitingCard(FlightNumber.shown(tracked.number), tracked.failure, v,
+        tracked.following && tracked.flight == null && !another && choice == null -> WaitingCard(FlightNumber.shown(tracked.number), tracked.failure, v,
             retry = FlightItem.mayRefresh(item.id), onRetry = { FlightItem.refresh(item.id) }, onChangeKey = changeKey, onAnother = { anotherSince = FlightItem.takes },
             onStop = { last = FlightNumber.shown(tracked.number); FlightItem.stop(item) })
         else -> {
             // Another flight is being chosen only while there is one that stays meanwhile.
             val staying = FlightNumber.shown(tracked.number).takeIf { another && tracked.following }
-            SearchCard(item, v, LocalDate.ofInstant(now, v.zone), initial = missed?.number ?: last, missed = missed, staying = staying, left = FlightLoad.left,
-                onChangeKey = changeKey, onCancel = if (staying != null) { { anotherSince = null; FlightItem.dropFailure(item.id) } } else null)
+            SearchCard(item, v, LocalDate.ofInstant(now, v.zone), initial = missed?.number ?: choice?.number ?: last, missed = missed, choice = choice, staying = staying,
+                left = FlightLoad.left, onChangeKey = changeKey, onChoose = { FlightItem.choose(item, it) },
+                onCancel = if (staying != null) { { anotherSince = null; FlightItem.dropFailure(item.id) } } else null)
         }
     }
 }
@@ -177,48 +207,80 @@ internal fun FlightMenu(item: ItemConfig, host: MenuHost) {
  * Nothing is followed (or another flight is being chosen, [staying] being the one that stays until
  * then): the field, the day, and what a lookup costs. Under the field stands why the last press of
  * Track found nothing; text that is no flight number is told so, and nothing is sent for it.
+ *
+ * Where the press found the number flying more than once ([choice]), the card asks which: its
+ * subtitle says what is asked, and the flights stand under the field as entries, with Cancel under
+ * them. A click or Enter chooses one ([onChoose], with its place among them). Changing the number,
+ * Cancel and closing the menu drop the question: nothing is followed for it.
  */
 @Composable
-private fun SearchCard(item: ItemConfig, v: Voice, today: LocalDate, initial: String, missed: FlightMiss?, staying: String?, left: Int?,
-                       onChangeKey: () -> Unit, onCancel: (() -> Unit)?) {
+private fun SearchCard(item: ItemConfig, v: Voice, today: LocalDate, initial: String, missed: FlightMiss?, choice: FlightChoice?, staying: String?, left: Int?,
+                       onChangeKey: () -> Unit, onChoose: (Int) -> Unit, onCancel: (() -> Unit)?) {
     var text by remember { mutableStateOf(initial) }
     val days = remember(today) { FlightText.days(today) }
     // The card was away while the number was looked up: it comes back with the number and with the day that was chosen.
-    var day by remember { mutableIntStateOf(missed?.day?.let { days.indexOf(it) }?.coerceAtLeast(0) ?: 0) }
+    var day by remember { mutableIntStateOf((missed?.day ?: choice?.day)?.let { days.indexOf(it) }?.coerceAtLeast(0) ?: 0) }
     var notNumber by remember { mutableStateOf(false) }
     val error = when {
         notNumber -> stringResource(R.string.flight_err_not_number)
         missed != null && FlightText.ofTheField(missed.failure) -> FlightText.error(missed.failure, missed.number, missed.day, v)
         else -> null
     }
-    MenuCard(Sym.FLIGHT, stringResource(R.string.item_flight_title), staying?.let { v.say(Word.FLIGHT_ANOTHER_SUBTITLE, it) } ?: stringResource(R.string.flight_none)) {
-        SearchField(label = stringResource(R.string.flight_number_label), placeholder = stringResource(R.string.flight_number_hint), initial = initial,
-            submit = stringResource(R.string.flight_track), selectAll = true, error = error, canSubmit = text.isNotBlank(),
-            onChange = { text = it; notNumber = false; FlightItem.dropFailure(item.id) },
-            onEnter = { entered ->
-                val question = FlightLoad.question(item.id, entered, days.getOrNull(day), v.zone)
-                if (question == null) notNumber = true else FlightItem.track(question, item)
-            })
-        if (missed != null && error == null) {
-            // The status under a search field is the one thing a menu says unasked: a screen reader hears what the press of Track came to.
-            Text(FlightText.error(missed.failure, missed.number, missed.day, v), style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp).semantics { liveRegion = LiveRegionMode.Polite })
-            if (missed.failure == Failure.REFUSED) MenuEntry(Sym.KEY, stringResource(R.string.flight_change_key), onClick = onChangeKey)
+    val field = remember { FocusRequester() }
+    val first = remember { FocusRequester() }
+    MenuCard(Sym.FLIGHT, stringResource(R.string.item_flight_title), choice?.asks ?: staying?.let { v.say(Word.FLIGHT_ANOTHER_SUBTITLE, it) } ?: stringResource(R.string.flight_none)) {
+        // Down from the field goes to the first of the flights, Up from there comes back.
+        Box(Modifier.onPreviewKeyEvent { e ->
+            if (choice == null || e.key != Key.DirectionDown) false
+            else { if (e.type == KeyEventType.KeyDown) runCatching { first.requestFocus() }; true }
+        }) {
+            SearchField(label = stringResource(R.string.flight_number_label), placeholder = stringResource(R.string.flight_number_hint), initial = initial,
+                submit = stringResource(R.string.flight_track), selectAll = true, error = error, canSubmit = text.isNotBlank(), focus = field,
+                onChange = { text = it; notNumber = false; FlightItem.dropFailure(item.id) },
+                onEnter = { entered ->
+                    val question = FlightLoad.question(item.id, entered, days.getOrNull(day), v.zone)
+                    when {
+                        // The flights of this number and day are here already: Track and Enter go to them, and nothing is looked up a second time.
+                        choice != null -> runCatching { first.requestFocus() }
+                        question == null -> notNumber = true
+                        else -> FlightItem.track(question, item)
+                    }
+                })
         }
-        Spacer(Modifier.height(8.dp))
-        ChipRow(days.mapIndexed { i, d ->
-            when (i) {
-                0 -> stringResource(R.string.flight_day_next)
-                1 -> stringResource(R.string.calendar_today)
-                2 -> stringResource(R.string.calendar_tomorrow)
-                else -> d?.let { v.time(it.atStartOfDay(), TimeForm.DAY) }.orEmpty()
+        if (choice != null) {
+            // The flights take the focus when they come, after the field (which asks for it when it appears): Enter chooses the first, the arrow keys go to the others.
+            LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
+            val top = choice.flights.indexOfFirst { it != null }
+            choice.flights.forEachIndexed { i, flight ->
+                if (flight != null) MenuEntry(Sym.FLIGHT_TAKEOFF, flight.title, sub = flight.detail.ifEmpty { null },
+                    modifier = (if (i != top) Modifier else Modifier.focusRequester(first).onPreviewKeyEvent { e ->
+                        if (e.key != Key.DirectionUp) false else { if (e.type == KeyEventType.KeyDown) runCatching { field.requestFocus() }; true }
+                    }).semantics { contentDescription = flight.spoken }) { onChoose(i) }
             }
-        }, selected = day) { day = it; FlightItem.dropFailure(item.id) }
-        Spacer(Modifier.height(4.dp))
-        MenuNote(listOfNotNull(stringResource(R.string.flight_lookup_note), left?.let { pluralStringResource(R.plurals.flight_lookups_left, it, it) }).joinToString("\n"))
-        if (onCancel != null) {
             MenuDivider()
-            MenuEntry(Sym.CLOSE, stringResource(R.string.common_cancel), onClick = onCancel)
+            MenuEntry(Sym.CLOSE, stringResource(R.string.common_cancel)) { FlightItem.dropFailure(item.id); runCatching { field.requestFocus() } }
+        } else {
+            if (missed != null && error == null) {
+                // The status under a search field is the one thing a menu says unasked: a screen reader hears what the press of Track came to.
+                Text(FlightText.error(missed.failure, missed.number, missed.day, v), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp).semantics { liveRegion = LiveRegionMode.Polite })
+                if (missed.failure == Failure.REFUSED) MenuEntry(Sym.KEY, stringResource(R.string.flight_change_key), onClick = onChangeKey)
+            }
+            Spacer(Modifier.height(8.dp))
+            ChipRow(days.mapIndexed { i, d ->
+                when (i) {
+                    0 -> stringResource(R.string.flight_day_next)
+                    1 -> stringResource(R.string.calendar_today)
+                    2 -> stringResource(R.string.calendar_tomorrow)
+                    else -> d?.let { v.time(it.atStartOfDay(), TimeForm.DAY) }.orEmpty()
+                }
+            }, selected = day) { day = it; FlightItem.dropFailure(item.id) }
+            Spacer(Modifier.height(4.dp))
+            MenuNote(listOfNotNull(stringResource(R.string.flight_lookup_note), left?.let { pluralStringResource(R.plurals.flight_lookups_left, it, it) }).joinToString("\n"))
+            if (onCancel != null) {
+                MenuDivider()
+                MenuEntry(Sym.CLOSE, stringResource(R.string.common_cancel), onClick = onCancel)
+            }
         }
     }
 }

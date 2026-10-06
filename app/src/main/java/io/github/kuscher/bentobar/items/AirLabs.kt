@@ -130,11 +130,137 @@ object AirLabs {
      * Null: a request was not sent at all (the service was switched off or the bar hid under the
      * lookup), so there is nothing to say, neither an answer nor a failure.
      */
-    fun lookup(n: FlightNumber, day: LocalDate?, key: String, now: Instant, zone: ZoneId? = null, get: (Request) -> Reply): Answer? {
+    fun lookup(n: FlightNumber, day: LocalDate?, key: String, now: Instant, zone: ZoneId? = null, get: (Request) -> Reply): Answer? =
+        hear(n, day, null, key, now, zone, withTimetable = false, get)?.answer
+
+    /**
+     * [lookup] for a flight that is followed already, when what was heard of it is gone: the flight of
+     * [n] that leaves the airport [from] on [day], which is that airport's own date. A number can fly
+     * more than once a day (Orlando to Newark in the morning, Newark to San Francisco after it), and
+     * `flight` answers with whichever is nearest to now. With an airport named, only the flights that
+     * leave from it and its lines of the timetable count: the flight that was chosen is found again,
+     * and nobody is asked a second time which one was meant. Null [from]: any airport's, which is what
+     * was kept before there was a choice.
+     */
+    fun lookup(n: FlightNumber, day: LocalDate?, from: String?, key: String, now: Instant, get: (Request) -> Reply): Answer? =
+        hear(n, day, from, key, now, null, withTimetable = false, get)?.answer
+
+    /**
+     * What a press of Track came to: the flights it can mean, or why there is none; and how many lookups
+     * the key has left, where a reply said. One flight is the usual case, and it is the one [lookup] finds.
+     */
+    class Candidates(val flights: List<Flight>, val failure: Failure?, val left: Int?)
+
+    /** "The next flight" of a number that flies more than once is one of those that leave within this long. */
+    val DAY_AHEAD: Duration = Duration.ofHours(24)
+    /** No number flies more often in a day than this, and no menu lists more: of a timetable that says otherwise, the first to leave. */
+    const val MOST_CANDIDATES = 12
+
+    /**
+     * The flights of [n] that a press of Track can mean: one, mostly, and several where the number
+     * flies more than once on the day that was asked for (UA 1227: Orlando to Newark in the morning,
+     * Newark to San Francisco after it, San Francisco to Portland in the evening). Then the user says
+     * which. The one flight is [lookup]'s, found with [lookup]'s requests; the timetable is asked for
+     * besides wherever a flight was found, since it is what says how often the number flies: two
+     * requests in the usual case, three at most.
+     *
+     * With a [day] (a day chip, a day of the device's in [zone]) there is to choose from: every line of
+     * the timetable that leaves on that day, as a plan, in the order they leave.
+     *
+     * With none ("Next flight"): each route's next flight to leave (the soonest of its lines, where
+     * the timetable has a line for each kind of day), where that is within [DAY_AHEAD], in the order
+     * they leave; and before them the flight that is the answer where nothing is asked, if the
+     * service itself knows it and it is in the air or has not left. That one stands for its route:
+     * the route's flight of the day after is not offered beside it, so a number that flies once a day
+     * asks nothing while its flight is in the air or late.
+     *
+     * A flight the service itself answered with stands in the place of the timetable's plan for it (the
+     * same airport, the same planned day: [FlightRules.same]): it has the gate and the delays, and takes
+     * from the plan only what it lacks. Two flights that are the same by that rule are offered once, the
+     * earlier: the app could not tell them apart once one of them is followed.
+     *
+     * Fewer than two to choose from, or no timetable to be had: the one flight, as [lookup] finds it.
+     * Never more than [MOST_CANDIDATES]. Null, and every failure: as for [lookup].
+     */
+    fun candidates(n: FlightNumber, day: LocalDate?, key: String, now: Instant, zone: ZoneId? = null, get: (Request) -> Reply): Candidates? {
+        val heard = hear(n, day, null, key, now, zone, withTimetable = true, get) ?: return null
+        val one = heard.answer.flight ?: return Candidates(emptyList(), heard.answer.failure, heard.answer.left)
+        val like = heard.nearest ?: unnamed(n)
+        val live = listOfNotNull(heard.nearest) + heard.coming.map { named(it, like) }
+        val several = if (day != null) thatDay(heard.lines, like, live, day, zone, now) else ahead(heard.lines, like, live, one, now)
+        return Candidates(if (several.size > 1) several.take(MOST_CANDIDATES) else listOf(one), null, heard.answer.left)
+    }
+
+    /**
+     * The flights of [day] to choose from, as [candidates] says them. A flight the service answered
+     * with that leaves on that day is one of them, whether the timetable has its line or not.
+     */
+    private fun thatDay(lines: List<Route>, like: Flight, live: List<Flight>, day: LocalDate, zone: ZoneId?, now: Instant): List<Flight> =
+        ordered(offered(lines.mapNotNull { on(it, like, day, zone) }, live, now) + live.filter { leaves(it, day, zone) })
+
+    /** The next flights to choose from, as [candidates] says them. [one]: the flight that is the answer where nothing is asked. */
+    private fun ahead(lines: List<Route>, like: Flight, live: List<Flight>, one: Flight, now: Instant): List<Flight> {
+        // (A flight that landed, or was diverted, is not one of the next. One that was canceled has not left, and whoever asks should hear of it.)
+        val first = one.takeIf { !it.timetable && it.state != FlightState.LANDED && it.state != FlightState.DIVERTED }
+        fun own(r: Route) = first != null && r.from == first.from.code && r.to == first.to.code
+        val until = now.plus(DAY_AHEAD)
+        // (A route can have a line for each kind of day, with a time of its own: its next flight is the soonest of theirs.)
+        val plans = lines.filterNot(::own).groupBy { it.from to it.to }.values
+            .mapNotNull { route -> route.mapNotNull { upcoming(it, like, now) }.minByOrNull { leaves(it) ?: Instant.MAX } }
+            .filter { leaves(it)?.isAfter(until) == false }
+        val plan = first?.from?.planned?.let { left -> lines.filter(::own).firstNotNullOfOrNull { planned(it, like, left.toLocalDate()) } }
+        val rest = ordered(offered(plans, live, now)).filter { first == null || !FlightRules.same(first, it) }
+        return listOfNotNull(first?.let { if (plan == null) it else filled(it, plan) }) + rest
+    }
+
+    /**
+     * [plans] of the timetable as flights to choose from: where the service itself answered with one
+     * of them ([live]), that flight in the plan's place, with what it lacks from the plan.
+     */
+    private fun offered(plans: List<Flight>, live: List<Flight>, now: Instant): List<Flight> =
+        plans.map { p -> live.firstOrNull { FlightRules.same(p, it) }?.let { filled(it, p) } ?: dated(p, now) }
+
+    /** [flights] in the order they leave, and none of them twice: of two that are the same flight by [FlightRules.same], the earlier. */
+    private fun ordered(flights: List<Flight>): List<Flight> =
+        flights.sortedBy { leaves(it) ?: Instant.MAX }.fold(emptyList()) { kept, f -> if (kept.any { FlightRules.same(it, f) }) kept else kept + f }
+
+    /**
+     * [live], a flight as the service said it, with what only the timetable's [plan] for it has: the
+     * time of an end the service gave none for (and the clock that time is read by), a terminal it did
+     * not name, the callsign. Nothing the service said is changed.
+     */
+    private fun filled(live: Flight, plan: Flight): Flight {
+        fun end(e: FlightEnd, p: FlightEnd): FlightEnd = when {
+            e.code != p.code -> e
+            e.time == null -> e.copy(planned = p.planned, offset = p.offset, terminal = e.terminal ?: p.terminal)
+            else -> e.copy(terminal = e.terminal ?: p.terminal)
+        }
+        return live.copy(from = end(live.from, plan.from), to = end(live.to, plan.to), callsign = live.callsign ?: plan.callsign)
+    }
+
+    /** The moment [f] leaves, by the best time there is for it. */
+    private fun leaves(f: Flight): Instant? = f.from.time?.let(f.from::moment)
+
+    /**
+     * What one lookup heard: its [answer], and what the service said on the way to it. [nearest]: the
+     * flight `flight` answered with; [coming]: the coming hours' flights; [lines]: the timetable; each
+     * where it was asked for and came.
+     */
+    private class Heard(val answer: Answer, val nearest: Flight?, val coming: List<Flight>, val lines: List<Route>)
+
+    /**
+     * The lookup itself, as [lookup] describes it. [from]: only this airport's flights and lines count.
+     * [withTimetable]: the timetable is asked for also where a flight was found without it (a press of
+     * Track: it says what else the number flies). No question is asked twice.
+     */
+    private fun hear(n: FlightNumber, day: LocalDate?, from: String?, key: String, now: Instant, zone: ZoneId?, withTimetable: Boolean, get: (Request) -> Reply): Heard? {
         var left: Int? = null
         var unsent = false
         // What is asked for: the number as it was entered, until the service has named the ticket's form of a callsign.
         var number = n
+        var nearest: Flight? = null
+        var coming: List<Flight> = emptyList()
+        var table: Read<List<Route>>? = null
         fun <T> ask(path: String, read: (String) -> Read<T>): Read<T> {
             // Once a request was not sent, the lookup is over: nothing more is tried.
             if (unsent) return Read(null, Failure.NO_ANSWER)
@@ -143,39 +269,51 @@ object AirLabs {
                 is Reply.Failed -> { if (reply.why == Why.OFF) unsent = true; Read(null, failure(reply)) }
             }
         }
+        fun counts(f: Flight) = from == null || f.from.code == from
+        /** The timetable, asked for once, whoever wants it. */
+        fun timetable(): Read<List<Route>> = table
+            ?: ask(ROUTES) { routes(it) }.let { r -> Read(r.value?.filter { from == null || it.from == from }, r.failure, r.left) }.also { table = it }
         fun found(): Answer {
             val first = ask(FLIGHT) { flight(it) }
             if (first.failure == Failure.NOT_FOUND) {
-                val timetable = ask(ROUTES) { routes(it) }
+                val timetable = timetable()
                 // The timetable was not to be had (no connection, no lookups left): that is what went wrong, not "nothing found".
                 timetable.failure?.takeIf { it != Failure.NOT_FOUND }?.let { return Answer(null, it, left) }
                 val lines = timetable.value.orEmpty()
-                val like = Flight(n.code, "", FlightEnd(""), FlightEnd(""), FlightState.PLANNED)
+                val like = unnamed(n)
                 val planned = (if (day != null) on(lines, like, day, zone) else upcoming(lines, like, now))?.let { dated(it, now) }
                 return Answer(planned, if (planned != null) null else if (day != null && lines.isNotEmpty()) Failure.NOT_THAT_DAY else Failure.NOT_FOUND, left)
             }
             val f = first.value ?: return Answer(null, first.failure ?: Failure.NO_ANSWER, left)
+            nearest = f
             // The one-flight question was tried with a callsign; the other two only with a ticket's number, which this reply has.
             if (n.callsign) FlightNumber.read(f.number)?.takeUnless { it.callsign }?.let { number = it }
             if (day != null) {
-                if (listOfNotNull(f.from.planned, f.from.time).any { leavesOn(f, it, zone) == day }) return Answer(f, null, left)
-                val timetable = ask(ROUTES) { routes(it) }
+                if (counts(f) && leaves(f, day, zone)) return Answer(f, null, left)
+                val timetable = timetable()
                 val lines = timetable.value ?: return Answer(null, timetable.failure?.takeIf { it != Failure.NOT_FOUND } ?: Failure.NOT_THAT_DAY, left)
                 return on(lines, f, day, zone)?.let { Answer(dated(it, now), null, left) } ?: Answer(null, Failure.NOT_THAT_DAY, left)
             }
-            if (!FlightRules.over(f, now)) return Answer(f, null, left)
+            if (counts(f) && !FlightRules.over(f, now)) return Answer(f, null, left)
             val soon = ask(SCHEDULES) { schedules(it) }
-            FlightRules.next(soon.value.orEmpty(), now)?.let { return Answer(named(it, f), null, left) }
-            val lines = ask(ROUTES) { routes(it) }
+            coming = soon.value.orEmpty().filter(::counts)
+            FlightRules.next(coming, now)?.let { return Answer(named(it, f), null, left) }
+            val lines = timetable()
             upcoming(lines.value.orEmpty(), f, now)?.let { return Answer(dated(it, now), null, left) }
             // No next flight, and one of the two was not to be had (no connection, told to slow down): that is what went wrong.
             // To follow the one that landed hours ago instead would be to say "Landed" and never ask again.
             listOf(soon.failure, lines.failure).firstOrNull { it != null && it != Failure.NOT_FOUND }?.let { return Answer(null, it, left) }
-            // Nothing ahead that anyone knows of: the one that was, as it was.
-            return Answer(f, null, left)
+            // Nothing ahead that anyone knows of: the one that was, as it was. (Another airport's is not the flight that was asked for.)
+            return if (counts(f)) Answer(f, null, left) else Answer(null, Failure.NOT_FOUND, left)
         }
-        return found().takeIf { !unsent }
+        val answer = found()
+        if (withTimetable && answer.flight != null) timetable()
+        // (How many lookups are left is what the last reply said, which can be the timetable's.)
+        return Heard(Answer(answer.flight, answer.failure, left), nearest, coming, table?.value.orEmpty()).takeIf { !unsent }
     }
+
+    /** A flight of [n] of which the number is all that is known: what a timetable's flight is said with when the service knows no flight to take the names from. */
+    private fun unnamed(n: FlightNumber): Flight = Flight(n.code, "", FlightEnd(""), FlightEnd(""), FlightState.PLANNED)
 
     /** What sending came to. Whoever carries requests must not throw; if one does, its message goes nowhere (it could hold the address, and with it the key). */
     private fun send(request: Request, get: (Request) -> Reply): Reply = try { get(request) } catch (_: Exception) { Reply.Failed(Why.UNREADABLE) }
@@ -387,13 +525,15 @@ object AirLabs {
      * soonest of the others.
      */
     fun upcoming(routes: List<Route>, like: Flight, now: Instant): Flight? {
-        fun leaves(f: Flight) = f.from.planned?.let(f.from::moment)
-        fun soonest(lines: List<Route>): Flight? = lines.mapNotNull { r ->
-            val today = LocalDateTime.ofEpochSecond(now.epochSecond, 0, ZoneOffset.ofTotalSeconds(r.fromOffset * 60)).toLocalDate()
-            (-1L..7L).firstNotNullOfOrNull { d -> planned(r, like, today.plusDays(d))?.takeIf { leaves(it)?.isAfter(now) == true } }
-        }.minByOrNull { leaves(it) ?: Instant.MAX }
+        fun soonest(lines: List<Route>): Flight? = lines.mapNotNull { upcoming(it, like, now) }.minByOrNull { leaves(it) ?: Instant.MAX }
         val (same, other) = routes.partition { it.from == like.from.code }
         return soonest(same) ?: soonest(other)
+    }
+
+    /** The next flight of one line of the timetable to leave after [now], within a week. */
+    private fun upcoming(route: Route, like: Flight, now: Instant): Flight? {
+        val today = LocalDateTime.ofEpochSecond(now.epochSecond, 0, ZoneOffset.ofTotalSeconds(route.fromOffset * 60)).toLocalDate()
+        return (-1L..7L).firstNotNullOfOrNull { d -> planned(route, like, today.plusDays(d))?.takeIf { leaves(it)?.isAfter(now) == true } }
     }
 
     /**
@@ -402,6 +542,9 @@ object AirLabs {
      */
     private fun leavesOn(f: Flight, t: LocalDateTime, zone: ZoneId?): LocalDate = if (zone == null) t.toLocalDate() else LocalDate.ofInstant(f.from.moment(t), zone)
 
+    /** True if [f] leaves on [day], by its plan or by the time it is now expected to: the service's flight is that day's then. */
+    private fun leaves(f: Flight, day: LocalDate, zone: ZoneId?): Boolean = listOfNotNull(f.from.planned, f.from.time).any { leavesOn(f, it, zone) == day }
+
     /**
      * The timetable's flight on [day], whichever of its lines flies then; the lines that start where
      * [like] started come first. With a [zone], [day] is a day of the device's and the flight is the
@@ -409,10 +552,12 @@ object AirLabs {
      * between the clocks furthest apart). Without one, [day] is the airport's own date.
      */
     fun on(routes: List<Route>, like: Flight, day: LocalDate, zone: ZoneId? = null): Flight? =
-        routes.sortedBy { it.from != like.from.code }.firstNotNullOfOrNull { r ->
-            if (zone == null) planned(r, like, day)
-            else (-2L..2L).firstNotNullOfOrNull { d -> planned(r, like, day.plusDays(d))?.takeIf { f -> f.from.planned?.let { leavesOn(f, it, zone) } == day } }
-        }
+        routes.sortedBy { it.from != like.from.code }.firstNotNullOfOrNull { on(it, like, day, zone) }
+
+    /** The flight of one line of the timetable on [day], which is a day of the device's with a [zone] and the airport's own date without. */
+    private fun on(route: Route, like: Flight, day: LocalDate, zone: ZoneId?): Flight? =
+        if (zone == null) planned(route, like, day)
+        else (-2L..2L).firstNotNullOfOrNull { d -> planned(route, like, day.plusDays(d))?.takeIf { f -> f.from.planned?.let { leavesOn(f, it, zone) } == day } }
 
     /** The zones there are, for [steady]: read once. */
     private val ZONES: List<ZoneId> by lazy { ZoneId.getAvailableZoneIds().mapNotNull { runCatching { ZoneId.of(it) }.getOrNull() } }

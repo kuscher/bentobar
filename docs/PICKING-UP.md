@@ -19,6 +19,52 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## After 0.9: which flight, where a number flies more than once a day (branch `flight-pick`, on `flight-route`, not released)
+Asked for after 0.9: "If several flights have the same number on the same day, can you give me a disambig when
+adding it." UA 1227 flies Orlando to Newark, Newark to San Francisco and San Francisco to Portland every day, and
+a press of Track took whichever the service answered with. Now the search card asks. Its subtitle says what is
+asked ("UA 1227 flies 3 times on Tue, Oct 6"; for Next flight "UA 1227: 3 flights in the next 24 hours"), and the
+flights stand under the field as entries: "Orlando → Newark" over "Tue 8:45 AM – 11:26 AM", each time its
+airport's own, with Cancel under them. A click or Enter makes one the flight the item follows. With one flight
+that day nothing is asked, as before. The bar shows the number while the choice is open; Cancel, a change of
+the number and closing the menu drop the question, and nothing is followed for it.
+- **How it is made**: `AirLabs.candidates` finds the one flight with the lookup's own requests and asks for the
+  timetable besides; `FlightLoad.track` makes an `Outcome.Several` of two or more; `FlightItem.choose` takes the
+  one that is chosen; `FlightText.several` and `FlightText.choice` have the words; the search card in
+  `FlightMenu.kt` draws them with the menu's own pieces. What is kept names the airport a flight leaves from
+  (the note and `Tracked.from`), and `AirLabs.lookup` with an airport finds that flight again when the answer is
+  gone, whichever the service answers with. A press of Track costs two lookups where it cost one (three at most,
+  as before), and the note under the field says "2 or 3".
+- **Checked**: unit tests on three saved replies for UA 1227 (`FlightCandidatesTest`, and more in
+  `FlightLoadTest` and `FlightSamplesTest`): tomorrow seen from Los Angeles (three, not the Monday flight from
+  Raleigh), a Monday (four), Next flight, a device in Tokyo, the service's own flight in its line's place, one
+  flight and no question, no timetable to be had, a number only the timetable knows, the airport bringing a
+  lookup back to the flight that was chosen, the third flight of the day followed while the service answers with
+  the first and the second, and what was kept before reading as it did. The debug build assembles.
+- **Not checked**: on a screen, anywhere: the list has never been drawn. To look at, with no key:
+  `./bento debug flight show several` (and `several-next`), then the item's menu. The entries' two lines at the
+  menu's width; the focus on the first flight when the list comes (Enter chooses it, the arrow keys go to the
+  others, Up goes back to the field, Track and Enter in the field go to the list); what a screen reader says;
+  Cancel, a change of the number and closing the menu; "UA 1227 …" in the bar meanwhile; and
+  `flight show several 2` for a flight that was chosen.
+- **Decided where the design did not say**: "Next flight" offers one flight for each route. The flight the
+  service answers with stands for its route while it is in the air, late or still to leave (a canceled one too),
+  so the same route's flight of the day after is not listed and a number that flies once a day never asks; a
+  flight that landed is not among the next ones. Two flights that are one to `FlightRules.same` (the same
+  airport, the same planned day) are offered once, since they could not be followed apart, and no more than
+  twelve are offered whatever a timetable says. A flight the service answers with that leaves on the chosen day
+  is among that day's even where the timetable has no line for it. The entries have two lines, as the city
+  search's results have: one line cuts longer city names at the menu's width. While the list is shown the day
+  chips and the lookup note are not. The question is the card's subtitle and is not read out unasked; a screen
+  reader hears the first flight when the list takes the focus, in a sentence with the weekday's whole name. If
+  the second request is not sent at all (the switch went off, the bar hid), the press comes to nothing, as every
+  lookup does whose later request was not sent.
+- **Left open**: "Today" late in the day lists flights that have left, as plans from the timetable (the rule is
+  every line that leaves on that day, and the lookup took such a flight before too). Pressing Track again after
+  Cancel asks the service again. A note kept before this names no airport and is looked up as it always was.
+  The eighteen saved AirLabs replies under `app/src/test/resources/airlabs/` are real replies without their
+  `request` part. The changelog and the release notes come with a release.
+
 ## After 0.9: the strip that stayed white after an unlock (branch `colour-watch`, not released)
 Reported from a Googlebook: after an unlock the strip sometimes stays white while the system's icons are dark.
 0.9 read the bar 250 ms after the strip came back and at most once more 800 ms later; a bar that keeps the lock

@@ -2,6 +2,8 @@ package io.github.kuscher.bentobar.items
 
 import io.github.kuscher.bentobar.items.AirLabs.Failure
 import io.github.kuscher.bentobar.items.FlightSamples.Staged
+import io.github.kuscher.bentobar.net.Reply
+import io.github.kuscher.bentobar.net.Request
 import io.github.kuscher.bentobar.util.Sym
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,6 +11,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 /**
@@ -264,5 +267,80 @@ class FlightSamplesTest {
         assertNull(card("canceled").share)
         assertTrue(card("canceled").from.struck && card("canceled").to.struck)
         assertTrue(card("diverted").to.struck && !card("diverted").from.struck)
+    }
+
+    // ---- several flights of one number to choose from (UA 1227, which flies three times a day)
+
+    private fun several(name: String, at: Instant = now) = staged(name, at = at) as Staged.Several
+
+    @Test fun severalFlightsOfOneNumberCanBeStagedForADay() {
+        // Tomorrow's three, staged on Wednesday evening in San Francisco: Thursday's, each at its timetable's time.
+        val s = several("several")
+        assertEquals("UA 1227", s.number)
+        assertEquals(LocalDate.of(2026, 10, 8), s.day)
+        assertEquals("UA 1227 flies 3 times on Thu, Oct 8", FlightText.several(s.number, s.day, s.flights.size, us))
+        val rows = s.flights.map { FlightText.choice(it.flight!!, now, us) }
+        // The first as the service says a flight, with its cities; the two after it as the timetable does.
+        assertEquals(listOf("Orlando → Newark", "Newark → SFO", "SFO → PDX"), rows.map { it.title })
+        assertEquals(listOf("Thu 8:45 AM – 11:26 AM", "Thu 1:20 PM – 4:19 PM", "Thu 7:05 PM – 9:00 PM"), rows.map { it.detail })
+        assertEquals("Orlando to Newark, leaves Thursday 8:45 AM, lands 11:26 AM", rows[0].spoken)
+        assertEquals(listOf(false, true, true), s.flights.map { it.flight!!.timetable })
+        // Each is as it would be kept: the number, its day at its own airport, that airport.
+        assertEquals(listOf("MCO", "EWR", "SFO"), s.flights.map { it.from })
+        assertTrue(s.flights.all { it.number == "UA1227" && it.day == "2026-10-08" })
+        // While the choice is open the bar shows the number, as it does while it is looked up.
+        assertEquals("UA 1227 …", FlightText.bar(null, s.number, now, 24, us).text)
+    }
+
+    @Test fun severalFlightsOfOneNumberCanBeStagedForTheNextOnes() {
+        val s = several("several-next")
+        assertNull(s.day)
+        assertEquals("UA 1227: 3 flights in the next 24 hours", FlightText.several(s.number, s.day, s.flights.size, us))
+        // They leave in seven, eleven and a half and twenty hours, as on the evening the service's replies were saved: all within the day ahead.
+        val leaves = s.flights.map { t -> t.flight!!.from.let { it.moment(it.time!!) } }
+        assertEquals(listOf(417L, 692L, 1217L), leaves.map { java.time.Duration.between(now, it).toMinutes() })
+        assertTrue(leaves.all { !it.isAfter(now.plus(AirLabs.DAY_AHEAD)) })
+        assertEquals(listOf("Thu 9:17 AM – 11:58 AM", "Thu 1:52 PM – 4:51 PM", "Thu 7:37 PM – 9:32 PM"), s.flights.map { FlightText.choice(it.flight!!, now, us).detail })
+        // Each lands as long after it leaves as the timetable has it.
+        assertEquals(listOf(161L, 359L, 115L), s.flights.map { t -> t.flight!!.let { java.time.Duration.between(it.from.moment(it.from.time!!), it.to.moment(it.to.time!!)).toMinutes() } })
+    }
+
+    @Test fun aRowsNumberAfterTheNameIsThatFlightFollowed() {
+        // What choosing it comes to, and what one flight alone comes to with no question: the flight, followed.
+        val second = tracked("several", "2")
+        assertEquals("EWR" to "SFO", second.flight!!.from.code to second.flight.to.code)
+        val c = FlightText.card(second, now, us)!!
+        assertEquals(listOf("UA 1227 · United Airlines", "Newark → SFO", "Leaves Thu 1:20 PM", "Planned"), listOf(c.title, c.route, c.headline, c.badge))
+        assertEquals("UA1227 · Thu 1:20 PM", FlightText.bar(second, null, now, 24, us).text)
+        // The first is the service's own flight, with its gate once it is near.
+        val first = tracked("several-next", "1")
+        assertEquals("48", first.flight!!.from.gate)
+        assertEquals("Gate 48 · Terminal B", FlightText.card(first, now, us)!!.from.words)
+        assertEquals(several("several").flights[2], tracked("several", "3"))
+        // There are three, and what follows the name is a row's number or nothing.
+        for (turn in listOf("0", "4", "old", "x")) assertNull(turn, staged("several", turn))
+        assertNull(staged("several-next", "9"))
+    }
+
+    @Test fun theNamesOfTheSamplesHaveTheTwoAndWhatMayFollowThem() {
+        for (name in listOf("several", "several-next")) assertTrue(name, " $name " in " ${FlightSamples.names} ")
+        assertTrue(FlightSamples.names, FlightSamples.names.endsWith(" | after several or several-next: 1 2 3"))
+        // They are no flight samples: a flight's turns do not follow them.
+        assertTrue(FlightSamples.names.substringBefore(" | ").split(" ").none { it.startsWith("several") && staged(it) is Staged.Following })
+    }
+
+    @Test fun theStagedFlightsAreTheOnesTheServicesRepliesForUA1227ComeTo() {
+        // On the evening the replies were saved (10:48 PM on Monday 5 October in Los Angeles) the two samples are, flight for
+        // flight, what a press of Track makes of them: for "Tomorrow", and for "Next flight".
+        val evening = Instant.parse("2026-10-06T05:48:00Z")
+        fun reply(name: String) = javaClass.getResource("/airlabs/$name.json")!!.readText()
+        val get: (Request) -> Reply = { r -> Reply.Ok(reply(if (r.path == AirLabs.FLIGHT) "flight-UA1227-first-leg-planned" else "routes-UA1227-three-legs-a-day")) }
+        val la = ZoneId.of("America/Los_Angeles")
+        val tomorrow = AirLabs.candidates(FlightNumber("UA", 1227), LocalDate.of(2026, 10, 6), "k", evening, la, get)!!.flights
+        assertEquals(3, tomorrow.size)
+        assertEquals(tomorrow, several("several", evening).flights.map { it.flight })
+        assertEquals(LocalDate.of(2026, 10, 6), several("several", evening).day)
+        assertEquals("UA 1227 flies 3 times on Tue, Oct 6", several("several", evening).let { FlightText.several(it.number, it.day, it.flights.size, us) })
+        assertEquals(AirLabs.candidates(FlightNumber("UA", 1227), null, "k", evening, null, get)!!.flights, several("several-next", evening).flights.map { it.flight })
     }
 }

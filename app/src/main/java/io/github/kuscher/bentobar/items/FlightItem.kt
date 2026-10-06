@@ -32,7 +32,9 @@ import java.util.Locale
  * requests and what is kept [FlightLoad]'s, the menu and the key's settings are in `FlightMenu.kt`.
  * This object holds them together: the loader for what each item follows ([tracker]: nothing is
  * scheduled, a flight is asked about when its item is looked at and its answer has grown old), the
- * one lookup at a time for a press of Track ([search]), and what a test stages in their place.
+ * one lookup at a time for a press of Track ([search]), whose flight is taken as it comes or, where
+ * the number flies more than once that day, once the menu was told which ([choose]), and what a test
+ * stages in their place.
  *
  * The key is `Online`'s. It is read in [FlightLoad], for the request, and is in no state, no
  * description, no tooltip and nothing a debug hook prints.
@@ -59,7 +61,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         restore = { id -> FlightLoad.kept(id, Now.wall(), ids()) },
         load = { id, last -> FlightLoad.load(id, last, Now.wall(), ids()) })
 
-    /** A press of Track: one lookup at a time, whose answer is taken by [takeAnswer]. */
+    /** A press of Track: one lookup at a time, whose answer is taken by [takeAnswer] or, where it is several flights, by [choose]. */
     internal val search: Ask<FlightLoad.Question, FlightLoad.Outcome> = Background.ask(type, online) { q -> FlightLoad.track(q, Now.wall()) }
 
     /**
@@ -107,6 +109,8 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
                     Count.COMMON_HOURS -> R.plurals.common_hours
                     Count.COMMON_MINUTES -> R.plurals.common_minutes
                     Count.FLIGHT_LOOKUPS_LEFT -> R.plurals.flight_lookups_left
+                    Count.FLIGHT_CHOICE_TIMES -> R.plurals.flight_choice_times
+                    Count.FLIGHT_CHOICE_FLIGHTS -> R.plurals.flight_choice_flights
                 }, n, n)
             },
             clock = { t, form ->
@@ -114,6 +118,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
                     TimeForm.TIME -> time
                     TimeForm.DAY -> "EEE"
                     TimeForm.DAY_TIME -> "EEE$time"
+                    TimeForm.WEEKDAY_TIME -> "EEEE$time"
                     TimeForm.DATE -> "MMMd"
                     TimeForm.DATE_TIME -> "MMMd$time"
                     TimeForm.DAY_DATE -> "EEEMMMd"
@@ -176,6 +181,12 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         Word.FLIGHT_ERR_REFUSED -> R.string.flight_err_refused
         Word.FLIGHT_ERR_USED_UP -> R.string.flight_err_used_up
         Word.FLIGHT_ERR_NO_ANSWER -> R.string.flight_err_no_answer
+        Word.FLIGHT_CHOICE_DAY -> R.string.flight_choice_day
+        Word.FLIGHT_CHOICE_NEXT -> R.string.flight_choice_next
+        Word.FLIGHT_CHOICE_SPAN -> R.string.flight_choice_span
+        Word.FLIGHT_DESC_CHOICE -> R.string.flight_desc_choice
+        Word.FLIGHT_DESC_CHOICE_LEAVES -> R.string.flight_desc_choice_leaves
+        Word.FLIGHT_DESC_CHOICE_LANDS -> R.string.flight_desc_choice_lands
         Word.FLIGHT_DESC_LEAVES_AT -> R.string.flight_desc_leaves_at
         Word.FLIGHT_DESC_LEAVES_IN -> R.string.flight_desc_leaves_in
         Word.FLIGHT_DESC_LANDS_IN -> R.string.flight_desc_lands_in
@@ -213,6 +224,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         when (val s = stagedFor(item)) {
             is Staged.Following -> return inBar(item, s.tracked, null, now, hours)
             is Staged.Looking -> return FlightText.bar(null, s.number, now, hours, voice())
+            is Staged.Several -> return FlightText.bar(null, s.number, now, hours, voice())
             is Staged.Failed, Staged.Empty -> return FlightText.bar(null, null, now, hours, voice())
             Staged.NoKey -> return FlightText.Bar(Sym.FLIGHT, desc = Env.str(R.string.flight_desc_not_set_up))
             null -> {}
@@ -239,13 +251,13 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
 
     /**
      * The number that is being looked up for the item [id], as it is shown: a press of Track (until
-     * its answer is taken, which is the next thing to happen once a flight was found), or a flight
-     * that is asked for afresh.
+     * its answer is taken, which is the next thing to happen once a flight was found, and while
+     * several flights wait for the menu to be told which), or a flight that is asked for afresh.
      */
     internal fun looking(id: String, t: Tracked?): String? {
         val asked = when (val s = search.state.value) {
             is Ask.State.Busy -> s.question
-            is Ask.State.Done -> s.question.takeIf { s.answer is FlightLoad.Outcome.Found }
+            is Ask.State.Done -> s.question.takeIf { s.answer.waits }
             else -> null
         }
         return asked?.takeIf { it.item == id }?.number?.shown
@@ -274,14 +286,50 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
      * The answer to a press of Track becomes what its item follows, if the item is still there. From
      * the menu as soon as it is in; with the next tick if the menu was closed meanwhile, so the
      * lookups it cost are not lost. Main thread. True if a flight was taken.
+     *
+     * Several flights are no answer to take: the item's menu asks which ([choose]). With that menu
+     * closed (it was closed while the number was looked up) there is nobody to ask, and none of them
+     * is taken: the question is dropped, and nothing is followed or kept for it. Which of the three
+     * it is, is [FlightLoad.turn]'s to say.
      */
     internal fun takeAnswer(): Boolean {
+        val state = search.state.value
+        return when (FlightLoad.turn(state, Ticker.focusItem)) {
+            FlightLoad.Turn.KEEP -> false
+            FlightLoad.Turn.DROP -> { drop(); false }
+            FlightLoad.Turn.TAKE -> (state as Ask.State.Done).let { take(it.question.item, (it.answer as FlightLoad.Outcome.Found).tracked) }
+        }
+    }
+
+    /**
+     * The menu of the item [id] opens. Several flights found for it while the menu was closed are not
+     * asked about now: a hidden item has no tick that would have let them go, and a list from an
+     * earlier look is nobody's question. Before the menu reads what there is to show. Main thread.
+     */
+    internal fun menuOpens(id: String) {
+        if (FlightLoad.turn(search.state.value, focused = id, opening = true) == FlightLoad.Turn.DROP) drop()
+    }
+
+    /**
+     * One of the several flights a press of Track found was chosen in the menu: [index], in the order
+     * they are listed. It becomes what [item] follows, as a single answer does. Main thread. True if
+     * it was taken. (Of a staged list the one chosen is shown as followed, and nothing is kept.)
+     */
+    internal fun choose(item: ItemConfig, index: Int): Boolean {
+        (stagedFor(item) as? Staged.Several)?.let { s ->
+            stage(Staged.Following(s.flights.getOrNull(index) ?: return false), "${stagedAs.orEmpty()} ${index + 1}")
+            return true
+        }
         val done = search.state.value as? Ask.State.Done ?: return false
-        val found = done.answer as? FlightLoad.Outcome.Found ?: return false
-        val id = done.question.item
+        val chosen = done.answer.chosen(index)?.takeIf { done.question.item == item.id } ?: return false
+        return take(item.id, chosen)
+    }
+
+    /** [found] becomes what the item [id] follows, if the item is still there: the lookup that brought it is over. */
+    private fun take(id: String, found: Tracked): Boolean {
         search.clear()
-        if (id !in ids() || !FlightLoad.take(id, found.tracked, Now.wall())) return false
-        fresh[id] = found.tracked
+        if (id !in ids() || !FlightLoad.take(id, found, Now.wall())) return false
+        fresh[id] = found
         takes++
         reread(id)
         // The bar has the flight now, and an open menu draws again.
@@ -289,10 +337,22 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         return true
     }
 
-    /** A press of Track that found nothing was read, or the text changed: its message goes. */
+    /**
+     * A press of Track that did not end with a flight followed was read, or the text changed, or the
+     * menu closed: its message goes, and so do the flights it offered to choose from. Nothing is
+     * followed for it and nothing kept. (A staged list goes the same way, and leaves the staged field.)
+     */
     internal fun dropFailure(id: String) {
+        if (staged is Staged.Several && first()?.id == id) { stage(Staged.Empty, "none"); return }
         val done = search.state.value as? Ask.State.Done ?: return
-        if (done.question.item == id && done.answer !is FlightLoad.Outcome.Found) search.clear()
+        if (done.question.item != id || done.answer is FlightLoad.Outcome.Found) return
+        if (done.answer is FlightLoad.Outcome.Several) drop() else search.clear()
+    }
+
+    /** The flights that waited to be chosen from are let go. The bar showed their number meanwhile: it is drawn again. */
+    private fun drop() {
+        search.clear()
+        Ticker.refresh(type)
     }
 
     /** Stop tracking: the item follows nothing, and what was kept for it is deleted. */
@@ -420,9 +480,11 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     /**
      * `flight show NAME [TURN]` shows a sample in the first Flight item's place, made for the (staged)
      * clock's moment; `flight show` lists the names; `flight off` ends it; `flight` says what is staged
-     * and how it reads now, after the clock was moved. A sample is a made-up flight. Of the real thing
-     * nothing is printed but whether there is a key and a switch: never the key, and never a number the
-     * user entered.
+     * and how it reads now, after the clock was moved. `flight show several` and `several-next` stage
+     * the flights of a number that flies three times a day, to choose from in the item's menu (closing
+     * the menu drops them, as it does the real ones); a row's number after either is that flight,
+     * followed. A sample is a made-up flight. Of the real thing nothing is printed but whether there is
+     * a key and a switch: never the key, and never a number the user entered.
      */
     override fun debug(args: List<String>): String? = when (args.firstOrNull()) {
         null -> "items=${ids().size} key=${Online.hasKey(online)} on=${Online.on(online)} staged=" + (staged?.let { "${stagedAs.orEmpty()}: ${reads(it)}" } ?: "nothing")
@@ -435,11 +497,16 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         if (name == null) return FlightSamples.names
         if (first() == null) return "no Flight item outside Off: add one first (add flight)"
         val sample = FlightSamples.of(name, turn, Now.wall()) ?: return "no sample $name ${turn.orEmpty()}: ${FlightSamples.names}"
+        stage(sample, listOfNotNull(name, turn).joinToString(" "))
+        return "$stagedAs: ${reads(sample)}"
+    }
+
+    /** [sample] is what the first Flight item shows from now on, under the name [called]. */
+    private fun stage(sample: Staged, called: String) {
         staged = sample
-        stagedAs = listOfNotNull(name, turn).joinToString(" ")
+        stagedAs = called
         places.clear()
         Ticker.refresh()
-        return "$stagedAs: ${reads(sample)}"
     }
 
     /**
@@ -459,6 +526,10 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
             }
             is Staged.Failed -> "menu \"${FlightText.error(sample.failure, sample.number, null, v)}\""
             is Staged.Looking -> "bar \"${FlightText.bar(null, sample.number, now, hours, v).text.orEmpty()}\""
+            is Staged.Several -> {
+                val rows = sample.flights.mapNotNull { it.flight }.joinToString(" | ") { f -> FlightText.choice(f, now, v).let { "${it.title}, ${it.detail}" } }
+                "bar \"${FlightText.bar(null, sample.number, now, hours, v).text.orEmpty()}\" | menu \"${FlightText.several(sample.number, sample.day, sample.flights.size, v)}\" | $rows"
+            }
             Staged.Empty -> "no flight tracked"
             Staged.NoKey -> "not set up"
         }

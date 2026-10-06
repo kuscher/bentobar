@@ -1,0 +1,149 @@
+{
+  "response": [
+    {
+      "airline_iata": "UA",
+      "airline_icao": "UAL",
+      "flight_number": "1227",
+      "flight_iata": "UA1227",
+      "flight_icao": "UAL1227",
+      "cs_airline_iata": null,
+      "cs_flight_iata": null,
+      "cs_flight_number": null,
+      "dep_iata": "EWR",
+      "dep_icao": "KEWR",
+      "dep_terminals": [
+        "C",
+        "A"
+      ],
+      "dep_time": "13:20",
+      "dep_time_utc": "17:20",
+      "arr_iata": "SFO",
+      "arr_icao": "KSFO",
+      "arr_terminals": [
+        "INTL",
+        "3",
+        "A",
+        "1"
+      ],
+      "arr_time": "16:19",
+      "arr_time_utc": "23:19",
+      "duration": 359,
+      "aircraft_icao": null,
+      "counter": 43462,
+      "updated": "2026-10-06T00:59:20.000Z",
+      "days": [
+        "fri",
+        "mon",
+        "sat",
+        "sun",
+        "thu",
+        "tue",
+        "wed"
+      ]
+    },
+    {
+      "airline_iata": "UA",
+      "airline_icao": "UAL",
+      "flight_number": "1227",
+      "flight_iata": "UA1227",
+      "flight_icao": "UAL1227",
+      "cs_airline_iata": null,
+      "cs_flight_iata": null,
+      "cs_flight_number": null,
+      "dep_iata": "MCO",
+      "dep_icao": "KMCO",
+      "dep_terminals": [
+        "B"
+      ],
+      "dep_time": "08:45",
+      "dep_time_utc": "12:45",
+      "arr_iata": "EWR",
+      "arr_icao": "KEWR",
+      "arr_terminals": [
+        "C",
+        "A"
+      ],
+      "arr_time": "11:26",
+      "arr_time_utc": "15:26",
+      "duration": 161,
+      "aircraft_icao": null,
+      "counter": 4275,
+      "updated": "2026-10-06T02:58:54.000Z",
+      "days": [
+        "fri",
+        "mon",
+        "sat",
+        "sun",
+        "thu",
+        "tue",
+        "wed"
+      ]
+    },
+    {
+      "airline_iata": "UA",
+      "airline_icao": "UAL",
+      "flight_number": "1227",
+      "flight_iata": "UA1227",
+      "flight_icao": "UAL1227",
+      "cs_airline_iata": null,
+      "cs_flight_iata": null,
+      "cs_flight_number": null,
+      "dep_iata": "RDU",
+      "dep_icao": "KRDU",
+      "dep_terminals": [
+        "2"
+      ],
+      "dep_time": "09:10",
+      "dep_time_utc": "13:10",
+      "arr_iata": "EWR",
+      "arr_icao": "KEWR",
+      "arr_terminals": null,
+      "arr_time": "11:47",
+      "arr_time_utc": "15:47",
+      "duration": 157,
+      "aircraft_icao": null,
+      "counter": 188,
+      "updated": "2026-09-22T00:01:53.000Z",
+      "days": [
+        "mon"
+      ]
+    },
+    {
+      "airline_iata": "UA",
+      "airline_icao": "UAL",
+      "flight_number": "1227",
+      "flight_iata": "UA1227",
+      "flight_icao": "UAL1227",
+      "cs_airline_iata": null,
+      "cs_flight_iata": null,
+      "cs_flight_number": null,
+      "dep_iata": "SFO",
+      "dep_icao": "KSFO",
+      "dep_terminals": [
+        "3",
+        "2"
+      ],
+      "dep_time": "19:05",
+      "dep_time_utc": "02:05",
+      "arr_iata": "PDX",
+      "arr_icao": "KPDX",
+      "arr_terminals": null,
+      "arr_time": "21:00",
+      "arr_time_utc": "04:00",
+      "duration": 115,
+      "aircraft_icao": null,
+      "counter": 4034,
+      "updated": "2026-10-06T02:58:54.000Z",
+      "days": [
+        "fri",
+        "mon",
+        "sat",
+        "sun",
+        "thu",
+        "tue",
+        "wed"
+      ]
+    }
+  ],
+  "terms": "Unauthorized access is prohibited and punishable by law. \nReselling data 'As Is' without AirLabs.Co permission is strictly prohibited. \nFull terms on https://airlabs.co/. \nContact us info@airlabs.co"
+}

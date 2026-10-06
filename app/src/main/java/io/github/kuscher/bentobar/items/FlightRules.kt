@@ -465,6 +465,37 @@ object FlightRules {
         }
     }
 
+    /** For at least this long after a flight landed, the service's list of the coming hours was seen to still have it. */
+    val LISTED_AFTER: Duration = Duration.ofHours(1)
+
+    /**
+     * True if the service's list of the coming hours can have [f] at [now]: it was to leave at most
+     * [KNOWN] from now, and landed, or is to land, at most [LISTED_AFTER] before. Its planned time is
+     * what finds it there, so a flight without one is not looked for; nor is a codeshare, whose number
+     * the list was not seen to have.
+     */
+    fun listed(f: Flight, now: Instant): Boolean {
+        val planned = f.from.planned ?: return false
+        if (f.flownAs != null || f.from.moment(planned).isAfter(now.plus(KNOWN))) return false
+        val lands = f.to.time?.let(f.to::moment) ?: return true
+        return !lands.plus(LISTED_AFTER).isBefore(now)
+    }
+
+    /** [f]'s time to land, by the best time there is for it, has passed at [now]. */
+    fun pastLanding(f: Flight, now: Instant): Boolean = passed(f.to, now)
+
+    /**
+     * True if the flight [t] holds, just found by a press of Track, is asked about again at once
+     * rather than when it is due: the coming hours' list can have it ([listed]), there is something to
+     * ask ([pace]), and lookups to spare ([FEW]). What Track found is the one-flight question's word,
+     * which for a number that flies more than once a day can be another flight's times, or the
+     * timetable's plan, which knows no delay: one ask of the list puts it right.
+     */
+    fun askAtOnce(t: Tracked, now: Instant): Boolean {
+        val f = t.flight ?: return false
+        return (t.left == null || t.left >= FEW) && pace(f, now) != null && listed(f, now)
+    }
+
     /** True if [got] is the flight [was] is, heard of again: it starts at the same airport on the same planned day. Another day's flight of the number is another flight. */
     fun same(was: Flight, got: Flight): Boolean =
         was.from.code == got.from.code && was.from.planned != null && was.from.planned.toLocalDate() == got.from.planned?.toLocalDate()
@@ -496,7 +527,7 @@ object FlightRules {
         val left: Int? = null,
         /** When a cancellation or a diversion was first seen: the alert lasts an hour from then. */
         val alertSince: Long? = null,
-        /** The service has gone on to another flight of the number, or knows this one no more: asking has ended. */
+        /** The service has gone on to another flight of the number (a later day's from its airport, or any once this one was to have landed), or knows this one no more: asking has ended. */
         val ended: Boolean = false,
         /** How long a "slow down" asked to be left alone, in seconds. */
         val waitSec: Long? = null,

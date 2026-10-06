@@ -200,7 +200,8 @@ class FlightCandidatesTest {
     @Test fun followingTheThirdFlightOfTheDayStaysOnItWhileTheServiceAnswersWithTheFirstAndTheSecond() {
         val flights = press(thatEvening(), tuesday).flights
         val third = flights[2]
-        fun again(text: String, was: Flight = third) = AirLabs.again(ua1227, "k", was) { Reply.Ok(text) }!!.again
+        // (Asked on Monday evening, more than ten hours before either leaves: the one-flight question's turn.)
+        fun again(text: String, was: Flight = third) = AirLabs.again(ua1227, "k", was, evening) { Reply.Ok(text) }!!.again
         // The service answers with the morning's flight from Orlando (the saved reply), then with the one from Newark: each leaves
         // before the one that is followed. Not yet: the plan stands, and it is asked about again when it is due.
         assertEquals(AirLabs.Again.NotYet, again(flight))
@@ -209,15 +210,146 @@ class FlightCandidatesTest {
         assertEquals(AirLabs.Again.NotYet, again(landed))
         // Tuesday evening's own: that is the flight, with its gate.
         assertEquals("F14", (again(fromSanFrancisco) as AirLabs.Again.Is).flight.from.gate)
-        // Wednesday's first: the service has gone on to a later flight of the number, and the asking ends.
+        // Wednesday's first: another airport's flight, which says nothing while Tuesday evening's has yet to fly. Asked once its
+        // time to land has passed (04:00 UTC on Wednesday), nobody will say more of it: the asking ends.
         val wednesday = Regex("\\d{4}-\\d{2}-\\d{2}").replace(flight) { LocalDate.parse(it.value).plusDays(1).toString() }
-        assertEquals(AirLabs.Again.Gone, again(wednesday))
-        // The second is followed the same way: not yet while the first is the answer, itself when it is, over when the third is.
+        assertEquals(AirLabs.Again.NotYet, again(wednesday))
+        assertEquals(AirLabs.Again.Gone, AirLabs.again(ua1227, "k", third, at("2026-10-07T08:00:00Z")) { Reply.Ok(wednesday) }!!.again)
+        // The second is followed the same way: not yet while the first is the answer, itself when it is. And not over when the
+        // third is: another airport's flight of the same day says nothing of this one (1.0 took it for the end and stopped asking).
         assertEquals(AirLabs.Again.NotYet, again(flight, flights[1]))
         assertEquals("C92", (again(fromNewark, flights[1]) as AirLabs.Again.Is).flight.from.gate)
-        assertEquals(AirLabs.Again.Gone, again(fromSanFrancisco, flights[1]))
+        assertEquals(AirLabs.Again.NotYet, again(fromSanFrancisco, flights[1]))
+        // Nor when Wednesday's first is: another airport's flight, and Newark's has not landed. (A later leg can leave after
+        // midnight, local or not: Singapore 23:55 to Frankfurt, then Frankfurt 08:35 to New York the next day.)
+        assertEquals(AirLabs.Again.NotYet, again(wednesday, flights[1]))
         // And whichever is followed is one flight to the rule, and none of the others.
         for (a in flights) for (b in flights) assertEquals(a === b, FlightRules.same(a, b))
+    }
+
+    // ---- Tuesday, with the flight from Newark late: what the service answered at 17:34 and at 19:47 UTC
+
+    /**
+     * The one-flight question about UA 1227 on Tuesday the 6th. At 17:34 UTC, with the flight from
+     * Newark due to leave in a quarter of an hour, it answered with the evening's flight from San
+     * Francisco. At 19:47 UTC, with Newark's in the air, with a mix of the two: Newark's airports and
+     * position, San Francisco's times, gates and belt. The coming hours' list, asked at 19:47 UTC,
+     * had both flights, each as it was: Newark's left at 13:47 instead of 13:20.
+     */
+    private val thirdPlanned = reply("flight-UA1227-third-leg-planned")
+    private val mixedUp = reply("flight-UA1227-second-leg-in-the-air-with-the-thirds-times")
+    private val secondLate = reply("schedules-UA1227-second-leg-late-in-the-air")
+    private val dueToLeave = at("2026-10-06T17:34:00Z")
+    private val inTheAir = at("2026-10-06T19:47:00Z")
+
+    /** The flight from Newark as it was chosen on Monday evening: the timetable's plan. */
+    private fun fromNewarkPlan(): Flight = press(thatEvening(), tuesday).flights[1].also { assertEquals("EWR-SFO", "${it.from.code}-${it.to.code}") }
+
+    @Test fun aFollowedFlightIsHeardOfInTheComingHoursListWhateverTheOneFlightQuestionSays() {
+        val s = service("flight" to mixedUp, "schedules" to secondLate)
+        val f = (AirLabs.again(ua1227, "k", fromNewarkPlan(), inTheAir, s::get)!!.again as AirLabs.Again.Is).flight
+        // One request, as before: the list of the coming hours, which has each flight of the number as it is.
+        assertEquals(listOf("schedules"), s.asked)
+        assertEquals("EWR-SFO", "${f.from.code}-${f.to.code}")
+        assertEquals(FlightState.IN_AIR, f.state)
+        assertFalse(f.timetable)
+        assertEquals(time("2026-10-06T13:20"), f.from.planned)
+        assertEquals(time("2026-10-06T13:47"), f.from.actual)
+        assertEquals(27, f.from.late)
+        assertEquals(time("2026-10-06T16:21"), f.to.expected)
+        assertEquals("A28", f.from.gate)
+        // The list names no airline and no cities: the ones the flight had stay.
+        assertEquals("United Airlines", f.airline)
+        assertEquals("Newark", f.from.place)
+    }
+
+    @Test fun anotherAirportsFlightOfTheSameDayIsNoWordAboutTheFollowedOne() {
+        // 17:34 UTC: the coming hours' list has nothing to say (here: nothing at all), and the one-flight question answers with
+        // San Francisco's flight. The plan for Newark's stands; whether it is over is the clock's to say, not that answer's.
+        val s = service("flight" to thirdPlanned, "schedules" to none)
+        val asked = AirLabs.again(ua1227, "k", fromNewarkPlan(), dueToLeave, s::get)!!
+        assertEquals(AirLabs.Again.NotYet, asked.again)
+        assertNull(asked.failure)
+        assertEquals(listOf("schedules", "flight"), s.asked)
+    }
+
+    @Test fun withinTheComingHoursAListThatCannotBeHadIsTheAnswer() {
+        val was = fromNewarkPlan()
+        // No connection, or a slow-down: no answer this time, and no second request to spend.
+        val offline = service("flight" to mixedUp)
+        val a = AirLabs.again(ua1227, "k", was, inTheAir, offline::get)!!
+        assertEquals(AirLabs.Again.Failed, a.again)
+        assertEquals(Failure.OFFLINE, a.failure)
+        assertEquals(listOf("schedules"), offline.asked)
+        val slow = AirLabs.again(ua1227, "k", was, inTheAir) { Reply.Failed(Why.STATUS, 429, retryAfterSec = 600) }!!
+        assertEquals(AirLabs.Again.Failed, slow.again)
+        assertEquals(600L, slow.retryAfterSec)
+        // A key that is refused: the end of asking until it is put right, as for the one-flight question.
+        val refused = service("schedules" to reply("error-unknown-key"), "flight" to mixedUp)
+        val r = AirLabs.again(ua1227, "k", was, inTheAir, refused::get)!!
+        assertEquals(AirLabs.Again.Gone, r.again)
+        assertEquals(Failure.REFUSED, r.failure)
+        assertEquals(listOf("schedules"), refused.asked)
+        // Switched off on the way: nothing to say.
+        assertNull(AirLabs.again(ua1227, "k", was, inTheAir) { Reply.Failed(Why.OFF) })
+    }
+
+    @Test fun theListIsAskedForTheNumberAsItWasEnteredAndNothingElse() {
+        val sent = ArrayList<Request>()
+        fun keep(text: String): (Request) -> Reply = { r -> sent += r; Reply.Ok(text) }
+        AirLabs.again(ua1227, "k", fromNewarkPlan(), inTheAir, keep(secondLate))
+        // A callsign is asked for in the ticket's form the followed flight has: the list was not seen to take a callsign.
+        AirLabs.again(FlightNumber("UAL", 1227), "k", fromNewarkPlan(), inTheAir, keep(secondLate))
+        assertEquals(List(2) { AirLabs.SCHEDULES to listOf("flight_iata" to "UA1227", "api_key" to "k") }, sent.map { it.path to it.query })
+    }
+
+    @Test fun theListIsAskedFromTenHoursBeforeItLeavesUntilAnHourAfterItLanded() {
+        // Newark's plan: leaves 17:20, lands 23:19 UTC. The list was seen to keep a landed flight for an hour and more.
+        val plan = fromNewarkPlan()
+        assertTrue(FlightRules.listed(plan, at("2026-10-07T00:19:00Z")))
+        assertFalse(FlightRules.listed(plan, at("2026-10-07T00:20:00Z")))
+        // By the time it is now expected to land, where the service said one: Newark's landed at 16:21, two minutes late.
+        val heard = AirLabs.schedules(secondLate).value!![0]
+        assertTrue(FlightRules.listed(heard, at("2026-10-07T00:21:00Z")))
+        assertFalse(FlightRules.listed(heard, at("2026-10-07T00:22:00Z")))
+        // Not a codeshare's number (the list was not seen to have one by the number it is sold as), and not a flight with no
+        // planned time (that is what finds it there): those are asked about with the one-flight question, as before.
+        val sold = AirLabs.flight(reply("flight-LH9152-codeshare")).value!!
+        assertTrue(sold.flownAs != null)
+        assertFalse(FlightRules.listed(sold, sold.from.moment(sold.from.planned!!)))
+        assertFalse(FlightRules.listed(plan.copy(from = plan.from.copy(planned = null, expected = plan.from.planned)), inTheAir))
+    }
+
+    @Test fun wokenLongAfterItWasToLandOneQuestionAndAnotherAirportsFlightEndIt() {
+        // The lid was closed through the landing. Two hours after it, the list has let it go: the one-flight question alone, and
+        // San Francisco's flight. Newark's is over by the clock and nobody will say more of it: the end, which shows it landed.
+        val heard = AirLabs.schedules(secondLate).value!![0]
+        val s = service("flight" to thirdPlanned, "schedules" to secondLate)
+        val asked = AirLabs.again(ua1227, "k", heard, at("2026-10-07T01:30:00Z"), s::get)!!
+        assertEquals(listOf("flight"), s.asked)
+        assertEquals(AirLabs.Again.Gone, asked.again)
+        assertNull(asked.failure)
+    }
+
+    @Test fun aFlightFoundByTrackIsAskedAboutAtOnceWhereTheComingHoursListCanHaveIt() {
+        // A press of Track at 19:47 UTC: "Next flight" takes the one-flight question's mixed-up answer for Newark's, and a day chip
+        // the timetable's plan. Either is put right by one ask of the list, at once.
+        fun atOnce(f: Flight, now: Instant, left: Int? = 880) =
+            FlightRules.askAtOnce(FlightRules.Tracked("UA1227", "2026-10-06", f, left = left, from = f.from.code), now)
+        val plan = fromNewarkPlan()
+        assertTrue(atOnce(plan, inTheAir))
+        assertTrue(atOnce(AirLabs.flight(mixedUp).value!!, inTheAir))
+        // Ten hours before it leaves (13:20 in Newark is 17:20 UTC), and not a minute earlier: the list reaches no further.
+        assertTrue(atOnce(plan, at("2026-10-06T07:20:00Z")))
+        assertFalse(atOnce(plan, at("2026-10-06T07:19:00Z")))
+        // Nothing to ask once it has landed, or by the clock was to land hours ago.
+        val flown = AirLabs.flight(landed).value!!
+        assertEquals(FlightState.LANDED, flown.state)
+        assertFalse(atOnce(flown, evening))
+        assertFalse(atOnce(plan, at("2026-10-07T03:00:00Z")))
+        // Nor with so few lookups left that nothing is asked unasked; with no count said yet, as usual.
+        assertFalse(atOnce(plan, inTheAir, left = FlightRules.FEW - 1))
+        assertTrue(atOnce(plan, inTheAir, left = null))
     }
 
     // ---- the flights a press of Track can mean

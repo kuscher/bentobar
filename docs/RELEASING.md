@@ -55,6 +55,21 @@ Play Console. The upload then commits its draft with `changesNotSentForReview=tr
 nothing about the draft. (0.8's tag ran before this was known: its bundle was put on Play by hand,
 from the workflow's `bundle` artifact.)
 
+## A release for GitHub alone
+
+To publish a version on GitHub without putting anything on Google Play, switch the Play job off
+for that tag and on again after it:
+
+```bash
+gh variable set PLAY_UPLOAD --body off
+git tag v<version> && git push origin v<version>
+# when the run is done:
+gh variable delete PLAY_UPLOAD
+```
+
+The run builds, checks and publishes the GitHub release as usual; the Play job shows as skipped.
+That version can go to Play later from the run's `bundle` artifact, or with the next tag.
+
 ## A dry run
 
 Actions tab › Release › **Run workflow** (on `main`), or `gh workflow run release.yml --ref main`.

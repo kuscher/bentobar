@@ -520,7 +520,7 @@ class AirLabsTest {
         var asked = 0
         assertNull(AirLabs.lookup(FlightNumber("JL", 101), null, "k", now) { if (asked++ == 0) Reply.Ok(reply("flight-JL101-landed-nine-hours-ago")) else Reply.Failed(Why.OFF) })
         assertEquals(2, asked)
-        assertNull(AirLabs.again(lh455, "k", flight("flight-LH455-in-the-air")) { Reply.Failed(Why.OFF) })
+        assertNull(AirLabs.again(lh455, "k", flight("flight-LH455-in-the-air"), now) { Reply.Failed(Why.OFF) })
         // Anything else that is no reply is "no answer", and no connection is itself.
         assertEquals(Failure.NO_ANSWER, lookup(lh455, now) { Reply.Failed(Why.STATUS, 502) }.failure)
         assertEquals(Failure.NO_ANSWER, lookup(lh455, now) { Reply.Failed(Why.TIMEOUT) }.failure)

@@ -309,8 +309,10 @@ object FlightRules {
      * minutes behind the plan, very late from [VERY_LATE]. Good news is the landing's alone: before a
      * flight leaves, "on time" is a plan like any other and claims nothing. Nothing is claimed either
      * where the badge has nothing to say (only the plan is known), nor of an answer that is over an
-     * hour old ([stale]: what it said of late and early may be wrong by now). A flight that is
-     * canceled or diverted will not arrive as planned, however old the answer.
+     * hour old ([stale]: what it said of late and early may be wrong by now), nor of a flight still in
+     * the air when the time it was to land has passed: "on time" is nobody's to say then, as before it
+     * leaves ([overdue]), while a delay that was known is still true. A flight that is canceled or
+     * diverted will not arrive as planned, however old the answer.
      */
     fun stands(f: Flight, now: Instant, stale: Boolean): Stands {
         val phase = phase(f, now)
@@ -318,7 +320,11 @@ object FlightRules {
         val badge = badge(f, now).takeUnless { stale } ?: return Stands.NO_CLAIM
         return when (badge.verdict) {
             Verdict.PLANNED -> Stands.NO_CLAIM
-            Verdict.ON_TIME, Verdict.EARLY -> if (phase == Phase.IN_AIR || phase == Phase.LANDED) Stands.GOOD else Stands.NO_CLAIM
+            Verdict.ON_TIME, Verdict.EARLY -> when {
+                phase == Phase.IN_AIR && passed(f.to, now) -> Stands.NO_CLAIM
+                phase == Phase.IN_AIR || phase == Phase.LANDED -> Stands.GOOD
+                else -> Stands.NO_CLAIM
+            }
             Verdict.DELAYED, Verdict.LATE -> if (badge.minutes >= VERY_LATE) Stands.VERY_LATE else Stands.LATE
         }
     }

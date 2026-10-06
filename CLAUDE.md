@@ -34,8 +34,8 @@ private projects and paths into their repos, and where signing keys are backed u
     The route line an item can have in its icon's place is the same line with a plane on it and no
     pointer (`ItemState.route`: `RouteTrack` draws it, `SliderMath.route` says where its parts stand,
     `StripLook.route` what color they take). The Flight item has one from its countdown until an hour
-    after landing, by `FlightRules.stands`; shown as text alone it has none, and its words keep their
-    tones (`FlightText.bar`'s `line`).
+    after landing (`FlightText.bar` says when), colored by `FlightRules.stands`; shown as text alone
+    it has none (`Display.line`), and its words keep their tones.
   - `bar/Menus.kt`: the menu card, the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
     visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,

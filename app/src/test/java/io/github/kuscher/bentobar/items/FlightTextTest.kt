@@ -5,6 +5,7 @@ import io.github.kuscher.bentobar.items.FlightRules.Kind
 import io.github.kuscher.bentobar.items.FlightRules.Tracked
 import io.github.kuscher.bentobar.items.FlightText.Voice
 import io.github.kuscher.bentobar.util.Sym
+import io.github.kuscher.bentobar.data.Display
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -671,14 +672,34 @@ class FlightTextTest {
         }
     }
 
-    @Test fun theItemHandsTheLineToTheBarUnlessItIsShownAsTextAlone() {
-        // Read as text, like the table of the words: what the item passes on to the strip shows on a device and nowhere else.
-        val item = java.io.File("src/main/java/io/github/kuscher/bentobar/items/FlightItem.kt").readText()
-        assertTrue(item.contains("line = item.display != Display.TEXT"))
-        assertTrue(item.contains("route = bar.route"))
-        // And the strip draws none for an item shown as text, whoever hands it one.
-        val strip = java.io.File("src/main/java/io/github/kuscher/bentobar/bar/BarUi.kt").readText()
-        assertTrue(strip.contains("s.route?.takeIf { display != Display.TEXT }"))
+    @Test fun anItemShownAsTextAloneHasNoLine() {
+        // The line stands in the icon's place: beside the words or alone, and never where only words are shown.
+        // The item asks for a line by this, and the strip draws one by it.
+        assertTrue(Display.ICON_AND_TEXT.line)
+        assertTrue(Display.ICON.line)
+        assertFalse(Display.TEXT.line)
+    }
+
+    @Test fun aPlaneIsRememberedWhereItFlewAndNotWhereItStandsOnALineThatIsOver() {
+        // In the air: where it was drawn is where the next drawing goes on from.
+        assertEquals(0.5, FlightText.flown(BarRoute(0.5f, Stands.GOOD))!!, 1e-6)
+        assertEquals(0.0, FlightText.flown(BarRoute(0f, Stands.LATE))!!, 1e-6)
+        // Canceled or diverted, the plane stands at the start or where it was: no place it has flown to.
+        assertNull(FlightText.flown(BarRoute(0.5f, Stands.WILL_NOT_ARRIVE, whole = true)))
+        assertNull(FlightText.flown(BarRoute(0f, Stands.WILL_NOT_ARRIVE, struck = true, whole = true)))
+        assertNull(FlightText.flown(null))
+    }
+
+    @Test fun inTheAirPastItsLandingTimeTheSentenceNoLongerSaysOnTime() {
+        val onTime = inAir(fra(expected = "2026-10-03T10:25"))
+        val before = lined(onTime, "2026-10-03T08:20:00Z")
+        assertEquals(Stands.GOOD, before.route?.stands)
+        assertTrue(before.desc, before.desc.endsWith(", on time"))
+        // Fifteen minutes past the time it was to land, and the service has not said that it has.
+        val past = lined(onTime, "2026-10-03T08:40:00Z")
+        assertEquals(Stands.NO_CLAIM, past.route?.stands)
+        assertFalse(past.desc, past.desc.contains("on time"))
+        assertEquals(bar(onTime, "2026-10-03T08:40:00Z").desc, past.desc)
     }
 
     @Test fun theBarAndTheMenuNameAFlightsPlaneAlike() {

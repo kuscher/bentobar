@@ -5,7 +5,6 @@ import android.net.Uri
 import android.text.format.DateFormat
 import androidx.compose.runtime.Composable
 import io.github.kuscher.bentobar.R
-import io.github.kuscher.bentobar.data.Display
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Online
 import io.github.kuscher.bentobar.data.Section
@@ -233,9 +232,8 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
      */
     private fun inBar(item: ItemConfig, t: Tracked?, looking: String?, now: Instant, hours: Int): FlightText.Bar {
         val plane = t?.let(FlightText::plane)
-        val bar = FlightText.bar(t, looking, now, hours, voice(), line = item.display != Display.TEXT, shown = plane?.let(places::get))
-        // (Not for a flight that will not arrive: where its plane is drawn is no place it has flown to.)
-        if (plane != null && bar.route != null && !bar.route.whole) drawn(plane, bar.route.share.toDouble())
+        val bar = FlightText.bar(t, looking, now, hours, voice(), line = item.display.line, shown = plane?.let(places::get))
+        if (plane != null) FlightText.flown(bar.route)?.let { drawn(plane, it) }
         return bar
     }
 
@@ -454,7 +452,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         val v = voice()
         return when (sample) {
             is Staged.Following -> {
-                val b = FlightText.bar(sample.tracked, null, now, hours, v, line = first()?.display != Display.TEXT)
+                val b = FlightText.bar(sample.tracked, null, now, hours, v, line = first()?.display?.line != false)
                 val c = FlightText.card(sample.tracked, now, v)
                 val line = b.route?.let { String.format(Locale.ROOT, "%.2f %s", it.share, it.stands) + (if (it.struck) " struck" else "") + (if (it.whole) " whole" else "") } ?: "none"
                 "bar \"${b.text.orEmpty()}\" tone=${b.tone} active=${b.active} line=$line | menu \"${c?.headline.orEmpty()}\" badge \"${c?.badge.orEmpty()}\" | ${c?.note.orEmpty()}"

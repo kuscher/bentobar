@@ -617,6 +617,20 @@ class FlightRulesTest {
         assertEquals(Stands.NO_CLAIM, leaving(-20))
     }
 
+    /** In the air past the time it was to land, and no word that it has: "on time" is nobody's to say any more, as before it leaves. */
+    @Test fun inTheAirPastItsLandingTimeGoodNewsIsNoLongerClaimed() {
+        val air = flight("flight-LH455-in-the-air")
+        val lands = air.to.moment(air.to.time!!)
+        assertEquals(Stands.GOOD, stands(air, lands.minusSeconds(60)))
+        assertEquals(Stands.NO_CLAIM, stands(air, lands))
+        assertEquals(Stands.NO_CLAIM, stands(air, lands.plusSeconds(15 * 60)))
+        // A delay that was known is still true then.
+        val late = air.copy(to = air.to.copy(expected = air.to.planned!!.plusMinutes(20)))
+        assertEquals(Stands.LATE, stands(late, late.to.moment(late.to.time!!).plusSeconds(15 * 60)))
+        // And a flight that has landed is on time or not by when it did.
+        assertEquals(Stands.GOOD, stands(flight("flight-LH455-landed"), saved.plusSeconds(30 * 60)))
+    }
+
     @Test fun onlyThePlanOrAnAnswerOverAnHourOldClaimsNothing() {
         // Only the plan is known: before it leaves, in the air and after it landed.
         assertEquals(Stands.NO_CLAIM, stands(flight("flight-LH454-planned")))

@@ -209,6 +209,13 @@ object FlightText {
      */
     fun plane(t: Tracked): String? = t.flight?.let { listOf(t.number, t.day.orEmpty(), it.from.code).joinToString(" ") }
 
+    /**
+     * Where the plane of [route] has flown to, to be remembered for its next drawing; null where the line
+     * says nothing of that: there is none, or the flight will not arrive (where its plane stands on a
+     * line that is over is no place it has flown to).
+     */
+    fun flown(route: BarRoute?): Double? = route?.takeUnless { it.whole }?.share?.toDouble()
+
     /** A plan whose time passed with no word: the plain plane and "no update", until the flight is cleared or the service speaks. */
     private fun noUpdate(l: Look): Bar = Bar(Sym.FLIGHT, fit(l.v.say(Word.FLIGHT_BAR_NO_UPDATE, l.number), l.v.say(Word.FLIGHT_BAR_NO_UPDATE, l.f.number), l.number),
         active = true, desc = l.v.say(Word.FLIGHT_DESC_NO_UPDATE, l.number), tooltip = l.tooltip)

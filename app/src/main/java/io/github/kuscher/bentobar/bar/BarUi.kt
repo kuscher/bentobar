@@ -387,7 +387,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val slider = s.slider?.takeIf { display != Display.ICON }
     // A route line takes the icon's place ("Icon and text" draws line and words, "Icon" the line alone);
     // shown as text only, the item has none.
-    val route = s.route?.takeIf { display != Display.TEXT }
+    val route = s.route?.takeIf { display.line }
     // While the pointer holds the slider: the level under it. Otherwise the item's own, which is the real one.
     var held by remember { mutableStateOf<Float?>(null) }
     val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == LayoutDirection.Rtl

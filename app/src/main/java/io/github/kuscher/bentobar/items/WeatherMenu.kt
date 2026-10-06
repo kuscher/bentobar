@@ -1,7 +1,9 @@
 package io.github.kuscher.bentobar.items
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,6 +55,7 @@ import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.ui.ChoiceRow
 import io.github.kuscher.bentobar.ui.InfoRow
+import io.github.kuscher.bentobar.ui.MainActivity
 import io.github.kuscher.bentobar.ui.MenuCard
 import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
@@ -122,6 +125,20 @@ internal fun DayRow(line: DayLine) {
     }
 }
 
+/**
+ * After an item chose My location: that is the user's own act, like Search, so the Weather switch goes
+ * on; and Android asks for the approximate location if it isn't allowed yet. True: it asks, in
+ * BentoBar's settings window, which opens for it (a menu then closes).
+ */
+internal fun hereChosen(): Boolean {
+    WeatherItem.source.turnOn()
+    WeatherHere.wake()
+    Ticker.refresh()
+    if (WeatherHere.allowed()) return false
+    MainActivity.requestPermission(Env.app, Manifest.permission.ACCESS_COARSE_LOCATION)
+    return true
+}
+
 /** The item's menu: one card for each state the item can be in. */
 @Composable
 internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
@@ -133,7 +150,7 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
     val source = WeatherItem.source
     val now = Now.wall()
     val staged = WeatherItem.staged(item) != null
-    val place = WeatherRules.place(item)
+    val place = WeatherLoad.place(item, WeatherHere.place)
     // On opening (and when the city or the switch changes under the menu): a reading older than ten minutes is asked again.
     LaunchedEffect(item.id, place, on, staged) { if (!staged) source.opened(item) }
 
@@ -144,7 +161,8 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
     val again: () -> Unit = { WeatherItem.again(item); pressed++ }
 
     val name = stringResource(R.string.item_weather_title)
-    val city = WeatherRules.city(item) ?: if (staged) WeatherSamples.CITY else name
+    val here = WeatherRules.here(item)
+    val city = if (here) stringResource(R.string.weather_here) else WeatherRules.city(item) ?: if (staged) WeatherSamples.CITY else name
     val by = "menu:" + item.id
     val pick: (City, String?) -> Unit = { found, region ->
         Store.updateItem(item.id) { WeatherRules.picked(it, found, region) }
@@ -153,6 +171,15 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
         Ticker.refresh()
     }
     val changeCity: @Composable () -> Unit = { MenuEntry(Sym.LOCATION_ON, stringResource(R.string.weather_change_city)) { changing = true } }
+    // My location instead of a city. Without the permission yet, the settings window opens to ask for it, and the menu closes.
+    val useHere: @Composable () -> Unit = {
+        MenuEntry(Sym.MY_LOCATION, stringResource(R.string.weather_use_here)) {
+            Store.updateItem(item.id) { WeatherRules.useHere(it) }
+            source.typed(by)
+            changing = false
+            if (hereChosen()) host.close()
+        }
+    }
 
     val status = WeatherItem.status(item, now)
     when {
@@ -160,17 +187,44 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
         status == Status.NotSetUp -> MenuCard(Sym.CLOUD, name, stringResource(R.string.common_not_set_up)) {
             MenuNote(stringResource(R.string.weather_consent))
             CitySearch(item, by, initial = WeatherRules.cityOf(ZoneId.systemDefault().id), onPick = pick)
+            MenuDivider()
+            useHere()
         }
         // The same card for another city: no note (it was read before), and a way back.
         changing -> MenuCard(Sym.CLOUD, city, stringResource(R.string.weather_change_city)) {
             CitySearch(item, by, initial = WeatherRules.city(item).orEmpty(), onPick = pick)
             MenuDivider()
+            if (!here) useHere()
             MenuEntry(Sym.CLOSE, stringResource(R.string.common_cancel)) { source.typed(by); changing = false }
         }
         // A layout that came with a city, or the switch off in Setup: the words, and the one entry that turns it on. Nothing is sent before it.
         status is Status.Off -> MenuCard(Sym.CLOUD, city, stringResource(if (status.everOn) R.string.common_off_in_setup else R.string.weather_not_turned_on)) {
             MenuNote(stringResource(R.string.weather_consent))
             MenuEntry(Sym.TOGGLE_ON, stringResource(R.string.weather_turn_on)) { source.turnOn(); Ticker.refresh() }
+        }
+        // My location, and where the device is isn't known: why, the one thing that helps, and a city instead.
+        status is Status.NoLocation -> MenuCard(Sym.CLOUD, city, stringResource(when (status.why) {
+            Locate.NOT_ALLOWED -> R.string.weather_here_not_allowed
+            Locate.OFF -> R.string.weather_here_off
+            else -> R.string.weather_here_none
+        })) {
+            MenuNote(stringResource(when (status.why) {
+                Locate.NOT_ALLOWED -> R.string.weather_here_not_allowed_note
+                Locate.OFF -> R.string.weather_here_off_note
+                else -> R.string.weather_here_none_note
+            }))
+            when (status.why) {
+                Locate.NOT_ALLOWED -> MenuEntry(Sym.MY_LOCATION, stringResource(R.string.weather_allow_location)) {
+                    host.close()
+                    MainActivity.requestPermission(Env.app, Manifest.permission.ACCESS_COARSE_LOCATION)
+                }
+                Locate.OFF -> MenuEntry(Sym.SETTINGS, stringResource(R.string.weather_location_settings)) {
+                    host.close()
+                    Env.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                }
+                else -> {}
+            }
+            changeCity()
         }
         // No spinner: the subtitle says it, and the body shows nothing that isn't known yet.
         status == Status.Loading -> MenuCard(Sym.CLOUD, city, stringResource(R.string.usage_loading)) { changeCity() }
@@ -293,35 +347,52 @@ internal fun CitySearch(item: ItemConfig, by: String, initial: String, canSubmit
 @Composable
 private fun SearchStatus(text: String) = Box(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) { MenuNote(text) }
 
-/** The item's settings: the city (the same search as in the menu), what the bar shows, the unit and a label. */
+/** The item's settings: the city (the same search as in the menu) or My location, what the bar shows, the unit and a label. */
 @Composable
 internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
     val online by Online.state.collectAsState()
     val on = Online.Service.OPEN_METEO in online.on
     val source = WeatherItem.source
     val city = WeatherRules.city(item)
+    val here = WeatherRules.here(item)
     val by = "settings:" + item.id
+    // Whether location is allowed can change in Android's settings beside this window: looked at again with the tick.
+    rememberTick()
     // One card serves whichever item is selected: nothing typed or opened for one item stays for the next.
     key(item.id) {
         var changing by remember { mutableStateOf(false) }
+        // Like Search, an item in Off may not turn the service on: the Where row above says where it is.
+        val chooseHere: @Composable () -> Unit = {
+            TextButton(onClick = { set(WeatherRules.useHere(item)); source.typed(by); changing = false; hereChosen() }, enabled = item.section != Section.OFF) {
+                Text(stringResource(R.string.weather_use_here))
+            }
+        }
         Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-            Text(if (city != null) stringResource(R.string.weather_city_current, city) else stringResource(R.string.weather_city_none),
-                style = MaterialTheme.typography.labelLarge)
+            Text(when {
+                here -> stringResource(R.string.weather_here_current)
+                city != null -> stringResource(R.string.weather_city_current, city)
+                else -> stringResource(R.string.weather_city_none)
+            }, style = MaterialTheme.typography.labelLarge)
             // The words before the first request, here as in the menu.
             Text(stringResource(R.string.weather_consent), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (WeatherRules.place(item) == null || changing) {
-                // An item in Off may ask nothing: the Where row above says where it is.
+            if ((!here && WeatherRules.place(item) == null) || changing) {
                 CitySearch(item, by, initial = city ?: WeatherRules.cityOf(ZoneId.systemDefault().id), canSubmit = item.section != Section.OFF) { found, region ->
                     set(WeatherRules.picked(item, found, region))
                     source.typed(by)
                     changing = false
                 }
-                if (changing) TextButton(onClick = { source.typed(by); changing = false }) { Text(stringResource(R.string.common_cancel)) }
+                Row(Modifier.offset(x = (-12).dp)) {
+                    if (!here) chooseHere()
+                    if (changing) TextButton(onClick = { source.typed(by); changing = false }) { Text(stringResource(R.string.common_cancel)) }
+                }
             } else Row(Modifier.offset(x = (-12).dp)) { // a text button's own padding: its words then start where the lines above do
                 // The field appears on a click, as in the menu, and takes the focus then: not each time the item is selected.
                 TextButton(onClick = { changing = true }) { Text(stringResource(R.string.weather_change_city)) }
+                if (!here) chooseHere()
                 // A layout that came with a city, or the switch off in Setup: the same act as the menu's.
                 if (!on) TextButton(onClick = { source.turnOn(); Ticker.refresh() }) { Text(stringResource(R.string.weather_turn_on)) }
+                // My location without the permission (refused, or taken back in Android's settings).
+                if (here && !WeatherHere.allowed()) TextButton(onClick = { hereChosen() }) { Text(stringResource(R.string.weather_allow_location)) }
             }
         }
     }

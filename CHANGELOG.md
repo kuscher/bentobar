@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Weather: My location.** The weather where you are, instead of a city you pick. BentoBar asks for
+  Android's approximate location only when you choose it, and sends Open-Meteo that location rounded
+  to about 10 km. It is kept in memory only, never in your layout.
 - **Weather: With conditions.** A new choice under Show puts a word for the sky beside the temperature
   ("72° · Partly cloudy", "54° · Light rain"). A strong wind where nothing falls is "Windy": whatever
   Show says, the icon is the wind's and the item says "Windy" to a screen reader; with this choice the

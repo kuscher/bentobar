@@ -16,9 +16,10 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Weather: the temperature and conditions of a city the user picks, from Open-Meteo, with the next
- * hours and days in its menu. One of the two item types that go online ([online]), and only after the
- * user set it up on this install: until then nothing is asked, whatever the layout says.
+ * Weather: the temperature and conditions of a city the user picks, or of where the device is ("My
+ * location", [WeatherHere]), from Open-Meteo, with the next hours and days in its menu. One of the two
+ * item types that go online ([online]), and only after the user set it up on this install: until then
+ * nothing is asked, whatever the layout says.
  *
  * The item itself is thin. What it shows and says is worked out in [WeatherRules] (pure, unit-tested
  * against the product's tables); everything that could send something goes through [source]
@@ -46,6 +47,8 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         up = Now::elapsed,
         layout = { Store.config.value.items },
         staged = { stagedFailure.getAndSet(null) },
+        here = { WeatherHere.place },
+        locating = { WeatherHere.why },
     )
 
     /** The rules' words, from the app's resources. */
@@ -71,7 +74,8 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
      */
     internal fun look(item: ItemConfig): Look {
         val fahrenheit = Units.fahrenheit(item.opt("unit", "system"))
-        return WeatherRules.look(item, fahrenheit, Units.windInMiles(fahrenheit, Locale.getDefault().country), within.shown(item))
+        return WeatherRules.look(item, fahrenheit, Units.windInMiles(fahrenheit, Locale.getDefault().country), within.shown(item),
+            hereName = Env.str(R.string.weather_here))
     }
 
     /** The state [item] is in at [now]: the staged one in a test, else the real one. It asks nothing. */
@@ -102,6 +106,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     // ---- deleted with the item --------------------------------------------------------------------
 
     private var seenItems: List<ItemConfig>? = null
+    private var seenHere: Place? = null
     private var keptFor: Set<Place>? = null
 
     /**
@@ -113,15 +118,23 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
      */
     private fun tidy() {
         val items = Store.config.value.items
-        if (items === seenItems) return
+        val here = WeatherHere.place
+        if (items === seenItems && here == seenHere) return
         seenItems = items
-        val places = WeatherLoad.places(items)
+        seenHere = here
+        // Where the device is is forgotten with the last item of My location.
+        if (here != null && items.none { it.type == type && WeatherRules.here(it) }) WeatherHere.forget()
+        val places = WeatherLoad.places(items, WeatherHere.place)
         if (places == keptFor) return
         keptFor = places
         source.keepOnly(places)
     }
 
-    override fun sample(now: Long) = tidy()
+    override fun sample(now: Long) {
+        tidy()
+        // Android is asked where the device is only for an item of My location outside Off, while the switch is on.
+        if (Online.on(online) && Store.config.value.items.any { it.type == type && it.section != Section.OFF && WeatherRules.here(it) }) WeatherHere.keepUp()
+    }
 
     // Also when the last Weather item went: nothing samples this type any more, so this is the moment that is left.
     override fun onIdle() = tidy()
@@ -157,7 +170,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
 
     // The switch went off: the loader, the search and what was kept have forgotten already; a staged sample goes too.
     // A staged failure stays: a tester stages it while the switch is off, so that the first request after "on" is the one that fails.
-    override fun forgetFetched() { stagedReading = null; stagedSearch = null }
+    override fun forgetFetched() { stagedReading = null; stagedSearch = null; WeatherHere.forget() }
 
     /**
      * `./bento debug weather stage <sample>`, `weather search places|none|offline|error|busy`,
@@ -169,7 +182,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
             val items = Store.config.value.items.filter { it.type == type }
             val first = firstShown()
             val reading = first?.let { source.peek(it) }
-            "staged=${stagedReading?.name ?: "none"} search=${if (stagedSearch == null) "real" else "staged"} fail=${stagedFailure.get() ?: "none"}" +
+            "staged=${stagedReading?.name ?: "none"} here=${if (WeatherHere.place != null) "known" else WeatherHere.why} search=${if (stagedSearch == null) "real" else "staged"} fail=${stagedFailure.get() ?: "none"}" +
                 " items=${items.size} places=${WeatherLoad.places(items).size}" +
                 " on=${Online.on(online)} setUp=${Online.setUp(online)}" + (first?.let {
                     " first=${status(it, Now.wall()).javaClass.simpleName} loading=${source.loading(it)} failure=${reading?.failure ?: "none"}" +
@@ -264,6 +277,7 @@ fun weatherRes(word: W): Int = when (word) {
     W.DESC_LOADING -> R.string.weather_desc_loading
     W.DESC_OFF -> R.string.weather_desc_off
     W.DESC_NO_READING -> R.string.weather_desc_no_reading
+    W.DESC_NO_LOCATION -> R.string.weather_desc_no_location
     W.DEGREES -> R.plurals.weather_degrees
     W.SUBTITLE -> R.string.weather_subtitle
     W.SUBTITLE_THERE -> R.string.weather_subtitle_there

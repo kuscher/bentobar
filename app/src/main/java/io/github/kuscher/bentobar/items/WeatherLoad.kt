@@ -60,9 +60,13 @@ object WeatherLoad {
      * An item in Off keeps its settings and nothing else. Its reading goes while the type still has a
      * live item to look at the layout (the tick that turns it off); kept with an item that is off, it
      * would outlive the item, since nothing runs for a type whose last item is off when that is deleted.
+     * [here]: where the device is, for the items of My location; null while that isn't known.
      */
-    fun places(items: List<ItemConfig>): Set<Place> =
-        items.filter { it.type == "weather" && it.section != Section.OFF }.mapNotNullTo(HashSet()) { WeatherRules.place(it) }
+    fun places(items: List<ItemConfig>, here: Place? = null): Set<Place> =
+        items.filter { it.type == "weather" && it.section != Section.OFF }.mapNotNullTo(HashSet()) { place(it, here) }
+
+    /** The place [item] asks about: its city, or [here] for one of My location. */
+    fun place(item: ItemConfig, here: Place?): Place? = if (WeatherRules.here(item)) here else WeatherRules.place(item)
 
     /**
      * Asks the service about [place]; blocks, so only a background load calls it. A good answer is a
@@ -163,12 +167,18 @@ class WeatherSource(
     /** The wall clock, and the time since boot: a reading's age is asked of both ([WeatherRules.old]). */
     private val wall: () -> Long,
     private val up: () -> Long,
+    /** Where the device is, rounded ([WeatherRules.nearby]), and why not where that isn't known: for the items of My location. */
+    private val here: () -> Place? = { null },
+    private val locating: () -> Locate = { Locate.FINDING },
 ) {
     private val service = Online.Service.OPEN_METEO
 
+    /** The place [item] asks about: its city, or where the device is. Null: none yet. */
+    private fun place(item: ItemConfig): Place? = WeatherLoad.place(item, here())
+
     /** The place [item] may ask about right now, or null: no city, an item in Off, or the switch off. */
     private fun asked(item: ItemConfig): Place? =
-        if (item.section == Section.OFF || !Online.on(service)) null else WeatherRules.place(item)
+        if (item.section == Section.OFF || !Online.on(service)) null else place(item)
 
     /**
      * What is known for [item]'s place, loading it first if that is due. This is what the bar's state
@@ -176,7 +186,7 @@ class WeatherSource(
      */
     fun reading(item: ItemConfig): Reading? {
         if (!Online.on(service)) return null
-        val place = WeatherRules.place(item) ?: return null
+        val place = place(item) ?: return null
         if (item.section != Section.OFF) {
             readings.want(place)
             askIfOld(place)
@@ -198,16 +208,18 @@ class WeatherSource(
     }
 
     /** What there is for [item]'s place, asking nothing. Any thread. */
-    fun peek(item: ItemConfig): Reading? = WeatherRules.place(item)?.let { readings.peek(it) }
+    fun peek(item: ItemConfig): Reading? = place(item)?.let { readings.peek(it) }
 
     /** The state [item] is in, asking nothing. */
     fun status(item: ItemConfig, now: Long): Status {
         val on = Online.on(service)
-        return WeatherRules.status(hasPlace = WeatherRules.place(item) != null, on = on, setUp = Online.setUp(service),
-            reading = if (on) peek(item) else null, now = now, up = up())
+        val place = place(item)
+        return WeatherRules.status(hasPlace = place != null, on = on, setUp = Online.setUp(service),
+            reading = if (on) place?.let { readings.peek(it) } else null, now = now, up = up(),
+            locating = if (WeatherRules.here(item) && place == null) locating() else null)
     }
 
-    fun loading(item: ItemConfig): Boolean = WeatherRules.place(item)?.let { readings.loading(it) } ?: false
+    fun loading(item: ItemConfig): Boolean = place(item)?.let { readings.loading(it) } ?: false
 
     /**
      * The item's menu opened: a good reading older than ten minutes is asked again. One whose last
@@ -273,7 +285,7 @@ class WeatherSource(
         if (asker == by) asking.clear()
     }
 
-    /** "Turn on weather": for a layout that came with a city, or after the switch was turned off in Setup. */
+    /** "Turn on weather": for a layout that came with a city, or after the switch was turned off in Setup. Also "Use my location". */
     fun turnOn(): Boolean = Online.turnOn(service)
 
     /**
@@ -292,6 +304,7 @@ class WeatherSource(
          * it here alike and differ only in where work runs and what time it is. [wall]: the wall
          * clock; [up]: the time since boot, which the loader counts by (the app's `Now.elapsed`);
          * [layout]: the layout's items right now (asked from the background thread).
+         * [here] and [locating]: where the device is, for My location ([WeatherHere]).
          * [staged]: a debug build's test hook; when it names a failure, the load that asked is not
          * sent and comes back as that failure, so the pace after an error can be watched on a device.
          */
@@ -303,15 +316,17 @@ class WeatherSource(
             up: () -> Long,
             layout: () -> List<ItemConfig>,
             staged: () -> Failure? = { null },
+            here: () -> Place? = { null },
+            locating: () -> Locate = { Locate.FINDING },
         ): WeatherSource = WeatherSource(
             refresher({ _, reading -> WeatherRules.every(reading) }, { place -> WeatherLoad.kept(place, wall()) },
                 { place, last ->
                     // "No connection" is what nothing-went-out looks like; the other two stand for a try that did.
                     staged()?.let { WeatherLoad.failed(place, last, it, went = it != Failure.OFFLINE) }
-                        ?: WeatherLoad.load(place, last, wall(), up()) { WeatherLoad.places(layout()) }
+                        ?: WeatherLoad.load(place, last, wall(), up()) { WeatherLoad.places(layout(), here()) }
                 }),
             ask { query -> WeatherLoad.search(query.text) },
-            background, wall, up,
+            background, wall, up, here, locating,
         )
 
         /** [state] as the field [by] shows it: an answer to another field's question is none of its business. */

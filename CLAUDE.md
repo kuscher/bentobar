@@ -44,8 +44,9 @@ private projects and paths into their repos, and where signing keys are backed u
     glyph icons, `Chips` for the Live Update chip), and the item types: several each in
     `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
     (`CpuItem`, `ClockItem`, `SoundItem`, `MediaItem`, `DevicesItem`, `HeatItem`, `WeatherItem`,
-    `FlightItem`). A type gets `onLive()`, `sample(now)` once a second and `onIdle()` from the
-    `Ticker`: listeners and polls hang on those, so none exists while the bar is hidden, the screen is
+    `FlightItem`). `WeatherHere` is Weather's My location: Android's approximate location, rounded to
+    0.1° (`WeatherRules.nearby`), in memory only; the layout holds `where=here` and never a place.
+    A type gets `onLive()`, `sample(now)` once a second and `onIdle()` from the `Ticker`: listeners and polls hang on those, so none exists while the bar is hidden, the screen is
     off or no such item is outside Off.
   - `items/Refresher.kt` is `Calendar`'s way of loading as one class (a background thread, one load
     per key, an immutable snapshot, a generation counter); `items/Ask.kt` is the same for one
@@ -215,6 +216,8 @@ private projects and paths into their repos, and where signing keys are backed u
   A service is asked only after its item was set up on this install: `data/Online.kt` records that
   outside the layout, so a pasted layout or a restored backup turns nothing on. Off (Setup › Online
   services) stops requests at once and deletes what was fetched (`ItemType.forgetFetched`).
+  The one location permission is `ACCESS_COARSE_LOCATION`, for Weather's My location, asked for only when
+  an item chooses it, and Android is asked only while such an item is outside Off and the switch is on.
   `ManifestTest` pins the permissions, the backup rules, cleartext off and the listener's entry;
   `HttpTest` and `HttpTransportTest` pin the three hosts and what a request may carry.
 - **A flight service's reply repeats the key it was asked with**, and the platform puts addresses

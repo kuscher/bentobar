@@ -411,6 +411,58 @@ class WeatherRulesTest {
 
     // ---- the bar: the states without a number ---------------------------------------------------
 
+    @Test fun myLocationWithoutAPlaceIsLoadingOrSaysWhy() {
+        fun status(why: Locate?, on: Boolean = true) = WeatherRules.status(hasPlace = false, on = on, setUp = true, reading = null, now = at(13, 30), locating = why)
+        assertEquals(Status.NotSetUp, status(null))
+        assertEquals(Status.Loading, status(Locate.FINDING))
+        assertEquals(Status.NoLocation(Locate.NOT_ALLOWED), status(Locate.NOT_ALLOWED))
+        assertEquals(Status.NoLocation(Locate.OFF), status(Locate.OFF))
+        assertEquals(Status.NoLocation(Locate.NONE), status(Locate.NONE))
+        // The switch first: with it off nothing is asked, so nothing is missing.
+        assertEquals(Status.Off(everOn = true), status(Locate.NOT_ALLOWED, on = false))
+        val b = WeatherRules.bar(Status.NoLocation(Locate.NOT_ALLOWED), look(), at(13, 30), w, t)
+        assertEquals(Sym.CLOUD_OFF, b.icon)
+        assertFalse(b.filled)
+        assertNull(b.text)
+        assertEquals("Weather: no location", b.desc)
+    }
+
+    @Test fun myLocationGoesByThatName() {
+        val item = WeatherRules.useHere(ItemConfig("w", "weather", options = mapOf("city" to "Oslo", "lat" to "59.91", "lon" to "10.75")))
+        val l = WeatherRules.look(item, fahrenheit = true, miles = true, rainHours = 2, hereName = "My location")
+        assertEquals("My location", l.city)
+        assertEquals("My location: 72 degrees. Partly cloudy.", bar(reading(), l).desc)
+        // Its city stays for a way back, and is the item's name again after it.
+        assertEquals("Oslo", WeatherRules.look(WeatherRules.useCity(item), true, true, 2, hereName = "My location").city)
+    }
+
+    @Test fun whereTheDeviceIsIsRoundedToOneDecimal() {
+        assertEquals(Place("47.4", "8.5"), WeatherRules.nearby(47.376_887, 8.541_694))
+        assertEquals(Place("37.8", "-122.4"), WeatherRules.nearby(37.7749, -122.4194))
+        assertEquals(Place("-33.9", "151.2"), WeatherRules.nearby(-33.8688, 151.2093))
+        assertEquals(Place("0.0", "0.0"), WeatherRules.nearby(-0.04, 0.04))
+        assertEquals(Place("90.0", "180.0"), WeatherRules.nearby(90.0, 180.0))
+        assertNull(WeatherRules.nearby(90.1, 0.0))
+        assertNull(WeatherRules.nearby(0.0, -180.1))
+        assertNull(WeatherRules.nearby(Double.NaN, 0.0))
+        assertEquals("a place", WeatherRules.nearby(47.37, 8.54).toString())
+    }
+
+    @Test fun pickingACityEndsMyLocationAndUsingItKeepsTheCity() {
+        val oslo = ItemConfig("w", "weather", options = mapOf("city" to "Oslo", "lat" to "59.91", "lon" to "10.75", "show" to "sky"))
+        val mine = WeatherRules.useHere(oslo)
+        assertTrue(WeatherRules.here(mine))
+        assertEquals(oslo.options + ("where" to "here"), mine.options)
+        assertFalse(WeatherRules.here(WeatherRules.useCity(mine)))
+        assertEquals(oslo, WeatherRules.useCity(mine))
+        val zurich = WeatherRules.picked(mine, City("Zurich", "Zurich", "Switzerland", "47.37", "8.55", "Europe/Zurich"), "Zurich, Switzerland")
+        assertFalse(WeatherRules.here(zurich))
+        assertEquals("47.37", zurich.options["lat"])
+        assertEquals("sky", zurich.options["show"])
+        // Only "here" is My location: a layout from anywhere can say anything.
+        for (v in listOf("HERE", "city", "", "here ")) assertFalse(WeatherRules.here(oslo.with("where", v)))
+    }
+
     @Test fun notSetUpIsAnOutlinedCloudWithoutText() {
         val b = WeatherRules.bar(WeatherRules.status(hasPlace = false, on = false, setUp = false, reading = null, now = at(13, 30)), look(city = null), at(13, 30), w, t)
         assertEquals(Sym.CLOUD, b.icon)

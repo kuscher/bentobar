@@ -159,6 +159,8 @@ class MainActivity : ComponentActivity() {
                 Notice.post(getString(R.string.setup_denied_settings), getString(R.string.common_open_settings)) { openAppInfo(this) }
         }
         Setup.refresh(this)
+        // Location allowed (or not) for Weather's My location: looked at now, not at its next look.
+        io.github.kuscher.bentobar.items.WeatherHere.wake()
         Ticker.refresh()
     }
 

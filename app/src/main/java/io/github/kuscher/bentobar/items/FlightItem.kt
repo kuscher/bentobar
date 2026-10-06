@@ -183,6 +183,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         Word.FLIGHT_DESC_LANDED -> R.string.flight_desc_landed
         Word.FLIGHT_DESC_LATE -> R.string.flight_desc_late
         Word.FLIGHT_DESC_EARLY -> R.string.flight_desc_early
+        Word.FLIGHT_DESC_ON_TIME -> R.string.flight_desc_on_time
         Word.FLIGHT_DESC_GATE -> R.string.flight_desc_gate
         Word.FLIGHT_DESC_BELT -> R.string.flight_desc_belt
         Word.FLIGHT_DESC_CANCELED -> R.string.flight_desc_canceled

@@ -100,6 +100,7 @@
     <string name="flight_desc_landed">%1$s landed at %2$s</string>
     <string name="flight_desc_late">, %1$s late</string>
     <string name="flight_desc_early">, %1$s early</string>
+    <string name="flight_desc_on_time">, on time</string>
     <string name="flight_desc_gate">, gate %1$s</string>
     <string name="flight_desc_belt">, belt %1$s</string>
     <string name="flight_desc_canceled">%1$s is canceled</string>

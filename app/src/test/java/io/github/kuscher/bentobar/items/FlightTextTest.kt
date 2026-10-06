@@ -613,6 +613,43 @@ class FlightTextTest {
         assertEquals(Tone.entries.toSet(), states.map { (f, now, heard) -> bar(f, now, heard).tone }.toSet())
     }
 
+    @Test fun whereTheLineIsGreenTheSpokenSentenceSaysOnTime() {
+        // In the air and expected within fifteen minutes of its plan: no figure in the words says so, and the green is for the eye.
+        val onTime = inAir(fra(expected = "2026-10-03T10:25"))
+        assertEquals("LH 455 to Frankfurt lands in 2 hours 5 minutes, on time", lined(onTime, "2026-10-03T06:20:00Z").desc)
+        assertEquals("LH 455 to Frankfurt lands in 2 hours 5 minutes, on time", lined(inAir(fra(expected = "2026-10-03T10:39")), "2026-10-03T06:34:00Z").desc)
+        // Early is green too, and already says by how much.
+        assertEquals("LH 455 to Frankfurt lands in 2 hours 5 minutes, 18 minutes early", lined(inAir(fra(expected = "2026-10-03T10:07")), "2026-10-03T06:02:00Z").desc)
+        // Landed within fifteen minutes of its plan, or before it: on time, and then the belt.
+        val down = lh455(left, fra(actual = "2026-10-03T10:01", belt = "21"), FlightState.LANDED)
+        assertEquals("LH 455 landed at 10:01 AM, on time, belt 21", lined(down, "2026-10-03T08:21:00Z").desc)
+        assertEquals("LH 455 landed at 10:30 AM, on time", lined(lh455(left, fra(actual = "2026-10-03T10:30"), FlightState.LANDED), "2026-10-03T08:40:00Z").desc)
+        // Where the line is not green the sentence is what it was: late, not live, only the plan known, landed late, before it leaves.
+        val late = inAir(fra(expected = "2026-10-03T10:45"))
+        val quiet = listOf(
+            Triple(late, "2026-10-03T06:40:00Z", "2026-10-03T06:40:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes, 20 minutes late",
+            Triple(late, "2026-10-03T06:40:00Z", "2026-10-03T05:00:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes, not live, updated 10:00 PM",
+            Triple(onTime, "2026-10-03T06:20:00Z", "2026-10-03T05:00:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes, not live, updated 10:00 PM",
+            Triple(inAir(fra()), "2026-10-03T06:20:00Z", "2026-10-03T06:20:00Z") to "LH 455 to Frankfurt lands in 2 hours 5 minutes",
+            Triple(lh455(left, fra(actual = "2026-10-03T10:50", belt = "21"), FlightState.LANDED), "2026-10-03T09:00:00Z", "2026-10-03T09:00:00Z") to "LH 455 landed at 10:50 AM, belt 21",
+            Triple(lh455(left, fra(), FlightState.LANDED), "2026-10-03T08:30:00Z", "2026-10-03T08:30:00Z") to "LH 455 landed at 10:25 AM",
+            Triple(lh455(sfo(expected = "2026-10-02T14:40")), near, near) to "LH 455 to Frankfurt leaves in 1 hour 37 minutes, gate G13",
+            Triple(lh455(state = FlightState.CANCELED), near, near) to "LH 455 is canceled",
+        )
+        for ((state, sentence) in quiet) {
+            val (f, now, heard) = state
+            assertEquals(sentence, lined(f, now, heard).desc)
+            assertEquals(sentence, bar(f, now, heard).desc)
+        }
+        // Without the line nothing is green, and after its hour in the bar a landed flight has no line: the sentence as it was.
+        assertEquals("LH 455 to Frankfurt lands in 2 hours 5 minutes", bar(onTime, "2026-10-03T06:20:00Z").desc)
+        assertEquals("LH 455 landed at 10:01 AM, belt 21", bar(down, "2026-10-03T08:21:00Z").desc)
+        assertEquals("LH 455 landed at 10:01 AM, belt 21", lined(down, "2026-10-03T09:01:00Z").desc)
+        // The two words, as they follow a sentence.
+        assertEquals(", on time", us.say(FlightText.Word.FLIGHT_DESC_ON_TIME))
+        assertEquals(", on time", FlightVoices.british().say(FlightText.Word.FLIGHT_DESC_ON_TIME))
+    }
+
     @Test fun theBarAndTheMenuNameAFlightsPlaneAlike() {
         // One plane for both lines: what either has drawn, the other goes on from.
         val t = tracked(inAir(fra(expected = "2026-10-03T10:25")), "2026-10-03T06:20:00Z")

@@ -402,6 +402,25 @@ class FlightCandidatesTest {
         assertEquals(listOf("SFO-FRA 2026-10-01T14:47", "FRA-MUC 2026-10-02T10:25"), legs(c))
     }
 
+    @Test fun aRouteWhoseTimetableHasALineForEachKindOfDayHasOneNextFlight() {
+        // A timetable can have several lines for one route: this one leaves AAA at 15:10 on Tuesdays and at 14:40 on Wednesdays.
+        // Five minutes before Tuesday's, both leave within a day, and "the next flight" of the route is still one: Tuesday's.
+        fun line(from: String, to: String, time: String, day: String) = """{"flight_iata":"XX12","dep_iata":"$from","arr_iata":"$to","dep_time":"$time","dep_time_utc":"$time",
+            "arr_time":"23:00","arr_time_utc":"23:00","duration":60,"days":["$day"]}"""
+        val oneRoute = """{"response":[${line("AAA", "BBB", "14:40", "wed")},${line("AAA", "BBB", "15:10", "tue")}]}"""
+        val now = at("2026-10-06T15:05:00Z")
+        val one = press(service("flight" to unknown, "routes" to oneRoute), now = now, n = FlightNumber("XX", 12))
+        assertEquals(listOf("AAA-BBB 2026-10-06T15:10"), legs(one))
+        // With a second route it is a question between the two routes' next flights, and Wednesday's is not a third.
+        val twoRoutes = oneRoute.replace("]}", ",${line("BBB", "CCC", "20:00", "tue")}]}")
+        assertEquals(3, AirLabs.routes(twoRoutes).value!!.size)
+        val two = press(service("flight" to unknown, "routes" to twoRoutes), now = now, n = FlightNumber("XX", 12))
+        assertEquals(listOf("AAA-BBB 2026-10-06T15:10", "BBB-CCC 2026-10-06T20:00"), legs(two))
+        // On a day chip each line counts for the days it flies: Wednesday's is the 14:40.
+        val wednesday = press(service("flight" to unknown, "routes" to twoRoutes), tuesday.plusDays(1), ZoneId.of("UTC"), now, FlightNumber("XX", 12))
+        assertEquals(listOf("AAA-BBB 2026-10-07T14:40"), legs(wednesday))
+    }
+
     @Test fun twoFlightsThatAreTheSameFlightAreOfferedOnce() {
         // A number that leaves one airport twice on one day is one flight to the rule that follows it (the airport and the
         // planned day), so the second could not be followed apart from the first. With another airport's flight: two to choose from.

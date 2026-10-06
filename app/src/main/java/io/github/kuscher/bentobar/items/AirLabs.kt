@@ -165,11 +165,12 @@ object AirLabs {
      * With a [day] (a day chip, a day of the device's in [zone]) there is to choose from: every line of
      * the timetable that leaves on that day, as a plan, in the order they leave.
      *
-     * With none ("Next flight"): each line's next flight to leave, where that is within [DAY_AHEAD], in
-     * the order they leave; and before them the flight that is the answer where nothing is asked, if
-     * the service itself knows it and it is in the air or has not left. That one stands for its line:
-     * the same line's flight of the day after is not offered beside it, so a number that flies once a
-     * day asks nothing while its flight is in the air or late.
+     * With none ("Next flight"): each route's next flight to leave (the soonest of its lines, where
+     * the timetable has a line for each kind of day), where that is within [DAY_AHEAD], in the order
+     * they leave; and before them the flight that is the answer where nothing is asked, if the
+     * service itself knows it and it is in the air or has not left. That one stands for its route:
+     * the route's flight of the day after is not offered beside it, so a number that flies once a day
+     * asks nothing while its flight is in the air or late.
      *
      * A flight the service itself answered with stands in the place of the timetable's plan for it (the
      * same airport, the same planned day: [FlightRules.same]): it has the gate and the delays, and takes
@@ -198,7 +199,10 @@ object AirLabs {
         val first = one.takeIf { !it.timetable && it.state != FlightState.LANDED && it.state != FlightState.DIVERTED }
         fun own(r: Route) = first != null && r.from == first.from.code && r.to == first.to.code
         val until = now.plus(DAY_AHEAD)
-        val plans = lines.filterNot(::own).mapNotNull { upcoming(it, like, now) }.filter { leaves(it)?.isAfter(until) == false }
+        // (A route can have a line for each kind of day, with a time of its own: its next flight is the soonest of theirs.)
+        val plans = lines.filterNot(::own).groupBy { it.from to it.to }.values
+            .mapNotNull { route -> route.mapNotNull { upcoming(it, like, now) }.minByOrNull { leaves(it) ?: Instant.MAX } }
+            .filter { leaves(it)?.isAfter(until) == false }
         val plan = first?.from?.planned?.let { left -> lines.filter(::own).firstNotNullOfOrNull { planned(it, like, left.toLocalDate()) } }
         val rest = ordered(offered(plans, live, now)).filter { first == null || !FlightRules.same(first, it) }
         return listOfNotNull(first?.let { if (plan == null) it else filled(it, plan) }) + rest

@@ -578,6 +578,27 @@ class FlightCandidatesTest {
         val bare = press(service("flight" to unknown, "routes" to table), tuesday).flights.map { FlightText.choice(it, evening, us) }
         assertEquals(listOf("MCO → EWR", "EWR → SFO", "SFO → PDX"), bare.map { it.title })
         assertEquals("MCO to EWR, leaves Tuesday 8:45 AM, lands 11:26 AM", bare[0].spoken)
+        // "Today", that Monday: the four, and no day in front of them.
+        val four = press(thatEvening(), monday).flights.map { FlightText.choice(it, evening, us) }
+        assertEquals(listOf("Orlando → Newark", "RDU → Newark", "Newark → SFO", "SFO → PDX"), four.map { it.title })
+        assertEquals(listOf("8:45 AM – 11:26 AM", "9:10 AM – 11:47 AM", "1:20 PM – 4:19 PM", "7:05 PM – 9:00 PM"), four.map { it.detail })
+        assertEquals("RDU to Newark, leaves 9:10 AM, lands 11:47 AM", four[1].spoken)
+    }
+
+    @Test fun onceItIsChosenAFlightReadsAsAnyFlightThatIsFollowed() {
+        // The third of Tuesday's, as an item holds it from the moment it was chosen: a plan from the timetable, a day ahead.
+        val third = press(thatEvening(), tuesday).flights[2]
+        val ms = evening.toEpochMilli()
+        val t = FlightRules.Tracked("UA1227", "2026-10-06", third, askedAt = ms, heardAt = ms, from = "SFO")
+        val card = FlightText.card(t, evening, us)!!
+        assertEquals(listOf("UA 1227 · United Airlines", "SFO → PDX", "Leaves Tue 7:05 PM", "Planned"), listOf(card.title, card.route, card.headline, card.badge))
+        // In the bar the number closes up to make room for the day.
+        assertEquals("UA1227 · Tue 7:05 PM", FlightText.bar(t, null, evening, 24, us).text)
+        // And while the choice was open, the number as it is while it is looked up.
+        assertEquals("UA 1227 …", FlightText.bar(FlightRules.Tracked(), "UA 1227", evening, 24, us).text)
+        assertEquals("Looking up UA 1227", FlightText.bar(FlightRules.Tracked(), "UA 1227", evening, 24, us).desc)
+        // The plane it is drawn with is its own: the same number and day from another airport is another flight's.
+        assertEquals("UA1227 2026-10-06 SFO", FlightText.plane(t))
     }
 
     @Test fun theDayInFrontIsTheAirportsOwnWhereItIsNotTheDevicesToday() {

@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.dp
 import io.github.kuscher.bentobar.data.Pill
 import io.github.kuscher.bentobar.data.TextSize
+import io.github.kuscher.bentobar.items.Stands
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -269,5 +270,18 @@ class SliderMathTest {
         }
         // On a line shorter than the plane the middle is the middle from either side.
         assertEquals(5f, route(0f, track = 10f, rtl = true).center, 0f)
+    }
+
+    @Test fun thePlanesPlaceIsMarkedByItsClearingNotByTheStepInColor() {
+        // The part ahead is the slider's quiet track. A colored part flown stands out from it far less than the slider's
+        // fill does (5:1 and more): by 2.0:1 at the least and 4.3:1 at the most. So the plane and the nothing on each side
+        // of it say where it is, and the color only says how the flight stands.
+        val dark = StripLook(Color.White, true, TextSize.DEFAULT, 12.dp, Pill.NONE)
+        val light = StripLook(Contrast.DARK_TEXT, false, TextSize.DEFAULT, 12.dp, Pill.NONE)
+        fun against(look: StripLook, stands: Stands) = Contrast.ratio(look.route(stands), look.sliderTrack.compositeOver(look.background))
+        val colored = listOf(dark, light).flatMap { look -> listOf(Stands.GOOD, Stands.LATE, Stands.VERY_LATE).map { against(look, it) } }
+        assertEquals(2.0f, colored.min(), 0.05f)
+        assertEquals(4.3f, colored.max(), 0.1f)
+        for (look in listOf(dark, light)) assertTrue(against(look, Stands.NO_CLAIM) >= 5f)
     }
 }

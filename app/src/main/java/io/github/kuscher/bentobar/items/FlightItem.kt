@@ -5,6 +5,7 @@ import android.net.Uri
 import android.text.format.DateFormat
 import androidx.compose.runtime.Composable
 import io.github.kuscher.bentobar.R
+import io.github.kuscher.bentobar.data.Display
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Online
 import io.github.kuscher.bentobar.data.Section
@@ -76,7 +77,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     internal var takes = 0
         private set
 
-    /** Where each flight's plane was last drawn on its line, by [FlightText.Card.plane]: it only goes forward. Main thread. */
+    /** Where each flight's plane was last drawn on its line, in the bar or in the menu, by [FlightText.plane]: it only goes forward. Main thread. */
     private val places = HashMap<String, Double>()
 
     /** Debug builds: what the first Flight item shows instead of the real thing (`./bento debug flight show NAME`); nothing is asked for it. */
@@ -202,14 +203,15 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     override fun state(item: ItemConfig): ItemState {
         // The rules are made to take whatever a reply or a file holds; should one trip all the same, the bar has its plane and no "!".
         val bar = try { bar(item) } catch (_: RuntimeException) { FlightText.Bar(Sym.FLIGHT, desc = Env.str(R.string.item_flight_title)) }
-        return ItemState(icon = bar.icon, text = bar.text, desc = bar.desc, active = bar.active, tone = bar.tone, tooltip = bar.tooltip, textLimit = FlightText.LIMIT)
+        return ItemState(icon = bar.icon, text = bar.text, desc = bar.desc, active = bar.active, tone = bar.tone, tooltip = bar.tooltip, textLimit = FlightText.LIMIT,
+            route = bar.route)
     }
 
     private fun bar(item: ItemConfig): FlightText.Bar {
         val now = Instant.ofEpochMilli(Now.wall())
         val hours = before.of(item)
         when (val s = stagedFor(item)) {
-            is Staged.Following -> return FlightText.bar(s.tracked, null, now, hours, voice())
+            is Staged.Following -> return inBar(item, s.tracked, null, now, hours)
             is Staged.Looking -> return FlightText.bar(null, s.number, now, hours, voice())
             is Staged.Failed, Staged.Empty -> return FlightText.bar(null, null, now, hours, voice())
             Staged.NoKey -> return FlightText.Bar(Sym.FLIGHT, desc = Env.str(R.string.flight_desc_not_set_up))
@@ -220,7 +222,20 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         if (!Online.on(online)) return FlightText.Bar(Sym.FLIGHT, desc = Env.str(R.string.flight_desc_off))
         tracker.want(item.id)
         val t = followed(item.id)
-        return FlightText.bar(t, looking(item.id, t), now, hours, voice())
+        return inBar(item, t, looking(item.id, t), now, hours)
+    }
+
+    /**
+     * What [item] shows of [t] at [now]: with the flight's route line, unless the item is shown as text
+     * alone (the line stands in the glyph's place). The plane is where the times put it and never
+     * behind where it was last drawn, here or on the menu's line: the two are one plane. Main thread.
+     */
+    private fun inBar(item: ItemConfig, t: Tracked?, looking: String?, now: Instant, hours: Int): FlightText.Bar {
+        val plane = t?.let(FlightText::plane)
+        val bar = FlightText.bar(t, looking, now, hours, voice(), line = item.display != Display.TEXT, shown = plane?.let(places::get))
+        // (Not for a flight that will not arrive: where its plane is drawn is no place it has flown to.)
+        if (plane != null && bar.route != null && !bar.route.whole) drawn(plane, bar.route.share.toDouble())
+        return bar
     }
 
     /**
@@ -239,8 +254,12 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     }
 
     /** Where the plane of [card]'s flight is drawn now: where the times put it, but never behind where it was drawn before. */
-    internal fun place(card: FlightText.Card): Double? = FlightRules.forward(places[card.plane], card.share).also {
-        if (it != null) { if (places.size > 16) places.clear(); places[card.plane] = it }
+    internal fun place(card: FlightText.Card): Double? = FlightRules.forward(places[card.plane], card.share).also { if (it != null) drawn(card.plane, it) }
+
+    /** The plane called [plane] was drawn [at] this share of its way, in the bar or in the menu. */
+    private fun drawn(plane: String, at: Double) {
+        if (places.size > 16) places.clear()
+        places[plane] = at
     }
 
     // ---- what the menu and the settings do
@@ -424,16 +443,20 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         return "$stagedAs: ${reads(sample)}"
     }
 
-    /** How a staged sample reads at the clock's moment: the bar's text and color, and the menu's headline and badge. */
+    /**
+     * How a staged sample reads at the clock's moment: the bar's text and color, its line (how far along
+     * the plane stands by the times, and how the flight does), and the menu's headline and badge.
+     */
     private fun reads(sample: Staged): String {
         val now = Instant.ofEpochMilli(Now.wall())
         val hours = first()?.let(before::of) ?: before.default
         val v = voice()
         return when (sample) {
             is Staged.Following -> {
-                val b = FlightText.bar(sample.tracked, null, now, hours, v)
+                val b = FlightText.bar(sample.tracked, null, now, hours, v, line = first()?.display != Display.TEXT)
                 val c = FlightText.card(sample.tracked, now, v)
-                "bar \"${b.text.orEmpty()}\" tone=${b.tone} active=${b.active} | menu \"${c?.headline.orEmpty()}\" badge \"${c?.badge.orEmpty()}\" | ${c?.note.orEmpty()}"
+                val line = b.route?.let { String.format(Locale.ROOT, "%.2f %s", it.share, it.stands) + (if (it.struck) " struck" else "") + (if (it.whole) " whole" else "") } ?: "none"
+                "bar \"${b.text.orEmpty()}\" tone=${b.tone} active=${b.active} line=$line | menu \"${c?.headline.orEmpty()}\" badge \"${c?.badge.orEmpty()}\" | ${c?.note.orEmpty()}"
             }
             is Staged.Failed -> "menu \"${FlightText.error(sample.failure, sample.number, null, v)}\""
             is Staged.Looking -> "bar \"${FlightText.bar(null, sample.number, now, hours, v).text.orEmpty()}\""

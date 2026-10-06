@@ -39,13 +39,14 @@ object FlightText {
         FLIGHT_TERMINAL, FLIGHT_BELT, FLIGHT_OPERATED_AS, FLIGHT_NOTE, FLIGHT_STATUS_REFUSED, FLIGHT_STATUS_USED_UP, FLIGHT_STATUS_FEW,
         FLIGHT_COPY_HEAD, FLIGHT_COPY_LEFT, FLIGHT_COPY_LANDS,
         FLIGHT_ERR_NOT_FOUND, FLIGHT_ERR_NOT_THAT_DAY, FLIGHT_ERR_REFUSED, FLIGHT_ERR_USED_UP, FLIGHT_ERR_NO_ANSWER,
+        FLIGHT_CHOICE_DAY, FLIGHT_CHOICE_NEXT, FLIGHT_CHOICE_SPAN, FLIGHT_DESC_CHOICE, FLIGHT_DESC_CHOICE_LEAVES, FLIGHT_DESC_CHOICE_LANDS,
         FLIGHT_DESC_LEAVES_AT, FLIGHT_DESC_LEAVES_IN, FLIGHT_DESC_LANDS_IN, FLIGHT_DESC_LANDED, FLIGHT_DESC_LATE, FLIGHT_DESC_EARLY, FLIGHT_DESC_ON_TIME, FLIGHT_DESC_GATE, FLIGHT_DESC_BELT,
         FLIGHT_DESC_CANCELED, FLIGHT_DESC_DIVERTED, FLIGHT_DESC_NO_UPDATE, FLIGHT_DESC_NOT_LIVE, FLIGHT_DESC_LOOKING, FLIGHT_DESC_HEADLINE_BADGE,
         FLIGHT_ROUTE_FROM, FLIGHT_ROUTE_TO, FLIGHT_ROUTE_FROM_CODE, FLIGHT_ROUTE_TO_CODE, FLIGHT_TIME_WAS,
     }
 
     /** A plural of the app's resources, named the same way. */
-    enum class Count { COMMON_HOURS, COMMON_MINUTES, FLIGHT_LOOKUPS_LEFT }
+    enum class Count { COMMON_HOURS, COMMON_MINUTES, FLIGHT_LOOKUPS_LEFT, FLIGHT_CHOICE_TIMES, FLIGHT_CHOICE_FLIGHTS }
 
     /** How a time is written: "2:40 PM", "Fri", "Fri 2:40 PM", "Dec 24", "Dec 24, 2:40 PM", "Sat, Oct 10". With the system's 12 or 24 hours. */
     enum class TimeForm { TIME, DAY, DAY_TIME, DATE, DATE_TIME, DAY_DATE }
@@ -87,6 +88,14 @@ object FlightText {
         val copy: String, val callsign: String?, val changeKey: Boolean, val plane: String,
     )
 
+    /**
+     * One of several flights of a number to choose from, as an entry of the menu. [title]: its route, with
+     * the cities where the service named them. [detail]: when it leaves and when it lands, each in its
+     * airport's own time, with the day in front where it does not leave on the device's today. [spoken]:
+     * both as the one sentence a screen reader gets.
+     */
+    data class Choice(val title: String, val detail: String, val spoken: String)
+
     /** How many characters [text] has as a reader counts them: a letter with its accent, or an emoji, is one. */
     fun length(text: String): Int {
         val chars = BreakIterator.getCharacterInstance()
@@ -120,7 +129,7 @@ object FlightText {
         fun join(a: String, b: String) = v.say(Word.FLIGHT_BAR_PLAN, a, b)
 
         /** A time at its airport, with its day when that is not the device's today: "2:40 PM", "Fri 2:40 PM", "Dec 24, 2:40 PM". */
-        fun at(time: LocalDateTime) = v.time(time, when (FlightRules.dayForm(time, today)) { DayForm.NONE -> TimeForm.TIME; DayForm.WEEKDAY -> TimeForm.DAY_TIME; DayForm.DATE -> TimeForm.DATE_TIME })
+        fun at(time: LocalDateTime) = at(time, today, v)
 
         /** When the service last answered about this flight, on the device's clock. */
         val updated: String get() = at(LocalDateTime.ofInstant(Instant.ofEpochMilli(t.heardAt), v.zone))
@@ -140,6 +149,10 @@ object FlightText {
         /** The line of a flight that goes its way: its plane where the times put it ([share]), and never behind where it was last drawn. */
         fun flying(share: Double): BarRoute? = route(FlightRules.forward(shown, share) ?: share)
     }
+
+    /** [time], an airport's own, as it is written for someone whose day is [today]: with its weekday within six days of that, with its date further off. */
+    private fun at(time: LocalDateTime, today: LocalDate, v: Voice): String =
+        v.time(time, when (FlightRules.dayForm(time, today)) { DayForm.NONE -> TimeForm.TIME; DayForm.WEEKDAY -> TimeForm.DAY_TIME; DayForm.DATE -> TimeForm.DATE_TIME })
 
     /** A length of time in the bar: "45m", "1h 37m", "2h 05m". */
     private fun figure(minutes: Long): String = Fmt.duration(minutes * 60_000L)
@@ -444,6 +457,32 @@ object FlightText {
 
     /** True where the text in the field is what is wrong (no such flight, not on that day): the field is marked. Else it is a message under it. */
     fun ofTheField(failure: Failure): Boolean = failure == Failure.NOT_FOUND || failure == Failure.NOT_THAT_DAY
+
+    /**
+     * What the menu asks when a press of Track found the number flying more than once: [count] flights
+     * on [day], the day that was chosen, which is the device's ("UA 1227 flies 3 times on Tue, Oct 6"),
+     * or, with none, among the next ones ("UA 1227: 3 flights in the next 24 hours", which are
+     * [AirLabs.DAY_AHEAD]). [number] as it is shown.
+     */
+    fun several(number: String, day: LocalDate?, count: Int, v: Voice): String =
+        if (day == null) v.say(Word.FLIGHT_CHOICE_NEXT, number, v.count(Count.FLIGHT_CHOICE_FLIGHTS, count))
+        else v.say(Word.FLIGHT_CHOICE_DAY, number, v.count(Count.FLIGHT_CHOICE_TIMES, count), v.time(day.atStartOfDay(), TimeForm.DAY_DATE))
+
+    /**
+     * [f], one of the flights to choose from, as it reads at [now]: "Orlando → Newark" and "Tue 8:45 AM –
+     * 11:26 AM". The times are the ones its card will show once it is followed (what is expected, else
+     * the plan). With no time to leave there are none: a time of landing alone would read as the other.
+     */
+    fun choice(f: Flight, now: Instant, v: Voice): Choice {
+        val leaves = f.from.time?.let { at(it, LocalDate.ofInstant(now, v.zone), v) }
+        val lands = f.to.time?.let { v.time(it, TimeForm.TIME) }
+        return Choice(
+            title = v.say(Word.FLIGHT_ROUTE, f.from.place, f.to.place),
+            detail = if (leaves != null && lands != null) v.say(Word.FLIGHT_CHOICE_SPAN, leaves, lands) else leaves.orEmpty(),
+            spoken = v.say(Word.FLIGHT_DESC_CHOICE, f.from.place, f.to.place) + leaves?.let { v.say(Word.FLIGHT_DESC_CHOICE_LEAVES, it) }.orEmpty() +
+                lands?.let { v.say(Word.FLIGHT_DESC_CHOICE_LANDS, it) }.orEmpty(),
+        )
+    }
 
     /** The days the chips under the field stand for: the next flight (no day), today, tomorrow, and the five days after. */
     fun days(today: LocalDate): List<LocalDate?> = listOf<LocalDate?>(null) + (0L..6L).map { today.plusDays(it) }

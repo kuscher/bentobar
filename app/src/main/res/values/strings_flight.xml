@@ -29,12 +29,25 @@
     <string name="flight_number_hint">LH 455</string>
     <string name="flight_day_next">Next flight</string>
     <string name="flight_track">Track</string>
-    <string name="flight_lookup_note">A lookup uses 1 to 3 of your key\'s lookups.</string>
+    <string name="flight_lookup_note">A lookup uses 2 or 3 of your key\'s lookups.</string>
     <plurals name="flight_lookups_left">
         <item quantity="one">About %1$d lookup left this month.</item>
         <item quantity="other">About %1$d lookups left this month.</item>
     </plurals>
     <string name="flight_looking_up">Looking up %1$s…</string>
+
+    <!-- The menu: a number that flies more than once on the day that was asked for. The two plurals are the count in the two sentences; flight_choice_span is a flight's two times. -->
+    <string name="flight_choice_day">%1$s flies %2$s on %3$s</string>
+    <string name="flight_choice_next">%1$s: %2$s in the next 24 hours</string>
+    <plurals name="flight_choice_times">
+        <item quantity="one">%1$d time</item>
+        <item quantity="other">%1$d times</item>
+    </plurals>
+    <plurals name="flight_choice_flights">
+        <item quantity="one">%1$d flight</item>
+        <item quantity="other">%1$d flights</item>
+    </plurals>
+    <string name="flight_choice_span">%1$s – %2$s</string>
 
     <!-- The menu: a flight that is followed. -->
     <string name="flight_header">%1$s · %2$s</string>
@@ -118,4 +131,9 @@
     <string name="flight_route_from_code">From %1$s, %2$s.</string>
     <string name="flight_route_to_code">To %1$s, %2$s.</string>
     <string name="flight_time_was">was %1$s</string>
+
+    <!-- Spoken: one of several flights to choose from. The two that start with a comma follow its route. -->
+    <string name="flight_desc_choice">%1$s to %2$s</string>
+    <string name="flight_desc_choice_leaves">, leaves %1$s</string>
+    <string name="flight_desc_choice_lands">, lands %1$s</string>
 </resources>

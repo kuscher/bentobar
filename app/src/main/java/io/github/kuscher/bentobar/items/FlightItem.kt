@@ -107,6 +107,8 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
                     Count.COMMON_HOURS -> R.plurals.common_hours
                     Count.COMMON_MINUTES -> R.plurals.common_minutes
                     Count.FLIGHT_LOOKUPS_LEFT -> R.plurals.flight_lookups_left
+                    Count.FLIGHT_CHOICE_TIMES -> R.plurals.flight_choice_times
+                    Count.FLIGHT_CHOICE_FLIGHTS -> R.plurals.flight_choice_flights
                 }, n, n)
             },
             clock = { t, form ->
@@ -176,6 +178,12 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         Word.FLIGHT_ERR_REFUSED -> R.string.flight_err_refused
         Word.FLIGHT_ERR_USED_UP -> R.string.flight_err_used_up
         Word.FLIGHT_ERR_NO_ANSWER -> R.string.flight_err_no_answer
+        Word.FLIGHT_CHOICE_DAY -> R.string.flight_choice_day
+        Word.FLIGHT_CHOICE_NEXT -> R.string.flight_choice_next
+        Word.FLIGHT_CHOICE_SPAN -> R.string.flight_choice_span
+        Word.FLIGHT_DESC_CHOICE -> R.string.flight_desc_choice
+        Word.FLIGHT_DESC_CHOICE_LEAVES -> R.string.flight_desc_choice_leaves
+        Word.FLIGHT_DESC_CHOICE_LANDS -> R.string.flight_desc_choice_lands
         Word.FLIGHT_DESC_LEAVES_AT -> R.string.flight_desc_leaves_at
         Word.FLIGHT_DESC_LEAVES_IN -> R.string.flight_desc_leaves_in
         Word.FLIGHT_DESC_LANDS_IN -> R.string.flight_desc_lands_in

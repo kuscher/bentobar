@@ -62,6 +62,8 @@
     <!-- My location: where the device is, instead of a city (Android's approximate location, rounded to about 10 km) -->
     <string name="weather_here">My location</string>
     <string name="weather_use_here">Use my location</string>
+    <!-- Back from My location to the city the item had: "Use Zurich". -->
+    <string name="weather_use_city">Use %1$s</string>
     <string name="weather_here_current">Place: My location, to about 10 km</string>
     <string name="weather_allow_location">Allow location</string>
     <string name="weather_location_settings">Location settings</string>

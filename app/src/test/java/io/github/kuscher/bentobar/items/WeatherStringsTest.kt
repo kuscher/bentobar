@@ -125,6 +125,7 @@ class WeatherStringsTest {
         // My location: where the device is instead of a city, and the three ways it can be unknown.
         "weather_here" to "My location",
         "weather_use_here" to "Use my location",
+        "weather_use_city" to "Use %1\$s",
         "weather_here_current" to "Place: My location, to about 10 km",
         "weather_allow_location" to "Allow location",
         "weather_location_settings" to "Location settings",

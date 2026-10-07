@@ -171,6 +171,16 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
         Ticker.refresh()
     }
     val changeCity: @Composable () -> Unit = { MenuEntry(Sym.LOCATION_ON, stringResource(R.string.weather_change_city)) { changing = true } }
+    // My location keeps the item's city for a way back: one press, and nothing to search for.
+    val kept = WeatherRules.city(item)
+    val useCity: @Composable () -> Unit = {
+        if (here && kept != null) MenuEntry(Sym.LOCATION_ON, stringResource(R.string.weather_use_city, kept)) {
+            Store.updateItem(item.id) { WeatherRules.useCity(it) }
+            source.typed(by)
+            changing = false
+            Ticker.refresh()
+        }
+    }
     // My location instead of a city. Without the permission yet, the settings window opens to ask for it, and the menu closes.
     val useHere: @Composable () -> Unit = {
         MenuEntry(Sym.MY_LOCATION, stringResource(R.string.weather_use_here)) {
@@ -194,7 +204,7 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
         changing -> MenuCard(Sym.CLOUD, city, stringResource(R.string.weather_change_city)) {
             CitySearch(item, by, initial = WeatherRules.city(item).orEmpty(), onPick = pick)
             MenuDivider()
-            if (!here) useHere()
+            if (!here) useHere() else useCity()
             MenuEntry(Sym.CLOSE, stringResource(R.string.common_cancel)) { source.typed(by); changing = false }
         }
         // A layout that came with a city, or the switch off in Setup: the words, and the one entry that turns it on. Nothing is sent before it.
@@ -224,10 +234,11 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
                 }
                 else -> {}
             }
+            useCity()
             changeCity()
         }
         // No spinner: the subtitle says it, and the body shows nothing that isn't known yet.
-        status == Status.Loading -> MenuCard(Sym.CLOUD, city, stringResource(R.string.usage_loading)) { changeCity() }
+        status == Status.Loading -> MenuCard(Sym.CLOUD, city, stringResource(R.string.usage_loading)) { useCity(); changeCity() }
         status is Status.Missing -> {
             val offline = status.failure == Failure.OFFLINE
             MenuCard(Sym.CLOUD, city, stringResource(if (offline) R.string.common_no_connection else R.string.weather_no_answer)) {
@@ -235,6 +246,7 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
                 // Dimmed for ten seconds after the try that failed (longer if the service asked for that), with no word of its own: the card says what went wrong.
                 MenuEntry(Sym.REFRESH, stringResource(R.string.common_try_again), enabled = entry == Again.READY, onClick = again)
+                useCity()
                 changeCity()
             }
         }
@@ -246,6 +258,7 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
                 // Dimmed for a minute after an answer (an automatic one too), and then it says why.
                 MenuEntry(Sym.REFRESH, stringResource(R.string.common_refresh),
                     detail = if (entry == Again.UP_TO_DATE) stringResource(R.string.weather_up_to_date) else null, enabled = entry == Again.READY, onClick = again)
+                useCity()
                 changeCity()
                 val site = stringResource(R.string.weather_open_site)
                 val opens = stringResource(R.string.common_opens_browser, site)
@@ -389,6 +402,8 @@ internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
                 // The field appears on a click, as in the menu, and takes the focus then: not each time the item is selected.
                 TextButton(onClick = { changing = true }) { Text(stringResource(R.string.weather_change_city)) }
                 if (!here) chooseHere()
+                // Back from My location to the item's own city, which it kept.
+                else if (city != null) TextButton(onClick = { set(WeatherRules.useCity(item)); source.typed(by) }) { Text(stringResource(R.string.weather_use_city, city)) }
                 // A layout that came with a city, or the switch off in Setup: the same act as the menu's.
                 if (!on) TextButton(onClick = { source.turnOn(); Ticker.refresh() }) { Text(stringResource(R.string.weather_turn_on)) }
                 // My location without the permission (refused, or taken back in Android's settings).

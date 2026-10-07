@@ -29,6 +29,8 @@
     <string name="weather_snow_showers">Snow showers</string>
     <string name="weather_thunderstorm">Thunderstorm</string>
     <string name="weather_thunderstorm_hail">Thunderstorm with hail</string>
+    <!-- A strong wind where nothing falls: said in the bar instead of the sky's word (the menu keeps the sky and gives the wind's speed). -->
+    <string name="weather_windy">Windy</string>
 
     <!-- in the bar: the temperature, what falls, the hour it is likely from ("72° · Rain 3 PM"); a label leads ("SF 72°") -->
     <string name="weather_bar_rain">Rain</string>
@@ -77,6 +79,7 @@
     <string name="weather_show_temp">Temperature</string>
     <string name="weather_show_high_low">With high and low</string>
     <string name="weather_show_feels">Feels like</string>
+    <string name="weather_show_sky">With conditions</string>
     <string name="weather_label_help">Shown before the temperature, like SF</string>
 
     <!-- spoken: the item ("San Francisco: 72 degrees. Partly cloudy. Rain likely at 3 PM.") -->

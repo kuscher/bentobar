@@ -38,10 +38,11 @@ class WeatherRulesTest {
      * of 4 PM.
      */
     private fun reading(temp: Double? = c72, feels: Double? = c68, code: Int? = 2, day: Boolean = true,
-                        hours: List<Triple<Int, Int?, Int?>> = emptyList(), hourTemp: Double? = c72, fetchedAt: Long = at(13, 20)): Reading {
+                        hours: List<Triple<Int, Int?, Int?>> = emptyList(), hourTemp: Double? = c72, fetchedAt: Long = at(13, 20),
+                        wind: Double? = 14.5): Reading {
         val wet = hours.associateBy { it.first + 1 }
         return Reading(place = "37.77,-122.42", fetchedAt = fetchedAt, zone = "America/Los_Angeles", offsetSec = -7 * 3600,
-            current = Current(at = at(13, 15) / 1000, temp = temp, feels = feels, code = code, day = day, windKmh = 14.5),
+            current = Current(at = at(13, 15) / 1000, temp = temp, feels = feels, code = code, day = day, windKmh = wind),
             // An entry an hour from 1 PM to midnight.
             hours = (13..24).map { h -> Hour(at(13) / 1000 + (h - 13) * 3600L, hourTemp, if (h in wet) wet.getValue(h).second else 0, if (h in wet) wet.getValue(h).third else 2, day = h < 19) },
             days = listOf(Day(at(0) / 1000, 2, c78, c61, 20, at(7, 8) / 1000, at(18, 42) / 1000),
@@ -303,11 +304,109 @@ class WeatherRulesTest {
     }
 
     @Test fun theItemSaysItNeverHasMoreThanTwentyCharacters() {
-        for (label in listOf(null, "SF", "Tahoe", "Lake Tahoe", "WWWWWWWWWWWW")) for (show in listOf(WeatherRules.SHOW_TEMP, WeatherRules.SHOW_HIGH_LOW, WeatherRules.SHOW_FEELS))
-            for (r in listOf(reading(), reading(temp = -40.0, feels = -51.0), reading(code = 95), reading(hours = listOf(Triple(22, 99, 86))))) {
+        for (label in listOf(null, "SF", "Tahoe", "Lake Tahoe", "WWWWWWWWWWWW")) for (show in listOf(WeatherRules.SHOW_TEMP, WeatherRules.SHOW_HIGH_LOW, WeatherRules.SHOW_FEELS, WeatherRules.SHOW_SKY))
+            for (r in listOf(reading(), reading(temp = -40.0, feels = -51.0), reading(code = 95), reading(code = 99), reading(code = 57), reading(wind = 50.0),
+                reading(hours = listOf(Triple(22, 99, 86))))) {
                 val text = bar(r, look(label = label, show = show, rainHours = 12)).text!!
                 assertTrue("$text is ${WeatherRules.count(text)}", WeatherRules.count(text) <= WeatherRules.BAR_CHARS)
             }
+    }
+
+    // ---- the bar: with conditions ---------------------------------------------------------------
+
+    @Test fun withConditionsTheSkysWordFollowsTheNumber() {
+        val sky = look(show = WeatherRules.SHOW_SKY)
+        assertEquals("72° · Partly cloudy", bar(reading(), sky).text)
+        assertEquals("72° · Clear", bar(reading(code = 0), sky).text)
+        assertEquals("72° · Clear", bar(reading(code = 0, day = false), sky).text)
+        assertEquals("72° · Mostly clear", bar(reading(code = 1), sky).text)
+        assertEquals("72° · Cloudy", bar(reading(code = 3), sky).text)
+        assertEquals("72° · Fog", bar(reading(code = 45), sky).text)
+        // Nothing falls and nothing is coming: the item stays where Show when… puts it.
+        assertFalse(bar(reading(), sky).active)
+        assertEquals(Tone.NORMAL, bar(reading(), sky).tone)
+        // The other choices of Show are as they were.
+        assertEquals("72°", bar(reading()).text)
+    }
+
+    @Test fun withConditionsWhatFallsIsTheMenusWordWhereItFits() {
+        val sky = look(show = WeatherRules.SHOW_SKY)
+        assertEquals("72° · Light rain", bar(reading(code = 61), sky).text)
+        assertEquals("72° · Drizzle", bar(reading(code = 53), sky).text)
+        assertEquals("72° · Snow showers", bar(reading(code = 85), sky).text)
+        assertEquals("72° · Thunderstorm", bar(reading(code = 95), sky).text)
+        // Longer than twenty characters: the bar's own word.
+        assertEquals("72° · Storm", bar(reading(code = 99), sky).text)
+        assertEquals("72° · Rain", bar(reading(code = 57), sky).text)
+        // It still comes out, in the same tone.
+        val rain = bar(reading(code = 61), sky)
+        assertTrue(rain.active)
+        assertEquals(Tone.ACCENT, rain.tone)
+        assertEquals(Tone.WARN, bar(reading(code = 95), sky).tone)
+    }
+
+    @Test fun withConditionsRainThatIsComingKeepsItsHour() {
+        assertEquals("72° · Rain 3 PM", bar(reading(hours = listOf(Triple(15, 80, 61))), look(show = WeatherRules.SHOW_SKY)).text)
+    }
+
+    @Test fun withConditionsALabelLeadsAndGoesBeforeTheSky() {
+        assertEquals("SF 72° · Cloudy", bar(reading(code = 3), look(label = "SF", show = WeatherRules.SHOW_SKY)).text)
+        // "SF 72° · Partly cloudy" is 22: the sky's word goes, the label stays.
+        assertEquals("SF 72°", bar(reading(), look(label = "SF", show = WeatherRules.SHOW_SKY)).text)
+    }
+
+    @Test fun aStrongWindWhereNothingFallsIsWindy() {
+        val sky = look(show = WeatherRules.SHOW_SKY)
+        val windy = bar(reading(wind = 40.0), sky)
+        assertEquals("72° · Windy", windy.text)
+        assertEquals(Sym.AIR, windy.icon)
+        assertEquals("San Francisco: 72 degrees. Windy.", windy.desc)
+        assertEquals("San Francisco · Windy", windy.tooltip)
+        // From 32 km/h (20 mph), by day and by night, whatever Show says for the glyph.
+        assertEquals("72° · Windy", bar(reading(wind = WeatherCodes.WINDY_KMH), sky).text)
+        assertEquals("72° · Partly cloudy", bar(reading(wind = 31.9), sky).text)
+        assertEquals(Sym.AIR, bar(reading(wind = 40.0, day = false)).icon)
+        assertEquals("72°", bar(reading(wind = 40.0)).text)
+        // Rain, a storm and fog say more than the wind does.
+        assertEquals("72° · Light rain", bar(reading(code = 61, wind = 60.0), sky).text)
+        assertEquals(Sym.RAINY, bar(reading(code = 61, wind = 60.0), sky).icon)
+        assertEquals("72° · Thunderstorm", bar(reading(code = 95, wind = 60.0), sky).text)
+        assertEquals("72° · Fog", bar(reading(code = 45, wind = 60.0), sky).text)
+        // So does rain that is coming: its glyph and its hour.
+        val coming = bar(reading(wind = 60.0, hours = listOf(Triple(15, 80, 61))), sky)
+        assertEquals("72° · Rain 3 PM", coming.text)
+        assertEquals(Sym.RAINY, coming.icon)
+        // Without a wind speed, no wind.
+        assertEquals("72° · Partly cloudy", bar(reading(wind = null), sky).text)
+    }
+
+    @Test fun theMenuKeepsTheSkyAndGivesTheWindItsSpeed() {
+        val f = WeatherRules.menu(reading(wind = 40.0), look(), at(13, 30), w, t)
+        assertEquals(Sym.PARTLY_CLOUDY_DAY, f.glyph)
+        assertEquals("Partly cloudy · feels like 68°", f.subtitle)
+        // 40 km/h is 25 mph, written and spoken; in km/h where the unit is.
+        assertEquals("Rain 0% · Wind 25\u00A0mph", f.rainWind)
+        assertTrue(f.heroDesc, f.heroDesc.endsWith("Wind 25 miles per hour."))
+        val metric = WeatherRules.menu(reading(wind = 40.0), look(fahrenheit = false), at(13, 30), w, t)
+        assertEquals("Rain 0% · Wind 40\u00A0km/h", metric.rainWind)
+        assertTrue(metric.heroDesc, metric.heroDesc.endsWith("Wind 40 kilometers per hour."))
+    }
+
+    @Test fun everyCodeAtEveryTemperatureFitsTheBar() {
+        // Every code of the table, one it doesn't know and none; every whole degree from −40 to 50 °C (−40 to 122 °F); every Show
+        // choice, with no label and the longest; calm and windy; a dry forecast and one with something coming at 10 PM.
+        val codes = (0..99).filter { WeatherCodes.sky(it) != null } + listOf(4, null)
+        for (code in codes) for (c in -40..50) for (fahrenheit in listOf(true, false)) for (wind in listOf(0.0, 50.0)) for (wet in listOf(false, true)) {
+            val temp = c.toDouble()
+            val r = reading(temp = temp, feels = temp - 11, code = code, wind = wind, hourTemp = temp,
+                hours = if (wet) listOf(Triple(22, 90, if (WeatherCodes.falls(code) != null) code else 63)) else emptyList())
+                .let { it.copy(days = it.days.map { d -> d.copy(high = temp + 9, low = temp - 9) }) }
+            for (show in listOf(WeatherRules.SHOW_TEMP, WeatherRules.SHOW_HIGH_LOW, WeatherRules.SHOW_FEELS, WeatherRules.SHOW_SKY))
+                for (label in listOf(null, "Lake Tahoe W")) {
+                    val text = bar(r, look(label = label, show = show, fahrenheit = fahrenheit, rainHours = 12)).text!!
+                    assertTrue("$text is ${WeatherRules.count(text)} (code $code, $c °C)", WeatherRules.count(text) <= WeatherRules.BAR_CHARS)
+                }
+        }
     }
 
     // ---- the bar: the states without a number ---------------------------------------------------

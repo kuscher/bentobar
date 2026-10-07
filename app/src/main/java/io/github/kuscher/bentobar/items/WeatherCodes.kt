@@ -62,6 +62,16 @@ object WeatherCodes {
         null -> Sym.CLOUD
     }
 
+    /** A sustained wind from this many km/h is "Windy" (20 mph, where the US National Weather Service's "windy" begins). */
+    const val WINDY_KMH = 32.0
+
+    /**
+     * Windy: a strong wind ([WINDY_KMH]) under a sky where nothing falls and no fog stands. Rain, snow,
+     * a storm and fog say more about the hour than the wind does, so they keep their own word and glyph.
+     */
+    fun windy(code: Int?, windKmh: Double?): Boolean =
+        windKmh != null && windKmh >= WINDY_KMH && falls(code) == null && sky(code) != Sky.FOG
+
     /** The bar's word for a code: what falls, or null when nothing does. */
     fun falls(code: Int?): Falls? = when (sky(code)) {
         Sky.DRIZZLE, Sky.FREEZING_DRIZZLE, Sky.LIGHT_RAIN, Sky.RAIN, Sky.HEAVY_RAIN, Sky.FREEZING_RAIN, Sky.SHOWERS, Sky.HEAVY_SHOWERS -> Falls.RAIN

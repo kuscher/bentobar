@@ -90,6 +90,12 @@ data class ItemState(
      * promise for wide scripts. 0: drawn as wide as it is.
      */
     val textLimit: Int = 0,
+    /**
+     * The texts an item takes turns showing (Stocks: one stock after another), [text] among them. Its
+     * place in the bar is as wide as the widest of them, so nothing next to it moves when the turn
+     * changes. Null: none.
+     */
+    val turns: List<String>? = null,
 ) {
     /** For logs and dumps: never the words themselves, which can be a track's title, a city or a flight. */
     override fun toString() = "ItemState(icon=${icon != null}, text of ${text?.length ?: 0}, active=$active, tone=$tone)"

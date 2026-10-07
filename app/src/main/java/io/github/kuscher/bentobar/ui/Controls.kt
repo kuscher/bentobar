@@ -132,14 +132,16 @@ class KeyWords(
  * drop-down. Without one: what is sent and to whom, where a key is got ([onGetKey], in the browser),
  * and a field that shows dots. With one ([keyed]): that it is saved, what [more] adds (Flight: the
  * lookups left), and the two ways to change that. A saved key is never shown again, here or anywhere.
- * [onSave] says whether the key was taken.
+ * [onSave] says whether the key was taken. [heading]: where the key is one part of the item's
+ * settings (Stocks'), its name over it.
  */
 @Composable
 fun ServiceKey(keyed: Boolean, words: KeyWords, onSave: (String) -> Boolean, onRemove: () -> Unit, onGetKey: () -> Unit,
-               more: @Composable () -> Unit = {}) {
+               heading: String? = null, more: @Composable () -> Unit = {}) {
     var replacing by remember { mutableStateOf(false) }
     val quiet = MaterialTheme.colorScheme.onSurfaceVariant
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        if (heading != null) Text(heading, style = MaterialTheme.typography.labelLarge)
         if (keyed && !replacing) {
             Text(stringResource(words.saved), style = MaterialTheme.typography.bodyLarge)
             more()

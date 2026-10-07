@@ -13,6 +13,8 @@ enum class Host(val domain: String) {
     OPEN_METEO_GEOCODING("geocoding-api.open-meteo.com"),
     /** Flight times (AirLabs), with the user's own key. */
     AIRLABS("airlabs.co"),
+    /** Stock quotes and the stock search (Finnhub), with the user's own key. */
+    FINNHUB("api.finnhub.io"),
 }
 
 /**
@@ -63,7 +65,7 @@ fun interface Transport {
  *
  * A request goes out only if [allowed] says so for its host: the service is switched on, an item
  * that uses it is outside Off, and something that shows items is on screen. Until the app has wired
- * it, nothing is allowed. HTTPS only, to the three [Host]s; the user agent is [USER_AGENT]; no
+ * it, nothing is allowed. HTTPS only, to the [Host]s; the user agent is [USER_AGENT]; no
  * cookies, no identifiers, no redirects. Nothing of a request but its host and path is ever logged,
  * and nothing at all of a reply.
  */

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- US stocks (Finnhub, with the user's own key). Every name here starts with stocks_, item_stocks_ or trigger_stocks. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="item_stocks_title">US stocks</string>
+    <string name="item_stocks_desc">Prices of the stocks you pick, one at a time; needs your own Finnhub key</string>
+    <string name="trigger_stocks">Show when a stock moves %1$s or more in a day</string>
+    <string name="trigger_stocks_short">shows on a %1$s move</string>
+    <string name="stocks_consent">Stock prices come from Finnhub, a market data service, with a free key of your own. BentoBar sends Finnhub your key, the symbols of the stocks you follow and what you search for, nothing else. Finnhub sees your IP address and knows which key asked. US stocks and ETFs only.</string>
+
+    <!-- the key, in the item's settings -->
+    <string name="stocks_key_section">Finnhub key</string>
+    <string name="stocks_get_key">Get a free key</string>
+    <string name="stocks_save_key">Save key</string>
+    <string name="stocks_key_help">Stays on this device. It is never shown again, and never copied with your settings.</string>
+    <string name="stocks_key_saved">Key saved</string>
+    <string name="stocks_replace_key">Replace key</string>
+    <string name="stocks_remove_key">Remove Finnhub key</string>
+    <string name="stocks_remove_key_help">Removing the key also deletes the prices that were fetched.</string>
+    <string name="stocks_add_key">Add your key…</string>
+    <string name="stocks_turn_on">Turn on US stocks</string>
+
+    <!-- the stocks, in the item's settings -->
+    <string name="stocks_section">Your stocks</string>
+    <string name="stocks_search_label">Symbol or company</string>
+    <string name="stocks_searching">Searching…</string>
+    <string name="stocks_nothing_found">Nothing found. Only US stocks and ETFs can be followed.</string>
+    <string name="stocks_search_no_answer">Finnhub didn\'t answer. Try again in a moment.</string>
+    <string name="stocks_search_slow">Too many requests. Try again in a minute.</string>
+    <string name="stocks_following">Following</string>
+    <string name="stocks_full">Ten stocks is the most one item follows.</string>
+    <string name="stocks_need_key">Save a key above to search for stocks.</string>
+    <string name="stocks_none_added">No stocks yet.</string>
+    <string name="stocks_turn_label">Each stock shows for</string>
+    <string name="stocks_turn_help">With more than one stock, the bar shows them in turn.</string>
+    <!-- The buttons beside a followed stock, as a screen reader says them: "Move AAPL up". -->
+    <string name="stocks_move_up">Move %1$s up</string>
+    <string name="stocks_move_down">Move %1$s down</string>
+    <string name="stocks_remove">Remove %1$s</string>
+
+    <!-- in the bar: "AAPL 227.52 ▲1.2%", one stock at a time -->
+    <string name="stocks_bar">%1$s %2$s %3$s</string>
+    <string name="stocks_bar_short">%1$s %2$s</string>
+    <string name="stocks_up">▲%1$s%%</string>
+    <string name="stocks_down">▼%1$s%%</string>
+    <!-- No change in the bar: "0.0%", with no arrow. -->
+    <string name="stocks_flat">%1$s%%</string>
+
+    <!-- the menu -->
+    <string name="stocks_none_yet">No stocks yet</string>
+    <string name="stocks_add_stocks">Add stocks…</string>
+    <string name="stocks_edit">Edit stocks…</string>
+    <string name="stocks_site">Finnhub.io</string>
+    <!-- The day's change in dollars and in percent: "+1.23 (+0.5%)". %1$s and %2$s come with their signs. -->
+    <string name="stocks_change">%1$s (%2$s)</string>
+    <!-- The menu's percentage, with its sign: "+0.5%". -->
+    <string name="stocks_percent">%1$s%%</string>
+    <string name="stocks_range">Day %1$s – %2$s</string>
+    <string name="stocks_market_open">Market open · closes %1$s</string>
+    <string name="stocks_market_closed">Market closed · opens %1$s</string>
+    <!-- %1$s: "updated 2:40 PM", or the same after "no connection," or "no answer,". -->
+    <string name="stocks_note">Prices by Finnhub · %1$s</string>
+    <string name="stocks_no_answer">Finnhub didn\'t answer</string>
+    <string name="stocks_slow_down">Too many requests: asking again in a few minutes</string>
+    <string name="stocks_key_refused">Finnhub refused the key</string>
+    <string name="stocks_no_access">Not in Finnhub\'s free plan</string>
+    <string name="stocks_not_found">Finnhub doesn\'t know this stock</string>
+    <string name="stocks_waiting">Waiting for a price</string>
+
+    <!-- spoken: the item ("US stocks: AAPL 227.52, up 1.2 percent; MSFT 418.07, down 0.4 percent.") -->
+    <string name="stocks_desc">%1$s %2$s, %3$s</string>
+    <string name="stocks_desc_price">%1$s %2$s</string>
+    <string name="stocks_desc_up">up %1$s percent</string>
+    <string name="stocks_desc_down">down %1$s percent</string>
+    <string name="stocks_desc_flat">unchanged</string>
+    <string name="stocks_desc_all">US stocks: %1$s.</string>
+    <string name="stocks_list">%1$s; %2$s</string>
+    <string name="stocks_desc_no_key">US stocks: not set up</string>
+    <string name="stocks_desc_off">US stocks: off</string>
+    <string name="stocks_desc_none">US stocks: none added</string>
+    <string name="stocks_desc_loading">US stocks: loading</string>
+    <string name="stocks_desc_no_prices">US stocks: no prices</string>
+
+    <!-- A choice of how long each stock shows: "3 s", "10 s". -->
+    <plurals name="stocks_seconds_short">
+        <item quantity="one">%1$d s</item>
+        <item quantity="other">%1$d s</item>
+    </plurals>
+</resources>

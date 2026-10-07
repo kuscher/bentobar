@@ -143,8 +143,8 @@ abstract class ItemType(
     open val permissions: List<String> = emptyList()
 
     /**
-     * The online service this type asks, or null: the type never goes online (every type but Weather
-     * and Flight). A request reaches a service only while an item of a type that names it is outside
+     * The online service this type asks, or null: the type never goes online (every type but Weather,
+     * Flight and Stocks). A request reaches a service only while an item of a type that names it is outside
      * Off, the service is switched on for this install and something shows items (see `Http.allowed`).
      */
     open val online: Online.Service? = null

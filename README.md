@@ -152,8 +152,8 @@ with that access:
 - It reads the **status bar's layout, and no other window**, to find free space.
 - It copies the **colour of the status bar clock**, from a picture of the status bar's own window
   (not your screen), so your items match.
-- It runs **system actions** (screenshot, lock, overview, all apps, power) when you pick them in
-  the Tools menu.
+- It runs **system actions** (screenshot, lock, overview, all apps, notifications, Quick Settings,
+  power) when you pick them in the Tools menu or click a Shortcut item.
 
 BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse or touches.
 

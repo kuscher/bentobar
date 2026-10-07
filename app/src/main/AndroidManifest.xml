@@ -27,6 +27,8 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- The Googlebook's Feedback app, for the Shortcut item's Report a bug: offered only where it is. -->
+        <package android:name="com.google.android.desktop.feedback" />
     </queries>
 
     <!-- Google Play offers BentoBar only to devices that say they are a PC: Googlebooks and other

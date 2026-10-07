@@ -44,9 +44,9 @@ private projects and paths into their repos, and where signing keys are backed u
     glyph icons, `Chips` for the Live Update chip), and the item types: several each in
     `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
     (`CpuItem`, `ClockItem`, `SoundItem`, `MediaItem`, `DevicesItem`, `HeatItem`, `WeatherItem`,
-    `FlightItem`). A type gets `onLive()`, `sample(now)` once a second and `onIdle()` from the
-    `Ticker`: listeners and polls hang on those, so none exists while the bar is hidden, the screen is
-    off or no such item is outside Off.
+    `FlightItem`, `ShortcutItem` with its pure `ShortcutRules`). A type gets `onLive()`,
+    `sample(now)` once a second and `onIdle()` from the `Ticker`: listeners and polls hang on those,
+    so none exists while the bar is hidden, the screen is off or no such item is outside Off.
   - `items/Refresher.kt` is `Calendar`'s way of loading as one class (a background thread, one load
     per key, an immutable snapshot, a generation counter); `items/Ask.kt` is the same for one
     question at a time (a search). Both are pure Kotlin; `items/Background.kt` wires them to the app.

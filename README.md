@@ -18,7 +18,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Googlebook_OS-Android_17-133F43" alt="Googlebook OS, Android 17">
-  <img src="https://img.shields.io/badge/goes_online-only_for_Weather_and_Flight-2E7D32" alt="Goes online only for Weather and Flight">
+  <img src="https://img.shields.io/badge/goes_online-only_for_Weather,_Flight_and_US_stocks-2E7D32" alt="Goes online only for Weather, Flight and US stocks">
   <img src="https://img.shields.io/badge/license-MIT-555555" alt="MIT license">
   <img src="https://img.shields.io/badge/developed_on-a_Googlebook-1F6F66" alt="Developed on a Googlebook">
 </p>
@@ -80,6 +80,7 @@ hides when an app goes full screen or the screen locks.
 | **Heat** | a word when Android slows a hot device | heat level, battery temperature |
 | **Weather** *(online)* | conditions and temperature of a city you pick; rain or snow that is coming | the next hours and days, sunrise and sunset. From [Open-Meteo](https://open-meteo.com) |
 | **Flight** *(online)* | a line with the plane where the flight is, a countdown to departure with the gate, then to landing, and delays | times at both airports, terminal, gate, baggage belt; a choice where a number flies more than once a day. From AirLabs, with a free key of your own |
+| **US stocks** *(online)* | US stocks you pick, one at a time (`AAPL 227.52 ▲1.2%`) for 3 seconds to a minute each, as you choose; can pop out on a big move | each stock's price, day change and range, and the market's hours. From [Finnhub](https://finnhub.io), with a free key of your own |
 | **Tools** | toolbox | screenshot, lock, overview, all apps, power, settings shortcuts |
 | **App folder** / **App shortcut** | your apps | a grid of apps / one click to open |
 | **Text or emoji**, **Spacer** | anything you like | optional link |
@@ -156,7 +157,7 @@ with that access:
 
 BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse or touches.
 
-**BentoBar goes online for two items only, and only after you set them up** on this device:
+**BentoBar goes online for three items only, and only after you set them up** on this device:
 
 - **Weather** sends [Open-Meteo](https://open-meteo.com) the city you search for, and for the forecast
   the coordinates of the city you pick, rounded to about a kilometre: about every 30 minutes while the
@@ -166,8 +167,13 @@ BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse
   track a flight, when you press Refresh, and while it follows the flight (about every 3 hours, then
   every 30 minutes or sooner from 3 hours before departure until it lands). AirLabs sees your IP
   address and can tie lookups to your key's account. BentoBar ships no key.
+- **US stocks** sends [Finnhub](https://finnhub.io) your own Finnhub key with the symbol of each stock you
+  follow: every 2 minutes while the US market is open and the bar is on screen, once after the close,
+  and when you open its menu, press Refresh or save a new key. Its search sends what you type when you
+  press Search.
+  Finnhub sees your IP address and can tie requests to your key's account. BentoBar ships no key.
 
-Requests can go to those two services and nowhere else (the code has no way to name another
+Requests can go to those three services and nowhere else (the code has no way to name another
 address), **Setup › Online services** switches each off, and a layout pasted from another install
 never turns them on. BentoBar sends nothing else anywhere: not your layout, your calendar, what's
 playing or anything it measures. It has no accounts of its own, no ads and no analytics, and it
@@ -179,7 +185,7 @@ send it no notifications: it receives none. Without it the item still shows that
 controls it. Nothing about what you play is stored or sent.
 
 If you use Android's backup, Android keeps a copy of BentoBar's settings in your Google account. Your
-AirLabs key and the two online switches are left out of it.
+AirLabs and Finnhub keys and the online switches are left out of it.
 
 **Usage access is optional and off by default.** If you turn it on (Setup, or the Network and
 Storage menus), BentoBar reads how much data and storage each app uses, to list the top five in
@@ -196,7 +202,7 @@ show the whole system instead.
 | Calendar *(optional)* | Next meeting, and events in the month view |
 | Alarms and reminders *(optional)* | timers that ring on the second while the Googlebook sleeps |
 | Usage access *(optional)* | the apps using the most data today and the largest apps, in the Network and Storage menus |
-| Internet | Weather (Open-Meteo) and Flight (AirLabs), only after you set them up; nothing else |
+| Internet | Weather (Open-Meteo), Flight (AirLabs) and US stocks (Finnhub), only after you set them up; nothing else |
 | Notification access *(optional)* | Now playing's title, artist and artwork; BentoBar receives no notifications |
 | Network state, launcher apps | the network menu, and picking apps for shortcuts |
 

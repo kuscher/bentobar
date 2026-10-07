@@ -53,6 +53,11 @@ notifications_active notifications_off password pending priority_high privacy_ti
 sync sync_problem toggle_off trending_flat vpn_key west wifi_off
 """.split()
 
+# Added for the Stocks item: its glyph in the bar goes up, down or flat with the day's change.
+ICONS += """
+show_chart trending_down trending_up
+""".split()
+
 # Symbols also exported as vector drawables (tiles, notifications, launcher icon), from the filled font.
 DRAWABLES = ["coffee", "timer", "avg_pace", "event", "pause", "play_arrow", "add", "stop", "videocam", "open_in_new"]
 

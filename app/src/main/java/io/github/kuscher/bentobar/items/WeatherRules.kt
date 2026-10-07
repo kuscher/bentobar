@@ -14,7 +14,6 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.text.BreakIterator
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -254,10 +253,10 @@ object WeatherRules {
     }
 
     /** The city's name as the item shows it, or null. */
-    fun city(item: ItemConfig): String? = oneLine(item.options["city"].orEmpty(), NAME_CHARS).ifEmpty { null }
+    fun city(item: ItemConfig): String? = TextRules.oneLine(item.options["city"].orEmpty(), NAME_CHARS).ifEmpty { null }
 
     /** A label as it is stored: one line, twelve characters at most. */
-    fun label(text: String): String = oneLine(text, LABEL_CHARS)
+    fun label(text: String): String = TextRules.oneLine(text, LABEL_CHARS)
 
     fun look(item: ItemConfig, fahrenheit: Boolean, miles: Boolean, rainHours: Int): Look =
         Look(city(item), label(item.opt("label", "")).ifEmpty { null }, item.opt("show", SHOW_TEMP), fahrenheit, miles, rainHours)
@@ -272,13 +271,13 @@ object WeatherRules {
     // ---- the search field -----------------------------------------------------------------------
 
     /** What a press of Search sends for [text]: one short line, or null if it has fewer than two characters. */
-    fun query(text: String): String? = oneLine(text, QUERY_CHARS).takeIf { it.codePointCount(0, it.length) >= 2 }
+    fun query(text: String): String? = TextRules.oneLine(text, QUERY_CHARS).takeIf { it.codePointCount(0, it.length) >= 2 }
 
     private val AREAS = setOf("Africa", "America", "Antarctica", "Arctic", "Asia", "Atlantic", "Australia", "Europe", "Indian", "Pacific")
 
     /** "Los Angeles" from "America/Los_Angeles": what the search field starts with. Empty for a zone that names no city. */
     fun cityOf(zoneId: String): String =
-        if ('/' !in zoneId || zoneId.substringBefore('/') !in AREAS) "" else oneLine(zoneId.substringAfterLast('/').replace('_', ' '), NAME_CHARS)
+        if ('/' !in zoneId || zoneId.substringBefore('/') !in AREAS) "" else TextRules.oneLine(zoneId.substringAfterLast('/').replace('_', ' '), NAME_CHARS)
 
     /** "Illinois, United States": the parts the reply has, or null when it has none. */
     fun region(city: City, w: WeatherWords): String? = when {
@@ -290,49 +289,8 @@ object WeatherRules {
 
     // ---- text from outside: a layout, a reply ---------------------------------------------------
 
-    /**
-     * [text] as one line of at most [max] characters: line breaks, tabs and other control characters
-     * become single spaces, and the characters that override the direction of the text after them
-     * are taken out (a label must not turn the bar's own numbers around). What a script needs to
-     * join or part its letters stays. Never more work than a few times what can stay, whatever comes in.
-     */
-    fun oneLine(text: String, max: Int): String {
-        var head = if (text.length > max * 32) text.substring(0, max * 32) else text
-        if (head.isNotEmpty() && head.last().isHighSurrogate()) head = head.dropLast(1)
-        val flat = StringBuilder(head.length)
-        var gap = false
-        for (c in head) {
-            when {
-                // Embeddings, overrides and isolates, with their ends.
-                c.code in 0x202A..0x202E || c.code in 0x2066..0x2069 -> {}
-                c.isWhitespace() || c.isISOControl() || c.code == 0x2028 || c.code == 0x2029 -> gap = flat.isNotEmpty()
-                else -> { if (gap) flat.append(' '); flat.append(c); gap = false }
-            }
-        }
-        return first(flat.toString(), max).trimEnd()
-    }
-
-    /** The first [max] characters of [text] as a reader counts them: a letter with its accent is one, and none is cut in half. */
-    fun first(text: String, max: Int): String {
-        if (text.length <= max) return text
-        val breaks = BreakIterator.getCharacterInstance(Locale.ROOT)
-        breaks.setText(text)
-        var end = 0
-        repeat(max) { val next = breaks.next(); if (next == BreakIterator.DONE) return text; end = next }
-        return text.substring(0, end)
-    }
-
-    /** How many characters [text] has, as a reader counts them. */
-    fun count(text: String): Int {
-        val breaks = BreakIterator.getCharacterInstance(Locale.ROOT)
-        breaks.setText(text)
-        var n = 0
-        while (breaks.next() != BreakIterator.DONE) n++
-        return n
-    }
-
-    /** A character is at least one unit long, so a short text needs no counting. */
-    private fun fits(text: String) = text.length <= BAR_CHARS || count(text) <= BAR_CHARS
+    /** At most [BAR_CHARS] characters, as a reader counts them. */
+    private fun fits(text: String) = TextRules.fits(text, BAR_CHARS)
 
     // ---- reading the replies --------------------------------------------------------------------
 
@@ -341,7 +299,7 @@ object WeatherRules {
     private fun JsonArray?.at(i: Int): JsonElement? = this?.getOrNull(i)
     private fun JsonElement?.number(): Double? = (this as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull?.takeIf { it.isFinite() }
     private fun JsonElement?.flag(): Boolean? = (this as? JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull
-    private fun JsonElement?.line(max: Int): String = (this as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { oneLine(it, max) }.orEmpty()
+    private fun JsonElement?.line(max: Int): String = (this as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { TextRules.oneLine(it, max) }.orEmpty()
 
     // A value beyond all sense is a value that is missing: its cell is left out.
     private fun JsonElement?.seconds(): Long? = number()?.takeIf { it >= 1 && it < 1e11 }?.toLong()

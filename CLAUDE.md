@@ -41,10 +41,11 @@ private projects and paths into their repos, and where signing keys are backed u
   - `bar/Menus.kt`: the menu card, the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
     visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
-    glyph icons, `Chips` for the Live Update chip), and the item types: several each in
+    glyph icons, `Chips` for the Live Update chip), `TextRules` (text from a layout or a reply as one line,
+    counted as a reader counts it), and the item types: several each in
     `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
     (`CpuItem`, `ClockItem`, `SoundItem`, `MediaItem`, `DevicesItem`, `HeatItem`, `WeatherItem`,
-    `FlightItem`). A type gets `onLive()`, `sample(now)` once a second and `onIdle()` from the
+    `FlightItem`, `StocksItem`). A type gets `onLive()`, `sample(now)` once a second and `onIdle()` from the
     `Ticker`: listeners and polls hang on those, so none exists while the bar is hidden, the screen is
     off or no such item is outside Off.
   - `items/Refresher.kt` is `Calendar`'s way of loading as one class (a background thread, one load
@@ -57,7 +58,7 @@ private projects and paths into their repos, and where signing keys are backed u
     "Notification access" list that Android wants for it: it asks for no notification type and is
     not bound by Android by itself (see the manifest's comment). Its pure rules are in
     `items/NowPlayingRules.kt`.
-  - `net/`: the only code that opens a connection (pure Kotlin). `Host` is an enum of the three
+  - `net/`: the only code that opens a connection (pure Kotlin). `Host` is an enum of the four
     hosts BentoBar may ask; a `Request` names one of them, a path and a query, so no call takes an
     address. `Http.get` refuses unless the service is switched on, an item that uses it is outside
     Off and something that shows items is on screen, and never runs on the main thread. A query can
@@ -108,7 +109,7 @@ private projects and paths into their repos, and where signing keys are backed u
 - `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|set ID k=v|look KEY VALUE|windows`.
   The receiver (`src/debug`, debug builds only) is guarded by DUMP, so only adb can call it.
   Also `now +3h|+90m|off` (moves the clock everything newer reads, `util/Now`), `net [reset]` (requests
-  sent per host, and whether each service may be asked right now), `online weather|flights on|off`,
+  sent per host, and whether each service may be asked right now), `online weather|flights|stocks on|off`,
   and `TYPE …` or `item TYPE …`, which go to that item type's own `debug(args)`. What a hook prints
   is logged: no hook takes or prints a key, and a type marked `discreet` prints no title (`state media`
   and `state flight` print the text's length).
@@ -209,14 +210,20 @@ private projects and paths into their repos, and where signing keys are backed u
   In desktop windowing, Settings opens in its own window and BentoBar's stays resumed, so onResume
   alone misses changes; and with strong skipping (Kotlin 2.x) a composable reading Android state
   inside isn't redrawn when its parameters are unchanged.
-- **Going online is two items' business, and each install's own decision.** Weather and Flight ask a
-  service; nothing else does, and nothing the accessibility service or any other item reads can get
-  there (`net/` is the only way out, and only those two types name a service in `ItemType.online`).
+- **Going online is three items' business, and each install's own decision.** Weather, Flight and Stocks
+  ask a service; nothing else does, and nothing the accessibility service or any other item reads can get
+  there (`net/` is the only way out, and only those three types name a service in `ItemType.online`).
   A service is asked only after its item was set up on this install: `data/Online.kt` records that
   outside the layout, so a pasted layout or a restored backup turns nothing on. Off (Setup › Online
   services) stops requests at once and deletes what was fetched (`ItemType.forgetFetched`).
   `ManifestTest` pins the permissions, the backup rules, cleartext off and the listener's entry;
-  `HttpTest` and `HttpTransportTest` pin the three hosts and what a request may carry.
+  `HttpTest` and `HttpTransportTest` pin the four hosts and what a request may carry; `OneWayOutTest` names
+  the files that may ask a service (`items/Weather*`, `Flight*`, `AirLabs*`, `Stocks*`, `Finnhub*`) or read a key.
+- **US stocks** (`StocksItem`, type "stocks", rules in `StocksRules`, requests and what is kept in `StocksLoad`, replies in
+  `Finnhub`): US stocks only (Finnhub's free plan), with the user's own key; one quote request per stock,
+  every 2 minutes while the market is open (`Market`: weekday hours in New York; a holiday is seen in quotes
+  that keep yesterday's time), once after the close. The bar takes turns (`ItemState.turns` sizes its place
+  for the widest). `./bento debug stocks stage up|down|mixed|big|closed|loading|offline|refused|nokey|none`.
 - **A flight service's reply repeats the key it was asked with**, and the platform puts addresses
   into exception messages. So: never keep or log a reply as it came, never log or rethrow what a
   request threw, and keep a key out of every state, description and debug line. Its count of lookups

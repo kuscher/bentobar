@@ -8,7 +8,7 @@ Contact email for the certificate: kuscher.projects@gmail.com.
   Weather item sends the coordinates of a city the user picked to a weather service; that is declared in Data
   safety, not here.)
 - **Unrestricted internet or web browsing:** No. Up to 0.8 the app had no internet permission. From 0.9 it has
-  one, for two fixed services (Open-Meteo, AirLabs); it is no browser, shows no web content, and opens links
+  one, for fixed services (Open-Meteo and AirLabs, and after 1.0.2 Finnhub); it is no browser, shows no web content, and opens links
   in the device's browser.
 
 Expected rating: Everyone / PEGI 3.

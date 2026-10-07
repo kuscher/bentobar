@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **US stocks.** Follow up to ten US stocks and ETFs: the bar shows one at a time (`AAPL 227.52 ▲1.2%`),
+  each for 5 seconds or as long as you choose, and can pop out when one moves a lot in a day. Its menu has each stock's day and the market's hours.
+  Prices come from Finnhub, with a free key of your own.
+
 ## 1.0.2 (2026-10-06)
 
 - **A new icon.** The same bento box seen from above, the status bar on top and three compartments

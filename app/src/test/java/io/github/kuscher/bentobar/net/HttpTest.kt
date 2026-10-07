@@ -32,8 +32,8 @@ class HttpTest {
         Http.resetCounts()
     }
 
-    @Test fun threeHostsAndNoOther() {
-        assertEquals(setOf("api.open-meteo.com", "geocoding-api.open-meteo.com", "airlabs.co"), Host.entries.map { it.domain }.toSet())
+    @Test fun fourHostsAndNoOther() {
+        assertEquals(setOf("api.open-meteo.com", "geocoding-api.open-meteo.com", "airlabs.co", "api.finnhub.io"), Host.entries.map { it.domain }.toSet())
     }
 
     @Test fun everyAddressIsHttpsToOneOfThem() {

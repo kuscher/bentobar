@@ -481,8 +481,9 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
                 else Modifier.slides(slider.steps, rtl, onHeld = { held = it }, onContext = { context() }) { level, done -> events.slide(entry.item, level, done) })
         }
         if (showText) {
-            val template = if (s.widthKey != null) Fmt.widthTemplate(s.text!!) else null
-            val slot = template?.let { tpl -> remember(tpl, textStyle) { measurer.measure(tpl, textStyle, maxLines = 1).size.width } }
+            // Texts that take turns sit in a place as wide as the widest of them; a ticking number in one sized for its widest reading.
+            val templates = s.turns ?: if (s.widthKey != null) listOf(Fmt.widthTemplate(s.text!!)) else null
+            val slot = templates?.let { tpls -> remember(tpls, textStyle) { tpls.maxOf { measurer.measure(it, textStyle, maxLines = 1).size.width } } }
             // With an icon, the number stays next to it and the spare room trails; text alone sits at the end.
             val iconShown = route != null || (showIcon && (s.image != null || !s.icon.isNullOrEmpty()))
             // An item that promises a length is held to it in width too: 8.5 dp a character at the usual text

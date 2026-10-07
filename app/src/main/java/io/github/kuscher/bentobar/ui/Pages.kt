@@ -329,6 +329,10 @@ fun SetupPage(activity: Activity, setup: SetupState, onTurnOn: () -> Unit) {
             if (Online.Service.AIRLABS in online.keyed) TextButton(onClick = { Online.removeKey(Online.Service.AIRLABS); Ticker.refresh() }) {
                 Text(stringResource(R.string.flight_remove_key), color = MaterialTheme.colorScheme.error)
             }
+            OnlineSwitch(Online.Service.FINNHUB, online, stringResource(R.string.setup_online_stocks), stringResource(R.string.setup_online_stocks_first))
+            if (Online.Service.FINNHUB in online.keyed) TextButton(onClick = { Online.removeKey(Online.Service.FINNHUB); Ticker.refresh() }) {
+                Text(stringResource(R.string.stocks_remove_key), color = MaterialTheme.colorScheme.error)
+            }
             Text(stringResource(R.string.setup_online_off_note), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -436,6 +440,7 @@ fun AboutPage() {
         Spacer(Modifier.height(4.dp))
         Bullet(stringResource(R.string.about_privacy_weather))
         Bullet(stringResource(R.string.about_privacy_flight))
+        Bullet(stringResource(R.string.about_privacy_stocks))
         Bullet(stringResource(R.string.about_privacy_media))
         Bullet(stringResource(R.string.about_privacy_others))
         Spacer(Modifier.height(8.dp))
@@ -454,6 +459,7 @@ fun AboutPage() {
         Bullet(stringResource(R.string.about_credit_kotlin))
         Bullet(stringResource(R.string.about_credit_openmeteo))
         Bullet(stringResource(R.string.about_credit_airlabs))
+        Bullet(stringResource(R.string.about_credit_finnhub))
         // Open-Meteo's licence asks for the credit and a link to it.
         TextButton(onClick = { Env.launch(Intent(Intent.ACTION_VIEW, Uri.parse(OPEN_METEO_URL))) }, modifier = Modifier.offset(x = (-12).dp)) {
             Text(stringResource(R.string.weather_open_site))

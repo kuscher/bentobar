@@ -57,4 +57,23 @@ class Ask<Q : Any, A : Any>(private val wiring: Refresher.Wiring, private val wo
         generation++
         current.value = State.Idle
     }
+
+    /** [clear], if the question on its way or answered is one of [mine]: that field's text changed, or the field went. Main thread. */
+    fun clearIf(mine: (Q) -> Boolean) {
+        if (current.value.asked?.let(mine) == true) clear()
+    }
 }
+
+/** The question of this state, on its way or answered; null when nothing is asked. */
+val <Q> Ask.State<Q, *>.asked: Q?
+    get() = when (this) {
+        is Ask.State.Busy -> question
+        is Ask.State.Done -> question
+        Ask.State.Idle -> null
+    }
+
+/**
+ * This state as one field shows it, where several fields ask with one [Ask]: an answer to another
+ * field's question is none of its business. [mine]: the questions this field asked.
+ */
+fun <Q, A> Ask.State<Q, A>.shownTo(mine: (Q) -> Boolean): Ask.State<Q, A> = if (asked?.let(mine) == true) this else Ask.State.Idle

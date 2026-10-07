@@ -59,7 +59,7 @@ class WeatherRulesTest {
     @Test fun aReadingIsTheTemperatureAsAWholeNumber() {
         val b = bar(reading())
         assertEquals("72°", b.text)
-        assertEquals(3, WeatherRules.count(b.text!!))
+        assertEquals(3, TextRules.count(b.text!!))
         assertEquals(Tone.NORMAL, b.tone)
         assertFalse(b.active)
         assertEquals(Sym.PARTLY_CLOUDY_DAY, b.icon)
@@ -70,7 +70,7 @@ class WeatherRulesTest {
         val b = bar(reading(temp = -20.0)) // −4 °F
         assertEquals("−4°", b.text)
         assertEquals('−', b.text!!.first())
-        assertEquals(3, WeatherRules.count(b.text!!))
+        assertEquals(3, TextRules.count(b.text!!))
         assertEquals("−4°", bar(reading(temp = -4.4), look(fahrenheit = false)).text)
     }
 
@@ -90,7 +90,7 @@ class WeatherRulesTest {
         // The product's own case: an 80% chance of rain in 90 minutes.
         val b = bar(reading(hours = listOf(Triple(15, 80, 61))))
         assertEquals("72° · Rain 3 PM", b.text)
-        assertEquals(15, WeatherRules.count(b.text!!))
+        assertEquals(15, TextRules.count(b.text!!))
         assertEquals(Tone.ACCENT, b.tone)
         assertTrue(b.active)
         // The glyph is what is coming, not the sky of this minute.
@@ -184,7 +184,7 @@ class WeatherRulesTest {
     @Test fun withA24HourClockTheHourIsWrittenThatWay() {
         val b = bar(reading(hours = listOf(Triple(15, 80, 73))), times = WeatherFileWords.times(sf, h24 = true))
         assertEquals("72° · Snow 15:00", b.text)
-        assertEquals(16, WeatherRules.count(b.text!!))
+        assertEquals(16, TextRules.count(b.text!!))
         assertEquals(Sym.WEATHER_SNOWY, b.icon)
         assertEquals(Tone.ACCENT, b.tone)
     }
@@ -200,7 +200,7 @@ class WeatherRulesTest {
     @Test fun whatFallsNowIsSaidWithoutATime() {
         val rain = bar(reading(code = 63))
         assertEquals("72° · Rain", rain.text)
-        assertEquals(10, WeatherRules.count(rain.text!!))
+        assertEquals(10, TextRules.count(rain.text!!))
         assertEquals(Tone.ACCENT, rain.tone)
         assertTrue(rain.active)
         assertEquals(Sym.RAINY, rain.icon)
@@ -235,7 +235,7 @@ class WeatherRulesTest {
         assertEquals("72°", bar(r, look(show = WeatherRules.SHOW_TEMP)).text)
         val both = bar(r, look(show = WeatherRules.SHOW_HIGH_LOW))
         assertEquals("72° ↑78° ↓61°", both.text)
-        assertEquals(13, WeatherRules.count(both.text!!))
+        assertEquals(13, TextRules.count(both.text!!))
         assertEquals(Tone.NORMAL, both.tone)
         assertFalse(both.active)
         assertEquals("68°", bar(r, look(show = WeatherRules.SHOW_FEELS)).text)
@@ -254,7 +254,7 @@ class WeatherRulesTest {
         assertEquals("SF 72°", bar(reading(), look(label = "SF")).text)
         val b = bar(reading(hours = listOf(Triple(15, 80, 61))), look(label = "SF"))
         assertEquals("SF 72° · Rain 3 PM", b.text)
-        assertEquals(18, WeatherRules.count(b.text!!))
+        assertEquals(18, TextRules.count(b.text!!))
     }
 
     // ---- the bar: twenty characters ------------------------------------------------------------
@@ -264,21 +264,21 @@ class WeatherRulesTest {
         // 72°, rain at 3 PM
         assertEquals("72° · Rain 3 PM", bar(rain).text)
         // label Tahoe: "Tahoe 72° · Rain 3 PM" is 21
-        assertEquals(21, WeatherRules.count("Tahoe 72° · Rain 3 PM"))
+        assertEquals(21, TextRules.count("Tahoe 72° · Rain 3 PM"))
         val tahoe = bar(rain, look(label = "Tahoe"))
         assertEquals("Tahoe 72° · Rain", tahoe.text)
-        assertEquals(16, WeatherRules.count(tahoe.text!!))
+        assertEquals(16, TextRules.count(tahoe.text!!))
         // label Lake Tahoe, −12°, snow at 10 PM: 28, then 22 without the time
-        assertEquals(28, WeatherRules.count("Lake Tahoe −12° · Snow 10 PM"))
-        assertEquals(22, WeatherRules.count("Lake Tahoe −12° · Snow"))
+        assertEquals(28, TextRules.count("Lake Tahoe −12° · Snow 10 PM"))
+        assertEquals(22, TextRules.count("Lake Tahoe −12° · Snow"))
         val snow = bar(reading(temp = -24.4, hours = listOf(Triple(22, 70, 73))), look(label = "Lake Tahoe", rainHours = 12))
         assertEquals("−12° · Snow", snow.text)
-        assertEquals(11, WeatherRules.count(snow.text!!))
+        assertEquals(11, TextRules.count(snow.text!!))
         // label Lake Tahoe, 72°, high and low: 24
-        assertEquals(24, WeatherRules.count("Lake Tahoe 72° ↑78° ↓61°"))
+        assertEquals(24, TextRules.count("Lake Tahoe 72° ↑78° ↓61°"))
         val both = bar(reading(), look(label = "Lake Tahoe", show = WeatherRules.SHOW_HIGH_LOW))
         assertEquals("72° ↑78° ↓61°", both.text)
-        assertEquals(13, WeatherRules.count(both.text!!))
+        assertEquals(13, TextRules.count(both.text!!))
     }
 
     @Test fun exactlyTwentyStays() {
@@ -287,26 +287,26 @@ class WeatherRulesTest {
         assertEquals("72° · Rain", b.text)
         val fits = bar(reading(code = 63), look(label = "San Diego")) // 9 + 1 + 10 = 20
         assertEquals("San Diego 72° · Rain", fits.text)
-        assertEquals(20, WeatherRules.count(fits.text!!))
+        assertEquals(20, TextRules.count(fits.text!!))
     }
 
     @Test fun charactersAreCountedAsAReaderCountsThem() {
         // An accent written as its own code point and a symbol outside the basic plane are one character each.
-        assertEquals(6, WeatherRules.count("Zu\u0308rich"))
-        assertEquals(1, WeatherRules.count("\uD83C\uDF27"))
+        assertEquals(6, TextRules.count("Zu\u0308rich"))
+        assertEquals(1, TextRules.count("\uD83C\uDF27"))
         assertEquals("São Paulo 72° · Rain", bar(reading(code = 63), look(label = "São Paulo")).text)
         // Written with the accent apart it is one unit longer in memory and still twenty characters to a reader: it stays.
         val apart = "Sa\u0303o Paulo"
         assertEquals(10, apart.length)
         assertEquals("$apart 72° · Rain", bar(reading(code = 63), look(label = apart)).text)
-        assertEquals(20, WeatherRules.count("$apart 72° · Rain"))
+        assertEquals(20, TextRules.count("$apart 72° · Rain"))
     }
 
     @Test fun theItemSaysItNeverHasMoreThanTwentyCharacters() {
         for (label in listOf(null, "SF", "Tahoe", "Lake Tahoe", "WWWWWWWWWWWW")) for (show in listOf(WeatherRules.SHOW_TEMP, WeatherRules.SHOW_HIGH_LOW, WeatherRules.SHOW_FEELS))
             for (r in listOf(reading(), reading(temp = -40.0, feels = -51.0), reading(code = 95), reading(hours = listOf(Triple(22, 99, 86))))) {
                 val text = bar(r, look(label = label, show = show, rainHours = 12)).text!!
-                assertTrue("$text is ${WeatherRules.count(text)}", WeatherRules.count(text) <= WeatherRules.BAR_CHARS)
+                assertTrue("$text is ${TextRules.count(text)}", TextRules.count(text) <= WeatherRules.BAR_CHARS)
             }
     }
 
@@ -666,7 +666,7 @@ class WeatherRulesTest {
         val joiner = String(Character.toChars(0x200C))
         assertEquals("a${joiner}b", WeatherRules.label("a${joiner}b"))
         // A name in a script written from the right is a name like any other.
-        assertEquals("تهران", WeatherRules.oneLine(" تهران ", 80))
+        assertEquals("تهران", TextRules.oneLine(" تهران ", 80))
         assertEquals("72° · Rain", bar(reading(code = 63), look(label = WeatherRules.label(overrides + "Lake Tahoe West"))).text)
     }
 

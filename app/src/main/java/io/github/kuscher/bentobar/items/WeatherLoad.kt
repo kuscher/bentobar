@@ -264,14 +264,7 @@ class WeatherSource(
     }
 
     /** The text of the field [by] changed: what was found for the old text goes. Nothing is sent. Main thread. */
-    fun typed(by: String) {
-        val asker = when (val s = asking.state.value) {
-            is Ask.State.Busy -> s.question.by
-            is Ask.State.Done -> s.question.by
-            Ask.State.Idle -> null
-        }
-        if (asker == by) asking.clear()
-    }
+    fun typed(by: String) = asking.clearIf { it.by == by }
 
     /** "Turn on weather": for a layout that came with a city, or after the switch was turned off in Setup. */
     fun turnOn(): Boolean = Online.turnOn(service)
@@ -315,10 +308,6 @@ class WeatherSource(
         )
 
         /** [state] as the field [by] shows it: an answer to another field's question is none of its business. */
-        fun shown(state: Ask.State<Query, Found>, by: String): Ask.State<Query, Found> = when (state) {
-            is Ask.State.Busy -> if (state.question.by == by) state else Ask.State.Idle
-            is Ask.State.Done -> if (state.question.by == by) state else Ask.State.Idle
-            Ask.State.Idle -> state
-        }
+        fun shown(state: Ask.State<Query, Found>, by: String): Ask.State<Query, Found> = state.shownTo { it.by == by }
     }
 }

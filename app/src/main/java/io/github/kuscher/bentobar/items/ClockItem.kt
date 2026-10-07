@@ -40,10 +40,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,6 +57,7 @@ import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
 import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.ui.SearchField
+import io.github.kuscher.bentobar.ui.SearchStatus
 import io.github.kuscher.bentobar.ui.SectionLabel
 import io.github.kuscher.bentobar.ui.SmallIconButton
 import io.github.kuscher.bentobar.ui.SwitchRow
@@ -293,7 +292,7 @@ private fun AddCity(cities: List<WorldCity>, places: List<WorldClock.Place>, now
     }
     when {
         WorldClock.key(query).length < WorldClock.MIN_LETTERS -> {}
-        hits.isEmpty() -> Box(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) { MenuNote(stringResource(R.string.clock_search_none)) }
+        hits.isEmpty() -> SearchStatus(stringResource(R.string.clock_search_none))
         else -> Column(Modifier.onFocusChanged { inResults[0] = it.hasFocus }) {
             hits.forEach { hit ->
                 MenuEntry(Sym.PUBLIC, if (hit.region != null) stringResource(R.string.clock_search_region, hit.name, hit.region) else hit.name,

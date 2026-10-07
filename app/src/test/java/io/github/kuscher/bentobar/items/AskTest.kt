@@ -67,4 +67,20 @@ class AskTest {
         search.ask("bug")
         assertEquals(Ask.State.Idle, search.state.value)
     }
+
+    @Test fun whereSeveralFieldsAskEachSeesOnlyItsOwnAnswer() {
+        // Questions as "field:text": the menu's field and the settings' field share the one Ask.
+        val fields = Ask<String, String>(wiring) { q -> q.substringAfter(':') + "!" }
+        fields.ask("menu:Springfield")
+        assertEquals(Ask.State.Done("menu:Springfield", "Springfield!"), fields.state.value.shownTo { it.startsWith("menu:") })
+        assertEquals(Ask.State.Idle, fields.state.value.shownTo { it.startsWith("settings:") })
+        assertEquals("menu:Springfield", fields.state.value.asked)
+        // Typing in the other field leaves this answer; typing in its own clears it.
+        fields.clearIf { it.startsWith("settings:") }
+        assertEquals("menu:Springfield", fields.state.value.asked)
+        fields.clearIf { it.startsWith("menu:") }
+        assertEquals(Ask.State.Idle, fields.state.value)
+        assertEquals(null, fields.state.value.asked)
+    }
+
 }

@@ -41,7 +41,8 @@ private projects and paths into their repos, and where signing keys are backed u
   - `bar/Menus.kt`: the menu card, the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
     visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
-    glyph icons, `Chips` for the Live Update chip), and the item types: several each in
+    glyph icons, `Chips` for the Live Update chip), `TextRules` (text from a layout or a reply as one line,
+    counted as a reader counts it), and the item types: several each in
     `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
     (`CpuItem`, `ClockItem`, `SoundItem`, `MediaItem`, `DevicesItem`, `HeatItem`, `WeatherItem`,
     `FlightItem`). A type gets `onLive()`, `sample(now)` once a second and `onIdle()` from the

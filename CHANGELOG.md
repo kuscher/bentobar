@@ -1,7 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.2 (2026-10-07)
 
+- **Shortcut.** A new item: one click, one action. Screenshot, Report a bug (opens the Googlebook's
+  Feedback app), lock, overview, all apps, notifications or Quick settings, shown as its icon, its name
+  or both, like any item. Report a bug is offered only where the Feedback app is.
+- **Weather: With conditions.** A new choice under Show puts a word for the sky beside the temperature
+  ("72° · Partly cloudy", "54° · Light rain"). A strong wind where nothing falls is "Windy": whatever
+  Show says, the icon is the wind's and the item says "Windy" to a screen reader; with this choice the
+  bar says it too. The menu keeps the sky and gives the wind's speed.
 - **Show when: no more blinking.** Network, CPU and Memory set to show when busy stay out for 20
   seconds after their reading drops below your line, so a download in bursts no longer pops the item
   in and out and shifts the bar each time. Items that end (a meeting, a timer) still go at once.
@@ -22,13 +29,6 @@
   not overwritten by your next change.
 - **Fewer screenshots.** The status bar's colours aren't read while BentoBar has nothing to show,
   and are read once it has.
-- **Shortcut.** A new item: one click, one action. Screenshot, Report a bug (opens the Googlebook's
-  Feedback app), lock, overview, all apps, notifications or Quick settings, shown as its icon, its name
-  or both, like any item. Report a bug is offered only where the Feedback app is.
-- **Weather: With conditions.** A new choice under Show puts a word for the sky beside the temperature
-  ("72° · Partly cloudy", "54° · Light rain"). A strong wind where nothing falls is "Windy": whatever
-  Show says, the icon is the wind's and the item says "Windy" to a screen reader; with this choice the
-  bar says it too. The menu keeps the sky and gives the wind's speed.
 
 ## 1.0.2 (2026-10-06)
 

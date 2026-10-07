@@ -2,6 +2,7 @@ package io.github.kuscher.bentobar.ui
 
 import android.content.pm.PackageManager
 import android.graphics.Rect
+import android.os.SystemClock
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.scrollBy
@@ -120,9 +121,11 @@ fun BarPage(running: Boolean, selected: String?, onSelect: (String?) -> Unit, on
     LaunchedEffect(deleted) {
         val d = deleted ?: return@LaunchedEffect
         val name = Items.of(d.item.type)?.title ?: res.getString(R.string.bar_deleted_fallback)
-        if (snackbar.showSnackbar(res.getString(R.string.bar_deleted, name), res.getString(R.string.bar_undo),
+        if (Undo.offered(d, SystemClock.elapsedRealtime()) &&
+            snackbar.showSnackbar(res.getString(R.string.bar_deleted, name), res.getString(R.string.bar_undo),
                 duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) Undo.restore(d)
-        Undo.deleted.value = null
+        // Not when the page goes first (a recreated window offers it again, within [Undo.offered]'s time).
+        Undo.deleted.compareAndSet(d, null)
     }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 900.dp
@@ -448,8 +451,17 @@ private fun RowScope.RowBody(item: ItemConfig, state: ItemState?) {
     }
 }
 
+/**
+ * One item's settings, kept by its id: choosing another item (a click in the preview takes no focus)
+ * starts afresh, so a field being typed in can't save what it holds into the next one.
+ */
 @Composable
 private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) -> Unit) {
+    key(item.id) { ItemDetailCard(item, state, onSelect) }
+}
+
+@Composable
+private fun ItemDetailCard(item: ItemConfig, state: ItemState?, onSelect: (String?) -> Unit) {
     val type = Items.of(item.type) ?: return
     val context = androidx.compose.ui.platform.LocalContext.current
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -523,7 +535,7 @@ private fun ItemDetail(item: ItemConfig, state: ItemState?, onSelect: (String?) 
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(onClick = { onSelect(Store.add(item.type, item.section, item.options)) }) { Text(stringResource(R.string.detail_duplicate)) }
+                OutlinedButton(onClick = { onSelect(Store.duplicate(item)) }) { Text(stringResource(R.string.detail_duplicate)) }
                 TextButton(onClick = { onSelect(null); Undo.delete(item) }) { Text(stringResource(R.string.common_delete), color = MaterialTheme.colorScheme.error) }
             }
         }
@@ -568,8 +580,18 @@ private fun TriggerControl(item: ItemConfig, trigger: Trigger) {
 
 /** Delete with an undo: the item and where it was, until the snackbar goes. */
 object Undo {
-    data class Deleted(val item: ItemConfig, val index: Int)
+    /** [at]: when, in `SystemClock.elapsedRealtime()`. */
+    data class Deleted(val item: ItemConfig, val index: Int, val at: Long = SystemClock.elapsedRealtime())
     val deleted = kotlinx.coroutines.flow.MutableStateFlow<Deleted?>(null)
+
+    /** As long as the snackbar shows (SnackbarDuration.Long). */
+    const val OFFER_MS = 10_000L
+
+    /**
+     * Whether [d] is still offered back at [now]: again when the window is recreated meanwhile (a resize,
+     * a theme), never after that time (settings left with the snackbar up and opened again later).
+     */
+    fun offered(d: Deleted, now: Long): Boolean = now - d.at in 0 until OFFER_MS
 
     fun delete(item: ItemConfig) {
         deleted.value = Deleted(item, Store.config.value.items.indexOfFirst { it.id == item.id })

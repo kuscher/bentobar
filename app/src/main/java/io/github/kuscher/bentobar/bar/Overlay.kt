@@ -3,6 +3,7 @@ package io.github.kuscher.bentobar.bar
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
+import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -76,9 +77,18 @@ class Overlay(
             setViewTreeSavedStateRegistryOwner(this@Overlay)
             addView(cv)
         }
+        try {
+            wm.addView(frame, params)
+        } catch (e: RuntimeException) {
+            // The service's window token went (Android unbinds it a moment before it says so): no window, and no crash. Not
+            // shown, so the next show tries again.
+            Log.w("BentoBar", "can't add the window ${params.title}: ${e.javaClass.simpleName}")
+            cv.disposeComposition()
+            life.hidden()
+            return
+        }
         compose = cv
         root = frame
-        wm.addView(frame, params)
     }
 
     /**

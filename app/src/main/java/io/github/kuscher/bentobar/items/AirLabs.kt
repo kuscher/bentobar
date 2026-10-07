@@ -72,7 +72,7 @@ data class FlightNumber(val designator: String, val number: Int, val suffix: Str
 object AirLabs {
     /** Where a key is got. */
     const val SIGN_UP = "https://airlabs.co/signup"
-    /** The one flight of a number nearest to now. */
+    /** The one flight of a number the service picks (not always the nearest to now, see above). */
     const val FLIGHT = "/api/v9/flight"
     /** The flights of a number in the next ten hours, and the ones just flown. */
     const val SCHEDULES = "/api/v9/schedules"

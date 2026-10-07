@@ -614,7 +614,10 @@ object FlightRules {
             t.flight == null -> NEAR
             else -> pace(t.flight, now, t.left) ?: if (unheard(t, t.flight, now)) NEAR else return null
         }
-        return (if (failed) maxOf(retry(t.failures), Duration.ofSeconds((t.waitSec ?: 0).coerceIn(0, 86_400))) else usual).toMillis()
+        // An ask that went out and came to nothing spent a lookup of the user's own key: far out, where the usual wait is
+        // three hours, the next waits as long. One that reached nobody cost nothing and is tried again at the back-off.
+        val backOff = if (t.failure == AirLabs.Failure.NO_ANSWER && usual >= FAR) usual else retry(t.failures)
+        return (if (failed) maxOf(backOff, Duration.ofSeconds((t.waitSec ?: 0).coerceIn(0, 86_400))) else usual).toMillis()
     }
 
     /** [f] is landed only by [shown]'s reckoning, and nothing was heard of it since it was to land. */

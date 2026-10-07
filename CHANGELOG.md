@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+- **Show when: no more blinking.** Network, CPU and Memory set to show when busy stay out for 20
+  seconds after their reading drops below your line, so a download in bursts no longer pops the item
+  in and out and shifts the bar each time. Items that end (a meeting, a timer) still go at once.
+- **A seconds clock that doesn't stall.** A click on an item, or a fresh answer from a service, could
+  hold a clock with seconds for a moment and then skip one.
+- **Flight: fewer lookups after a failure.** A failed lookup for a flight more than ten hours away is
+  tried again at the usual pace, every three hours, rather than within minutes. Without a connection
+  nothing is sent and the wait doesn't grow.
+- **Settings: typing.** A folder's, timer's or countdown's name, a label or a Text item's words no
+  longer change under the cursor (an emptied folder name came back as "Apps"), and a field stops at
+  the longest text the item keeps instead of cutting it afterwards. A field can't carry what you typed
+  into the next item you pick.
+- **Duplicate** keeps "Show when" and "Show as", and puts the copy next to the original.
+- **Undo** after deleting an item is offered for as long as its message shows, also when the window
+  is resized; it is no longer offered again when you open settings later.
+- **A layout from a later version opens.** A setting this version doesn't know falls back to its
+  default instead of the whole layout being reset; a layout that can't be read at all is kept aside,
+  not overwritten by your next change.
+- **Fewer screenshots.** The status bar's colours aren't read while BentoBar has nothing to show,
+  and are read once it has.
+
 ## 1.0.2 (2026-10-06)
 
 - **A new icon.** The same bento box seen from above, the status bar on top and three compartments

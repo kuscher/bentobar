@@ -244,6 +244,37 @@ class WeatherSourceTest {
         assertEquals(setOf(Place("47.4", "8.5")), WeatherLoad.places(layout, here))
     }
 
+    @Test fun myLocationsReadingIsHeldInMemoryAndNeverWrittenToTheDevice() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = WeatherRules.useHere(added)
+        layout = listOf(item)
+        s.turnOn()
+        here = Place("47.4", "8.5")
+        assertNotNull(s.reading(item))
+        assertEquals(1, net.asked.size)
+        assertTrue(s.status(item, wall) is Status.Live)
+        // In memory for the bar and the menu; on the device, nothing, under no name.
+        assertEquals(emptySet<String>(), Kept.fetched(OPEN_METEO).names())
+        // Beside a city, only the city's reading is kept.
+        val city = zurich("w2")
+        layout = listOf(item, city)
+        assertNotNull(s.reading(city))
+        assertEquals(setOf(Kept.safe("47.37,8.55")), Kept.fetched(OPEN_METEO).names())
+        // What an earlier version kept for where the device was: a restart doesn't read it back, but asks, and the
+        // answer's keeping removes it; so does a tidy.
+        fun planted() = Kept.fetched(OPEN_METEO).write("47.4,8.5", Kept.fetched(OPEN_METEO).read("47.37,8.55")!!.text.replace("47.37,8.55", "47.4,8.5"), wall)
+        planted()
+        val restarted = source()
+        assertNull(restarted.peek(item))
+        assertNotNull(restarted.reading(item))
+        assertEquals(2, net.asked.count { r -> ("latitude" to "47.4") in r.query })
+        assertEquals(setOf(Kept.safe("47.37,8.55")), Kept.fetched(OPEN_METEO).names())
+        planted()
+        restarted.keepOnly(WeatherLoad.places(layout, here), cities = WeatherLoad.places(layout))
+        assertEquals(setOf(Kept.safe("47.37,8.55")), Kept.fetched(OPEN_METEO).names())
+    }
+
     @Test fun myLocationFromAPastedLayoutSendsNothingUntilTurnOnWeather() = FakeHttp.use { net ->
         net.forecasts()
         val s = source()

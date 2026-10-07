@@ -127,7 +127,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         val places = WeatherLoad.places(items, WeatherHere.place)
         if (places == keptFor) return
         keptFor = places
-        source.keepOnly(places)
+        source.keepOnly(places, cities = WeatherLoad.places(items))
     }
 
     override fun sample(now: Long) {

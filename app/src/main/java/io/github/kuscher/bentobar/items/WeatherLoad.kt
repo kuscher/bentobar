@@ -56,11 +56,12 @@ object WeatherLoad {
     fun searchRequest(text: String) = Request(Host.OPEN_METEO_GEOCODING, "/v1/search", listOf("name" to text, "count" to "5", "format" to "json"))
 
     /**
-     * The places a reading is kept for: those of the layout's Weather items that are not turned off.
-     * An item in Off keeps its settings and nothing else. Its reading goes while the type still has a
-     * live item to look at the layout (the tick that turns it off); kept with an item that is off, it
-     * would outlive the item, since nothing runs for a type whose last item is off when that is deleted.
-     * [here]: where the device is, for the items of My location; null while that isn't known.
+     * The places the layout's Weather items ask about, of those that are not turned off. An item in Off
+     * keeps its settings and nothing else. Its reading goes while the type still has a live item to look
+     * at the layout (the tick that turns it off); kept with an item that is off, it would outlive the
+     * item, since nothing runs for a type whose last item is off when that is deleted. [here]: where the
+     * device is, for the items of My location; without it, the cities alone, which are the places whose
+     * reading is kept on the device.
      */
     fun places(items: List<ItemConfig>, here: Place? = null): Set<Place> =
         items.filter { it.type == "weather" && it.section != Section.OFF }.mapNotNullTo(HashSet()) { place(it, here) }
@@ -73,7 +74,8 @@ object WeatherLoad {
      * new [Reading], kept on the device. A failure is a reading too: [last]'s numbers with what went
      * wrong, so the bar keeps what it shows. Null: it was not asked after all (the switch went off or
      * the bar hid under the load), which is neither. [now] is the wall clock and [up] the time since
-     * boot, both of this moment; [places]: the layout's places right now.
+     * boot, both of this moment; [places]: the layout's cities right now, the places a reading is kept
+     * for (where the device is, for My location, is not among them: it is held in memory only).
      */
     fun load(place: Place, last: Reading?, now: Long, up: Long = 0, places: () -> Set<Place>): Reading? {
         val before = Http.sent(Host.OPEN_METEO)
@@ -290,12 +292,14 @@ class WeatherSource(
 
     /**
      * The layout's places are now [places]: readings of any other place go, from memory at once and
-     * from the device in the background ("deleted with the item"). On an install that never set
-     * Weather up nothing was ever fetched, so there is nothing to look for. Main thread.
+     * from the device in the background ("deleted with the item"). [cities]: those of them that are
+     * kept on the device, the cities; where the device is (My location) is held in memory only. On an
+     * install that never set Weather up nothing was ever fetched, so there is nothing to look for.
+     * Main thread.
      */
-    fun keepOnly(places: Set<Place>) {
+    fun keepOnly(places: Set<Place>, cities: Set<Place> = places) {
         readings.keepOnly(places)
-        if (Online.setUp(service)) background.execute { WeatherLoad.tidy(places) }
+        if (Online.setUp(service)) background.execute { WeatherLoad.tidy(cities) }
     }
 
     companion object {
@@ -319,11 +323,13 @@ class WeatherSource(
             here: () -> Place? = { null },
             locating: () -> Locate = { Locate.FINDING },
         ): WeatherSource = WeatherSource(
-            refresher({ _, reading -> WeatherRules.every(reading) }, { place -> WeatherLoad.kept(place, wall()) },
+            // Only a city's reading is kept on the device and read back from it: where the device is (My location) is held in
+            // memory only, so a reading of that place is neither written nor looked for there.
+            refresher({ _, reading -> WeatherRules.every(reading) }, { place -> if (place in WeatherLoad.places(layout())) WeatherLoad.kept(place, wall()) else null },
                 { place, last ->
                     // "No connection" is what nothing-went-out looks like; the other two stand for a try that did.
                     staged()?.let { WeatherLoad.failed(place, last, it, went = it != Failure.OFFLINE) }
-                        ?: WeatherLoad.load(place, last, wall(), up()) { WeatherLoad.places(layout(), here()) }
+                        ?: WeatherLoad.load(place, last, wall(), up()) { WeatherLoad.places(layout()) }
                 }),
             ask { query -> WeatherLoad.search(query.text) },
             background, wall, up, here, locating,

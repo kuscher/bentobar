@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **Weather: With conditions.** A new choice under Show puts a word for the sky beside the temperature
+  ("72° · Partly cloudy", "54° · Light rain"). A strong wind where nothing falls is "Windy": whatever
+  Show says, the icon is the wind's and the item says "Windy" to a screen reader; with this choice the
+  bar says it too. The menu keeps the sky and gives the wind's speed.
+
 ## 1.0.2 (2026-10-06)
 
 - **A new icon.** The same bento box seen from above, the status bar on top and three compartments

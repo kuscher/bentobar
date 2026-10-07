@@ -384,6 +384,29 @@ class WeatherRulesTest {
         val f = WeatherRules.menu(reading(wind = 40.0), look(), at(13, 30), w, t)
         assertEquals(Sym.PARTLY_CLOUDY_DAY, f.glyph)
         assertEquals("Partly cloudy · feels like 68°", f.subtitle)
+        // 40 km/h is 25 mph, written and spoken; in km/h where the unit is.
+        assertEquals("Rain 0% · Wind 25\u00A0mph", f.rainWind)
+        assertTrue(f.heroDesc, f.heroDesc.endsWith("Wind 25 miles per hour."))
+        val metric = WeatherRules.menu(reading(wind = 40.0), look(fahrenheit = false), at(13, 30), w, t)
+        assertEquals("Rain 0% · Wind 40\u00A0km/h", metric.rainWind)
+        assertTrue(metric.heroDesc, metric.heroDesc.endsWith("Wind 40 kilometers per hour."))
+    }
+
+    @Test fun everyCodeAtEveryTemperatureFitsTheBar() {
+        // Every code of the table, one it doesn't know and none; every whole degree from −40 to 50 °C (−40 to 122 °F); every Show
+        // choice, with no label and the longest; calm and windy; a dry forecast and one with something coming at 10 PM.
+        val codes = (0..99).filter { WeatherCodes.sky(it) != null } + listOf(4, null)
+        for (code in codes) for (c in -40..50) for (fahrenheit in listOf(true, false)) for (wind in listOf(0.0, 50.0)) for (wet in listOf(false, true)) {
+            val temp = c.toDouble()
+            val r = reading(temp = temp, feels = temp - 11, code = code, wind = wind, hourTemp = temp,
+                hours = if (wet) listOf(Triple(22, 90, if (WeatherCodes.falls(code) != null) code else 63)) else emptyList())
+                .let { it.copy(days = it.days.map { d -> d.copy(high = temp + 9, low = temp - 9) }) }
+            for (show in listOf(WeatherRules.SHOW_TEMP, WeatherRules.SHOW_HIGH_LOW, WeatherRules.SHOW_FEELS, WeatherRules.SHOW_SKY))
+                for (label in listOf(null, "Lake Tahoe W")) {
+                    val text = bar(r, look(label = label, show = show, fahrenheit = fahrenheit, rainHours = 12)).text!!
+                    assertTrue("$text is ${WeatherRules.count(text)} (code $code, $c °C)", WeatherRules.count(text) <= WeatherRules.BAR_CHARS)
+                }
+        }
     }
 
     // ---- the bar: the states without a number ---------------------------------------------------

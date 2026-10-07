@@ -12,14 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -54,9 +48,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -76,11 +67,13 @@ import io.github.kuscher.bentobar.items.FlightText.Voice
 import io.github.kuscher.bentobar.items.FlightText.Word
 import io.github.kuscher.bentobar.ui.ChipRow
 import io.github.kuscher.bentobar.ui.CopyEntry
+import io.github.kuscher.bentobar.ui.KeyWords
 import io.github.kuscher.bentobar.ui.MenuCard
 import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
 import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.ui.SearchField
+import io.github.kuscher.bentobar.ui.ServiceKey
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Fonts
 import io.github.kuscher.bentobar.util.Now
@@ -433,70 +426,18 @@ internal fun StatusBadge(text: String, kind: Kind) {
     }
 }
 
-/**
- * The key, in the item's settings (a long paste is awkward in a drop-down). Without one: what is
- * sent and to whom, where a key is got, and a field that shows dots. With one: that it is saved, how
- * many lookups it has left where that is known, and the two ways to change that. A saved key is never
- * shown again, here or anywhere.
- */
+/** The key, in the item's settings: the shared [ServiceKey], with how many lookups it has left where that is known. */
 @Composable
 internal fun FlightKey() {
     rememberTick()
     val online by Online.state.collectAsState()
-    val keyed = Online.Service.AIRLABS in online.keyed
-    var replacing by remember { mutableStateOf(false) }
-    val quiet = MaterialTheme.colorScheme.onSurfaceVariant
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        if (keyed && !replacing) {
-            Text(stringResource(R.string.flight_key_saved), style = MaterialTheme.typography.bodyLarge)
-            FlightLoad.left?.let { Text(pluralStringResource(R.plurals.flight_lookups_left, it, it), style = MaterialTheme.typography.bodySmall, color = quiet) }
-            Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(onClick = { replacing = true }) { Text(stringResource(R.string.flight_replace_key)) }
-                // At once, with no dialog and no Undo: an Undo would mean keeping the key after it was removed.
-                TextButton(onClick = { FlightItem.removeKey() }) { Text(stringResource(R.string.flight_remove_key), color = MaterialTheme.colorScheme.error) }
-            }
-            Text(stringResource(R.string.flight_remove_key_help), style = MaterialTheme.typography.bodySmall, color = quiet)
-        } else {
-            if (!keyed) {
-                Text(stringResource(R.string.flight_consent), style = MaterialTheme.typography.bodyMedium)
-                val getKey = stringResource(R.string.flight_get_key)
-                val opens = stringResource(R.string.common_opens_browser, getKey)
-                TextButton(onClick = { FlightItem.openSignUp() }, modifier = Modifier.semantics { contentDescription = opens }) { Text(getKey) }
-            }
-            KeyField(onSave = { if (FlightItem.saveKey(it)) replacing = false }, onCancel = if (replacing) { { replacing = false } } else null)
-            Text(stringResource(R.string.flight_key_help), style = MaterialTheme.typography.bodySmall, color = quiet, modifier = Modifier.padding(start = 4.dp, top = 2.dp))
-        }
+    ServiceKey(Online.Service.AIRLABS in online.keyed, FLIGHT_KEY, onSave = { FlightItem.saveKey(it) }, onRemove = { FlightItem.removeKey() },
+        onGetKey = { FlightItem.openSignUp() }) {
+        FlightLoad.left?.let { Text(pluralStringResource(R.plurals.flight_lookups_left, it, it), style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
-/**
- * Where the key is pasted. A password field: it shows dots, and no keyboard learns it. What is typed
- * is held only while it is typed (never with the window's saved state), and is gone from here the
- * moment it is saved.
- */
-@Composable
-private fun KeyField(onSave: (String) -> Unit, onCancel: (() -> Unit)?) {
-    var typed by remember { mutableStateOf("") }
-    fun save() {
-        if (typed.isBlank()) return
-        onSave(typed)
-        typed = ""
-    }
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(
-            value = typed,
-            onValueChange = { typed = it.take(200) },
-            label = { Text(stringResource(R.string.flight_key_section)) },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false, imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { save() }),
-            modifier = Modifier.weight(1f).onPreviewKeyEvent { e ->
-                // A hardware keyboard's Enter saves too. Down acts and up is swallowed, so the keyboard's own action can't act a second time.
-                if (e.key == Key.Enter || e.key == Key.NumPadEnter) { if (e.type == KeyEventType.KeyDown) save(); true } else false
-            },
-        )
-        FilledTonalButton(onClick = { save() }, enabled = typed.isNotBlank()) { Text(stringResource(R.string.flight_save_key), maxLines = 1) }
-        if (onCancel != null) TextButton(onClick = onCancel) { Text(stringResource(R.string.common_cancel), maxLines = 1) }
-    }
-}
+private val FLIGHT_KEY = KeyWords(R.string.flight_key_section, R.string.flight_consent, R.string.flight_get_key, R.string.flight_save_key,
+    R.string.flight_key_help, R.string.flight_key_saved, R.string.flight_replace_key, R.string.flight_remove_key, R.string.flight_remove_key_help)
+

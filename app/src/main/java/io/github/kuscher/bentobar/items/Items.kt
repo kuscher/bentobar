@@ -19,7 +19,7 @@ object Items {
     val all: List<ItemType> = listOf(
         CpuItem, NetworkItem, BatteryItem, MemoryItem, StorageItem, HeatItem, DevicesItem,
         CalendarItem, EventItem, ClockItem, TimerItem, CountdownItem,
-        CaffeineItem, MediaItem, SoundItem, ToolsItem, FolderItem, AppItem, TextItem, SpacerItem,
+        CaffeineItem, MediaItem, SoundItem, ToolsItem, ShortcutItem, FolderItem, AppItem, TextItem, SpacerItem,
         WeatherItem, FlightItem,
     )
     private val byType = all.associateBy { it.type }

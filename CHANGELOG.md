@@ -22,6 +22,9 @@
   not overwritten by your next change.
 - **Fewer screenshots.** The status bar's colours aren't read while BentoBar has nothing to show,
   and are read once it has.
+- **Shortcut.** A new item: one click, one action. Screenshot, Report a bug (opens the Googlebook's
+  Feedback app), lock, overview, all apps, notifications or Quick settings, shown as its icon, its name
+  or both, like any item. Report a bug is offered only where the Feedback app is.
 
 ## 1.0.2 (2026-10-06)
 

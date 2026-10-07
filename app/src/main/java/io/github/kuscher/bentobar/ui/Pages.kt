@@ -96,7 +96,7 @@ fun AddPage(onAdded: (String) -> Unit) {
     val groups = listOf(
         AddGroup(R.string.add_group_system, listOf("cpu", "network", "memory", "battery", "storage", "heat", "devices")),
         AddGroup(R.string.add_group_time, listOf("calendar", "event", "clock", "timer", "countdown")),
-        AddGroup(R.string.add_group_tools, listOf("caffeine", "media", "sound", "tools", "folder", "app", "text", "spacer")),
+        AddGroup(R.string.add_group_tools, listOf("caffeine", "media", "sound", "tools", "shortcut", "folder", "app", "text", "spacer")),
         // The only items that go online, in a group that says so.
         AddGroup(R.string.add_group_online, listOf("weather", "flight"), caption = R.string.add_group_online_caption),
     )

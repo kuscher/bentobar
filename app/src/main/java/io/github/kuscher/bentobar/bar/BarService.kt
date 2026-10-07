@@ -607,6 +607,8 @@ class BarController(private val service: AccessibilityService) {
 
         override fun click(item: ItemConfig, at: Rect) {
             placed[item.id] = at
+            // A click ends the hover's tooltip, whatever it does next (a screenshot must not catch it).
+            hideTip()
             val type = Items.of(item.type) ?: return
             if (type.onClick(item)) { Ticker.refresh(); return }
             if (type.menu == null) return

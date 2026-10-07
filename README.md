@@ -81,6 +81,7 @@ hides when an app goes full screen or the screen locks.
 | **Weather** *(online)* | conditions and temperature of a city you pick; rain or snow that is coming | the next hours and days, sunrise and sunset. From [Open-Meteo](https://open-meteo.com) |
 | **Flight** *(online)* | a line with the plane where the flight is, a countdown to departure with the gate, then to landing, and delays | times at both airports, terminal, gate, baggage belt; a choice where a number flies more than once a day. From AirLabs, with a free key of your own |
 | **Tools** | toolbox | screenshot, lock, overview, all apps, power, settings shortcuts |
+| **Shortcut** | one action, as its icon, its name or both (📷 Screenshot) | none: a click does it. Screenshot, Report a bug (the Googlebook's Feedback app), lock, overview, all apps, notifications, Quick settings |
 | **App folder** / **App shortcut** | your apps | a grid of apps / one click to open |
 | **Text or emoji**, **Spacer** | anything you like | optional link |
 
@@ -151,8 +152,8 @@ with that access:
 - It reads the **status bar's layout, and no other window**, to find free space.
 - It copies the **colour of the status bar clock**, from a picture of the status bar's own window
   (not your screen), so your items match.
-- It runs **system actions** (screenshot, lock, overview, all apps, power) when you pick them in
-  the Tools menu.
+- It runs **system actions** (screenshot, lock, overview, all apps, notifications, Quick Settings,
+  power) when you pick them in the Tools menu or click a Shortcut item.
 
 BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse or touches.
 

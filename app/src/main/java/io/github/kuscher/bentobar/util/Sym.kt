@@ -37,6 +37,7 @@ object Sym {
     const val BLUETOOTH_CONNECTED = "\ue1a8"
     const val BOLT = "\uea0b"
     const val BOOKMARK = "\ue8e7"
+    const val BUG_REPORT = "\ue868"
     const val BUILD = "\uf8cd"
     const val CALENDAR_ADD_ON = "\uef85"
     const val CALENDAR_CLOCK = "\uf540"

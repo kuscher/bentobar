@@ -25,9 +25,11 @@ third-party"), naming the hi-res icon and the title. The icon's rice, salmon, ta
 another brand's colours. Alex chose a new palette from five ("E · Deep teal"): `tools/logo.py` draws the same box in
 mint on deep teal (#133F43); the drawables, the splash background, `docs/images/icon.png`, the store's
 `icon-512.png` and `feature-graphic.png` were made anew (the feature graphic from the September capture, which has a
-plain wallpaper: no store image shows the Googlebook's own wallpaper). The title stays as it was. Version code 13;
-the tag uploads the bundle to closed testing as a draft, as usual, and the listing and review go through the Console
-with a note to the reviewer that the icon is original.
+plain wallpaper: no store image shows the Googlebook's own wallpaper). Version code 13;
+the tag uploaded the bundle to closed testing as a draft. Sent to Google Play the same afternoon from the Console:
+the store title "BentoBar: Customized Statusbar" (Alex's choice, 30 characters), the new icon and feature graphic,
+1.0.2 for closed testing and production (in 1.0's place), and an appeal on the rejected issue saying what changed and
+that the icon is original. Managed publishing is on, so an approval waits for a press of Publish.
 
 ## 1.0.1 (2026-10-06): a followed flight's delay shows again where its number flies more than once a day
 Released on GitHub only (tag `v1.0.1`, version code 12), with the Play job switched off for the tag

@@ -150,7 +150,7 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
     val source = WeatherItem.source
     val now = Now.wall()
     val staged = WeatherItem.staged(item) != null
-    val place = WeatherLoad.place(item, WeatherHere.place)
+    val place = WeatherLoad.place(item, WeatherHere.fix)
     // On opening (and when the city or the switch changes under the menu): a reading older than ten minutes is asked again.
     LaunchedEffect(item.id, place, on, staged) { if (!staged) source.opened(item) }
 

@@ -47,7 +47,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         up = Now::elapsed,
         layout = { Store.config.value.items },
         staged = { stagedFailure.getAndSet(null) },
-        here = { WeatherHere.place },
+        here = { WeatherHere.fix },
         locating = { WeatherHere.why },
     )
 
@@ -106,7 +106,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     // ---- deleted with the item --------------------------------------------------------------------
 
     private var seenItems: List<ItemConfig>? = null
-    private var seenHere: Place? = null
+    private var seenHere: Fix? = null
     private var keptFor: Set<Place>? = null
 
     /**
@@ -118,13 +118,13 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
      */
     private fun tidy() {
         val items = Store.config.value.items
-        val here = WeatherHere.place
+        val here = WeatherHere.fix
         if (items === seenItems && here == seenHere) return
         seenItems = items
         seenHere = here
         // Where the device is is forgotten with the last item of My location.
         if (here != null && items.none { it.type == type && WeatherRules.here(it) }) WeatherHere.forget()
-        val places = WeatherLoad.places(items, WeatherHere.place)
+        val places = WeatherLoad.places(items, WeatherHere.fix)
         if (places == keptFor) return
         keptFor = places
         source.keepOnly(places, cities = WeatherLoad.places(items))
@@ -182,8 +182,8 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
             val items = Store.config.value.items.filter { it.type == type }
             val first = firstShown()
             val reading = first?.let { source.peek(it) }
-            "staged=${stagedReading?.name ?: "none"} here=${if (WeatherHere.place != null) "known" else WeatherHere.why} search=${if (stagedSearch == null) "real" else "staged"} fail=${stagedFailure.get() ?: "none"}" +
-                " items=${items.size} places=${WeatherLoad.places(items, WeatherHere.place).size}" +
+            "staged=${stagedReading?.name ?: "none"} here=${if (WeatherHere.fix != null) "known" else WeatherHere.why} search=${if (stagedSearch == null) "real" else "staged"} fail=${stagedFailure.get() ?: "none"}" +
+                " items=${items.size} places=${WeatherLoad.places(items, WeatherHere.fix).size}" +
                 " on=${Online.on(online)} setUp=${Online.setUp(online)}" + (first?.let {
                     " first=${status(it, Now.wall()).javaClass.simpleName} loading=${source.loading(it)} failure=${reading?.failure ?: "none"}" +
                         " again=${againEntry(it)}" +

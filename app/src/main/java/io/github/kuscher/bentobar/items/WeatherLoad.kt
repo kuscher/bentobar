@@ -63,11 +63,16 @@ object WeatherLoad {
      * device is, for the items of My location; without it, the cities alone, which are the places whose
      * reading is kept on the device.
      */
-    fun places(items: List<ItemConfig>, here: Place? = null): Set<Place> =
+    fun places(items: List<ItemConfig>, here: Fix? = null): Set<Place> =
         items.filter { it.type == "weather" && it.section != Section.OFF }.mapNotNullTo(HashSet()) { place(it, here) }
 
-    /** The place [item] asks about: its city, or [here] for one of My location. */
-    fun place(item: ItemConfig, here: Place?): Place? = if (WeatherRules.here(item)) here else WeatherRules.place(item)
+    /**
+     * The place [item] asks about: its city, or for one of My location where the device is ([here]),
+     * rounded to about ten kilometers ([WeatherRules.nearby]). This is where that rounding happens: what
+     * is asked and what a reading is held under is never the location as Android said it.
+     */
+    fun place(item: ItemConfig, here: Fix?): Place? =
+        if (WeatherRules.here(item)) here?.let { WeatherRules.nearby(it.lat, it.lon) } else WeatherRules.place(item)
 
     /**
      * Asks the service about [place]; blocks, so only a background load calls it. A good answer is a
@@ -169,8 +174,8 @@ class WeatherSource(
     /** The wall clock, and the time since boot: a reading's age is asked of both ([WeatherRules.old]). */
     private val wall: () -> Long,
     private val up: () -> Long,
-    /** Where the device is, rounded ([WeatherRules.nearby]), and why not where that isn't known: for the items of My location. */
-    private val here: () -> Place? = { null },
+    /** Where the device is, as Android said it ([WeatherLoad.place] rounds it), and why not where that isn't known: for the items of My location. */
+    private val here: () -> Fix? = { null },
     private val locating: () -> Locate = { Locate.FINDING },
 ) {
     private val service = Online.Service.OPEN_METEO
@@ -320,7 +325,7 @@ class WeatherSource(
             up: () -> Long,
             layout: () -> List<ItemConfig>,
             staged: () -> Failure? = { null },
-            here: () -> Place? = { null },
+            here: () -> Fix? = { null },
             locating: () -> Locate = { Locate.FINDING },
         ): WeatherSource = WeatherSource(
             // Only a city's reading is kept on the device and read back from it: where the device is (My location) is held in

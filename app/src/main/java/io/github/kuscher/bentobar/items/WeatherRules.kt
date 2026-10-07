@@ -89,6 +89,15 @@ data class Place(val lat: String, val lon: String) {
 }
 
 /**
+ * Where the device is, as Android said it (My location). Held in memory only, and never used as it
+ * is: [WeatherLoad.place] rounds it to a [Place] ([WeatherRules.nearby]) before anything is asked or
+ * held under it.
+ */
+data class Fix(val lat: Double, val lon: Double) {
+    override fun toString() = "a fix"
+}
+
+/**
  * Why an item that shows the weather of where the device is has no place yet ([WeatherRules.status]).
  * [FINDING]: Android was asked and hasn't answered. The others are states with words of their own.
  */

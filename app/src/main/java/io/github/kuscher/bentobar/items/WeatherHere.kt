@@ -9,10 +9,11 @@ import io.github.kuscher.bentobar.util.Now
 
 /**
  * Where the device is, for the Weather items of My location: Android's approximate location (the
- * only location permission BentoBar has), rounded to about ten kilometers ([WeatherRules.nearby]).
+ * only location permission BentoBar has), as Android said it. [WeatherLoad.place] rounds it to about
+ * ten kilometers ([WeatherRules.nearby]) before anything is asked or held under it.
  *
  * It lives in memory only. The layout holds the choice and never the place, and nothing here is
- * logged or written: what is kept on the device is the reading of the rounded place, like a city's.
+ * logged or written, nor is the reading of the rounded place: that too is held in memory only.
  * Android is asked while an item of My location is outside Off and the Weather switch is on
  * ([keepUp], from the item's tick), at most every half an hour, and its last known location is
  * taken first, which asks for no new fix at all.
@@ -25,8 +26,8 @@ object WeatherHere {
     /** Whether location is allowed and on is looked at no more often than this (and at once after [wake]). */
     private const val LOOK_MS = 5_000L
 
-    /** Where the device is, rounded; null until Android said so. Any thread. */
-    @Volatile var place: Place? = null
+    /** Where the device is, as Android said it; null until Android said so. Any thread. */
+    @Volatile var fix: Fix? = null
         private set
 
     /** Why there is no [place], while there is none. */
@@ -49,11 +50,11 @@ object WeatherHere {
         val up = Now.elapsed()
         if (lookedAt != 0L && up - lookedAt < LOOK_MS) return
         lookedAt = up
-        if (!allowed()) { if (place != null || why != Locate.NOT_ALLOWED) { forget(); why = Locate.NOT_ALLOWED; Ticker.refresh() }; return }
+        if (!allowed()) { if (fix != null || why != Locate.NOT_ALLOWED) { forget(); why = Locate.NOT_ALLOWED; Ticker.refresh() }; return }
         val lm = Env.app.getSystemService(LocationManager::class.java) ?: return none()
-        if (!lm.isLocationEnabled) { cancel(); if (place == null && why != Locate.OFF) { why = Locate.OFF; Ticker.refresh() }; return }
+        if (!lm.isLocationEnabled) { cancel(); if (fix == null && why != Locate.OFF) { why = Locate.OFF; Ticker.refresh() }; return }
         if (pending != null) return
-        val known = place
+        val known = fix
         if (askedAt != 0L && up - askedAt < (if (known != null) EVERY_MS else if (why == Locate.NONE) RETRY_MS else 0)) return
         askedAt = up
         // A fix some app asked for in the last half hour is as good as a new one, and costs nothing.
@@ -79,13 +80,16 @@ object WeatherHere {
     private fun providers(lm: LocationManager): List<String> =
         listOf(LocationManager.FUSED_PROVIDER, LocationManager.NETWORK_PROVIDER).filter { runCatching { lm.isProviderEnabled(it) }.getOrDefault(false) }
 
-    private fun found(fix: Location) {
-        val near = WeatherRules.nearby(fix.latitude, fix.longitude) ?: return none()
-        if (near != place) { place = near; Ticker.refresh() }
+    private fun found(location: Location) {
+        val near = WeatherRules.nearby(location.latitude, location.longitude) ?: return none()
+        val before = fix
+        fix = Fix(location.latitude, location.longitude)
+        // A move within the same ten kilometers is the same place: nothing to work out again.
+        if (before == null || WeatherRules.nearby(before.lat, before.lon) != near) Ticker.refresh()
     }
 
     private fun none() {
-        if (place == null) { why = Locate.NONE; Ticker.refresh() }
+        if (fix == null) { why = Locate.NONE; Ticker.refresh() }
     }
 
     private fun cancel() {
@@ -96,7 +100,7 @@ object WeatherHere {
     /** Something changed that could let a place be found now: the permission was answered, an item chose My location. Main thread. */
     fun wake() {
         lookedAt = 0L
-        if (place == null) askedAt = 0L
+        if (fix == null) askedAt = 0L
     }
 
     /**
@@ -105,7 +109,7 @@ object WeatherHere {
      */
     fun forget() {
         cancel()
-        place = null
+        fix = null
         why = Locate.FINDING
         askedAt = 0L
     }

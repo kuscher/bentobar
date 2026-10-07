@@ -50,8 +50,8 @@ class WeatherSourceTest {
      * (which the fake leaves wide open). Here neither does, on purpose: what keeps a request from
      * going out in these tests is the item's own rule and nothing behind it.
      */
-    /** Where the device is, for My location, and why not while that isn't known: as WeatherHere would say. */
-    private var here: Place? = null
+    /** Where the device is, for My location, as Android says it (unrounded: the source rounds it), and why not while that isn't known: as WeatherHere would say. */
+    private var here: Fix? = null
     private var locating = Locate.FINDING
 
     private fun source(staged: () -> Failure? = { null }): WeatherSource {
@@ -233,11 +233,14 @@ class WeatherSourceTest {
         val item = WeatherRules.useHere(added)
         layout = listOf(item)
         s.turnOn()
-        here = WeatherRules.nearby(47.376_887, 8.541_694)
+        // Android says where the device is to a few meters; the source sends it, and holds its reading, to one decimal.
+        here = Fix(47.376_887, 8.541_694)
         assertNotNull(s.reading(item))
         assertEquals(1, net.asked.size)
         assertEquals("47.4", net.query("latitude"))
         assertEquals("8.5", net.query("longitude"))
+        assertTrue(net.asked.single().query.none { (_, v) -> "47.37" in v || "8.54" in v })
+        assertEquals("47.4,8.5", s.peek(item)!!.place)
         assertTrue(s.status(item, wall) is Status.Live)
         // The layout holds the choice, never the place.
         assertEquals(mapOf("where" to "here"), item.options)
@@ -250,7 +253,7 @@ class WeatherSourceTest {
         val item = WeatherRules.useHere(added)
         layout = listOf(item)
         s.turnOn()
-        here = Place("47.4", "8.5")
+        here = Fix(47.4, 8.5)
         assertNotNull(s.reading(item))
         assertEquals(1, net.asked.size)
         assertTrue(s.status(item, wall) is Status.Live)
@@ -280,7 +283,7 @@ class WeatherSourceTest {
         val s = source()
         val item = WeatherRules.useHere(added)
         layout = listOf(item)
-        here = Place("47.4", "8.5")
+        here = Fix(47.4, 8.5)
         s.watch(item, 60 * min)
         sentNothing(net)
         assertEquals(Status.Off(everOn = false), s.status(item, wall))
@@ -292,14 +295,14 @@ class WeatherSourceTest {
         val item = WeatherRules.useHere(added)
         layout = listOf(item)
         s.turnOn()
-        here = Place("47.4", "8.5")
+        here = Fix(47.4, 8.5)
         s.watch(item, 5 * min)
         assertEquals(1, net.asked.size)
         // Moved within the same ten kilometers: the same place, nothing new is asked.
-        here = WeatherRules.nearby(47.41, 8.52)
+        here = Fix(47.41, 8.52)
         s.watch(item, 5 * min)
         assertEquals(1, net.asked.size)
-        here = WeatherRules.nearby(46.948, 7.447)
+        here = Fix(46.948, 7.447)
         s.watch(item, 1 * min)
         assertEquals(2, net.asked.size)
         assertEquals("46.9", net.query("latitude"))

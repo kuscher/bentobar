@@ -70,7 +70,7 @@
     <string name="weather_here_off">Location is off</string>
     <string name="weather_here_off_note">Location is turned off on this device. Turn it on in Android\'s settings, or pick a city.</string>
     <string name="weather_here_none">Location not found</string>
-    <string name="weather_here_none_note">Android doesn\'t know where this device is right now. BentoBar asks again in a minute; or pick a city.</string>
+    <string name="weather_here_none_note">Android doesn\'t know where this device is right now. BentoBar asks again, less often each time, then every half hour; or pick a city.</string>
     <!-- Beside Refresh while it is dimmed because an answer came less than a minute ago. -->
     <string name="weather_up_to_date">up to date</string>
 

@@ -122,8 +122,8 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         if (items === seenItems && here == seenHere) return
         seenItems = items
         seenHere = here
-        // Where the device is is forgotten with the last item of My location.
-        if (here != null && items.none { it.type == type && WeatherRules.here(it) }) WeatherHere.forget()
+        // Where the device is is forgotten with the last item of My location (and with the switch, see forgetFetched).
+        if (here != null && !HereRules.keeps(items, Online.on(online))) WeatherHere.forget()
         val places = WeatherLoad.places(items, WeatherHere.fix)
         if (places == keptFor) return
         keptFor = places
@@ -133,7 +133,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     override fun sample(now: Long) {
         tidy()
         // Android is asked where the device is only for an item of My location outside Off, while the switch is on.
-        if (Online.on(online) && Store.config.value.items.any { it.type == type && it.section != Section.OFF && WeatherRules.here(it) }) WeatherHere.keepUp()
+        if (HereRules.asks(Store.config.value.items, Online.on(online))) WeatherHere.keepUp()
     }
 
     // Also when the last Weather item went: nothing samples this type any more, so this is the moment that is left.

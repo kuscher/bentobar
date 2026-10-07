@@ -133,7 +133,7 @@ class WeatherStringsTest {
         "weather_here_off" to "Location is off",
         "weather_here_off_note" to "Location is turned off on this device. Turn it on in Android's settings, or pick a city.",
         "weather_here_none" to "Location not found",
-        "weather_here_none_note" to "Android doesn't know where this device is right now. BentoBar asks again in a minute; or pick a city.",
+        "weather_here_none_note" to "Android doesn't know where this device is right now. BentoBar asks again, less often each time, then every half hour; or pick a city.",
         "weather_desc_no_location" to "Weather: no location",
     )
 

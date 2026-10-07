@@ -1,1 +1,1 @@
-BentoBar: Status Bar Items
+BentoBar: Customized Statusbar

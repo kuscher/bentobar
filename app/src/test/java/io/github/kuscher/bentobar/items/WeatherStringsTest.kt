@@ -17,7 +17,7 @@ class WeatherStringsTest {
     /** The copy deck, table 9.6: the resource and its US English text. */
     private val deck = mapOf(
         "item_weather_title" to "Weather",
-        "item_weather_desc" to "Temperature and conditions for a city you pick; forecast in its menu",
+        "item_weather_desc" to "Temperature and conditions for a city you pick or where you are; forecast in its menu",
         "trigger_weather" to "Show when rain or snow is falling, or likely within %1\$s",
         "trigger_weather_short" to "shows before rain or snow",
         "weather_clear" to "Clear",

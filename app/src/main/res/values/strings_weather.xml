@@ -2,7 +2,7 @@
 <!-- Weather (Open-Meteo). Every name here starts with weather_, item_weather_ or trigger_weather. -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
     <string name="item_weather_title">Weather</string>
-    <string name="item_weather_desc">Temperature and conditions for a city you pick; forecast in its menu</string>
+    <string name="item_weather_desc">Temperature and conditions for a city you pick or where you are; forecast in its menu</string>
     <string name="trigger_weather">Show when rain or snow is falling, or likely within %1$s</string>
     <string name="trigger_weather_short">shows before rain or snow</string>
     <string name="weather_consent">Weather comes from Open-Meteo, a free weather service. BentoBar sends it the city you search for and that city\'s coordinates, or with My location where this device is, to about 10 km; nothing else. Like any website, it sees your IP address.</string>

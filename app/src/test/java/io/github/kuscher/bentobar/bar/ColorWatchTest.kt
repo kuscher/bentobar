@@ -362,4 +362,33 @@ class ColorWatchTest {
     }
 
     private companion object { const val HINTS = "hints" }
+
+    @Test fun aStripWithNothingToDrawReadsNothingAndCatchesUpWhenItHasSomething() {
+        // Back from the lock screen: the slow series starts, then the strip turns out empty (CPU and Network wait for a
+        // second reading). An invisible window of ours reading the screen is what Play Protect flags: no readings then.
+        val w = ColorWatch()
+        w.cause(Cause.SLOW, 0, 250)
+        w.pause()
+        assertNull(w.due(0))
+        // Something to draw a second later: the series the unlock asked for, not just two quick readings that can still
+        // catch the lock screen's look.
+        val s = Strip("lock", w).also { w.resume(1_000, 250) }.follow { "lock" }
+        assertEquals(listOf(1_250L, 2_000L, 3_000L, 4_500L, 7_000L, 11_000L), s.at)
+    }
+
+    @Test fun aCauseWhileTheStripIsEmptyWaitsForIt() {
+        val w = ColorWatch()
+        w.pause()
+        w.owe(Cause.QUICK)
+        assertNull(w.due(0))
+        w.owe(Cause.SLOW); w.owe(Cause.QUICK)                // a quick one doesn't take a slow one's place
+        val s = Strip("a", w).also { w.resume(5_000, 250) }.follow { "a" }
+        assertEquals(6, s.at.size)
+        // Nothing owed: content appearing gets its two quick readings.
+        val q = ColorWatch().also { it.pause(); it.resume(0, 250) }
+        assertEquals(listOf(250L, 1_250L), Strip("a", q).follow { "a" }.at)
+        // The strip left the screen meanwhile: what was owed no longer matters (its return asks again).
+        val gone = ColorWatch().also { it.pause(); it.owe(Cause.SLOW); it.clear(); it.resume(0, 250) }
+        assertEquals(listOf(250L, 1_250L), Strip("a", gone).follow { "a" }.at)
+    }
 }

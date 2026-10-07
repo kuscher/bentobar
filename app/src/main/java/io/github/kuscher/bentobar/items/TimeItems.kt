@@ -438,7 +438,7 @@ object TimerItem : ItemType("timer", R.string.item_timer_title, Sym.TIMER, R.str
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
         TextRow(stringResource(R.string.timer_name), item.opt("label", ""), placeholder = stringResource(R.string.item_timer_title),
-            help = stringResource(R.string.timer_name_help)) {
+            help = stringResource(R.string.timer_name_help), maxLength = 30) {
             set(item.with("label", it.take(30).ifBlank { null }))
         }
     }
@@ -512,7 +512,7 @@ object CountdownItem : ItemType("countdown", R.string.item_countdown_title, Sym.
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow(stringResource(R.string.option_label), item.opt("label", ""), placeholder = stringResource(R.string.countdown_label_hint)) {
+        TextRow(stringResource(R.string.option_label), item.opt("label", ""), placeholder = stringResource(R.string.countdown_label_hint), maxLength = 16) {
             set(item.with("label", it.take(16).ifBlank { null }))
         }
         val at = item.opt("at", "")

@@ -123,7 +123,7 @@ object ClockItem : ItemType("clock", R.string.item_clock_title, Sym.SCHEDULE, R.
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
         ZonePicker(item.options["zone"]) { set(item.with("zone", it)) }
         TextRow(stringResource(R.string.option_label), item.opt("label", ""), help = stringResource(R.string.clock_label_help),
-            placeholder = stringResource(R.string.option_none)) {
+            placeholder = stringResource(R.string.option_none), maxLength = 12) {
             set(item.with("label", it.take(12).ifBlank { null }))
         }
         ChoiceRow(stringResource(R.string.clock_hours), listOf("system" to stringResource(R.string.option_like_system),

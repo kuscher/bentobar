@@ -419,14 +419,16 @@ class FlightLoadTest {
         online { net ->
             follow(net)
             Online.turnOff(AIRLABS); Online.turnOn(AIRLABS)
-            net.fails(Why.OFFLINE)
+            Http.connected = { false }
             val first = FlightLoad.load(item, null, asked + min, ids)!!
             assertEquals("LH455", first.number)
             assertNull(first.flight)
-            assertEquals(Failure.OFFLINE, first.failure); assertEquals(1, first.failures)
+            // Without a connection nothing was sent: no count of failures goes up, and it is tried again in two minutes each time.
+            assertEquals(Failure.OFFLINE, first.failure); assertEquals(0, first.failures)
             assertEquals(2 * min, FlightRules.every(first, at("2026-10-02T07:30:00Z")))
             val second = FlightLoad.load(item, first, asked + 3 * min, ids)!!
-            assertEquals(2, second.failures)
+            assertEquals(0, second.failures)
+            assertEquals(2 * min, FlightRules.every(second, at("2026-10-02T07:32:00Z")))
             // What is kept of it reads back, so a restart knows what it was waiting for.
             assertEquals(second, FlightLoad.kept(item, asked + 3 * min, ids)!!.value)
         }
@@ -504,17 +506,26 @@ class FlightLoadTest {
         }
     }
 
-    @Test fun aFailedAskKeepsTheFlightSaysWhyAndCountsUp() {
+    @Test fun aFailedAskKeepsTheFlightSaysWhyAndCountsTheTriesThatWentOut() {
         online { net ->
             val t = follow(net)
-            net.fails(Why.OFFLINE)
+            // No network: nothing leaves the device.
+            Http.connected = { false }
             val first = FlightLoad.load(item, t, asked + 30 * min, ids)!!
             assertEquals(t.flight, first.flight)
-            assertEquals(Failure.OFFLINE, first.failure); assertEquals(1, first.failures)
+            // A try that reached nobody doesn't make the next wait longer: at the gate, before the Wi-Fi is up, the back-off
+            // would otherwise grow to half an hour before anything was ever asked.
+            assertEquals(Failure.OFFLINE, first.failure); assertEquals(0, first.failures)
             assertEquals(asked + 30 * min, first.askedAt)
             assertEquals(asked, first.heardAt)                         // "updated" stays when it was last heard of
+            assertEquals(0, FlightLoad.load(item, first, asked + 31 * min, ids)!!.failures)
+            // A connection that broke after the request went out may have cost a lookup: that one counts, as for Weather.
+            Http.connected = { true }
+            net.fails(Why.OFFLINE)
+            val reset = FlightLoad.load(item, first, asked + 31 * min, ids)!!
+            assertEquals(Failure.OFFLINE, reset.failure); assertEquals(1, reset.failures)
             net.fails(Why.STATUS, 429, retryAfterSec = 900)
-            val second = FlightLoad.load(item, first, asked + 32 * min, ids)!!
+            val second = FlightLoad.load(item, reset, asked + 32 * min, ids)!!
             assertEquals(Failure.NO_ANSWER, second.failure); assertEquals(2, second.failures)
             assertEquals(900L, second.waitSec)
             assertEquals(15 * min, FlightRules.every(second, at("2026-10-02T08:01:00Z")))

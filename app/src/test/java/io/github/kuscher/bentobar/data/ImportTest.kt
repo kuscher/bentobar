@@ -16,6 +16,27 @@ class ImportTest {
         assertEquals(c, Store.parseLayout(json.encodeToString(BarConfig.serializer(), c)))
     }
 
+    /** A layout as a later version may write it: a position, a section and a display this version doesn't know. */
+    private val fromLater = """{"version":9,"position":"TOP","items":[
+        {"id":"c","type":"clock","section":"SOMEWHERE","display":"FANCY","options":{"seconds":"true"}},
+        {"id":"t","type":"timer"}],"spacing":7}"""
+
+    @Test fun aStoredLayoutWithAValueThisVersionDoesntKnowStillReads() {
+        // Unreadable, the whole layout was replaced by the defaults, and the next edit made that for good.
+        val c = Store.decode(fromLater)!!
+        assertEquals(Position.RIGHT, c.position)
+        assertEquals(listOf("c", "t"), c.items.map { it.id })
+        assertEquals(Section.SHOWN, c.items[0].section)
+        assertEquals(Display.ICON_AND_TEXT, c.items[0].display)
+        assertEquals("true", c.items[0].options["seconds"])
+        assertEquals(7, c.spacing)
+        assertNull(Store.decode("not a layout"))
+    }
+
+    @Test fun aPastedLayoutWithAValueThisVersionDoesntKnowStillPastes() {
+        assertEquals(listOf("c", "t"), Store.parseLayout(fromLater)!!.items.map { it.id })
+    }
+
     @Test fun somethingElseOnTheClipboardIsNotALayout() {
         // Each of these used to replace the bar with an empty one.
         assertNull(Store.parseLayout("{}"))

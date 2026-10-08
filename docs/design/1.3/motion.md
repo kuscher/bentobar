@@ -46,7 +46,7 @@ prototypes before anything is built.
 | --- | --- | --- |
 | Direction | **drop**: 8 dp from above | it travels with the edge; a rising row crosses it (the prototype has Rise) |
 | Block | each child of the card: header, Sparkline, InfoRow, MenuEntry, SectionLabel, a TileGrid row, ChipRow, Meter; a divider joins the block below | one rule; tiles in a row share a step, no sideways ripple |
-| Start | block i at 30 + 20 × min(i, 8) ms | trails the edge by ≤ 25 ms up to 350 dp; past the ninth block all come at 190 ms |
+| Start | block i of n at 30 + i × min(20, 160 ÷ (n − 1)) ms | 20 ms apart up to nine blocks; in a taller popup closer together, the last still at 190 ms and none together (revised after the review of the build: a cap of 8 steps clumped the lower rows) |
 | Motion | spring(0.86, 520), Booklight's `place` | overshoots 0.04 dp: nothing shrinks back |
 | Alpha | smoothstep(0, 0.6) of the block's own progress | readable ~65 ms in while the last 3 dp settle; the clip already hides what the edge hasn't reached |
 | Inside a block | nothing animates | opened fifty times a day, it must not perform |
@@ -81,7 +81,7 @@ A plain fade is quieter but loses the tie to the item.
 | Pill | the item's box (item + 6 dp each end), 30 dp tall, radius 10 |
 | Leading edge | spring(0.85, 1400), at once |
 | Old edge | holds 5 frames at 120 Hz (2 at 60), then spring(0.86, 900) |
-| Long way | over **110 dp** to go: holds 2 frames, then spring(0.90, 1400). Booklight uses 98; 110 makes every neighbour step (36–102 dp) near |
+| Long way | either edge has over **110 dp** to go: holds 2 frames, then spring(0.90, 1400). Booklight uses 98; 110 makes every neighbour step (36–102 dp) near, except from a wide item to a narrow one, where the old edge crosses the wide item (revised after the review of the build) |
 | Stretch | as is up to 40 dp past the wider item, eased to at most 56 |
 | Already moving | no hold; each edge carries on from where it is at its speed |
 | Simulated, 120 Hz | 58 → 88 dp: 35 dp stretch, at rest 200 ms. 90 → 90: 52 dp, 258 ms. Booklight's row, same code: 34 dp, 200 ms (measured 34, 197) |

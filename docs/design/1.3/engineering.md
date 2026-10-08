@@ -148,3 +148,25 @@ Smallest first; debug timings are an upper bound (release is 3–4× faster):
 | A later Compose maps input differently | Mis-hits on the card | P3; offset events in `dispatchTouchEvent` |
 | Exit never ends | A window left up, which Play Protect watches for | Timer removal; instant close on stop |
 | Hover never reaches the strip | No gliding highlight | P7 before strip work |
+
+## As built (8 October 2026, on the Lenovo Googlebook 15)
+- **Blur works on an accessibility overlay** (P1–P3): a `ComponentDialog` of type TYPE_ACCESSIBILITY_OVERLAY, with
+  `setBackgroundBlurRadius`, blurs only the root view's rectangle.
+- **The window is exactly the card**, not card plus margins. Framing the root view's left or top moved input: Compose
+  places touches by the root view's own top-left corner, so a framed root shifted every press 16 dp right and 4 dp
+  down (code review). Only the bottom edge is framed now; nothing else moves.
+- **The shadow has a window of its own** (an untouchable `Overlay` just below the popup's, with the room around the
+  card): a framed root view clips whatever is drawn outside it, the drawn shadow included (P5). Both windows draw
+  from the same state every frame. Measured: 10 % darker at the lower edge, 3–4 % at the sides, symmetric.
+- **Same frame for blur and glass:** values written outside a composition reach Compose only with its next frame,
+  while the blur region is framed in this one; the blur ran a frame ahead (motion review). Each frame's values are
+  now sent with `Snapshot.sendApplyNotifications()`; logged, the blur region and the drawn glass agree within 1 px.
+- **The clock starts once frames flow:** a new window's first frames are slow (~40 ms, then ~26 ms while the
+  shadow's window takes its size). The opening's clock waits until the first frame is committed and two frames come
+  on time (at most 250 ms); until then the glass has no presence. Release build: mid-opening every frame on its
+  8.3 ms slot, almost all drawn in 1–3 ms.
+- **Input around the popup:** a press outside it on its own item folds it and spends that press's click; on another
+  item it dissolves and the click opens that item's popup; a click while it folds turns it round. A click in a gap
+  of the strip goes to the highlighted item (`StripEvents.gapClick`).
+- Test builds on a device with a released BentoBar: `-PreleaseSignedDebug` (the debug build signed with the release
+  key) instead of an id suffix, so the accessibility switch and the layout stay.

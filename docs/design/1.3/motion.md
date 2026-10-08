@@ -12,6 +12,8 @@ prototypes before anything is built.
 
 ## 1. Opening
 
+*Version 2 (§7) replaces the numbers in §1–4 wherever it gives new ones.*
+
 | Part | Value | Why |
 | --- | --- | --- |
 | Window | added at full size, laid out once | the glass is uncovered, not scaled |
@@ -130,3 +132,85 @@ refresh rate; 0.25× stretches all of it. Not modelled: the cropped shadow, Esc,
    the open item, which shows what is open, and it doesn't flick sideways as the pointer heads into the popup.
 2. **Contents: drop into place, or rise like Booklight's rows?** Recommendation: drop, so they move with the
    glass. The prototype has both.
+
+## 7. Version 2 (8 October): faster, and the contents' choreography
+
+Alex asked for quicker motion, a choreography for what's inside the popups, and a "no animations" setting.
+Everything gets about a fifth quicker, and each kind of content gets a small entrance, all in one order from the
+top left. These numbers replace §1–4's.
+
+### 7.1 Faster
+
+| Part | v1 | v2 | Why |
+| --- | --- | --- | --- |
+| Opening T | 240 + 20 per 100 dp over 200, ≤ 340 | **160 + 0.16 × H, 190 to 270** (300 dp: 208; 616: 259) | 20 % shorter |
+| Curve | (0.55, 0, 0.1, 1) | **(0.45, 0, 0.1, 1)** | still slow-fast-slow with a shorter wait: half open at 69 ms, not 96 (300 dp). A gentler middle, so the fastest step grows only 11 % (616 dp: 67 dp a frame, was 61). The rejected curve went the other way (0.7) |
+| Presence | 100 ms | **80 ms** | |
+| Block starts | 30 + i × min(20, 160 ÷ (n − 1)) | **24 + i × min(16, 128 ÷ (n − 1))** | the last block starts by 152 ms |
+| Block drop | 8 dp, spring(0.86, 520) | **6 dp, spring(0.86, 700)** | readable at 57 ms (was 67); 0.03 dp past |
+| Closing | contents 50; presence out 60 ms from fold end − 30 | **contents 40; presence out 50 ms from fold end − 25**; fold still 0.45 T | 300 dp: 119 ms (was 147) |
+| Switching | dissolves in 90 ms | **75 ms** | |
+| Strip pill | fades 120 ms | **fades 100 ms**; band unchanged | the approved rubber already answers in the first frame |
+| Strip items appearing | 220 ms | **180 ms**, (0.2, 0, 0, 1) | |
+
+Unchanged: the turn-round spring, the grace, the guard, the wait for the first frames.
+
+### 7.2 The choreography
+
+Each moving element is addressed by role and index (`Modifier.entrance(role, i)`); its progress is a function of
+the popup's one clock. Blocks (§2) still drop in and carry their parts, which arrive in reading order: rows top to
+bottom, each row left to right.
+
+**Verbs.** Only layer properties and draw-phase effects:
+
+| Verb | What | Timing |
+| --- | --- | --- |
+| drop | the whole block, 6 dp from above | spring(0.86, 700); a block without parts takes alpha smoothstep(0, 0.6) of it |
+| fade | alpha | 100 ms, (0.2, 0, 0, 1) |
+| pop | scale from s₀ about its centre, plus alpha | spring(0.9, 900): 0.15 % past, nothing shrinks back; alpha smoothstep(0, 0.5) |
+| draw | a line trimmed left to right; the fill under it clipped to the line's head | 180 ms, (0.35, 0, 0.1, 1) |
+| fill | a bar growing from its start to its value | 180 ms, same curve |
+
+**Roles.** Offsets are counted from the block's start; j is the index in reading order.
+
+| Role: parts | Verbs | Offsets, ms |
+| --- | --- | --- |
+| Header: icon tile, title, subtitle, trailing | pop 0.85, fade, fade, fade | 0, 20, 36, 48 |
+| Big value ("70°", a countdown), its lines | pop 0.94 from its baseline's left, fade | 0, 24 + 16 j |
+| InfoRow: label, value | fade, fade | 0, 24 |
+| SectionLabel | drop only | 0 |
+| MenuEntry: icon, label, detail or trailing | pop 0.8, fade, fade | 0, 20, 36 |
+| Sparkline: track, line, second series | fade, draw, draw | 0, 30, 70 |
+| HourStrip cell (time, glyph, temperature together) | pop 0.9 | 16 j |
+| DayRow: day, glyph, chance, high, low | fade, pop 0.8, fade, fade, fade | 0, 12, 24, 36, 48 |
+| TileGrid tile, row r, column c | pop 0.9 | 18 (r + c), a diagonal from the top left |
+| ChipRow chip | pop 0.92 | 16 min(j, 6) |
+| Meter; CoreBars bar | fill | 30; 30 + 12 j |
+| Month grid day, week w, weekday d | pop 0.9 | 10 (w + d), a diagonal; today's ring pops from 0.6, 40 ms after its day |
+| Media: artwork, title, artist, button j, progress | pop 0.92, fade, fade, pop 0.8, fill | 0, 24, 40, 56 + 16 j, 40 |
+| Flight route | the flown part draws behind the plane, which rides the line's head; the rest of the route fades | 30; 160 + 160 × the share of the route flown, ms, on the glass's curve (Booklight's `flies`, quicker) |
+
+**Never moves:** text itself (no counting or rolling), hover fills, a value updating live.
+
+**One cap.** An element starts at its block's start plus its offset. If a popup's last start would come after
+180 ms, every start is scaled by 180 ÷ that start, keeping order and proportions; durations never scale. So
+everything has started by 180 ms, is readable by about 240 and at rest by about 360 (v1's Weather: 352, with far
+less moving). Parts below a scrolling popup's visible height are at rest from the start.
+
+**Closing has no choreography:** everything fades together in 40 ms; exits shouldn't perform.
+
+**For the visual designer**, who owns how each role looks as it arrives: the roles, order and timing are fixed;
+only layer and draw-phase changes, nothing past its place.
+
+### 7.3 "No animations"
+
+A switch in Look, "Animations", on by default; off is Alex's "no animations". Animations are off when the switch
+is off or the system's Remove animations is on; otherwise the system's animator scale still applies.
+
+**Off stops:** the popup's opening, choreography, fold, dissolve and turn-round (whole in its first frame, gone in
+the next); the highlight's glide and fades (it jumps); strip items appearing, sliding aside, lifting to 1.08 and
+settling after a drag; ‹ revealing hidden items; any fade of a changing value.
+
+**Off keeps:** the 150 ms grace, the 350 ms guard and the 600 ms tooltip and collapse delays (tolerances, not
+motion); a dragged item following the pointer one to one; the glass, blur and shadow; the wait for the first
+frame, so the popup shows whole as soon as it's drawn.

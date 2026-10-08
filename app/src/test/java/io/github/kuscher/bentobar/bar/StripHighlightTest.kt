@@ -170,6 +170,18 @@ class StripHighlightTest {
         assertEquals(340f, band.last, 0f)
     }
 
+    @Test fun fromAWideItemToANarrowOneTheOldEdgeHasTheLongWayAndGoesFirmly() {
+        // Weather (150 dp) to the calendar (30 dp) beside it: the leading edge has only ~40 dp to go, but the old edge
+        // crosses the whole wide item. Counted as a near move it swept across on the soft spring, a slow wipe (motion
+        // review of the built 1.3); as a long way it holds two frames and follows firmly.
+        val band = Band(0f, 150f)
+        band.go(162f, 30f, 120f, 1f)
+        val took = settle(band, 120f) {}
+        assertTrue("at rest after $took ms", took <= 200)
+        assertEquals(162f, band.first, 0f)
+        assertEquals(192f, band.last, 0f)
+    }
+
     @Test fun aBandThatIsMovingTurnsRoundWithoutHoldingAndKeepsItsSpeed() {
         val f = frame(120f)
         val band = Band(0f, 58f)

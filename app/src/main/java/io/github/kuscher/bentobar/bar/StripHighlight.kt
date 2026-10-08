@@ -337,7 +337,9 @@ internal class Band(first: Float, size: Float) {
         val old = if (forward) start else end
         val leadTo = if (forward) first + size else first
         val oldTo = if (forward) first else first + size
-        val far = abs(leadTo - (if (forward) e else s)) > NEAR
+        // A long way for either edge: from a wide item to a narrow one beside it the leading edge barely moves, but the old
+        // edge crosses the whole wide item, and on the soft spring that read as a slow wipe.
+        val far = maxOf(abs(leadTo - (if (forward) e else s)), abs(oldTo - (if (forward) s else e))) > NEAR
         lead.go(leadTo, LEAD, now, if (forward) e else s)
         // (An edge that had not let go yet when the direction turned stays where it is: it is the one that leads now.)
         val frames = if (calm) holdFrames(far, refresh, scale) else 0

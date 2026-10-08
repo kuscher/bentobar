@@ -66,22 +66,32 @@ class MenuMotionTest {
     }
 
     @Test fun eachBlockDropsIntoPlaceInTurnWithoutShrinkingBack() {
-        // Block i starts at 30 + 20 × min(i, 8) ms, 8 dp above its place.
-        assertEquals(-8f, MenuMotion.block(0, 29f).dy, 0f)
-        assertEquals(0f, MenuMotion.block(0, 29f).alpha, 0f)
-        assertEquals(-8f, MenuMotion.block(3, 89f).dy, 0f)
-        assertTrue(MenuMotion.block(3, 100f).dy > -8f)
-        // From the ninth block on, they all come at 190 ms.
-        assertEquals(MenuMotion.block(8, 250f).dy, MenuMotion.block(20, 250f).dy, 0f)
+        // In a popup of five blocks, block i starts at 30 + 20 × i ms, 8 dp above its place.
+        assertEquals(-8f, MenuMotion.block(0, 29f, 5).dy, 0f)
+        assertEquals(0f, MenuMotion.block(0, 29f, 5).alpha, 0f)
+        assertEquals(-8f, MenuMotion.block(3, 89f, 5).dy, 0f)
+        assertTrue(MenuMotion.block(3, 100f, 5).dy > -8f)
         var most = -8f
-        for (ms in 30..700) { val b = MenuMotion.block(0, ms.toFloat()); most = maxOf(most, b.dy) }
+        for (ms in 30..700) { val b = MenuMotion.block(0, ms.toFloat(), 5); most = maxOf(most, b.dy) }
         assertTrue("overshoot ${most} dp", most < 0.1f)
         // Readable about 65 ms in; within half a dp by about 180 ms on that spring, so the last block is still by ~370 ms.
-        assertTrue(MenuMotion.block(0, 30f + 65f).alpha > 0.85f)
-        assertEquals(0f, MenuMotion.block(8, 190f + 180f).dy, 0.5f)
-        assertTrue(MenuMotion.block(8, 190f + 400f).done)
-        assertEquals(0f, MenuMotion.block(8, 190f + 400f).dy, 0f)
-        assertEquals(1f, MenuMotion.block(8, 190f + 400f).alpha, 0f)
+        assertTrue(MenuMotion.block(0, 30f + 65f, 5).alpha > 0.85f)
+        assertEquals(0f, MenuMotion.block(8, 190f + 180f, 9).dy, 0.5f)
+        assertTrue(MenuMotion.block(8, 190f + 400f, 9).done)
+        assertEquals(0f, MenuMotion.block(8, 190f + 400f, 9).dy, 0f)
+        assertEquals(1f, MenuMotion.block(8, 190f + 400f, 9).alpha, 0f)
+    }
+
+    @Test fun aTallPopupsBlocksSpreadOverTheSameTimeRatherThanArrivingInAClump() {
+        // Sixteen blocks (the Weather popup): the last still starts at 190 ms, and no two start together, so the lower
+        // glass is never left empty while a clump waits (the motion review of the built 1.3).
+        assertEquals(190f, MenuMotion.blockStartMs(15, 16), 0.01f)
+        for (i in 1 until 16) assertTrue(MenuMotion.blockStartMs(i, 16) > MenuMotion.blockStartMs(i - 1, 16))
+        // Up to nine blocks, 20 ms apart as before.
+        assertEquals(30f + 20f * 4, MenuMotion.blockStartMs(4, 5), 0f)
+        assertEquals(190f, MenuMotion.blockStartMs(8, 9), 0f)
+        assertEquals(30f, MenuMotion.blockStartMs(0, 1), 0f)
+        assertEquals(590f, MenuMotion.blocksDoneMs(16), 0.01f)
     }
 
     @Test fun closingFoldsBackIntoTheItemAndFadesAsItLands() {
@@ -135,7 +145,7 @@ class MenuMotionTest {
         assertEquals(50f, MenuMotion.scaled(100f, 2f), 0f)          // "Animator duration scale 2×": twice as slow
         assertEquals(Float.POSITIVE_INFINITY, MenuMotion.scaled(0f, 0f), 0f)
         assertTrue(MenuMotion.opening(MenuMotion.scaled(0f, 0f), 300f).done)
-        assertTrue(MenuMotion.block(0, MenuMotion.scaled(0f, 0f)).done)
+        assertTrue(MenuMotion.block(0, MenuMotion.scaled(0f, 0f), 3).done)
         assertTrue(MenuMotion.closing(MenuMotion.scaled(0f, 0f), 300f, 300f, 1f).done)
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -88,7 +89,8 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
                     }
                     .menuGlass(g, look),
             ) {
-                CompositionLocalProvider(LocalMenuGlass provides glass) {
+                // Text with no colour of its own takes the glass's (Material's Surface did this; the glass is drawn here).
+                CompositionLocalProvider(LocalMenuGlass provides glass, LocalContentColor provides scheme.onSurface) {
                     Column(
                         Modifier.heightIn(max = maxHeight).verticalScroll(rememberScrollState())
                             .graphicsLayer { alpha = g.contents },

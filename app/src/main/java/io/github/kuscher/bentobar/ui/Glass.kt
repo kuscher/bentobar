@@ -87,13 +87,14 @@ fun DropColumn(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
             blocks[i] = next
             if (measurables[i].layoutId != JOINS_BELOW) next++
         }
+        val count = next
         val drop = MenuMotion.DROP_DP.dp.toPx() / MenuMotion.DROP_DP
         layout(width, height) {
             var y = 0
             placeables.forEachIndexed { i, p ->
                 if (glass == null) p.place(0, y)
                 else p.placeWithLayer(0, y) {
-                    val b = MenuMotion.block(blocks[i], glass.clockMs)
+                    val b = MenuMotion.block(blocks[i], glass.clockMs, count)
                     translationY = b.dy * drop
                     alpha = b.alpha
                 }
@@ -147,6 +148,7 @@ fun Modifier.menuGlass(glass: MenuGlassState, look: GlassLook): Modifier = this.
         val p = glass.presence * glass.alpha
         if (p <= 0f) return@drawBehind
         val h = min(glass.heightDp.dp.toPx(), size.height)
+        if (android.util.Log.isLoggable("BentoBarMotion", android.util.Log.DEBUG)) android.util.Log.d("BentoBarMotion", "glass drawn=${h.toInt()}")
         val r = min(MenuMotion.RADIUS_DP.dp.toPx(), h / 2f)
         val px = 1f
         drawRoundRect(look.veil.copy(alpha = look.veil.alpha * p), size = Size(size.width, h), cornerRadius = CornerRadius(r))

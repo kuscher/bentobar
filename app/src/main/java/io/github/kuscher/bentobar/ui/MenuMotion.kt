@@ -102,16 +102,19 @@ object MenuMotion {
     /** Where a block is and how visible: [dy] dp from its place (negative: above it), [alpha]. */
     data class Block(val dy: Float, val alpha: Float, val done: Boolean)
 
-    /** When block [index] starts: each 20 ms after the one above; past the ninth, all together. */
-    fun blockStartMs(index: Int): Float = 30f + 20f * min(index, 8)
+    /**
+     * When block [index] of [count] starts: each 20 ms after the one above, closer together in a tall popup, so the
+     * last still starts by 190 ms and none arrive in a clump (a fixed cap left the lower glass empty, then filled it at once).
+     */
+    fun blockStartMs(index: Int, count: Int): Float = 30f + index * if (count <= 1) 20f else min(20f, 160f / (count - 1))
 
     /**
      * Block [index] [ms] after the popup's first frame: it drops [DROP_DP] into place on Booklight's
      * `place` spring (0.86, 520), which overshoots by less than 0.05 dp, so nothing shrinks back. It is
      * readable well before the last few dp settle; the glass's edge already hides what it hasn't reached.
      */
-    fun block(index: Int, ms: Float): Block {
-        val s = (ms - blockStartMs(index)) / 1000f
+    fun block(index: Int, ms: Float, count: Int): Block {
+        val s = (ms - blockStartMs(index, count)) / 1000f
         if (s <= 0f) return Block(-DROP_DP, 0f, false)
         if (s > 1f) return Block(0f, 1f, true) // long settled (and "Remove animations": no time at all)
         val x = spring(-DROP_DP, s, 0.86f, 520f)
@@ -120,7 +123,7 @@ object MenuMotion {
     }
 
     /** The time when every block of a popup with [blocks] blocks is at rest, for the clock to stop. */
-    fun blocksDoneMs(blocks: Int): Float = blockStartMs(blocks - 1) + 400f
+    fun blocksDoneMs(blocks: Int): Float = blockStartMs(blocks - 1, blocks) + 400f
 
     /** A popup's alpha [ms] after it was left for another. */
     fun dissolve(ms: Float): Float = 1f - (ms / DISSOLVE_MS).coerceIn(0f, 1f)

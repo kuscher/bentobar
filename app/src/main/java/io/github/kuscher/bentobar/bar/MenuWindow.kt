@@ -242,6 +242,7 @@ class MenuWindow(
                 if (Log.isLoggable(MOTION_TAG, Log.DEBUG)) Log.d(MOTION_TAG, "open ms=${ms.roundToInt()} h=${g.heightDp.roundToInt()}/${full.roundToInt()} p=${"%.2f".format(g.presence)}")
                 put(g, nanos)
                 glass.clockMs = ms
+                sync()
                 if (g.done && ms >= MenuMotion.blocksDoneMs(9)) { settle(); return }
             }
             Phase.REOPENING -> {
@@ -257,6 +258,7 @@ class MenuWindow(
             Phase.DISSOLVING -> {
                 glass.alpha = MenuMotion.dissolve(ms)
                 applyBlur()
+                sync()
                 if (ms >= MenuMotion.DISSOLVE_MS) { remove(); return }
             }
             else -> return
@@ -272,7 +274,15 @@ class MenuWindow(
         glass.shadow = g.shadow
         glass.contents = g.contents
         applyBlur()
+        sync()
     }
+
+    /**
+     * Tells Compose of this frame's values now. Written outside a composition, they would otherwise reach it with its
+     * next frame, while the blur's region (framed before this frame is drawn) already has them: the blur ran a frame
+     * ahead of the glass, a frosted band below its edge during the fast middle of the opening.
+     */
+    private fun sync() = androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
 
     /** At rest, open: the glass whole, the blocks in place, the clock stopped. */
     private fun settle() {
@@ -281,6 +291,7 @@ class MenuWindow(
         glass.presence = 1f; glass.shadow = 1f; glass.contents = 1f; glass.alpha = 1f
         glass.clockMs = Float.POSITIVE_INFINITY
         applyBlur()
+        sync()
     }
 
     /**
@@ -306,6 +317,7 @@ class MenuWindow(
         val follow = glass.blur && glass.fullHeightPx > 0
         val bottom = if (follow) shownPx.coerceIn(1, h) else h
         outline.corner = min(MenuMotion.RADIUS_DP * density, bottom / 2f)
+        if (Log.isLoggable(MOTION_TAG, Log.DEBUG)) Log.d(MOTION_TAG, "blur bottom=$bottom")
         if (follow || framed) {
             // A layout pass gives the root view the whole window again, so the frame is set anew every time.
             framed = follow

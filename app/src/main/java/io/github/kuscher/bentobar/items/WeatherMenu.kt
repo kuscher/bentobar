@@ -135,9 +135,16 @@ internal fun hereChosen(): Boolean {
     WeatherHere.wake()
     Ticker.refresh()
     if (WeatherHere.allowed()) return false
-    MainActivity.requestPermission(Env.app, Manifest.permission.ACCESS_COARSE_LOCATION)
+    askLocation()
     return true
 }
+
+/**
+ * Android's question for the approximate location, and nothing more: Allow location, in the menu and
+ * in the settings, leaves the Weather switch as it is (an item in Off may not turn it on). The answer
+ * wakes [WeatherHere] (MainActivity).
+ */
+internal fun askLocation() = MainActivity.requestPermission(Env.app, Manifest.permission.ACCESS_COARSE_LOCATION)
 
 /** The item's menu: one card for each state the item can be in. */
 @Composable
@@ -226,7 +233,7 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
             when (status.why) {
                 Locate.NOT_ALLOWED -> MenuEntry(Sym.MY_LOCATION, stringResource(R.string.weather_allow_location)) {
                     host.close()
-                    MainActivity.requestPermission(Env.app, Manifest.permission.ACCESS_COARSE_LOCATION)
+                    askLocation()
                 }
                 Locate.OFF -> MenuEntry(Sym.SETTINGS, stringResource(R.string.weather_location_settings)) {
                     host.close()
@@ -406,8 +413,8 @@ internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
                 else if (city != null) TextButton(onClick = { set(WeatherRules.useCity(item)); source.typed(by) }) { Text(stringResource(R.string.weather_use_city, city)) }
                 // A layout that came with a city, or the switch off in Setup: the same act as the menu's.
                 if (!on) TextButton(onClick = { source.turnOn(); Ticker.refresh() }) { Text(stringResource(R.string.weather_turn_on)) }
-                // My location without the permission (refused, or taken back in Android's settings).
-                if (here && !WeatherHere.allowed()) TextButton(onClick = { hereChosen() }) { Text(stringResource(R.string.weather_allow_location)) }
+                // My location without the permission (refused, or taken back in Android's settings): Android's question only.
+                if (here && !WeatherHere.allowed()) TextButton(onClick = { askLocation() }) { Text(stringResource(R.string.weather_allow_location)) }
             }
         }
     }

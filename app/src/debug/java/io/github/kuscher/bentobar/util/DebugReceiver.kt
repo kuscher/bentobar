@@ -113,6 +113,7 @@ class DebugReceiver : BroadcastReceiver() {
                             "collapse" -> c.copy(autoCollapseSec = args[2].toInt())
                             "spacing" -> c.copy(spacing = args[2].toInt())
                             "switch" -> c.copy(hoverSwitchesPopups = args[2] == "on")
+                            "animations" -> c.copy(noAnimations = args[2] == "off")
                             else -> c
                         }
                     }; "ok"

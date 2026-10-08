@@ -114,12 +114,10 @@ internal fun MediaMenu(item: ItemConfig, host: MenuHost) {
                 Spacer(Modifier.height(8.dp))
             }
         }
-        // The three pop in together, as one: the kit's buttons take no modifier of their own.
-        Box(Modifier.popIn(56f, 0.8f)) {
-            MediaButtons(playing = view.playing, canPrevious = view.canPrevious, canPlayPause = view.canPlayPause, canNext = view.canNext,
-                arrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                onPrevious = { NowPlaying.previous() }, onPlayPause = { NowPlaying.playPause() }, onNext = { NowPlaying.next() })
-        }
+        // The three pop in one after another, from 56 ms (§7.2).
+        MediaButtons(playing = view.playing, canPrevious = view.canPrevious, canPlayPause = view.canPlayPause, canNext = view.canNext,
+            arrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), entranceMs = 56f,
+            onPrevious = { NowPlaying.previous() }, onPlayPause = { NowPlaying.playPause() }, onNext = { NowPlaying.next() })
         if (player != null && track != null) {
             Spacer(Modifier.height(4.dp))
             val others = now.others

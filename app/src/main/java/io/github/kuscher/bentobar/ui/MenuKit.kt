@@ -253,16 +253,18 @@ fun SmallIconButton(sym: String, label: String, color: Color = LocalContentColor
 @Composable
 fun MediaButtons(playing: Boolean, canPrevious: Boolean = true, canPlayPause: Boolean = true, canNext: Boolean = true,
                  arrangement: Arrangement.Horizontal = Arrangement.spacedBy(8.dp),
+                 /** In a popup, the buttons pop in one after another from this offset in their block (§7.2). */
+                 entranceMs: Float = 0f,
                  onPrevious: () -> Unit, onPlayPause: () -> Unit, onNext: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = arrangement) {
-        FilledTonalIconButton(onClick = onPrevious, enabled = canPrevious) {
+        FilledTonalIconButton(onClick = onPrevious, enabled = canPrevious, modifier = Modifier.popIn(entranceMs, 0.8f)) {
             SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = stringResource(R.string.sound_previous))
         }
-        FilledTonalIconButton(onClick = onPlayPause, enabled = canPlayPause) {
+        FilledTonalIconButton(onClick = onPlayPause, enabled = canPlayPause, modifier = Modifier.popIn(entranceMs + 16f, 0.8f)) {
             SymIcon(if (playing) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp,
                 contentDescription = stringResource(if (playing) R.string.common_pause else R.string.sound_play))
         }
-        FilledTonalIconButton(onClick = onNext, enabled = canNext) {
+        FilledTonalIconButton(onClick = onNext, enabled = canNext, modifier = Modifier.popIn(entranceMs + 32f, 0.8f)) {
             SymIcon(Sym.SKIP_NEXT, size = 22.sp, contentDescription = stringResource(R.string.sound_next))
         }
     }

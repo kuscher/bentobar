@@ -90,7 +90,7 @@ internal fun HourStrip(cells: List<HourCell>) {
         // Each pops in whole, 16 ms after the one to its left (motion.md §7.2).
         for (i in 0 until 6) {
             val cell = cells.getOrNull(i)
-            Column(Modifier.popIn(16f * i, 0.9f).weight(1f).clearAndSetSemantics { if (cell != null) contentDescription = cell.desc },
+            Column(Modifier.popIn(10f * i, 0.9f).weight(1f).clearAndSetSemantics { if (cell != null) contentDescription = cell.desc },
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(cell?.time.orEmpty(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 Spacer(Modifier.height(4.dp))

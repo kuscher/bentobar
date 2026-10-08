@@ -184,7 +184,7 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
             for (r in 0 until rows) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     val firstDay = month.atDay(1).plusDays((r * 7 - lead).toLong())
-                    if (weeks) Text(firstDay.get(weekOf).toString(), Modifier.fadeIn(10f * r).width(24.dp),
+                    if (weeks) Text(firstDay.get(weekOf).toString(), Modifier.fadeIn(5f * r).width(24.dp),
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     for (c in 0 until 7) {
                         val i = r * 7 + c - lead
@@ -199,7 +199,7 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
                                 val label = if (has) stringResource(R.string.calendar_day_has_events, full) else full
                                 // Today's disc pops from further in, 40 ms after its day would, its number and dot with it.
                                 Column(
-                                    Modifier.popIn(10f * (r + c) + if (isToday) 40f else 0f, if (isToday) 0.6f else 0.9f).size(28.dp).clip(CircleShape)
+                                    Modifier.popIn(5f * (r + c), if (isToday) 0.8f else 0.9f).size(28.dp).clip(CircleShape)
                                         .background(when { isToday -> MaterialTheme.colorScheme.primary; isPicked -> MaterialTheme.colorScheme.secondaryContainer; else -> Color.Transparent })
                                         .selectable(selected = isPicked, onClick = { picked = d }).pointerHoverIcon(PointerIcon.Hand)
                                         .semantics { contentDescription = label },

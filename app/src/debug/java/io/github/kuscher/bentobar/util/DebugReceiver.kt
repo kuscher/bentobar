@@ -43,6 +43,7 @@ class DebugReceiver : BroadcastReceiver() {
                 }
                 "reset" -> { Store.update { Defaults.config().copy(onboarded = it.onboarded) }; "reset" }
                 "add" -> Store.add(args[1], args.getOrNull(2)?.let { Section.valueOf(it.uppercase()) } ?: Section.SHOWN)
+                "remove" -> { Store.remove(args[1]); "ok" }
                 "set" -> {
                     val (k, v) = args[2].split('=', limit = 2)
                     val item = Store.config.value.items.firstOrNull { it.id == args[1] || it.type == args[1] } ?: error("no item")

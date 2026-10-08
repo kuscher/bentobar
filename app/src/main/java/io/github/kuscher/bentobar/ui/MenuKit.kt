@@ -339,7 +339,7 @@ fun CopyEntry(label: String, icon: String = Sym.CONTENT_COPY, text: () -> String
 /** A square-ish tile with an icon over a label, for grids of actions. */
 @Composable
 fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: () -> Unit) {
-    // Tiles pop in in a diagonal from the top left, 18 ms a step (four to a row in a menu's width).
+    // Tiles pop in in a diagonal from the top left, 15 ms a step (four to a row in a menu's width).
     val order = LocalTileOrder.current
     val i = remember(order) { order?.next() ?: 0 }
     val source = remember { MutableInteractionSource() }
@@ -351,7 +351,7 @@ fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: 
         else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
     Column(
-        Modifier.popIn(18f * (i / 4 + i % 4), 0.9f).width(84.dp).focusRing(focused, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp)).background(bg)
+        Modifier.popIn(15f * (i / 4 + i % 4), 0.9f).width(84.dp).focusRing(focused, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp)).background(bg)
             .hoverable(source)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand)
@@ -390,7 +390,7 @@ val LocalTileOrder = androidx.compose.runtime.staticCompositionLocalOf<TileOrder
 fun ChipRow(labels: List<String>, selected: Int? = null, onClick: (Int) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         labels.forEachIndexed { i, l ->
-            val popIn = Modifier.popIn(16f * minOf(i, 6), 0.92f)
+            val popIn = Modifier.popIn(10f * minOf(i, 6), 0.92f)
             val source = remember { MutableInteractionSource() }
             val hovered by source.collectIsHoveredAsState()
             val focused by source.collectIsFocusedAsState()
@@ -429,7 +429,7 @@ fun rememberTick(): Long {
 @Composable
 fun CoreBars(values: DoubleArray, color: Color = MaterialTheme.colorScheme.primary) {
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
-    // Each bar fills from the bottom, 12 ms after the one before it (§7.2).
+    // Each bar fills from the bottom, 8 ms after the one before it (§7.2: no wave in a block longer than 60 ms).
     val part = rememberPart(30f)
     Canvas(Modifier.part(part).fillMaxWidth().height(36.dp)) {
         if (values.isEmpty()) return@Canvas
@@ -439,7 +439,7 @@ fun CoreBars(values: DoubleArray, color: Color = MaterialTheme.colorScheme.prima
             val x = i * (w + gap)
             drawRoundRect(track, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Size(w, size.height),
                 androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
-            val h = (v.coerceIn(0.0, 1.0) * size.height).toFloat() * (if (part == null) 1f else MenuMotion.draw(part.ms(plus = 12f * i)))
+            val h = (v.coerceIn(0.0, 1.0) * size.height).toFloat() * (if (part == null) 1f else MenuMotion.draw(part.ms(plus = 8f * i)))
             if (h > 0.5f) drawRoundRect(color, androidx.compose.ui.geometry.Offset(x, size.height - h), androidx.compose.ui.geometry.Size(w, h),
                 androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
         }

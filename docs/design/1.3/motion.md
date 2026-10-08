@@ -202,6 +202,10 @@ less moving). Parts below a scrolling popup's visible height are at rest from th
 **For the visual designer**, who owns how each role looks as it arrives: the roles, order and timing are fixed;
 only layer and draw-phase changes, nothing past its place.
 
+**Revised after the review of the build (8 October):** no wave inside one block spans more than 60 ms, so a tall
+popup still reads from the top left: hour cells 10 j, month days 5 (w + d), tiles 15 (r + c), chips 10 min(j, 6),
+CoreBars 30 + 8 j. Today's disc pops with its own day, from 0.8, with no 40 ms of its own: it was arriving last.
+
 ### 7.3 "No animations"
 
 A switch in Look, "Animations", on by default; off is Alex's "no animations". Animations are off when the switch

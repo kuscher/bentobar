@@ -20,17 +20,18 @@ class HereKeeperTest {
     private val zurich = Fix(47.376_887, 8.541_694)
     private var changes = 0
 
-    /** Android as a test sets it: the permission, the location switch, a last known location, and the asks it was given. */
-    private class FakeAndroid : Locator {
+    /** Android as a test sets it: the permission, the location switch, a last known location (taken at [lastAt]), and the asks it was given. */
+    private class FakeAndroid(private val clock: () -> Long) : Locator {
         var allowed = true
         var on = true
-        var last: Located? = null
+        var lastFix: Fix? = null
+        var lastAt = 0L
         var provider = true
         val asks = ArrayList<(Located?) -> Unit>()
         var calledOff = 0
         override fun allowed() = allowed
         override fun on() = on
-        override fun last() = last
+        override fun last() = lastFix?.let { Located(it, age = clock() - lastAt) }
         override fun current(answer: (Located?) -> Unit): Locator.Cancel? {
             if (!provider) return null
             asks += answer
@@ -41,7 +42,7 @@ class HereKeeperTest {
         fun answer(located: Located?) = asks.last()(located)
     }
 
-    private val android = FakeAndroid()
+    private val android = FakeAndroid { now }
     private val keeper = HereKeeper(android, { now }) { changes++ }
     private val here = WeatherRules.useHere(ItemConfig("w1", "weather"))
     private val city = ItemConfig("w2", "weather", options = mapOf("city" to "Zurich", "lat" to "47.37", "lon" to "8.55"))
@@ -53,7 +54,8 @@ class HereKeeperTest {
     }
 
     @Test fun aLastKnownLocationUnderHalfAnHourOldIsTakenWithoutANewAsk() {
-        android.last = Located(zurich, age = 10 * min)
+        android.lastFix = zurich
+        android.lastAt = now - 10 * min
         tick()
         assertEquals(zurich, keeper.fix)
         assertTrue(android.asks.isEmpty())
@@ -200,5 +202,26 @@ class HereKeeperTest {
         android.answer(Located(zurich, age = 0))
         assertFalse(keeper.follow(listOf(here.copy(section = Section.OFF)), sampled = emptyList(), on = true))
         assertEquals(Here(), keeper.held)
+    }
+
+    @Test fun asksThatBringBackOnlyAndroidsOldFixBackOff() {
+        val start = now
+        tick()
+        android.answer(Located(zurich, age = 0))
+        // From now on Android has no new fix: its last known location stays this one.
+        android.lastFix = zurich
+        android.lastAt = start
+        val asked = ArrayList<Long>()
+        while (now < start + 70 * min) {
+            val before = android.asks.size
+            tick(5 * sec)
+            if (android.asks.size > before) {
+                asked += (now - start) / min
+                android.answer(null) // no new fix: the keeper falls back to the old one, which is nothing new
+            }
+        }
+        assertEquals(listOf(30L, 31L, 33L, 38L, 53L), asked)
+        assertNull(keeper.fix)
+        assertEquals(Locate.NONE, keeper.why)
     }
 }

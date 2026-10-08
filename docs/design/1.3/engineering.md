@@ -163,7 +163,7 @@ Smallest first; debug timings are an upper bound (release is 3–4× faster):
   now sent with `Snapshot.sendApplyNotifications()`; logged, the blur region and the drawn glass agree within 1 px.
 - **The clock starts once frames flow:** a new window's first frames are slow (~40 ms, then ~26 ms while the
   shadow's window takes its size). The opening's clock waits until the first frame is committed and two frames come
-  on time (at most 250 ms); until then the glass has no presence. Release build: mid-opening every frame on its
+  on time (at most 150 ms after the first frame was asked for, so a click never waits long for an answer); until then the glass has no presence. Release build: mid-opening every frame on its
   8.3 ms slot, almost all drawn in 1–3 ms.
 - **Input around the popup:** a press outside it on its own item folds it and spends that press's click; on another
   item it dissolves and the click opens that item's popup; a click while it folds turns it round. A click in a gap

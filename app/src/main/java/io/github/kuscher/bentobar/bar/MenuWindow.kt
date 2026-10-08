@@ -389,7 +389,7 @@ class MenuWindow(
         /** Each frame of an opening, in debug logs: `adb shell setprop log.tag.BentoBarMotion DEBUG`. */
         private const val MOTION_TAG = "BentoBarMotion"
         /** The opening's clock starts this long after its first frame was asked for, if Android hasn't said it was drawn. */
-        private const val FIRST_FRAME_WAIT_NS = 250_000_000L
+        private const val FIRST_FRAME_WAIT_NS = 150_000_000L
         /** How long after its fold should have ended a closing window is taken away regardless. */
         private const val REMOVAL_GRACE_MS = 250L
     }

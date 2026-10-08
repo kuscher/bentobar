@@ -63,7 +63,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Locale
 
 /**
- * Keep-awake: while on, BarService keeps a tiny window with FLAG_KEEP_SCREEN_ON on screen. [until]
+ * Keep-awake: while on, BarService sets FLAG_KEEP_SCREEN_ON on the visible strip (a wake lock while the strip is hidden). [until]
  * is wall time (it survives a restart); [anchor] keeps setting the clock from changing how long it lasts.
  */
 object Caffeine {
@@ -247,10 +247,6 @@ object Apps {
         }.getOrNull()?.also { icons[key] = it }
     }
 
-    fun hasMono(context: Context, cn: ComponentName) = runCatching {
-        (context.packageManager.getActivityIcon(cn) as? AdaptiveIconDrawable)?.monochrome != null
-    }.getOrDefault(false)
-
     fun launch(cn: ComponentName) = Env.launch(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(cn))
 
     fun parse(list: String): List<ComponentName> = list.split(',').mapNotNull { ComponentName.unflattenFromString(it.trim()) }
@@ -334,7 +330,10 @@ object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow(stringResource(R.string.folder_name), item.opt("label", stringResource(R.string.common_apps))) { set(item.with("label", it.take(16).ifBlank { null })) }
+        // The default name is the placeholder, not the text: emptied, the field stays empty while it is typed in.
+        TextRow(stringResource(R.string.folder_name), item.opt("label", ""), placeholder = stringResource(R.string.common_apps), maxLength = 16) {
+            set(item.with("label", it.take(16).ifBlank { null }))
+        }
         AppPicker(Apps.parse(item.opt("apps", "")), multi = true) { list ->
             set(item.with("apps", list.joinToString(",") { it.flattenToString() }.ifBlank { null }))
         }
@@ -362,7 +361,7 @@ object TextItem : ItemType("text", R.string.item_text_title, Sym.TEXT_FIELDS, R.
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow(stringResource(R.string.text_text), item.opt("text", stringResource(R.string.text_default)), help = stringResource(R.string.text_text_help)) {
+        TextRow(stringResource(R.string.text_text), item.opt("text", stringResource(R.string.text_default)), help = stringResource(R.string.text_text_help), maxLength = 40) {
             set(item.with("text", it.take(40)))
         }
         ChoiceRow(stringResource(R.string.text_icon), iconChoices.map { it.first to stringResource(iconNames.getValue(it.first)) },

@@ -60,9 +60,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.Executors
 
-/** Whether the user has turned on Usage access for BentoBar (Android settings › Special app access). */
-fun usageAccess(context: Context): Boolean = Usage.granted(context)
-
 /**
  * Usage access (PACKAGE_USAGE_STATS), an optional special app access the user turns on in Android
  * settings. Android can't show apps which other apps use the CPU or memory, but with Usage access

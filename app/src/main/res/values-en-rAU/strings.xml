@@ -5,7 +5,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
 
     <!-- base -->
-    <string name="a11y_description">BentoBar draws your items (network speed, timer, calendar, tools…) on the status bar. Android allows that only through an accessibility service.\n\nWith it on, BentoBar: reads only the status bar\'s layout, to find free space for your items; reads the colour of the status bar clock, so your items match it; and runs the system actions you pick in the Tools menu, such as screenshot or lock.\n\nIt doesn\'t read other apps\' windows or watch your keyboard, mouse or touches. Nothing the service reads ever leaves your Googlebook: BentoBar never collects or shares it.</string>
+    <string name="a11y_description">BentoBar draws your items (network speed, timer, calendar, tools…) on the status bar. Android allows that only through an accessibility service.\n\nWith it on, BentoBar: reads only the status bar\'s layout, to find free space for your items; reads the colour of the status bar clock, so your items match it; and runs the system actions you pick in the Tools menu or as a Shortcut item, such as screenshot or lock.\n\nIt doesn\'t read other apps\' windows or watch your keyboard, mouse or touches. Nothing the service reads ever leaves your Googlebook: BentoBar never collects or shares it.</string>
 
     <!-- tool -->
     <string name="app_match_color">Match the bar\'s colour</string>

@@ -19,7 +19,7 @@ object Items {
     val all: List<ItemType> = listOf(
         CpuItem, NetworkItem, BatteryItem, MemoryItem, StorageItem, HeatItem, DevicesItem,
         CalendarItem, EventItem, ClockItem, TimerItem, CountdownItem,
-        CaffeineItem, MediaItem, SoundItem, ToolsItem, FolderItem, AppItem, TextItem, SpacerItem,
+        CaffeineItem, MediaItem, SoundItem, ToolsItem, ShortcutItem, FolderItem, AppItem, TextItem, SpacerItem,
         WeatherItem, FlightItem,
     )
     private val byType = all.associateBy { it.type }
@@ -36,6 +36,11 @@ object Ticker {
     private val main = Handler(Looper.getMainLooper())
     private val users = HashSet<String>()
     private val lastRun = HashMap<String, Long>()
+    /** When the last scheduled tick ran: what a recompute by hand is stamped with ([TickRules.stamp]). */
+    private var lastTickAt: Long? = null
+    /** When each item last had something to say, for [TickRules.held]; and the settings it had then (a change ends its hold). */
+    private val lastActive = HashMap<String, Long>()
+    private val heldFor = HashMap<String, ItemConfig>()
     private val _states = MutableStateFlow<Map<String, ItemState>>(emptyMap())
     private val _tick = MutableStateFlow(0L)
 
@@ -69,7 +74,7 @@ object Ticker {
     private fun forgetStates(type: String) {
         val ids = Store.config.value.items.filter { it.type == type }.mapTo(HashSet()) { it.id }
         if (ids.any { it in _states.value }) _states.value = _states.value - ids
-        ids.forEach { lastRun -= it }
+        ids.forEach { lastRun -= it; lastActive -= it; heldFor -= it }
     }
 
     private inline fun hook(type: String, what: String, call: (ItemType) -> Unit) {
@@ -107,7 +112,7 @@ object Ticker {
 
     private val loop = object : Runnable {
         override fun run() {
-            runOnce()
+            runOnce(scheduled = true)
             val now = System.currentTimeMillis()
             // On the second boundary; every other second under battery saver.
             val period = if (Env.powerSave(SystemClock.elapsedRealtime())) 2000 else 1000
@@ -134,7 +139,7 @@ object Ticker {
     }
 
     /** Recomputes now (after a settings change or a click), without waiting for the next second. */
-    fun refresh() { lastRun.clear(); runOnce() }
+    fun refresh() { lastRun.clear(); runOnce(scheduled = false) }
 
     /**
      * Recomputes one item now, and nothing else: no sampler runs. For what only that item shows and
@@ -144,8 +149,9 @@ object Ticker {
     fun refresh(item: ItemConfig) {
         val current = Store.config.value.items.firstOrNull { it.id == item.id } ?: return
         val type = Items.of(current.type) ?: return
-        _states.value = _states.value + (current.id to compute(type, current))
-        lastRun[current.id] = SystemClock.elapsedRealtime()
+        val now = SystemClock.elapsedRealtime()
+        _states.value = _states.value + (current.id to held(type, current, now))
+        lastRun[current.id] = TickRules.stamp(now, lastTickAt)
     }
 
     /**
@@ -160,8 +166,8 @@ object Ticker {
         val mine = needed(Store.config.value).filter { it.type == type }
         if (mine.isEmpty()) return
         val now = SystemClock.elapsedRealtime()
-        _states.value = _states.value + mine.associate { it.id to compute(t, it) }
-        mine.forEach { lastRun[it.id] = now }
+        _states.value = _states.value + mine.associate { it.id to held(t, it, now) }
+        mine.forEach { lastRun[it.id] = TickRules.stamp(now, lastTickAt) }
         _tick.value = System.currentTimeMillis()
     }
 
@@ -170,8 +176,24 @@ object Ticker {
         ItemState(icon = type.icon, text = "!", desc = Env.str(R.string.item_failed, type.title))
     }
 
-    private fun runOnce() {
+    /**
+     * [type]'s state for [item], with "has something to say" held for a while after it last had
+     * ([TickRules.held]): what the strip shows by, so an item at its threshold doesn't blink. A change to
+     * the item's settings ends its hold, so a threshold moved in the settings shows at once.
+     */
+    private fun held(type: ItemType, item: ItemConfig, now: Long): ItemState {
+        val state = compute(type, item)
+        if (!TickRules.holds(type.type)) return state
+        if (heldFor[item.id] != item) { lastActive -= item.id; heldFor[item.id] = item }
+        if (state.active) { lastActive[item.id] = now; return state }
+        return if (TickRules.held(false, lastActive[item.id], now)) state.copy(active = true) else state
+    }
+
+    /** [scheduled]: the tick on the second; else a recompute by hand, stamped with the tick before it. */
+    private fun runOnce(scheduled: Boolean) {
         val now = SystemClock.elapsedRealtime()
+        if (scheduled) lastTickAt = now
+        val stamp = if (scheduled) now else TickRules.stamp(now, lastTickAt)
         val cfg = Store.config.value
         val live = needed(cfg)
         val types = live.mapTo(HashSet()) { it.type }
@@ -195,10 +217,12 @@ object Ticker {
             val type = Items.of(item.type) ?: continue
             val last = lastRun[item.id] ?: 0L
             if (item.id in next && !TickRules.due(now, last, type.refreshMs)) continue
-            next[item.id] = compute(type, item)
-            lastRun[item.id] = now
+            next[item.id] = held(type, item, now)
+            lastRun[item.id] = stamp
         }
         next.keys.retainAll(ids)
+        lastActive.keys.retainAll(ids)
+        heldFor.keys.retainAll(ids)
         _states.value = next
         _tick.value = System.currentTimeMillis()
     }

@@ -249,11 +249,14 @@ class BarController(private val service: AccessibilityService) {
         io.shutdown()
     }
 
+    /** Window events, logged only where asked for: `adb shell setprop log.tag.BentoBarEvents DEBUG`. */
+    private val EVENTS_TAG = "BentoBarEvents"
+
     fun onEvent(e: AccessibilityEvent) {
         if (tracing) trace("event windows id=${e.windowId} changes=0x${Integer.toHexString(e.windowChanges)} ours=${e.windowId in overlayIds}")
         when (e.eventType) {
             AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
-                if (Log.isLoggable("BentoBarEvents", Log.DEBUG)) Log.d(tag, "windows changed id=${e.windowId} changes=0x${Integer.toHexString(e.windowChanges)} ours=${e.windowId in overlayIds}")
+                if (Log.isLoggable(EVENTS_TAG, Log.DEBUG)) Log.d(EVENTS_TAG, "windows changed id=${e.windowId} changes=0x${Integer.toHexString(e.windowChanges)} ours=${e.windowId in overlayIds}")
                 if (e.windowId in overlayIds) return // our own windows resizing
                 // Only windows appearing, going or moving can hide or cover the bar; titles, focus
                 // and stacking changes (every page load, every terminal command) can't.
@@ -392,6 +395,9 @@ class BarController(private val service: AccessibilityService) {
         if (!strip.shown) {
             stripEmpty = false // a new window starts visible; its first measure says whether it has content
             strip.show { StripHost() }
+            // Android refused the window (the service is going): nothing is on screen, so nothing may run or go online.
+            // The next look at the bar tries again.
+            if (!strip.shown) { BarStatus.current.value = BarStatus.STOPPED; return }
             updateAwake()
             // Back on screen (after a full-screen app, the lock screen, a covering panel): the bar may
             // look different now, or only in a while (after an unlock it kept the lock screen's look for
@@ -424,6 +430,8 @@ class BarController(private val service: AccessibilityService) {
      */
     private fun readSoon(cause: ColorWatch.Cause, firstMs: Long) {
         if (!started || !strip.shown) return
+        // Not while the strip has nothing to draw: the reading waits until it has ([ColorWatch.pause]).
+        if (stripEmpty) return watch.owe(cause)
         watch.cause(cause, SystemClock.uptimeMillis(), firstMs)
         arm()
     }
@@ -438,6 +446,7 @@ class BarController(private val service: AccessibilityService) {
 
     private fun sampleColor() {
         if (!started || !strip.shown || !pm.isInteractive) return watch.clear()
+        if (stripEmpty) return watch.pause()
         val s = snap
         if (s == null || Store.config.value.color != ColorMode.AUTO) { watch.clear(); return applyLook() }
         watch.taken(SystemClock.uptimeMillis())
@@ -570,7 +579,14 @@ class BarController(private val service: AccessibilityService) {
 
     private fun applyWidth(w: Int) {
         val empty = w <= 0
-        if (empty != stripEmpty) { stripEmpty = empty; strip.setContentVisible(!empty); trace("strip ${if (empty) "empty" else "has content"}"); updateAwake() }
+        if (empty != stripEmpty) {
+            stripEmpty = empty; strip.setContentVisible(!empty); trace("strip ${if (empty) "empty" else "has content"}"); updateAwake()
+            // Nothing to draw: no readings; something again: the readings owed meanwhile, or two quick ones.
+            if (started && strip.shown) {
+                if (empty) watch.pause() else watch.resume(SystemClock.uptimeMillis(), 250)
+                arm()
+            }
+        }
         val width = w.coerceAtLeast(1)
         if (strip.params.width == width) return
         trace("width ${strip.params.width} -> $width")
@@ -591,6 +607,8 @@ class BarController(private val service: AccessibilityService) {
 
         override fun click(item: ItemConfig, at: Rect) {
             placed[item.id] = at
+            // A click ends the hover's tooltip, whatever it does next (a screenshot must not catch it).
+            hideTip()
             val type = Items.of(item.type) ?: return
             if (type.onClick(item)) { Ticker.refresh(); return }
             if (type.menu == null) return
@@ -872,7 +890,6 @@ class BarController(private val service: AccessibilityService) {
     }
 
     companion object {
-        const val SYSTEMUI = "com.android.systemui"
         private const val TOOLTIP_MAX_DP = 360
         private const val RELEVANT = AccessibilityEvent.WINDOWS_CHANGE_ADDED or AccessibilityEvent.WINDOWS_CHANGE_REMOVED or
             AccessibilityEvent.WINDOWS_CHANGE_BOUNDS

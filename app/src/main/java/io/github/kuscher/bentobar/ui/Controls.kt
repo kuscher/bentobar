@@ -18,6 +18,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -64,22 +65,29 @@ fun SwitchRow(label: String, checked: Boolean, help: String? = null, enabled: Bo
     }
 }
 
-/** A text field that saves as you type (debounced by recomposition, cheap for small strings). */
+/**
+ * A text field that saves as you type. While it has the focus it keeps what is typed: a caller may
+ * store something else (nothing for a blank, a shortened text) and the field must not change under
+ * the cursor. It shows the stored [value] again when the focus goes, and whenever the value changes
+ * while it doesn't have it. [maxLength]: no more can be typed than the caller keeps.
+ */
 @Composable
 fun TextRow(label: String, value: String, help: String? = null, placeholder: String = "", numeric: Boolean = false,
             /** Shown instead of [help], with the field marked, while the text can't be used. */
-            error: String? = null, onChange: (String) -> Unit) {
-    var text by remember(value) { mutableStateOf(value) }
+            error: String? = null, maxLength: Int = Int.MAX_VALUE, onChange: (String) -> Unit) {
+    var text by remember { mutableStateOf(value) }
+    var focused by remember { mutableStateOf(false) }
+    LaunchedEffect(value, focused) { if (!focused) text = value }
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
         OutlinedTextField(
             value = text,
-            onValueChange = { text = it; onChange(it) },
+            onValueChange = { typed -> typed.take(maxLength).let { text = it; onChange(it) } },
             label = { Text(label) },
             placeholder = { Text(placeholder) },
             singleLine = true,
             isError = error != null,
             keyboardOptions = if (numeric) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
         )
         (error ?: help)?.let {
             Text(it, style = MaterialTheme.typography.bodySmall,

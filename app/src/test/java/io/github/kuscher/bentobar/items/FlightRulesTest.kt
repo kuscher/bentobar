@@ -390,9 +390,14 @@ class FlightRulesTest {
         assertEquals(listOf(2 * min, 4 * min, 8 * min, 16 * min, 30 * min, 30 * min, 30 * min), (1..7).map { failed(it) })
         assertEquals(2 * min, failed(1, Failure.OFFLINE))
         assertEquals(30 * min, failed(40, Failure.OFFLINE))
-        // Far out, where the usual wait is three hours, a failed ask is tried again just as soon.
+        // Far out, where the usual wait is three hours, an ask that reached nobody (it cost nothing) is tried again just as soon.
         val far = tracked(flight("flight-LH454-planned"), "2026-10-01T18:00:00Z").copy(failure = Failure.OFFLINE, failures = 1)
         assertEquals(2 * min, every(far, "2026-10-01T18:00:00Z"))
+        // But one that went out and came to nothing (an error, a reply nobody can read) spent a lookup of the user's own key:
+        // far out, the next waits the usual three hours, not two minutes. Retried at the back-off, a flight days away that kept
+        // failing cost up to 48 lookups a day instead of 8.
+        assertEquals(3 * hour, every(far.copy(failure = Failure.NO_ANSWER, failures = 1), "2026-10-01T18:00:00Z"))
+        assertEquals(3 * hour, every(far.copy(failure = Failure.NO_ANSWER, failures = 5), "2026-10-01T18:00:00Z"))
         // But where nothing would be asked anyway, a failure changes nothing: a landed flight is not asked about again.
         assertNull(every(tracked(flight("flight-LH96-landed"), "2026-10-02T07:29:00Z").copy(failure = Failure.OFFLINE, failures = 1), "2026-10-02T07:30:00Z"))
         // A service that says how long to wait is given at least that long.

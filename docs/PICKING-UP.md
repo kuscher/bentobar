@@ -19,6 +19,22 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 1.2 (2026-10-07): Shortcut, With conditions + Windy, and the health fixes
+Three PRs, merged in this order as merge commits: #27 (health fixes from a code-health review of 1.0.2:
+show-when hold for network/cpu/memory, the tick stamp, Flight's back-off, TextRow, Duplicate, Undo,
+`coerceInputValues`, no colour readings while the strip is empty, the `addView` guard, dead code), #26 (the
+Shortcut item; the disclosure, `a11y_description`, README and Play texts now say a Shortcut item runs system actions
+too) and #25 (Weather's With conditions and Windy). Version code 14. **Released on GitHub only**
+(`PLAY_UPLOAD=off`, docs/RELEASING.md) while 1.0.2's Play review is open; it goes to Play from the run's `bundle`
+artifact or with the next tag, when Alex says so. For that submission: the accessibility declaration's text
+(`store-submission/forms/app-content.md`) and the full description now mention the Shortcut item; Play's
+"What's new" is in `store-submission/listing/en-US/release-notes.txt`. Not tried on a device before the tag (none
+at hand).
+Next, for 1.3: #23 (Weather: My location) and #24 (US stocks), both with changes requested on 2026-10-07. #23 adds
+BentoBar's first location permission (Data safety, privacy page, a possible background-location question); #24 adds
+Finnhub (privacy page, Play's financial-features answer) and must switch `WeatherRules.count` to `TextRules.count`
+in #25's tests, and rerun `tools/icons.py` with the Shortcut item's `bug_report`.
+
 ## 1.0.2 (2026-10-06): a new icon, after Play's rejection of 1.0's listing
 Play rejected 1.0's store listing under the Impersonation policy ("copyrighted or proprietary assets … from a
 third-party"), naming the hi-res icon and the title. The icon's rice, salmon, tamago and edamame on blue read as

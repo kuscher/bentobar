@@ -1,6 +1,5 @@
 package io.github.kuscher.bentobar.bar
 
-import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
@@ -31,17 +30,11 @@ object StatusBarScan {
     private val timeRe = Regex("""\d{1,2}[:.]\d{2}""")
 
     /** The status bar window: a system window along the top edge, shorter than [maxHeight]. */
-    fun findWindow(service: AccessibilityService, screenWidth: Int, maxHeight: Int): AccessibilityWindowInfo? =
-        findWindow(service.windows, screenWidth, maxHeight)
-
     fun findWindow(windows: List<AccessibilityWindowInfo>, screenWidth: Int, maxHeight: Int): AccessibilityWindowInfo? =
         windows.firstOrNull { w ->
             val r = Rect().also { w.getBoundsInScreen(it) }
             w.type == AccessibilityWindowInfo.TYPE_SYSTEM && r.top == 0 && r.height() in 1..maxHeight && r.width() >= screenWidth / 2
         }
-
-    fun scan(service: AccessibilityService, screenWidth: Int, maxHeight: Int): BarSnapshot? =
-        findWindow(service, screenWidth, maxHeight)?.let { scan(it) }
 
     fun scan(w: AccessibilityWindowInfo): BarSnapshot {
         val bar = Rect().also { w.getBoundsInScreen(it) }

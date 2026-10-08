@@ -421,5 +421,5 @@ internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
         set(item.with("unit", it))
     }
     TextRow(stringResource(R.string.option_label), item.opt("label", ""), help = stringResource(R.string.weather_label_help),
-        placeholder = stringResource(R.string.option_none)) { set(item.with("label", WeatherRules.label(it).ifEmpty { null })) }
+        placeholder = stringResource(R.string.option_none), maxLength = WeatherRules.LABEL_CHARS) { set(item.with("label", WeatherRules.label(it).ifEmpty { null })) }
 }

@@ -173,7 +173,6 @@ class History(val size: Int = 60) {
     fun add(v: Double) { values[head] = v; head = (head + 1) % size; if (count < size) count++ }
     fun toList(): List<Double> = List(count) { values[(head - count + it + size) % size] }
     fun last(): Double = if (count == 0) 0.0 else values[(head - 1 + size) % size]
-    fun max(): Double = toList().maxOrNull() ?: 0.0
 }
 
 /** Device-wide network throughput from TrafficStats (all interfaces since boot). */
@@ -435,5 +434,4 @@ class StorageSampler {
         }
     }
 
-    fun refresh() { lastAt = 0; sample(SystemClock.elapsedRealtime()) }
 }

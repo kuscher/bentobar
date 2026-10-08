@@ -43,6 +43,8 @@ class ColorWatch {
     private var windowsDue: Long? = null
     /** When a change of windows last got its first reading. */
     private var windowsRead = -BarNeighbours.APART_MS
+    /** The series still owed while the strip has nothing to draw ([pause]): SLOW, QUICK or none. */
+    private var owed: Cause? = null
 
     /**
      * Something that can change the bar happened at [now]; the first reading is wanted [first] ms later.
@@ -114,6 +116,29 @@ class ColorWatch {
     fun clear() {
         slow.clear(); quick.clear(); windowsDue = null
         again = 0
+        owed = null
+    }
+
+    /**
+     * The strip is on screen with nothing to draw: no readings (an invisible window of ours reading the
+     * screen is what Play Protect flags). The series still to come is owed until [resume].
+     */
+    fun pause() {
+        owe(if (slow.isNotEmpty()) Cause.SLOW else if (quick.isNotEmpty()) Cause.QUICK else null)
+        slow.clear(); quick.clear(); windowsDue = null
+        again = 0
+    }
+
+    /** A [cause] while the strip has nothing to draw: it waits for [resume]; a slow one isn't replaced by a quick one. */
+    fun owe(cause: Cause?) {
+        if (cause != null && owed != Cause.SLOW) owed = cause
+    }
+
+    /** The strip has something to draw again at [now]: the owed series starts [first] ms later, two quick readings if none. */
+    fun resume(now: Long, first: Long) {
+        val cause = owed ?: Cause.QUICK
+        owed = null
+        cause(cause, now, first)
     }
 
     private fun busy(now: Long) = asked.count { it > now - MINUTE_MS } >= BUSY

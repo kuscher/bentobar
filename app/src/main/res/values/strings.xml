@@ -6,7 +6,7 @@
     <string name="app_name">BentoBar</string>
     <string name="a11y_label">BentoBar</string>
     <string name="a11y_summary">Draws your items in the status bar</string>
-    <string name="a11y_description">BentoBar draws your items (network speed, timer, calendar, tools…) on the status bar. Android allows that only through an accessibility service.\n\nWith it on, BentoBar: reads only the status bar\'s layout, to find free space for your items; reads the color of the status bar clock, so your items match it; and runs the system actions you pick in the Tools menu, such as screenshot or lock.\n\nIt doesn\'t read other apps\' windows or watch your keyboard, mouse or touches. Nothing the service reads ever leaves your Googlebook: BentoBar never collects or shares it.</string>
+    <string name="a11y_description">BentoBar draws your items (network speed, timer, calendar, tools…) on the status bar. Android allows that only through an accessibility service.\n\nWith it on, BentoBar: reads only the status bar\'s layout, to find free space for your items; reads the color of the status bar clock, so your items match it; and runs the system actions you pick in the Tools menu or as a Shortcut item, such as screenshot or lock.\n\nIt doesn\'t read other apps\' windows or watch your keyboard, mouse or touches. Nothing the service reads ever leaves your Googlebook: BentoBar never collects or shares it.</string>
     <string name="tile_bar">BentoBar</string>
     <string name="tile_awake">Keep awake</string>
     <string name="tile_timer">Timer</string>
@@ -504,7 +504,7 @@
     <string name="setup_turn_on_draws">draws your items in the status bar\'s free space</string>
     <string name="setup_turn_on_reads">reads only the status bar\'s layout, to find free space for your items</string>
     <string name="setup_turn_on_copies">reads the color of the status bar clock, so your items match it</string>
-    <string name="setup_turn_on_runs">runs the system actions you pick in the Tools menu, such as screenshot or lock</string>
+    <string name="setup_turn_on_runs">runs the system actions you pick in the Tools menu or as a Shortcut item, such as screenshot or lock</string>
     <string name="setup_turn_on_doesnt">It doesn\'t read other apps\' windows or watch your keyboard, mouse or touches. What it reads stays on your Googlebook: BentoBar never collects or shares it.</string>
     <string name="disclosure_title">BentoBar uses the Accessibility API</string>
     <string name="disclosure_intro">Android lets an app draw on the status bar only through an accessibility service (the AccessibilityService API). With its service on, BentoBar:</string>

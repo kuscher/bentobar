@@ -53,6 +53,11 @@ notifications_active notifications_off password pending priority_high privacy_ti
 sync sync_problem toggle_off trending_flat vpn_key west wifi_off
 """.split()
 
+# Added for the Shortcut item: "Report a bug" (the other actions use glyphs the Tools menu has).
+ICONS += """
+bug_report
+""".split()
+
 # Symbols also exported as vector drawables (tiles, notifications, launcher icon), from the filled font.
 DRAWABLES = ["coffee", "timer", "avg_pace", "event", "pause", "play_arrow", "add", "stop", "videocam", "open_in_new"]
 

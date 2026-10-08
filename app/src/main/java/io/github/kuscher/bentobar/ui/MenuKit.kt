@@ -3,6 +3,7 @@ package io.github.kuscher.bentobar.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -12,7 +13,6 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -91,10 +92,11 @@ fun MenuCard(
     iconRes: Int? = null,
     /** The subtitle's color, where it says something out of the ordinary (a time being planned). */
     subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    content: @Composable ColumnScope.() -> Unit,
+    content: @Composable () -> Unit,
 ) {
-    Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    // Each child is a block that drops into place as the popup opens: the header first, then the content's own children.
+    DropColumn(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Row(Modifier.padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(30.dp).clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
@@ -112,7 +114,6 @@ fun MenuCard(
             }
             if (trailing != null) trailing()
         }
-        Spacer(Modifier.height(10.dp))
         content()
     }
 }
@@ -137,7 +138,11 @@ fun MenuNote(text: String) = Text(text, style = MaterialTheme.typography.bodySma
     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 2.dp))
 
 @Composable
-fun MenuDivider() = HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+fun MenuDivider() = HorizontalDivider(
+    // On glass a tint of the text colour rather than an opaque line (visual.md); it arrives with the block below it.
+    Modifier.layoutId(JOINS_BELOW).padding(vertical = 8.dp),
+    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isSystemInDarkTheme()) 0.16f else 0.12f),
+)
 
 @Composable
 fun SectionLabel(text: String) = Text(text.uppercase(), style = MaterialTheme.typography.labelSmall,
@@ -192,7 +197,7 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
     val focused by source.collectIsFocusedAsState()
     Row(
         modifier.fillMaxWidth().heightIn(min = if (sub != null) 48.dp else 40.dp).focusRing(focused, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
-            .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
+            .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f) else Color.Transparent)
             .hoverable(source)
             // An Enter that is being held when the focus arrives here (a search's results come in and the
             // first takes the focus) is not this entry's: its repeats are swallowed, so its release presses nothing.

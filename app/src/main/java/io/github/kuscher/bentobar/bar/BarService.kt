@@ -47,6 +47,7 @@ import io.github.kuscher.bentobar.items.Items
 import io.github.kuscher.bentobar.items.MenuHost
 import io.github.kuscher.bentobar.items.Ticker
 import io.github.kuscher.bentobar.ui.MainActivity
+import io.github.kuscher.bentobar.ui.MenuRoom
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -137,10 +138,15 @@ class BarController(private val service: AccessibilityService) {
         expanded.value = false; pinned = false
         if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
     }
-    private var menu: Overlay? = null
+    private var menu: MenuWindow? = null
     private var menuKey: String? = null
     private var menuClosedKey: String? = null
     private var menuClosedAt = 0L
+    /** Closed by a press outside it: that press's own click on the same item mustn't open it again. */
+    private var menuClosedByPress = false
+    /** A popup still folding away, and its key: clicked again meanwhile, it turns round. */
+    private var leaving: MenuWindow? = null
+    private var leavingKey: String? = null
     private var snap: BarSnapshot? = null
     private var sampled: BarColors? = null
     private var overlayIds = emptySet<Int>()
@@ -198,7 +204,7 @@ class BarController(private val service: AccessibilityService) {
 
     private val screen = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
-            if (i.action == Intent.ACTION_SCREEN_OFF) closeMenu()
+            if (i.action == Intent.ACTION_SCREEN_OFF) closeMenu(now = true)
             updateAwake()
             main.post(scanNow)
             if (i.action == Intent.ACTION_SCREEN_ON) {
@@ -239,7 +245,7 @@ class BarController(private val service: AccessibilityService) {
         BarOverflow.ids.value = emptySet()
         runCatching { service.unregisterReceiver(screen) }
         runCatching { WallpaperManager.getInstance(service).removeOnColorsChangedListener(wallpaper) }
-        closeMenu()
+        closeMenu(now = true)
         hideTip()
         main.removeCallbacksAndMessages(null) // after closeMenu, which posts a collapse
         strip.destroy()
@@ -270,7 +276,7 @@ class BarController(private val service: AccessibilityService) {
 
     /** Rotation, density or resolution: a menu or tooltip placed for the old display would be off, so close them. */
     fun onConfigChanged() {
-        closeMenu(); hideTip()
+        closeMenu(now = true); hideTip()
         main.postDelayed(scanNow, 200); readSoon(ColorWatch.Cause.SLOW, 500)
     }
 
@@ -357,7 +363,7 @@ class BarController(private val service: AccessibilityService) {
         } else {
             if (strip.shown) Log.i(tag, "bar hidden (statusBar=${s != null} covered=${cover?.let { "${it.title} " + Rect().also { r -> it.getBoundsInScreen(r) }.toShortString() }} " +
                 "enabled=${cfg.enabled} interactive=${pm.isInteractive} locked=${km.isKeyguardLocked})")
-            closeMenu()
+            closeMenu(now = true)
             hideTip()
             cancelDrag() // the strip's window goes, and with it the release that would end a drag
             strip.hide()
@@ -620,7 +626,7 @@ class BarController(private val service: AccessibilityService) {
             toggleMenu("ctx:${item.id}", at, 280) { host ->
                 ItemContextMenu(item.id, host) {
                     val type = Items.of(item.type)
-                    if (type?.menu != null) { closeMenu(); menuClosedKey = null; toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
+                    if (type?.menu != null) { closeMenu(dissolve = true); menuClosedKey = null; toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
                 }
             }
         }
@@ -714,7 +720,7 @@ class BarController(private val service: AccessibilityService) {
     private fun barMenu(at: Rect, everything: Boolean) = toggleMenu("bentobar", at, 290) { host ->
         BentoBarMenu(host, openItem = { item ->
             val type = Items.of(item.type)
-            closeMenu(); menuClosedKey = null
+            closeMenu(dissolve = true); menuClosedKey = null
             // From the list of every item, an item's menu opens under the item itself.
             val anchor = placed[item.id]?.takeIf { everything } ?: at
             if (type != null && type.onClick(item)) Ticker.refresh()
@@ -742,39 +748,50 @@ class BarController(private val service: AccessibilityService) {
     private val host = object : MenuHost {
         override fun close() = closeMenu()
         override fun openItemSettings(id: String) { closeMenu(); MainActivity.open(service, id.ifEmpty { null }) }
-        override fun afterClose(action: () -> Unit) { closeMenu(); main.postDelayed(action, 250) }
+        // Once the popup is gone from the screen (a screenshot must not show it): a frame after its window is removed.
+        override fun afterClose(action: () -> Unit) { closeMenu(then = { main.postDelayed(action, 50) }) }
     }
 
-    /** Opens the menu [key] below [anchor] (strip window coordinates), or closes it if it's open. */
+    /**
+     * Opens the popup [key] below [anchor] (strip window coordinates), or closes it if it's open. A popup
+     * open for another item dissolves while this one unfolds; one still folding away turns round.
+     */
     fun toggleMenu(key: String, anchor: Rect, widthDp: Int, content: @Composable (MenuHost) -> Unit) {
         val now = SystemClock.uptimeMillis()
         hideTip()
         if (menuKey == key) { closeMenu(); return }
-        // The press that closed this very menu (outside touch) shouldn't reopen it.
-        if (menuClosedKey == key && now - menuClosedAt < 350) return
-        closeMenu() // resets the sampling demand, so the new menu's is set after it
+        // The press that closed this very popup (outside touch) shouldn't reopen it.
+        if (menuClosedByPress && menuClosedKey == key && now - menuClosedAt < 350) return
+        val back = leaving
+        if (leavingKey == key && back != null && back.reopen()) {
+            leaving = null; leavingKey = null
+            menu = back; menuKey = key
+            focusMenu(key)
+            return
+        }
+        closeMenu(dissolve = true) // resets the sampling demand, so the new popup's is set after it
         val s = snap ?: return
-        Ticker.focusItem = key.removePrefix("item:").takeIf { key.startsWith("item:") }
-        Ticker.revealHidden = expanded.value || key == "bentobar"
         val loc = strip.locationOnScreen()
         val a = Rect(anchor).apply { offset(loc[0], loc[1]) }
         val bounds = wm.currentWindowMetrics.bounds
-        val margin = (MENU_MARGIN.value * density).toInt()
-        val w = (widthDp * density).toInt() + 2 * margin
-        val x = if (a.centerX() > bounds.width() / 2) a.right + margin - w else a.left - margin
+        val w = (widthDp * density).toInt()
+        val side = (MenuRoom.side.value * density).toInt()
+        // Under an item in the right half the card's right edge lines up with the item's, in the left half its left edge.
+        val left = if (a.centerX() > bounds.width() / 2) a.right - w else a.left
+        val x = left.coerceIn(side, (bounds.width() - w - side).coerceAtLeast(side))
+        val y = s.bar.bottom + (MenuRoom.top.value * density).toInt()
         val maxH = ((bounds.height() - s.bar.bottom) / density - 170).toInt().coerceAtLeast(200)
-        val o = Overlay(service, "BentoBar menu", focusable = true, onOutside = { closeMenu() },
-            onKey = { e ->
-                if (e.keyCode == KeyEvent.KEYCODE_ESCAPE && e.action == KeyEvent.ACTION_UP) { closeMenu(); true } else false
-            })
-        o.params.gravity = Gravity.TOP or Gravity.LEFT
-        o.params.width = w // exact: a WRAP_CONTENT window would be capped at the dialog width
-        o.params.x = x.coerceIn(0, (bounds.width() - w).coerceAtLeast(0))
-        o.params.y = s.bar.bottom + (4 * density).toInt() - margin
+        val o = MenuWindow(service, "BentoBar menu", onOutside = { closeMenu(byPress = true) }, onEscape = { closeMenu() })
+        if (!o.show(x, y, w, shadow = { MenuShadow(widthDp.dp, o.glass) }) { MenuSurface(widthDp.dp, maxH.dp, o.glass) { content(host) } }) return
         menu = o
         menuKey = key
+        focusMenu(key)
+    }
+
+    private fun focusMenu(key: String) {
+        Ticker.focusItem = key.removePrefix("item:").takeIf { key.startsWith("item:") }
+        Ticker.revealHidden = expanded.value || key == "bentobar"
         Ticker.start("menu")
-        o.show { MenuSurface(widthDp.dp, maxH.dp) { content(host) } }
     }
 
     // ---- tooltips ----------------------------------------------------------------------------
@@ -814,13 +831,30 @@ class BarController(private val service: AccessibilityService) {
         tip?.destroy(); tip = null
     }
 
-    fun closeMenu() {
-        val o = menu ?: return
+    /**
+     * Closes the open popup: it folds back into its item ([dissolve]: it dissolves in place, left for
+     * another), or goes at once ([now]: the service stopping, the screen going off, the display
+     * changing). [then] runs once it is off the screen. [byPress]: a press outside it closed it.
+     */
+    fun closeMenu(now: Boolean = false, dissolve: Boolean = false, byPress: Boolean = false, then: (() -> Unit)? = null) {
+        val o = menu
+        if (o == null) {
+            if (now) { leaving?.close(now = true); leaving = null; leavingKey = null }
+            then?.invoke()
+            return
+        }
         menu = null
         menuClosedKey = menuKey
         menuClosedAt = SystemClock.uptimeMillis()
+        menuClosedByPress = byPress
+        // An earlier one still leaving goes at once: only one popup is ever folding away.
+        leaving?.close(now = true)
+        leaving = o; leavingKey = menuKey
         menuKey = null
-        o.destroy()
+        o.close(dissolve = dissolve, now = now) {
+            if (leaving === o) { leaving = null; leavingKey = null }
+            then?.invoke()
+        }
         Ticker.focusItem = null
         Ticker.revealHidden = expanded.value
         Ticker.stop("menu")

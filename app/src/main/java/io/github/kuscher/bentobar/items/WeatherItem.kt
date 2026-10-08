@@ -122,7 +122,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         if (items === seenItems && here == seenHere) return
         seenItems = items
         seenHere = here
-        val places = WeatherLoad.places(items, WeatherHere.fix)
+        val places = WeatherLoad.places(items, here)
         if (places == keptFor) return
         keptFor = places
         source.keepOnly(places, cities = WeatherLoad.places(items))

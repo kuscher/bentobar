@@ -50,8 +50,8 @@ class HereKeeper(private val android: Locator, private val clock: () -> Long, pr
     /** Everything held, a fix past its time included: for tests, which check that forgetting leaves nothing. */
     internal val held: Here get() = here
 
-    /** Whether an ask is on its way. */
-    val asking: Boolean get() = waiting != null
+    /** Whether an ask is on its way: for tests. */
+    internal val asking: Boolean get() = waiting != null
 
     /**
      * An item of My location is live: keeps [fix] up to date, looking at the permission and the
@@ -64,7 +64,7 @@ class HereKeeper(private val android: Locator, private val clock: () -> Long, pr
         val allowed = android.allowed()
         val on = allowed && android.on()
         if (!on) callOff()
-        val look = HereRules.look(here, now, allowed, on, asking = waiting != null)
+        val look = HereRules.look(here, now, allowed, on, asking)
         set(look.here)
         if (look.ask) ask(now)
     }

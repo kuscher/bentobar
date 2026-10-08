@@ -72,6 +72,15 @@ class HereRulesTest {
         assertEquals(1 * min, HereRules.backOff(HereRules.none(Here()).misses))
     }
 
+    @Test fun onlyAFirstAskIsFindingAndAnAskAfterNoneKeepsNone() {
+        assertEquals(Locate.FINDING, HereRules.asked(Here(), start).why)
+        val none = HereRules.none(HereRules.asked(Here(), start))
+        assertEquals(Locate.NONE, HereRules.asked(none, start + 1 * min).why)
+        // Location back on, or the permission given: that ask is a first one again.
+        assertEquals(Locate.FINDING, HereRules.asked(Here(why = Locate.OFF), start).why)
+        assertEquals(Locate.FINDING, HereRules.asked(Here(why = Locate.NOT_ALLOWED), start).why)
+    }
+
     @Test fun aWakeAsksAtOnceWhereThereIsNoFix() {
         var h = HereRules.asked(Here(), start)
         repeat(3) { h = HereRules.none(HereRules.asked(h, start)) }

@@ -151,4 +151,22 @@ class HereKeeperTest {
         android.answer(Located(zurich, age = 0))
         assertEquals(Here(), keeper.held)
     }
+
+    @Test fun whileAndroidHasNoLocationEveryAskAfterTheFirstKeepsSayingSo() {
+        // A Googlebook on Ethernet, where Android never knows where it is.
+        tick()
+        assertEquals(Locate.FINDING, keeper.why) // the first ask: "Loading…"
+        android.answer(null)
+        assertEquals(Locate.NONE, keeper.why)
+        val drawn = changes
+        for (wait in listOf(1L, 2L, 5L, 15L, 30L, 30L).map { it * min }) {
+            tick(wait)
+            assertTrue(keeper.asking)
+            // Not "Loading…" again: the bar's crossed-out cloud and an open menu's "Location not found" stay.
+            assertEquals(Locate.NONE, keeper.why)
+            android.answer(null)
+        }
+        assertEquals(7, android.asks.size)
+        assertEquals(drawn, changes)
+    }
 }

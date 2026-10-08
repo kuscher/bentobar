@@ -78,8 +78,13 @@ object HereRules {
     /** How long after the [misses]th ask in a row that found nothing Android is asked again. */
     fun backOff(misses: Int): Long = BACK_OFF_MS[(misses - 1).coerceIn(0, BACK_OFF_MS.lastIndex)]
 
-    /** Android is being asked, at [now]. */
-    fun asked(h: Here, now: Long): Here = h.copy(askedAt = now, why = if (h.fix == null) Locate.FINDING else h.why)
+    /**
+     * Android is being asked, at [now]. Without a fix, a first ask is [Locate.FINDING] ("Loading…"); an
+     * ask after Android had none keeps [Locate.NONE], so the bar and an open menu don't change for each
+     * ask of the back-off (on a Googlebook on Ethernet that is forever).
+     */
+    fun asked(h: Here, now: Long): Here =
+        h.copy(askedAt = now, why = if (h.fix == null && h.why != Locate.NONE) Locate.FINDING else h.why)
 
     /** Android said where the device is: [fix], taken at [at]. One already past its time counts as none. */
     fun found(h: Here, fix: Fix, at: Long, now: Long): Here =

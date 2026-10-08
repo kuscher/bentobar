@@ -54,8 +54,13 @@ class WeatherSourceTest {
     private var here: Fix? = null
     private var locating = Locate.FINDING
 
+    /** Loads wait here until [runHeld] while [held]; otherwise they run at once, on this thread. */
+    private val waiting = ArrayDeque<Runnable>()
+    private var held = false
+    private fun runHeld() { held = false; while (waiting.isNotEmpty()) waiting.removeFirst().run() }
+
     private fun source(staged: () -> Failure? = { null }): WeatherSource {
-        val wiring = Refresher.Wiring(Executor { it.run() }, { it.run() }, { elapsed }, { changes++ }, minGapMs = 10_000, afterThrowMs = 60_000,
+        val wiring = Refresher.Wiring(Executor { r -> if (held) waiting.addLast(r) else r.run() }, { it.run() }, { elapsed }, { changes++ }, minGapMs = 10_000, afterThrowMs = 60_000,
             mayLoad = { shown })
         return WeatherSource.make(
             refresher = { every, restore, load -> Refresher(wiring, every, restore, load).also { readings = it } },
@@ -276,6 +281,27 @@ class WeatherSourceTest {
         planted()
         restarted.keepOnly(WeatherLoad.places(layout, here), cities = WeatherLoad.places(layout))
         assertEquals(setOf(Kept.safe("47.37,8.55")), Kept.fetched(OPEN_METEO).names())
+    }
+
+    @Test fun myLocationsFirstReadingStillOnItsWayWhenTheItemGoesIsNotHeld() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = WeatherRules.useHere(added)
+        layout = listOf(item)
+        s.turnOn()
+        here = Fix(47.4, 8.5)
+        held = true
+        s.reading(item)
+        // The item goes (deleted, Off, or back to its city) before the answer: the place is forgotten, and the tick tidies.
+        layout = emptyList()
+        here = null
+        s.keepOnly(WeatherLoad.places(layout, here), cities = WeatherLoad.places(layout))
+        runHeld()
+        assertEquals(1, net.asked.size)
+        // The answer came after: it is held under no place, so an item of My location added later finds nothing from before.
+        layout = listOf(item)
+        here = Fix(47.4, 8.5)
+        assertNull(s.peek(item))
     }
 
     @Test fun myLocationFromAPastedLayoutSendsNothingUntilTurnOnWeather() = FakeHttp.use { net ->

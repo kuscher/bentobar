@@ -105,6 +105,13 @@ class MenuWindow(
     private var lastBlur = -1
     private var onGone: (() -> Unit)? = null
     private var shown = false
+    /**
+     * The window's first frame has gone to the screen. A new window's first frame takes a while (tens of ms):
+     * the opening's clock starts after it, or the glass would be part way open before anything showed.
+     */
+    private var committed = false
+    /** When the first frame was asked for, in ns: the clock starts anyway if Android never says (a window not drawn). */
+    private var firstAsked = -1L
 
     private val blurListener = Consumer<Boolean> { on -> glass.blur = on && !solid; applyBlur() }
     private val frameGlass = ViewTreeObserver.OnPreDrawListener { frame(); true }
@@ -164,6 +171,9 @@ class MenuWindow(
         }
         shown = true
         wm.addCrossWindowBlurEnabledListener(service.mainExecutor, blurListener)
+        committed = false
+        firstAsked = -1L
+        window.decorView.viewTreeObserver.registerFrameCommitCallback { committed = true }
         phase = Phase.OPENING
         phaseStart = -1L
         if (scale() <= 0f) settle() else Choreographer.getInstance().postFrameCallback(tick)
@@ -215,11 +225,21 @@ class MenuWindow(
         if (!shown || phase == Phase.GONE || phase == Phase.OPEN) return
         val full = fullDp()
         if (full <= 0f) { Choreographer.getInstance().postFrameCallback(tick); return } // not measured yet
+        if (phase == Phase.OPENING && phaseStart < 0) {
+            if (firstAsked < 0) firstAsked = nanos
+            // Until the first frame is on its way to the screen: the lip, not there yet; the clock waits.
+            if (!committed && nanos - firstAsked < FIRST_FRAME_WAIT_NS) {
+                put(MenuMotion.opening(0f, full), nanos)
+                Choreographer.getInstance().postFrameCallback(tick)
+                return
+            }
+        }
         if (phaseStart < 0) phaseStart = nanos
         val ms = MenuMotion.scaled((nanos - phaseStart) / 1e6f, scale())
         when (phase) {
             Phase.OPENING -> {
                 val g = MenuMotion.opening(ms, full)
+                if (Log.isLoggable(MOTION_TAG, Log.DEBUG)) Log.d(MOTION_TAG, "open ms=${ms.roundToInt()} h=${g.heightDp.roundToInt()}/${full.roundToInt()} p=${"%.2f".format(g.presence)}")
                 put(g, nanos)
                 glass.clockMs = ms
                 if (g.done && ms >= MenuMotion.blocksDoneMs(9)) { settle(); return }
@@ -342,6 +362,10 @@ class MenuWindow(
 
         /** The glass's blur (visual.md: 24 dp, a little more than Booklight's 22 for small text under it). */
         const val BLUR_DP = 24f
+        /** Each frame of an opening, in debug logs: `adb shell setprop log.tag.BentoBarMotion DEBUG`. */
+        private const val MOTION_TAG = "BentoBarMotion"
+        /** The opening's clock starts this long after its first frame was asked for, if Android hasn't said it was drawn. */
+        private const val FIRST_FRAME_WAIT_NS = 150_000_000L
         /** How long after its fold should have ended a closing window is taken away regardless. */
         private const val REMOVAL_GRACE_MS = 250L
     }

@@ -110,4 +110,11 @@ object HereRules {
      */
     fun wanted(items: List<ItemConfig>, on: Boolean): Boolean =
         on && items.any { it.type == "weather" && it.section != Section.OFF && WeatherRules.here(it) }
+
+    /**
+     * Whether Android's location permission may be asked for: an item of My location is in the layout, in
+     * any section (Allow location serves an item in Off too). The settings window, which asks, is exported:
+     * another app's intent to it asks nothing for a layout without one.
+     */
+    fun mayAsk(items: List<ItemConfig>): Boolean = items.any { it.type == "weather" && WeatherRules.here(it) }
 }

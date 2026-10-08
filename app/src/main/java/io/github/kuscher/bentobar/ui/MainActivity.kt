@@ -52,6 +52,7 @@ import io.github.kuscher.bentobar.bar.BarStatus
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.items.Chips
 import io.github.kuscher.bentobar.items.Env
+import io.github.kuscher.bentobar.items.HereRules
 import io.github.kuscher.bentobar.items.Items
 import io.github.kuscher.bentobar.items.Notify
 import io.github.kuscher.bentobar.items.Ticker
@@ -119,6 +120,8 @@ class MainActivity : ComponentActivity() {
         intent.getStringExtra(EXTRA_ITEM)?.let { selected = it; page = 0 }
         if (intent.getBooleanExtra(EXTRA_EDIT, false)) page = 0
         intent.getStringExtra(EXTRA_REQUEST)?.let { perm ->
+            // Location only for a layout with an item of My location: this activity is exported, and another app's intent mustn't ask it.
+            if (perm == android.Manifest.permission.ACCESS_COARSE_LOCATION && !HereRules.mayAsk(Store.config.value.items)) return@let
             if (checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED) requestPermissions(arrayOf(perm), 1)
         }
         if (intent.action == "android.service.quicksettings.action.QS_TILE_PREFERENCES") page = 2

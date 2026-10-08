@@ -15,7 +15,7 @@ Artboards: `Glass` (with a lever to compare Booklight's veil), `Shadow`, `StripL
 | | Light | Dark | Why |
 |---|---|---|---|
 | Blur | 24 dp (Android radius; σ ≈ 14) | 24 dp | A touch above Booklight's 22: popups sit over window chrome and small text that must blur past reading. |
-| Veil | `surfaceContainerLowest` × 0.66 | × 0.72 | 12–14 sp text, not Booklight's 17 sp titles (contrast below). Dark gets more: white pages are the usual thing behind it. |
+| Veil | `surfaceContainerLowest` × **0.56** | × **0.62** | Alex asked for more see-through (8 Oct; was 0.66 / 0.72). Still above Booklight's 0.42 / 0.50 for 12–14 sp text; dark gets more, white pages being the usual thing behind it. Needs the glass inks below. |
 | Corner radius | 24 dp | 24 dp | Concentric with the 12 dp rows and 10 dp header tile, 12–14 dp in (today 20). |
 | Rim | white, 1 dp, × 0.80 | × 0.44 | Booklight's outline, thinned from 1.25 dp for a small card. |
 | Hairline | black, outermost 1 px, × 0.20 | × 0.28 | Holds the edge on a white page. Same values as Booklight. |
@@ -25,18 +25,24 @@ Artboards: `Glass` (with a lever to compare Booklight's veil), `Shadow`, `StripL
 **One level, no setting:** a menu is glanced at; one value tuned for the hard cases beats a choice nobody revisits.
 The rim stays still (no travelling reflection).
 
-**Contrast.** The worst case is a flat field; a busy backdrop blurs towards grey, which only helps. Saturated wallpapers
-land between (light over #1A3BA0: labels 5.0:1; dark over #FFD600: 5.5:1).
+**Contrast.** The worst case is a flat field; a busy backdrop blurs towards grey, which only helps, and saturated
+wallpapers land between the cases below.
 
-| Behind the glass | Titles, values (`onSurface`) | Labels (`onSurfaceVariant`) | Section labels (`primary`) |
+At 0.56 / 0.62 the scheme's own inks drop too far (dark titles over a white page 4.2:1, light grey labels over black
+2.9:1, section labels 2.0:1). So **on glass only** (blur on; the solid fallback keeps the scheme's inks):
+
+- grey text (`onSurfaceVariant`) and section labels (`primary`) are drawn **halfway to `onSurface`** (`lerp` 0.5:
+  about tone 20 / 25 in light, 85 in dark);
+- in dark, titles and values (`onSurface`) are drawn **halfway to white** (about tone 95).
+
+| Behind the glass, with those inks | Titles, values | Grey labels | Section labels |
 |---|---|---|---|
-| Light glass, pure black | 7.2:1 | 3.9:1 | 2.7:1 |
-| Light glass, dark window #202124 | 8.2:1 | 4.5:1 | 3.1:1 |
-| Dark glass, pure white | 6.1:1 | 4.6:1 | 4.6:1 |
-| Booklight's 0.42 / 0.50, same three | 3.2 / 4.2 / 2.8 | 1.8 / 2.3 / 2.1 | 1.2 / 1.6 / 2.1 |
+| Light glass, pure black | 5.3:1 | 4.1:1 (was 2.9) | 3.4:1 (was 2.0) |
+| Light glass, dark window #202124 | 6.3:1 | 4.8:1 | 4.1:1 |
+| Dark glass, pure white | 4.8:1 (was 4.2) | 3.7:1 (was 3.2) | 3.7:1 |
+| Booklight's 0.42 / 0.50, its own inks | 3.2 / 4.2 / 2.8 | 1.8 / 2.3 / 2.1 | 1.2 / 1.6 / 2.1 |
 
-The weak spot, section labels on light glass over pure black, is short uppercase text that repeats its rows: accept,
-keep the colour.
+Grey labels over pure white in dark (3.7:1) are the floor this veil allows; the halfway step keeps their hue.
 
 ## 2. Shadow (drawn by us, not Android's elevation)
 
@@ -82,9 +88,11 @@ pill, highlight, alert capsule, content. A held slider keeps the pill on its ite
 
 ## 4. Inside the popups (small changes for the glass)
 
-- **`MenuEntry` hover:** `onSurface` 0.08 → **0.10**, to hold over glass whose brightness varies across the card.
+- **`MenuEntry` hover:** `onSurface` 0.08 → **0.12** (0.10 at the old veil), to hold over thinner glass whose brightness
+  varies across the card.
 - **Wells:** `Sparkline` and `Meter` tracks and `ActionTile` at rest go from `surfaceContainerHighest`/`High` to
-  `onSurface` × **0.06 light / 0.08 dark** (tile hover 0.12 / 0.14). Opaque grey patches on glass look like stickers.
+  `onSurface` × **0.08 light / 0.10 dark** (tile hover 0.14 / 0.16; raised with the thinner veil). Opaque grey
+  patches on glass look like stickers.
 - **`MenuDivider`:** `outlineVariant` → `onSurface` × **0.12 / 0.16**; over a dark window `outlineVariant` comes out
   lighter than the glass.
 
@@ -97,7 +105,9 @@ tooltips, the 1.08 lift.
 
 ```
 glass.blur            24 dp (Android radius; CSS σ ≈ 14)
-glass.veil            surfaceContainerLowest × 0.66 light / 0.72 dark
+glass.veil            surfaceContainerLowest × 0.56 light / 0.62 dark
+glass.ink2            on glass: onSurfaceVariant, primary text → lerp(·, onSurface, 0.5)
+glass.ink1Dark        on dark glass: onSurface → lerp(onSurface, white, 0.5)
 glass.solid           surfaceContainerHigh × 1.0
 glass.radius          24 dp
 glass.rim             #FFFFFF, 1 dp, × 0.80 light / 0.44 dark
@@ -105,8 +115,8 @@ glass.hairline        #000000, outermost 1 px, × 0.20 light / 0.28 dark
 shadow.key            y 7 · σ 9 (CSS blur 18) · spread −4 · #000 × 0.12 light / 0.20 dark
 shadow.contact        y 1 · σ 1 (CSS blur 2) · spread 0 · #000 × 0.04 light / 0.07 dark
 shadow.room           top 8 · sides 16 · bottom 24 dp (window margin)
-menu.rowHover         onSurface × 0.10
-menu.well             onSurface × 0.06 light / 0.08 dark   (hover 0.12 / 0.14)
+menu.rowHover         onSurface × 0.12
+menu.well             onSurface × 0.08 light / 0.10 dark   (hover 0.14 / 0.16)
 menu.divider          onSurface × 0.12 light / 0.16 dark
 strip.hl.height       26 dp      strip.hl.radius   13 dp     strip.hl.outset   4 dp
 strip.hl.hover        fg × 0.14  strip.hl.held     fg × 0.18 strip.hl.pressed  fg × 0.22
@@ -114,3 +124,41 @@ strip.alert           alertBg · 22 dp tall · radius 11 · outset 2 dp
 ```
 
 The artboards use these as CSS variables (`--glass-veil-light`, `--shadow-key-dark`, `--strip-hl-held`, …).
+
+## 5. Contents appearing (8 October)
+
+Timing and order are the motion designer's; this is how each part looks on its way in.
+
+- **Allowed:** layer properties (alpha, translation, scale) and draw-phase trims, clips and fill widths. No re-measured
+  text, no blur, no colour change beyond a fill's alpha, nothing past its end state, nothing outside the growing glass.
+- **Text moves down into place,** with the glass opening downward: 6 dp for rows, 4 dp for small text. Objects (tiles,
+  chips, artwork, discs) scale from their centre instead of travelling.
+- **The end state is the final look exactly.** A row under a resting pointer takes its hover tint only after it lands,
+  with the hover's own fade.
+- **Light and dark use the same values;** fading text passing through a paler (or dimmer) ink needs no compensation.
+- **No animations** (the new setting, or animator scale 0): every part at its end state at once, no fade.
+- **Anything not listed** appears as a row.
+
+| Role | Start | End | Notes |
+|---|---|---|---|
+| Header icon tile | scale 0.84, fill alpha 0, glyph alpha 0 | 1 · 1 · 1 | The `primaryContainer` fill rises over the glass (the tint arriving); the glyph follows once the fill is past half |
+| Title, subtitle | alpha 0, y −4 dp | alpha 1, y 0 | The subtitle a beat after the title |
+| Big value ("70°") | alpha 0, y −6 dp, scale 0.96 from its left baseline | 1 · 0 · 1 | No counting up; the lines beside it as rows |
+| `InfoRow` | alpha 0, y −6 dp | 1 · 0 | Label and value as one |
+| `SectionLabel` | alpha 0 | 1 | No travel; lands a beat before its first row |
+| `MenuEntry` | alpha 0, y −6 dp | 1 · 0 | Icon, label, detail as one; a disabled row lands at its 0.38 ink |
+| `MenuNote`, `MenuDivider` | alpha 0 | 1 | No travel; the divider does not draw across |
+| `Sparkline` | well alpha 0; line trimmed to 0; fill clipped at x 0 | well 1, trim 1, clip full | Well first; the line draws left to right (oldest to newest), the fill under it clipped to the line's head at its resting gradient; a second series draws with the first |
+| `HourStrip` column | alpha 0, y −6 dp | 1 · 0 | Time, icon and temperature as one; left to right |
+| `DayRow` | alpha 0, y −6 dp | 1 · 0 | As a row; a range bar, where shown, grows like a meter |
+| `TileGrid` tile | alpha 0, scale 0.92 | 1 · 1 | Its well and label as one |
+| `ChipRow` chip | alpha 0, scale 0.92 | 1 · 1 | The ✓ with it; its colour never changes |
+| `Meter`, `CoreBars` | track alpha 0; fill width (bars: height) 0 | track 1, fill at the value | Track first, then the fill grows from its start (bars from the bottom) and stops exactly on the value |
+| Month grid | weekday row and each week: alpha 0, y −4 dp | 1 · 0 | Weeks as rows, not 42 cells; event dots ride with their week |
+| Today's disc | alpha 0, scale 0.6 | 1 · 1 | After its week lands; its number, in the disc's on-colour throughout, scales and fades with it |
+| `MediaMenu` artwork | alpha 0, scale 0.96 | 1 · 1 | Clipped to its rounded corners throughout; track text as rows |
+| Flight route line | rest line alpha 0; flown part trimmed to 0; plane alpha 0, 4 dp back along the line | all at rest | Rest line and dots first; the flown part draws from the origin; the plane settles forward last |
+| `SearchField` | alpha 0 | 1 | No travel: the caret is live at once |
+
+Shared values for the motion designer: rows −6 dp, small text −4 dp, objects 0.92, tile 0.84, artwork and big value
+0.96, disc 0.6; every start alpha 0.

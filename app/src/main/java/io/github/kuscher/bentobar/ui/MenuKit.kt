@@ -146,7 +146,10 @@ fun MenuDivider() = HorizontalDivider(
 
 @Composable
 fun SectionLabel(text: String) = Text(text.uppercase(), style = MaterialTheme.typography.labelSmall,
-    color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+    // On glass halfway to the text's colour: the accent alone fell to 2:1 over a dark window behind (visual.md §5).
+    color = if (LocalMenuGlass.current?.blur == true) androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.onSurface, 0.5f) else MaterialTheme.colorScheme.primary,
+    modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
 
 /** A small line chart of recent values, filled underneath. Two series share one scale. */
 @Composable
@@ -197,7 +200,8 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
     val focused by source.collectIsFocusedAsState()
     Row(
         modifier.fillMaxWidth().heightIn(min = if (sub != null) 48.dp else 40.dp).focusRing(focused, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
-            .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f) else Color.Transparent)
+            .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(
+                alpha = if (LocalMenuGlass.current?.blur == true) 0.12f else 0.10f) else Color.Transparent)
             .hoverable(source)
             // An Enter that is being held when the focus arrives here (a search's results come in and the
             // first takes the focus) is not this entry's: its repeats are swallowed, so its release presses nothing.

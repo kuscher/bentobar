@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
@@ -89,12 +90,23 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
                     }
                     .menuGlass(g, look),
             ) {
+                // On glass, text and fills are made for what shows through (visual.md §5): grey text halfway to the main
+                // text's colour, the main text in dark theme halfway to white, tracks and tiles see-through tints of it.
+                // The solid card keeps the scheme as it is.
+                val inks = if (!g.blur) scheme else scheme.copy(
+                    onSurface = if (dark) lerp(scheme.onSurface, Color.White, 0.5f) else scheme.onSurface,
+                    onSurfaceVariant = lerp(scheme.onSurfaceVariant, if (dark) lerp(scheme.onSurface, Color.White, 0.5f) else scheme.onSurface, 0.5f),
+                    surfaceContainerHigh = scheme.onSurface.copy(alpha = if (dark) 0.10f else 0.08f),
+                    surfaceContainerHighest = scheme.onSurface.copy(alpha = if (dark) 0.14f else 0.12f),
+                )
                 // Text with no colour of its own takes the glass's (Material's Surface did this; the glass is drawn here).
-                CompositionLocalProvider(LocalMenuGlass provides glass, LocalContentColor provides scheme.onSurface) {
+                MaterialTheme(colorScheme = inks) {
+                CompositionLocalProvider(LocalMenuGlass provides glass, LocalContentColor provides inks.onSurface) {
                     Column(
                         Modifier.heightIn(max = maxHeight).verticalScroll(rememberScrollState())
                             .graphicsLayer { alpha = g.contents },
                     ) { content() }
+                }
                 }
             }
         }

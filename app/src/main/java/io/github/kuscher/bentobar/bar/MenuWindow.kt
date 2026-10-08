@@ -8,7 +8,6 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.util.Log
 import android.view.Choreographer
 import android.view.Gravity
@@ -27,6 +26,7 @@ import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.ui.MenuGlassState
 import io.github.kuscher.bentobar.ui.MenuMotion
 import io.github.kuscher.bentobar.ui.MenuRoom
+import io.github.kuscher.bentobar.ui.Motion
 import java.util.function.Consumer
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -376,9 +376,7 @@ class MenuWindow(
     private fun refresh(): Long = (dialog.window?.decorView?.display?.refreshRate ?: 60f).toLong().coerceAtLeast(30)
 
     /** The system's animator duration scale: 1 normally, 0 with "Remove animations" (then nothing moves). */
-    private fun scale(): Float = runCatching {
-        Settings.Global.getFloat(service.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
-    }.getOrDefault(1f)
+    private fun scale(): Float = Motion.scale(service)
 
     companion object {
         /** Debug builds (`./bento debug solid on`): popups as if the platform had no blur, to see the solid card. */

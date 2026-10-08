@@ -124,7 +124,7 @@ private projects and paths into their repos, and where signing keys are backed u
 - `./bento app` builds the debug APK, installs it, enables the service and opens settings.
 - `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|set ID k=v|look KEY VALUE|windows`.
   The receiver (`src/debug`, debug builds only) is guarded by DUMP, so only adb can call it.
-  `solid on|off`: popups as if the platform had no blur (the solid card). Each frame of a popup's opening and its
+  `solid on|off`: popups as if the platform had no blur (the solid card). `look switch on|off`: "Switch popups on hover". Each frame of a popup's opening and its
   blur region go to the log with `adb shell setprop log.tag.BentoBarMotion DEBUG`.
   On a test device with a released BentoBar, `./gradlew assembleDebug -PreleaseSignedDebug` signs the debug build
   with the release key (from `~/.config/bentobar`): it installs over the release, same version code, and keeps its

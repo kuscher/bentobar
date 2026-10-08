@@ -156,7 +156,7 @@ internal fun TrackBlock(art: Bitmap?, title: String, artist: String, album: Stri
         // The border is for a white cover on the light card, which would have no edge.
         Box(Modifier.size(56.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)) {
-            Crossfade(art, animationSpec = tween(150), label = "artwork") { picture ->
+            Crossfade(art, animationSpec = io.github.kuscher.bentobar.ui.Motion.spec(tween<Float>(150)), label = "artwork") { picture ->
                 if (picture == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     SymIcon(Sym.MUSIC_NOTE, size = 24.sp, filled = true, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else Image(remember(picture) { picture.asImageBitmap() }, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)

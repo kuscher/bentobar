@@ -720,6 +720,14 @@ class BarController(private val service: AccessibilityService) {
 
         override fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {
             main.removeCallbacks(showTip)
+            // "Switch popups on hover": with a popup open, the item pointed at opens its own, as in a menu bar.
+            val type = Items.of(item.type)
+            if (inside && !sliding && type != null &&
+                PopupRules.hoverOpens(menuKey, item.id, hasPopup = type.menu != null, on = Store.config.value.hoverSwitchesPopups)) {
+                placed[item.id] = at
+                toggleMenu("item:${item.id}", at, type.menuWidthDp) { host -> ItemMenu(item.id, host) }
+                return
+            }
             if (inside && menu == null && !sliding) { tipFor = item to Rect(at); main.postDelayed(showTip, 600) } else hideTip()
         }
 

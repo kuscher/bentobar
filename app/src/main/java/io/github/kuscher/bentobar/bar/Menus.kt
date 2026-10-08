@@ -67,7 +67,7 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
         val dark = isSystemInDarkTheme()
         val scheme = MaterialTheme.colorScheme
         val look = GlassLook(
-            veil = if (g.blur) scheme.surfaceContainerLowest.copy(alpha = if (dark) 0.72f else 0.66f) else scheme.surfaceContainerHigh,
+            veil = if (g.blur) scheme.surfaceContainerLowest.copy(alpha = if (dark) 0.62f else 0.56f) else scheme.surfaceContainerHigh,
             rim = Color.White.copy(alpha = if (dark) 0.44f else 0.80f),
             hairline = Color.Black.copy(alpha = if (dark) 0.28f else 0.20f),
             dark = dark,

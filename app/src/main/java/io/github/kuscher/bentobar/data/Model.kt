@@ -101,6 +101,10 @@ data class BarConfig(
     val color: ColorMode = ColorMode.AUTO,
     /** Space between items in dp (12 matches the system icons' rhythm on the desktop bar). */
     val spacing: Int = 12,
+    /** With a popup open, pointing at another item opens its popup, as in a menu bar. Off: nothing opens on hover by itself. */
+    val hoverSwitchesPopups: Boolean = false,
+    /** "No animations": BentoBar's popups, highlight and items appear and go at once (`ui/Motion`). */
+    val noAnimations: Boolean = false,
     /**
      * Mirror the running timer or next meeting as an Android Live Update chip: FALLBACK only
      * while BentoBar's own bar isn't showing (accessibility off, or hidden with the tile).

@@ -183,7 +183,7 @@ class Reorder {
         if (target != null) {
             val from = ghostTop
             settleTop = from
-            animate(from, target, animationSpec = tween(140)) { v, _ -> settleTop = v }
+            animate(from, target, animationSpec = Motion.spec(tween(140))) { v, _ -> settleTop = v }
         }
         pending = id to s
         Store.move(id, s.section, s.index)
@@ -261,7 +261,7 @@ private fun Modifier.layoutOffset(holder: PlacementHolder, scope: CoroutineScope
         val a = holder.anim ?: return@offset IntOffset.Zero
         if (a.targetValue != holder.target) {
             val t = holder.target
-            scope.launch { a.animateTo(t, spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold)) }
+            scope.launch { a.animateTo(t, Motion.spec(spring(stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold))) }
         }
         a.value - holder.target
     }

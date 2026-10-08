@@ -63,6 +63,7 @@ import androidx.compose.ui.layout.onPlaced
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import io.github.kuscher.bentobar.ui.Motion
 import io.github.kuscher.bentobar.ui.animatePlacement
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.semantics.Role
@@ -250,7 +251,7 @@ fun Strip(
     // scale comes with the effect's context, as every animation of Compose's takes it.
     LaunchedEffect(glow) {
         val context = coroutineContext
-        glow.frames { context[MotionDurationScale]?.scaleFactor ?: 1f }
+        glow.frames { if (Motion.off) 0f else context[MotionDurationScale]?.scaleFactor ?: 1f }
     }
     Row(
         Modifier.height(heightDp)
@@ -527,7 +528,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
     }
     DisposableEffect(entry.item.id) { onDispose { glow.gone(entry.item.id) } }
     val liftScale by androidx.compose.animation.core.animateFloatAsState(if (lifted) 1.08f else 1f,
-        androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMedium), label = "lift")
+        Motion.spec(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMedium)), label = "lift")
     // Live numbers (speeds, percentages, clocks) sit in a fixed slot sized for their widest
     // reading (Fmt.widthTemplate), right-aligned, so nothing next to them moves as they change.
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -537,7 +538,7 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
     // in instead of popping. Drawn in the graphics layer only: no relayout, so the window doesn't
     // resize per frame.
     val appear = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, androidx.compose.animation.core.tween(220)) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, Motion.spec(androidx.compose.animation.core.tween(220))) }
     val alert = s.tone == Tone.ALERT
     val color = when (s.tone) {
         Tone.ALERT -> look.alertFg
@@ -585,8 +586,8 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
                         dragLeft = null
                         scope.launch {
                             settle.snapTo(from)
-                            settle.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow))
+                            settle.animateTo(0f, Motion.spec(androidx.compose.animation.core.spring(dampingRatio = 0.8f,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)))
                         }
                     }
                 })
@@ -683,7 +684,7 @@ private fun VolumeTrack(slider: BarSlider, held: Float?, handle: Boolean, look: 
     // were still on its way when the pointer lets go would draw the fill a step back first.
     val glided by androidx.compose.animation.core.animateFloatAsState(slider.level.coerceIn(0f, 1f),
         if (held != null) androidx.compose.animation.core.snap()
-        else androidx.compose.animation.core.tween(120, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "level")
+        else Motion.spec(androidx.compose.animation.core.tween(120, easing = androidx.compose.animation.core.FastOutSlowInEasing)), label = "level")
     val level = held ?: glided
     val track = look.sliderTrack
     // Muted, the fill is drawn solid in the color its strength gives on the bar: its round end lies over the

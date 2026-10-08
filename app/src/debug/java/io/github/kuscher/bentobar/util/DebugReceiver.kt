@@ -112,6 +112,7 @@ class DebugReceiver : BroadcastReceiver() {
                             "hover" -> c.copy(hiddenMode = if (args[2] == "on") io.github.kuscher.bentobar.data.HiddenMode.HOVER else io.github.kuscher.bentobar.data.HiddenMode.CLICK)
                             "collapse" -> c.copy(autoCollapseSec = args[2].toInt())
                             "spacing" -> c.copy(spacing = args[2].toInt())
+                            "switch" -> c.copy(hoverSwitchesPopups = args[2] == "on")
                             else -> c
                         }
                     }; "ok"

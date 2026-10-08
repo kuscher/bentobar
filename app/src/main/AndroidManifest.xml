@@ -12,7 +12,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
-    <!-- Weather's My location, asked for only when an item chooses it: approximate only, never precise, and no background-location permission (the bar's service is "in use"). -->
+    <!-- Weather's My location, asked for only when an item chooses it: approximate only, never precise, and no background-location permission: Android gives the bar's accessibility service the location under the "while using the app" grant (how Play reads that is decided with the 1.3 submission). -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- To explain why the bar can't run when Advanced Protection is on (normal permission). -->

@@ -129,7 +129,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     }
 
     override fun sample(now: Long) {
-        // Kept for an item of My location outside Off, while the switch is on; asked for only while such an item is sampled (on screen).
+        // Kept for an item of My location outside Off, while the switch is on; asked for only while such an item is sampled (on screen, or behind ‹ for its Show when rule).
         WeatherHere.follow(Store.config.value.items, Ticker.sampled, Online.on(online))
         tidy()
     }

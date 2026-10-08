@@ -223,10 +223,11 @@ private projects and paths into their repos, and where signing keys are backed u
   an item chooses it (the exported `MainActivity` asks it only for a layout with one: `HereRules.mayAsk`).
   Where the device is is kept only while such an item is outside Off and the switch is on
   (`HereRules.wanted`; else it is forgotten, with an ask on its way), and Android is asked only while
-  such an item is sampled, that is on screen or while the settings window is open (`Ticker.sampled`, the
-  ticker's own list; else an ask on its way is called off): when the fix is half an hour old, and without
-  one after 1, 2, 5 and 15 minutes, then every half hour (asks that find nothing new while a fix is still
-  good wait the same way).
+  such an item is sampled (`TickRules.needed`, as `Ticker.sampled`): on screen, behind ‹ waiting for its
+  Show when rule (which needs the forecast where the device is), or while the settings window is open;
+  else an ask on its way is called off. Then when the fix is half an hour old, and without one after 1, 2,
+  5 and 15 minutes, then every half hour (asks that find nothing new while a fix is still good wait the
+  same way).
   A fix is good for 35 minutes, so after a night yesterday's place is never asked about (`HereRules` and
   `HereKeeper`, pure and unit-tested; `WeatherHere` is the keeper on Android's location service).
   `ManifestTest` pins the permissions, the backup rules, cleartext off and the listener's entry;

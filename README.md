@@ -163,9 +163,9 @@ BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse
   the coordinates of the city you pick, rounded to about a kilometre: about every 30 minutes while the
   bar is on screen, and when you open its menu or press Refresh. Open-Meteo sees your IP address, as
   any website does. With **My location** instead of a city, BentoBar asks Android for the device's
-  approximate location (never the precise one) while that item is in the bar or BentoBar's settings
-  window is open: every 30 minutes once it knows, and when Android doesn't, again after 1, 2, 5 and 15
-  minutes, then every 30. It sends
+  approximate location (never the precise one) while that item is in the bar (behind ‹ too when it shows
+  for rain or snow) or BentoBar's settings window is open: every 30 minutes once it knows, and when
+  Android doesn't, again after 1, 2, 5 and 15 minutes, then every 30. It sends
   Open-Meteo that location rounded to about 10 km. BentoBar asks only for Android's "while using the
   app" permission, not for background location. Where you are, and its forecast, are kept
   in memory only: never on the device, in your layout or in its backup.

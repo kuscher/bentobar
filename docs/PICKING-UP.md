@@ -19,6 +19,14 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 1.3.1 (2026-10-08): an open popup at rest is still again
+PR #29, merged as a merge commit: `MenuWindow.frame()` set the root's bounds and invalidated its outline before every
+frame, and each asked for another frame, so an open popup ran 60 layout/draw passes a second at rest (a tenth of a
+core on the Lenovo). Now only when the glass's size or corners change (`bar/GlassFrame.kt`, `GlassFrameTest`). Version
+code 16. Released on GitHub only (`PLAY_UPLOAD=off`), at Alex's word. Measured on the Lenovo (release builds): openings
+58-59/59 frames on time, blur or solid alike; a popup's first frame blocks the main thread 15-30 ms (two new windows,
+composition), so a switch between popups hitches about 3 frames: the one known cost left.
+
 ## 1.3 (2026-10-08): glass popups, motion, one highlight
 A visual and motion release (docs/design/1.3: brief, visual, motion, engineering with "as built"). PR #28, merged as
 a merge commit. Popups in a Dialog-hosted TYPE_ACCESSIBILITY_OVERLAY window with the platform's background blur

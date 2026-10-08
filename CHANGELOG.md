@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.3.1 (2026-10-08)
 
 - **An open popup no longer keeps BentoBar busy.** While a popup sat open, it drew its window again 60 times a
   second with nothing changed: about a tenth of a CPU core for as long as it stayed open. Now it draws once a second

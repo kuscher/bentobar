@@ -73,6 +73,8 @@ import io.github.kuscher.bentobar.ui.SliderRow
 import io.github.kuscher.bentobar.ui.SmallIconButton
 import io.github.kuscher.bentobar.ui.SwitchRow
 import io.github.kuscher.bentobar.ui.TextRow
+import io.github.kuscher.bentobar.ui.fadeIn
+import io.github.kuscher.bentobar.ui.popIn
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Dates
 import io.github.kuscher.bentobar.util.Fmt
@@ -165,44 +167,49 @@ private fun MonthMenu(item: ItemConfig, host: MenuHost) {
             SmallIconButton(Sym.CHEVRON_RIGHT, stringResource(R.string.calendar_next_month)) { offset++ }
         }
         val weeks = item.optBool("weeks", true)
-        Row(Modifier.fillMaxWidth()) {
-            if (weeks) Text("", Modifier.width(24.dp))
-            for (i in 0 until 7) {
-                val dow = firstDow.plus(i.toLong())
-                Text(dow.getDisplayName(TextStyle.NARROW, Locale.getDefault()), Modifier.weight(1f),
-                    style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // The grid is one block, so its days can pop in a diagonal from the top left, 10 ms a step down or across
+        // (motion.md §7.2); the weekday letters fade in first, and each week's number with its first day.
+        Column(Modifier.fillMaxWidth()) {
+            Row(Modifier.fadeIn(0f).fillMaxWidth()) {
+                if (weeks) Text("", Modifier.width(24.dp))
+                for (i in 0 until 7) {
+                    val dow = firstDow.plus(i.toLong())
+                    Text(dow.getDisplayName(TextStyle.NARROW, Locale.getDefault()), Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-        }
-        val cells = lead + month.lengthOfMonth()
-        val rows = (cells + 6) / 7
-        for (r in 0 until rows) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                val firstDay = month.atDay(1).plusDays((r * 7 - lead).toLong())
-                if (weeks) Text(firstDay.get(weekOf).toString(), Modifier.width(24.dp),
-                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                for (c in 0 until 7) {
-                    val i = r * 7 + c - lead
-                    Box(Modifier.weight(1f).height(30.dp), contentAlignment = Alignment.Center) {
-                        if (i in 0 until month.lengthOfMonth()) {
-                            val d = month.atDay(i + 1)
-                            val isToday = d == today
-                            val isPicked = d == picked
-                            val has = allowed && eventsOn(d).isNotEmpty()
-                            // TalkBack reads the whole date (and whether anything's on), not just "14".
-                            val full = Dates.format("EEEEdMMMM", d)
-                            val label = if (has) stringResource(R.string.calendar_day_has_events, full) else full
-                            Column(
-                                Modifier.size(28.dp).clip(CircleShape)
-                                    .background(when { isToday -> MaterialTheme.colorScheme.primary; isPicked -> MaterialTheme.colorScheme.secondaryContainer; else -> Color.Transparent })
-                                    .selectable(selected = isPicked, onClick = { picked = d }).pointerHoverIcon(PointerIcon.Hand)
-                                    .semantics { contentDescription = label },
-                                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
-                            ) {
-                                Text("${i + 1}", modifier = Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-                                    color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal)
-                                if (has) Box(Modifier.size(4.dp).clip(CircleShape).background(if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary))
+            val cells = lead + month.lengthOfMonth()
+            val rows = (cells + 6) / 7
+            for (r in 0 until rows) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    val firstDay = month.atDay(1).plusDays((r * 7 - lead).toLong())
+                    if (weeks) Text(firstDay.get(weekOf).toString(), Modifier.fadeIn(10f * r).width(24.dp),
+                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                    for (c in 0 until 7) {
+                        val i = r * 7 + c - lead
+                        Box(Modifier.weight(1f).height(30.dp), contentAlignment = Alignment.Center) {
+                            if (i in 0 until month.lengthOfMonth()) {
+                                val d = month.atDay(i + 1)
+                                val isToday = d == today
+                                val isPicked = d == picked
+                                val has = allowed && eventsOn(d).isNotEmpty()
+                                // TalkBack reads the whole date (and whether anything's on), not just "14".
+                                val full = Dates.format("EEEEdMMMM", d)
+                                val label = if (has) stringResource(R.string.calendar_day_has_events, full) else full
+                                // Today's disc pops from further in, 40 ms after its day would, its number and dot with it.
+                                Column(
+                                    Modifier.popIn(10f * (r + c) + if (isToday) 40f else 0f, if (isToday) 0.6f else 0.9f).size(28.dp).clip(CircleShape)
+                                        .background(when { isToday -> MaterialTheme.colorScheme.primary; isPicked -> MaterialTheme.colorScheme.secondaryContainer; else -> Color.Transparent })
+                                        .selectable(selected = isPicked, onClick = { picked = d }).pointerHoverIcon(PointerIcon.Hand)
+                                        .semantics { contentDescription = label },
+                                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
+                                ) {
+                                    Text("${i + 1}", modifier = Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                                        color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal)
+                                    if (has) Box(Modifier.size(4.dp).clip(CircleShape).background(if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary))
+                                }
                             }
                         }
                     }

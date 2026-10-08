@@ -3,6 +3,7 @@ package io.github.kuscher.bentobar.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -12,7 +13,6 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -44,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -68,6 +69,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
@@ -91,12 +93,13 @@ fun MenuCard(
     iconRes: Int? = null,
     /** The subtitle's color, where it says something out of the ordinary (a time being planned). */
     subtitleColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-    content: @Composable ColumnScope.() -> Unit,
+    content: @Composable () -> Unit,
 ) {
-    Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    // Each child is a block that drops into place as the popup opens: the header first, then the content's own children.
+    DropColumn(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Row(Modifier.padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(30.dp).clip(RoundedCornerShape(10.dp))
+                Modifier.popIn(0f, 0.85f).size(30.dp).clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
@@ -106,13 +109,13 @@ fun MenuCard(
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fadeIn(20f))
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall,
-                    color = subtitleColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    color = subtitleColor, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(36f))
             }
-            if (trailing != null) trailing()
+            if (trailing != null) Box(Modifier.fadeIn(48f)) { trailing() }
         }
-        Spacer(Modifier.height(10.dp))
         content()
     }
 }
@@ -125,9 +128,9 @@ fun MenuCard(
 fun InfoRow(label: String, value: String, valueColor: Color = MaterialTheme.colorScheme.onSurface) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f))
+            modifier = Modifier.weight(1f).fadeIn(0f))
         Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = if (value.any(Char::isDigit)) "tnum" else null),
-            fontWeight = FontWeight.Medium, color = valueColor)
+            fontWeight = FontWeight.Medium, color = valueColor, modifier = Modifier.fadeIn(24f))
     }
 }
 
@@ -137,11 +140,18 @@ fun MenuNote(text: String) = Text(text, style = MaterialTheme.typography.bodySma
     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 2.dp))
 
 @Composable
-fun MenuDivider() = HorizontalDivider(Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+fun MenuDivider() = HorizontalDivider(
+    // On glass a tint of the text colour rather than an opaque line (visual.md); it arrives with the block below it.
+    Modifier.layoutId(JOINS_BELOW).padding(vertical = 8.dp),
+    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isSystemInDarkTheme()) 0.16f else 0.12f),
+)
 
 @Composable
 fun SectionLabel(text: String) = Text(text.uppercase(), style = MaterialTheme.typography.labelSmall,
-    color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
+    // On glass halfway to the text's colour: the accent alone fell to 2:1 over a dark window behind (visual.md §5).
+    color = if (LocalMenuGlass.current?.blur == true) androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.onSurface, 0.5f) else MaterialTheme.colorScheme.primary,
+    modifier = Modifier.padding(top = 4.dp, bottom = 6.dp))
 
 /** A small line chart of recent values, filled underneath. Two series share one scale. */
 @Composable
@@ -154,8 +164,16 @@ fun Sparkline(
     max: Double? = null,
 ) {
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
-    Canvas(modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(10.dp)).background(track)) {
+    // Its well fades in, then the line draws in from its oldest reading to its newest, its fill clipped to the line's
+    // head (§7.2); from its first reading, not the well's edge: a short history would otherwise pop in at the end.
+    val part = rememberPart(30f)
+    Canvas(modifier.fadeIn(0f).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(10.dp)).background(track).part(part)) {
         val top = max ?: maxOf(values.maxOrNull() ?: 0.0, second?.maxOrNull() ?: 0.0, 1e-9)
+        val drawn = if (part == null) 1f else MenuMotion.draw(part.ms())
+        if (drawn <= 0f) return@Canvas
+        val longest = maxOf(values.size, second?.size ?: 0)
+        val first = size.width - size.width / (60 - 1).coerceAtLeast(longest - 1) * (longest - 1).coerceAtLeast(0)
+        val head = if (drawn >= 1f) size.width else first + (size.width - first) * drawn
         fun series(vs: List<Double>, c: Color, fill: Boolean) {
             if (vs.size < 2) return
             val stepX = size.width / (60 - 1).coerceAtLeast(vs.size - 1)
@@ -172,8 +190,10 @@ fun Sparkline(
             }
             drawPath(path, c, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
-        series(values, color, true)
-        if (second != null) series(second, secondColor, false)
+        clipRect(right = head) {
+            series(values, color, true)
+            if (second != null) series(second, secondColor, false)
+        }
         drawLine(color.copy(alpha = 0.15f), Offset(0f, size.height - 1), Offset(size.width, size.height - 1))
     }
 }
@@ -192,7 +212,8 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
     val focused by source.collectIsFocusedAsState()
     Row(
         modifier.fillMaxWidth().heightIn(min = if (sub != null) 48.dp else 40.dp).focusRing(focused, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))
-            .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
+            .background(if ((hovered || focused) && enabled) MaterialTheme.colorScheme.onSurface.copy(
+                alpha = if (LocalMenuGlass.current?.blur == true) 0.12f else 0.10f) else Color.Transparent)
             .hoverable(source)
             // An Enter that is being held when the focus arrives here (a search's results come in and the
             // first takes the focus) is not this entry's: its repeats are swallowed, so its release presses nothing.
@@ -203,19 +224,19 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val c = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        if (image != null) Image(image, null, Modifier.size(20.dp))
-        else SymIcon(icon, size = 18.sp, color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else c)
+        if (image != null) Image(image, null, Modifier.popIn(0f, 0.8f).size(20.dp))
+        else Box(Modifier.popIn(0f, 0.8f)) { SymIcon(icon, size = 18.sp, color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else c) }
         Spacer(Modifier.width(10.dp))
-        if (sub == null) Text(label, style = MaterialTheme.typography.bodyMedium, color = c, modifier = Modifier.weight(1f),
+        if (sub == null) Text(label, style = MaterialTheme.typography.bodyMedium, color = c, modifier = Modifier.weight(1f).fadeIn(20f),
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        else Column(Modifier.weight(1f)) {
+        else Column(Modifier.weight(1f).fadeIn(20f)) {
             Text(label, style = MaterialTheme.typography.bodyMedium, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        if (trailing != null) trailing()
+            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.fadeIn(36f))
+        if (trailing != null) Box(Modifier.fadeIn(36f)) { trailing() }
     }
 }
 
@@ -242,16 +263,18 @@ fun SmallIconButton(sym: String, label: String, color: Color = LocalContentColor
 @Composable
 fun MediaButtons(playing: Boolean, canPrevious: Boolean = true, canPlayPause: Boolean = true, canNext: Boolean = true,
                  arrangement: Arrangement.Horizontal = Arrangement.spacedBy(8.dp),
+                 /** In a popup, the buttons pop in one after another from this offset in their block (§7.2). */
+                 entranceMs: Float = 0f,
                  onPrevious: () -> Unit, onPlayPause: () -> Unit, onNext: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = arrangement) {
-        FilledTonalIconButton(onClick = onPrevious, enabled = canPrevious) {
+        FilledTonalIconButton(onClick = onPrevious, enabled = canPrevious, modifier = Modifier.popIn(entranceMs, 0.8f)) {
             SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = stringResource(R.string.sound_previous))
         }
-        FilledTonalIconButton(onClick = onPlayPause, enabled = canPlayPause) {
+        FilledTonalIconButton(onClick = onPlayPause, enabled = canPlayPause, modifier = Modifier.popIn(entranceMs + 10f, 0.8f)) {
             SymIcon(if (playing) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp,
                 contentDescription = stringResource(if (playing) R.string.common_pause else R.string.sound_play))
         }
-        FilledTonalIconButton(onClick = onNext, enabled = canNext) {
+        FilledTonalIconButton(onClick = onNext, enabled = canNext, modifier = Modifier.popIn(entranceMs + 20f, 0.8f)) {
             SymIcon(Sym.SKIP_NEXT, size = 22.sp, contentDescription = stringResource(R.string.sound_next))
         }
     }
@@ -326,6 +349,9 @@ fun CopyEntry(label: String, icon: String = Sym.CONTENT_COPY, text: () -> String
 /** A square-ish tile with an icon over a label, for grids of actions. */
 @Composable
 fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: () -> Unit) {
+    // Tiles pop in in a diagonal from the top left, 15 ms a step (four to a row in a menu's width).
+    val order = LocalTileOrder.current
+    val i = remember(order) { order?.next() ?: 0 }
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     val focused by source.collectIsFocusedAsState()
@@ -335,7 +361,7 @@ fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: 
         else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
     Column(
-        Modifier.width(84.dp).focusRing(focused, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp)).background(bg)
+        Modifier.popIn(15f * (i / 4 + i % 4), 0.9f).width(84.dp).focusRing(focused, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp)).background(bg)
             .hoverable(source)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand)
@@ -353,8 +379,16 @@ fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: 
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TileGrid(content: @Composable () -> Unit) =
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+fun TileGrid(content: @Composable () -> Unit) {
+    val order = remember { TileOrder() }
+    androidx.compose.runtime.CompositionLocalProvider(LocalTileOrder provides order) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+    }
+}
+
+/** The order tiles come in a grid, as they are first composed (so as they are laid out). */
+class TileOrder { private var n = 0; fun next() = n++ }
+val LocalTileOrder = androidx.compose.runtime.staticCompositionLocalOf<TileOrder?> { null }
 
 /**
  * Pill buttons in a row (presets such as 5, 10, 25 min). With [selected] they are a choice: that one
@@ -366,13 +400,14 @@ fun TileGrid(content: @Composable () -> Unit) =
 fun ChipRow(labels: List<String>, selected: Int? = null, onClick: (Int) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         labels.forEachIndexed { i, l ->
+            val popIn = Modifier.popIn(10f * minOf(i, 6), 0.92f)
             val source = remember { MutableInteractionSource() }
             val hovered by source.collectIsHoveredAsState()
             val focused by source.collectIsFocusedAsState()
             val chosen = selected == i
             Text(if (chosen) "✓ $l" else l, style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.heightIn(min = 32.dp).focusRing(focused, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
+                modifier = popIn.heightIn(min = 32.dp).focusRing(focused, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
                     .background(if (hovered) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
                         else MaterialTheme.colorScheme.secondaryContainer)
                     .hoverable(source)
@@ -387,8 +422,9 @@ fun ChipRow(labels: List<String>, selected: Int? = null, onClick: (Int) -> Unit)
 /** A thin progress track. */
 @Composable
 fun Meter(fraction: Float, color: Color = MaterialTheme.colorScheme.primary) {
-    Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(6.dp).clip(RoundedCornerShape(50)).background(color))
+    Box(Modifier.fadeIn(0f).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+        // The fill grows from its start and stops on its value (§7.2).
+        Box(Modifier.drawIn(30f).fillMaxWidth(fraction.coerceIn(0f, 1f)).height(6.dp).clip(RoundedCornerShape(50)).background(color))
     }
 }
 
@@ -403,7 +439,9 @@ fun rememberTick(): Long {
 @Composable
 fun CoreBars(values: DoubleArray, color: Color = MaterialTheme.colorScheme.primary) {
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
-    Canvas(Modifier.fillMaxWidth().height(36.dp)) {
+    // Each bar fills from the bottom, 8 ms after the one before it (§7.2: no wave in a block longer than 60 ms).
+    val part = rememberPart(30f)
+    Canvas(Modifier.part(part).fillMaxWidth().height(36.dp)) {
         if (values.isEmpty()) return@Canvas
         val gap = 3.dp.toPx()
         val w = (size.width - gap * (values.size - 1)) / values.size
@@ -411,7 +449,7 @@ fun CoreBars(values: DoubleArray, color: Color = MaterialTheme.colorScheme.prima
             val x = i * (w + gap)
             drawRoundRect(track, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Size(w, size.height),
                 androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
-            val h = (v.coerceIn(0.0, 1.0) * size.height).toFloat()
+            val h = (v.coerceIn(0.0, 1.0) * size.height).toFloat() * (if (part == null) 1f else MenuMotion.draw(part.ms(plus = 8f * i)))
             if (h > 0.5f) drawRoundRect(color, androidx.compose.ui.geometry.Offset(x, size.height - h), androidx.compose.ui.geometry.Size(w, h),
                 androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
         }

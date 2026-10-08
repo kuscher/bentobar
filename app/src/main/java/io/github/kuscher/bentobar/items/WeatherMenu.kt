@@ -30,11 +30,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -44,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kuscher.bentobar.R
@@ -60,6 +63,8 @@ import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.ui.SearchField
 import io.github.kuscher.bentobar.ui.SectionLabel
 import io.github.kuscher.bentobar.ui.TextRow
+import io.github.kuscher.bentobar.ui.fadeIn
+import io.github.kuscher.bentobar.ui.popIn
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Now
 import io.github.kuscher.bentobar.util.Sym
@@ -82,9 +87,10 @@ internal fun HourStrip(cells: List<HourCell>) {
     val anyChance = cells.any { it.chance != null }
     Row(Modifier.fillMaxWidth()) {
         // Always six places, so the cells stand where they stood when fewer hours are left to show.
+        // Each pops in whole, 16 ms after the one to its left (motion.md §7.2).
         for (i in 0 until 6) {
             val cell = cells.getOrNull(i)
-            Column(Modifier.weight(1f).clearAndSetSemantics { if (cell != null) contentDescription = cell.desc },
+            Column(Modifier.popIn(10f * i, 0.9f).weight(1f).clearAndSetSemantics { if (cell != null) contentDescription = cell.desc },
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(cell?.time.orEmpty(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 Spacer(Modifier.height(4.dp))
@@ -106,19 +112,21 @@ internal fun HourStrip(cells: List<HourCell>) {
 internal fun DayRow(line: DayLine) {
     Row(Modifier.fillMaxWidth().heightIn(min = 32.dp).clearAndSetSemantics { contentDescription = line.desc },
         verticalAlignment = Alignment.CenterVertically) {
+        // Left to right as it reads (motion.md §7.2): the day, its glyph popping, the chance, high, low.
         Text(line.day, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
-            modifier = Modifier.width(44.dp))
+            modifier = Modifier.fadeIn(0f).width(44.dp))
         // The glyph's place stays when the reply named no condition, so the chances stay in line.
-        Box(Modifier.widthIn(min = 20.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.popIn(12f, 0.8f).widthIn(min = 20.dp), contentAlignment = Alignment.Center) {
             SymIcon(line.glyph.orEmpty(), size = 18.sp, filled = true, color = MaterialTheme.colorScheme.onSurface)
         }
         Spacer(Modifier.width(8.dp))
-        if (line.chance != null) Text(line.chance, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+        if (line.chance != null) Text(line.chance, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1,
+            modifier = Modifier.fadeIn(24f))
         Spacer(Modifier.weight(1f))
         Text(line.high.orEmpty(), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"), fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(40.dp))
+            color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.fadeIn(36f).width(40.dp))
         Text(line.low.orEmpty(), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(40.dp))
+            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.fadeIn(48f).width(40.dp))
     }
 }
 
@@ -211,14 +219,18 @@ private fun ForecastBody(f: Forecast) {
         // One node for a screen reader: "72 degrees. High 78, low 61. Rain, 20 percent chance. Wind 9 miles per hour."
         Row(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = f.heroDesc }, verticalAlignment = Alignment.CenterVertically) {
             if (f.temp != null) {
-                Text(f.temp, style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                // The big value grows from where it stands on its line, its bottom at the start (near enough its baseline).
+                val start = if (LocalLayoutDirection.current == LayoutDirection.Rtl) 1f else 0f
+                Text(f.temp, style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1, modifier = Modifier.popIn(0f, 0.94f, TransformOrigin(start, 1f)))
                 Spacer(Modifier.width(16.dp))
             }
+            // Its lines then fade in one after the other.
             Column {
                 if (f.highLow != null) Text(f.highLow, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(24f))
                 if (f.rainWind != null) Text(f.rainWind, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(if (f.highLow != null) 40f else 24f))
             }
         }
         Spacer(Modifier.height(8.dp))

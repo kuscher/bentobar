@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **Glass popups.** Every popup is frosted glass over a blur of what is behind it, like Booklight's panel, with a
+  thin white rim and rounder corners. Where the system has no blur (battery saver), a solid card with the same
+  rim, corners and shadow.
+- **A shadow that sits straight.** The shadow under a popup no longer leans to one side or stops short at an edge:
+  it falls straight down, lighter, and never shows through the glass.
+- **Popups unfold from the bar.** A popup opens down from its item, its contents dropping into place one after
+  another, and folds back into the item when it closes. Clicking another item hands over: the open popup
+  dissolves while the new one unfolds; clicking an item again while its popup folds away turns it round.
+- **One highlight that follows the mouse.** Moving the pointer across the bar, a single highlight glides from item
+  to item, stretching across and gathering like Booklight's rows; it never drops out between items, and a click
+  between two items goes to the one it is on. It stays on the item whose popup is open.
+- With "Remove animations" on, popups appear and go at once and the highlight jumps.
+
 ## 1.2 (2026-10-07)
 
 - **Shortcut.** A new item: one click, one action. Screenshot, Report a bug (opens the Googlebook's

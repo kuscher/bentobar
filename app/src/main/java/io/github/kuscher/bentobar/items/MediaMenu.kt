@@ -70,6 +70,9 @@ import io.github.kuscher.bentobar.ui.SectionLabel
 import io.github.kuscher.bentobar.ui.Setup
 import io.github.kuscher.bentobar.ui.SliderRow
 import io.github.kuscher.bentobar.ui.SmallIconButton
+import io.github.kuscher.bentobar.ui.drawIn
+import io.github.kuscher.bentobar.ui.fadeIn
+import io.github.kuscher.bentobar.ui.popIn
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Now
 import io.github.kuscher.bentobar.util.Sym
@@ -111,8 +114,9 @@ internal fun MediaMenu(item: ItemConfig, host: MenuHost) {
                 Spacer(Modifier.height(8.dp))
             }
         }
+        // The three pop in one after another, from 36 ms, 10 ms apart (§7.2: a block's parts within 60 ms).
         MediaButtons(playing = view.playing, canPrevious = view.canPrevious, canPlayPause = view.canPlayPause, canNext = view.canNext,
-            arrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            arrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), entranceMs = 36f,
             onPrevious = { NowPlaying.previous() }, onPlayPause = { NowPlaying.playPause() }, onNext = { NowPlaying.next() })
         if (player != null && track != null) {
             Spacer(Modifier.height(4.dp))
@@ -153,10 +157,11 @@ internal fun TrackBlock(art: Bitmap?, title: String, artist: String, album: Stri
     Row(Modifier.fillMaxWidth().padding(bottom = 12.dp).clearAndSetSemantics { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically) {
         val shape = RoundedCornerShape(12.dp)
-        // The border is for a white cover on the light card, which would have no edge.
-        Box(Modifier.size(56.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHighest)
+        // The border is for a white cover on the light card, which would have no edge. The artwork pops in, its
+        // lines fade in after it (motion.md §7.2).
+        Box(Modifier.popIn(0f, 0.92f).size(56.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHighest)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)) {
-            Crossfade(art, animationSpec = tween(150), label = "artwork") { picture ->
+            Crossfade(art, animationSpec = io.github.kuscher.bentobar.ui.Motion.spec(tween<Float>(150)), label = "artwork") { picture ->
                 if (picture == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     SymIcon(Sym.MUSIC_NOTE, size = 24.sp, filled = true, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else Image(remember(picture) { picture.asImageBitmap() }, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -165,11 +170,11 @@ internal fun TrackBlock(art: Bitmap?, title: String, artist: String, album: Stri
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             if (title.isNotEmpty()) Text(title, style = MaterialTheme.typography.titleMedium.copy(textDirection = TextDirection.Content),
-                color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(16f))
             if (artist.isNotEmpty()) Text(artist, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(28f))
             if (album.isNotEmpty()) Text(album, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Content),
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(36f))
         }
     }
 }
@@ -216,8 +221,9 @@ internal fun PositionBar(session: NowPlaying.Session) {
                     },
                     valueRange = 0f..length.toFloat(),
                     interactionSource = source,
-                    // The menus' ring for what the keyboard is on: with a thumb of its own, Material's slider shows none.
-                    modifier = Modifier.fillMaxWidth().height(32.dp)
+                    // The menus' ring for what the keyboard is on: with a thumb of its own, Material's slider shows none. As the
+                    // popup opens the bar draws in from its start, the thumb showing when the line reaches it.
+                    modifier = Modifier.drawIn(36f).fillMaxWidth().height(32.dp)
                         .then(if (focused) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, ring) else Modifier)
                         .semantics { contentDescription = label; stateDescription = state },
                     track = {
@@ -239,8 +245,9 @@ internal fun PositionBar(session: NowPlaying.Session) {
                 progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
             }) { Meter(fraction) }
         }
-        // The two times are in what the bar itself says ("1:42 of 5:37"), so they are not read a second time.
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics {}) {
+        // The two times are in what the bar itself says ("1:42 of 5:37"), so they are not read a second time. They fade in
+        // with the bar.
+        Row(Modifier.fadeIn(36f).fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics {}) {
             val style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum")
             Text(MediaText.time(shown), style = style, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             Spacer(Modifier.weight(1f))

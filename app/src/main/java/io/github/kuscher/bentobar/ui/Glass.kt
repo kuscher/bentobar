@@ -9,6 +9,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.RoundRect
@@ -24,6 +28,8 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -53,6 +59,17 @@ class MenuGlassState {
     var blur by mutableStateOf(true)
     /** The card's whole height, in px, once it has been measured (0 before); the shadow's window sizes itself by it. */
     var fullHeightPx by androidx.compose.runtime.mutableIntStateOf(0)
+
+    // The choreography's bookkeeping (motion.md §7.2), all set while the popup's first frames are laid out and drawn,
+    // before its clock starts: where each block of the card's column begins, which blocks have parts that arrive on
+    // their own, and the latest start of any part (for the cap at 180 ms). Plain fields: no frame reads them as state.
+    /** The column of blocks ([DropColumn]), for a part to find its block by where it is. */
+    internal var column: LayoutCoordinates? = null
+    /** Each block's top in the column, in px. */
+    internal var blockTops = IntArray(0)
+    /** Blocks with parts of their own: they only drop, and their parts fade or pop themselves. */
+    internal val withParts = HashSet<Int>()
+    internal var lastStartMs = 0f
 }
 
 /** The popup whose contents are being laid out, for its blocks to drop into place on its clock (none: no entrance). */
@@ -75,7 +92,7 @@ object MenuRoom {
 @Composable
 fun DropColumn(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val glass = LocalMenuGlass.current
-    Layout(content, modifier) { measurables, constraints ->
+    Layout(content, if (glass == null) modifier else modifier.onPlaced { glass.column = it }) { measurables, constraints ->
         val child = Constraints(maxWidth = constraints.maxWidth)
         val placeables = measurables.map { it.measure(child) }
         val width = maxOf(constraints.minWidth, placeables.maxOfOrNull { it.width } ?: 0).coerceAtMost(constraints.maxWidth)
@@ -89,6 +106,12 @@ fun DropColumn(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
         }
         val count = next
         val drop = MenuMotion.DROP_DP.dp.toPx() / MenuMotion.DROP_DP
+        if (glass != null) {
+            val tops = IntArray(count)
+            var top = 0
+            placeables.forEachIndexed { i, p -> if (i == 0 || blocks[i] != blocks[i - 1]) tops[blocks[i]] = top; top += p.height }
+            glass.blockTops = tops
+        }
         layout(width, height) {
             var y = 0
             placeables.forEachIndexed { i, p ->
@@ -96,7 +119,8 @@ fun DropColumn(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
                 else p.placeWithLayer(0, y) {
                     val b = MenuMotion.block(blocks[i], glass.clockMs, count)
                     translationY = b.dy * drop
-                    alpha = b.alpha
+                    // A block whose parts arrive on their own only drops: they fade or pop in themselves.
+                    alpha = if (blocks[i] in glass.withParts) 1f else b.alpha
                 }
                 y += p.height
             }
@@ -175,5 +199,84 @@ private object Shadows {
         }
         p.color = Color.Black.copy(alpha = alpha.coerceIn(0f, 1f)).toArgb()
         return p
+    }
+}
+
+/**
+ * A part of a popup that arrives on its own as the popup opens (motion.md §7.2, visual.md §5): [offsetMs] after its
+ * block starts. It finds its block by where it is in the card's column, and tells the popup its start, so that every
+ * start can be scaled to come by [MenuMotion.LAST_START_MS]. Outside a popup ([LocalMenuGlass] null) there is none.
+ */
+class Part internal constructor(private val glass: MenuGlassState, private val offsetMs: Float) {
+    private var coords: LayoutCoordinates? = null
+    private var block = -1
+    /** Below what the popup shows (it scrolls): at rest from the start. */
+    private var below = false
+
+    internal fun placed(at: LayoutCoordinates) { coords = at; if (block < 0) resolve() }
+
+    private fun resolve() {
+        val col = glass.column ?: return
+        val me = coords ?: return
+        if (!col.isAttached || !me.isAttached) return
+        val mid = col.localPositionOf(me, Offset.Zero).y + me.size.height / 2f
+        val tops = glass.blockTops
+        var b = 0
+        for (i in tops.indices) if (tops[i] <= mid) b = i
+        block = b
+        below = glass.fullHeightPx > 0 && mid > glass.fullHeightPx
+        glass.withParts += b
+        glass.lastStartMs = maxOf(glass.lastStartMs, MenuMotion.blockStartMs(b, tops.size) + offsetMs)
+    }
+
+    /** Ms since this part's start: negative before it, infinite once the popup rests (or "No animations"). */
+    fun ms(plus: Float = 0f): Float {
+        val clock = glass.clockMs
+        if (clock.isInfinite() || below) return Float.POSITIVE_INFINITY
+        if (block < 0) resolve()
+        val b = block.coerceAtLeast(0)
+        return clock - MenuMotion.partStartMs(b, glass.blockTops.size.coerceAtLeast(1), offsetMs + plus, glass.lastStartMs)
+    }
+}
+
+/** This popup's [Part] [offsetMs] after its block starts, or null outside a popup. Give its element [Modifier.part]. */
+@Composable
+fun rememberPart(offsetMs: Float): Part? {
+    val glass = LocalMenuGlass.current ?: return null
+    return androidx.compose.runtime.remember(glass, offsetMs) { Part(glass, offsetMs) }
+}
+
+/** Where [part] is, so it can find its block: on the element the part draws. */
+fun Modifier.part(part: Part?): Modifier = if (part == null) this else this.onPlaced { part.placed(it) }
+
+/** Fades in [offsetMs] after its block starts. */
+@Composable
+fun Modifier.fadeIn(offsetMs: Float): Modifier {
+    val p = rememberPart(offsetMs) ?: return this
+    return this.part(p).graphicsLayer { alpha = MenuMotion.fade(p.ms()) }
+}
+
+/** Pops in from [from] about its centre ([origin]) [offsetMs] after its block starts. */
+@Composable
+fun Modifier.popIn(offsetMs: Float, from: Float, origin: TransformOrigin = TransformOrigin.Center): Modifier {
+    val p = rememberPart(offsetMs) ?: return this
+    return this.part(p).graphicsLayer {
+        val pop = MenuMotion.pop(p.ms(), from)
+        scaleX = pop.scale; scaleY = pop.scale; alpha = pop.alpha; transformOrigin = origin
+    }
+}
+
+/** Draws in from its start [offsetMs] after its block starts: left to right, or from the bottom up when [rising]. */
+@Composable
+fun Modifier.drawIn(offsetMs: Float, rising: Boolean = false): Modifier {
+    val p = rememberPart(offsetMs) ?: return this
+    return this.part(p).drawWithContent {
+        val f = MenuMotion.draw(p.ms())
+        when {
+            f >= 1f -> drawContent()
+            f <= 0f -> Unit
+            rising -> clipRect(top = size.height * (1f - f)) { this@drawWithContent.drawContent() }
+            else -> clipRect(right = size.width * f) { this@drawWithContent.drawContent() }
+        }
     }
 }

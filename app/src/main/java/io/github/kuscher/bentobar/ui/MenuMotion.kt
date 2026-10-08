@@ -130,6 +130,43 @@ object MenuMotion {
     /** The time when every block of a popup with [blocks] blocks is at rest, for the clock to stop. */
     fun blocksDoneMs(blocks: Int): Float = blockStartMs(blocks - 1, blocks) + 400f
 
+    // ---- The choreography (motion.md §7.2): each part of a popup arrives on its own, after its block. ----
+
+    /** Every part has started by then: a popup whose last part would start later has all its starts scaled down. */
+    const val LAST_START_MS = 180f
+    private val FADES = Curve(0.2f, 0f, 0f, 1f)
+    private val DRAWS = Curve(0.35f, 0f, 0.1f, 1f)
+
+    /**
+     * When a part [offsetMs] into block [block] of [blocks] starts, in a popup whose last part would start at
+     * [lastStartMs]: past [LAST_START_MS] every start is scaled by that much, keeping their order and proportions
+     * (durations never scale).
+     */
+    fun partStartMs(block: Int, blocks: Int, offsetMs: Float, lastStartMs: Float): Float {
+        val start = blockStartMs(block, blocks) + offsetMs
+        return if (lastStartMs > LAST_START_MS) start * LAST_START_MS / lastStartMs else start
+    }
+
+    /** A part fading in, [ms] after its start: 100 ms on (0.2, 0, 0, 1). */
+    fun fade(ms: Float): Float = if (ms.isInfinite() && ms > 0) 1f else FADES.at(ms / 100f)
+
+    /** A part's scale and alpha. */
+    data class Pop(val scale: Float, val alpha: Float)
+
+    /**
+     * A part popping in [ms] after its start: its scale grows [from] to 1 about its centre on spring(0.9, 900), which
+     * passes its place by 0.15 % at most (nothing shrinks back), its alpha with the first half of the way.
+     */
+    fun pop(ms: Float, from: Float): Pop {
+        if (ms <= 0f) return Pop(from, 0f)
+        if (ms.isInfinite() || ms > 400f) return Pop(1f, 1f)
+        val left = spring(1f, ms / 1000f, 0.9f, 900f) // 1 → 0: what is left of the way
+        return Pop(1f - (1f - from) * left, smoothstep(0f, 0.5f, 1f - left))
+    }
+
+    /** A line drawing in, or a bar filling, [ms] after its start: how much of it shows, 180 ms on (0.35, 0, 0.1, 1). */
+    fun draw(ms: Float): Float = if (ms.isInfinite() && ms > 0) 1f else DRAWS.at(ms / 180f)
+
     /** A popup's alpha [ms] after it was left for another. */
     fun dissolve(ms: Float): Float = 1f - (ms / DISSOLVE_MS).coerceIn(0f, 1f)
 

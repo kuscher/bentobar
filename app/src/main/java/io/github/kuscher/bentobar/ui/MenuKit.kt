@@ -98,7 +98,7 @@ fun MenuCard(
     DropColumn(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
         Row(Modifier.padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(30.dp).clip(RoundedCornerShape(10.dp))
+                Modifier.popIn(0f, 0.85f).size(30.dp).clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
@@ -108,11 +108,12 @@ fun MenuCard(
             }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fadeIn(20f))
                 if (subtitle != null) Text(subtitle, style = MaterialTheme.typography.bodySmall,
-                    color = subtitleColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    color = subtitleColor, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(36f))
             }
-            if (trailing != null) trailing()
+            if (trailing != null) Box(Modifier.fadeIn(48f)) { trailing() }
         }
         content()
     }
@@ -126,9 +127,9 @@ fun MenuCard(
 fun InfoRow(label: String, value: String, valueColor: Color = MaterialTheme.colorScheme.onSurface) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f))
+            modifier = Modifier.weight(1f).fadeIn(0f))
         Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = if (value.any(Char::isDigit)) "tnum" else null),
-            fontWeight = FontWeight.Medium, color = valueColor)
+            fontWeight = FontWeight.Medium, color = valueColor, modifier = Modifier.fadeIn(24f))
     }
 }
 
@@ -162,7 +163,8 @@ fun Sparkline(
     max: Double? = null,
 ) {
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
-    Canvas(modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(10.dp)).background(track)) {
+    // Its well fades in, then the line draws in from the oldest reading, its fill clipped to the line's head (§7.2).
+    Canvas(modifier.fadeIn(0f).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(10.dp)).background(track).drawIn(30f)) {
         val top = max ?: maxOf(values.maxOrNull() ?: 0.0, second?.maxOrNull() ?: 0.0, 1e-9)
         fun series(vs: List<Double>, c: Color, fill: Boolean) {
             if (vs.size < 2) return
@@ -212,19 +214,19 @@ fun MenuEntry(icon: String, label: String, detail: String? = null, enabled: Bool
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val c = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        if (image != null) Image(image, null, Modifier.size(20.dp))
-        else SymIcon(icon, size = 18.sp, color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else c)
+        if (image != null) Image(image, null, Modifier.popIn(0f, 0.8f).size(20.dp))
+        else Box(Modifier.popIn(0f, 0.8f)) { SymIcon(icon, size = 18.sp, color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else c) }
         Spacer(Modifier.width(10.dp))
-        if (sub == null) Text(label, style = MaterialTheme.typography.bodyMedium, color = c, modifier = Modifier.weight(1f),
+        if (sub == null) Text(label, style = MaterialTheme.typography.bodyMedium, color = c, modifier = Modifier.weight(1f).fadeIn(20f),
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        else Column(Modifier.weight(1f)) {
+        else Column(Modifier.weight(1f).fadeIn(20f)) {
             Text(label, style = MaterialTheme.typography.bodyMedium, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-        if (trailing != null) trailing()
+            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, modifier = Modifier.fadeIn(36f))
+        if (trailing != null) Box(Modifier.fadeIn(36f)) { trailing() }
     }
 }
 
@@ -335,6 +337,9 @@ fun CopyEntry(label: String, icon: String = Sym.CONTENT_COPY, text: () -> String
 /** A square-ish tile with an icon over a label, for grids of actions. */
 @Composable
 fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: () -> Unit) {
+    // Tiles pop in in a diagonal from the top left, 18 ms a step (four to a row in a menu's width).
+    val order = LocalTileOrder.current
+    val i = remember(order) { order?.next() ?: 0 }
     val source = remember { MutableInteractionSource() }
     val hovered by source.collectIsHoveredAsState()
     val focused by source.collectIsFocusedAsState()
@@ -344,7 +349,7 @@ fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: 
         else -> MaterialTheme.colorScheme.surfaceContainerHigh
     }
     Column(
-        Modifier.width(84.dp).focusRing(focused, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp)).background(bg)
+        Modifier.popIn(18f * (i / 4 + i % 4), 0.9f).width(84.dp).focusRing(focused, RoundedCornerShape(14.dp)).clip(RoundedCornerShape(14.dp)).background(bg)
             .hoverable(source)
             .clickable(interactionSource = source, indication = null, onClick = onClick)
             .pointerHoverIcon(PointerIcon.Hand)
@@ -362,8 +367,16 @@ fun ActionTile(icon: String, label: String, selected: Boolean = false, onClick: 
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TileGrid(content: @Composable () -> Unit) =
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+fun TileGrid(content: @Composable () -> Unit) {
+    val order = remember { TileOrder() }
+    androidx.compose.runtime.CompositionLocalProvider(LocalTileOrder provides order) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+    }
+}
+
+/** The order tiles come in a grid, as they are first composed (so as they are laid out). */
+class TileOrder { private var n = 0; fun next() = n++ }
+val LocalTileOrder = androidx.compose.runtime.staticCompositionLocalOf<TileOrder?> { null }
 
 /**
  * Pill buttons in a row (presets such as 5, 10, 25 min). With [selected] they are a choice: that one
@@ -375,13 +388,14 @@ fun TileGrid(content: @Composable () -> Unit) =
 fun ChipRow(labels: List<String>, selected: Int? = null, onClick: (Int) -> Unit) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         labels.forEachIndexed { i, l ->
+            val popIn = Modifier.popIn(16f * minOf(i, 6), 0.92f)
             val source = remember { MutableInteractionSource() }
             val hovered by source.collectIsHoveredAsState()
             val focused by source.collectIsFocusedAsState()
             val chosen = selected == i
             Text(if (chosen) "✓ $l" else l, style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.heightIn(min = 32.dp).focusRing(focused, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
+                modifier = popIn.heightIn(min = 32.dp).focusRing(focused, RoundedCornerShape(50)).clip(RoundedCornerShape(50))
                     .background(if (hovered) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.8f)
                         else MaterialTheme.colorScheme.secondaryContainer)
                     .hoverable(source)
@@ -396,8 +410,9 @@ fun ChipRow(labels: List<String>, selected: Int? = null, onClick: (Int) -> Unit)
 /** A thin progress track. */
 @Composable
 fun Meter(fraction: Float, color: Color = MaterialTheme.colorScheme.primary) {
-    Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(6.dp).clip(RoundedCornerShape(50)).background(color))
+    Box(Modifier.fadeIn(0f).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(50)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+        // The fill grows from its start and stops on its value (§7.2).
+        Box(Modifier.drawIn(30f).fillMaxWidth(fraction.coerceIn(0f, 1f)).height(6.dp).clip(RoundedCornerShape(50)).background(color))
     }
 }
 
@@ -412,7 +427,9 @@ fun rememberTick(): Long {
 @Composable
 fun CoreBars(values: DoubleArray, color: Color = MaterialTheme.colorScheme.primary) {
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
-    Canvas(Modifier.fillMaxWidth().height(36.dp)) {
+    // Each bar fills from the bottom, 12 ms after the one before it (§7.2).
+    val part = rememberPart(30f)
+    Canvas(Modifier.part(part).fillMaxWidth().height(36.dp)) {
         if (values.isEmpty()) return@Canvas
         val gap = 3.dp.toPx()
         val w = (size.width - gap * (values.size - 1)) / values.size
@@ -420,7 +437,7 @@ fun CoreBars(values: DoubleArray, color: Color = MaterialTheme.colorScheme.prima
             val x = i * (w + gap)
             drawRoundRect(track, androidx.compose.ui.geometry.Offset(x, 0f), androidx.compose.ui.geometry.Size(w, size.height),
                 androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
-            val h = (v.coerceIn(0.0, 1.0) * size.height).toFloat()
+            val h = (v.coerceIn(0.0, 1.0) * size.height).toFloat() * (if (part == null) 1f else MenuMotion.draw(part.ms(plus = 12f * i)))
             if (h > 0.5f) drawRoundRect(color, androidx.compose.ui.geometry.Offset(x, size.height - h), androidx.compose.ui.geometry.Size(w, h),
                 androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
         }

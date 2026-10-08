@@ -146,4 +146,39 @@ class MenuMotionTest {
         assertTrue(MenuMotion.block(0, MenuMotion.scaled(0f, 0f), 3).done)
         assertTrue(MenuMotion.closing(MenuMotion.scaled(0f, 0f), 300f, 300f, 1f).done)
     }
+
+    @Test fun eachPartStartsAfterItsBlockByItsOffsetAndEverythingHasStartedBy180Ms() {
+        // A part 20 ms into the third of five blocks: 24 + 2 × 16 + 20.
+        assertEquals(76f, MenuMotion.partStartMs(block = 2, blocks = 5, offsetMs = 20f, lastStartMs = 150f), 0.01f)
+        // A popup whose last part would start at 240 ms: every start is scaled by 180 ÷ 240, order and proportions kept.
+        assertEquals(76f * 0.75f, MenuMotion.partStartMs(2, 5, 20f, lastStartMs = 240f), 0.01f)
+        assertEquals(180f, MenuMotion.partStartMs(4, 5, 152f, lastStartMs = 240f), 0.01f)
+    }
+
+    @Test fun theVerbsEndExactlyWhereThePartRestsAndNothingPassesItsPlace() {
+        // Fade: 100 ms on (0.2, 0, 0, 1).
+        assertEquals(0f, MenuMotion.fade(0f), 0f)
+        assertEquals(1f, MenuMotion.fade(100f), 0f)
+        assertTrue(MenuMotion.fade(50f) > 0.7f)
+        // Pop from 0.85: at its place at rest, never more than 0.2 % past it, fully there by about 120 ms.
+        assertEquals(0.85f, MenuMotion.pop(0f, 0.85f).scale, 0f)
+        assertEquals(0f, MenuMotion.pop(0f, 0.85f).alpha, 0f)
+        var most = 0f
+        for (ms in 0..400) most = maxOf(most, MenuMotion.pop(ms.toFloat(), 0.85f).scale)
+        assertTrue("scale reached $most", most <= 1.002f)
+        assertEquals(1f, MenuMotion.pop(120f, 0.85f).alpha, 0.001f)
+        assertEquals(1f, MenuMotion.pop(500f, 0.85f).scale, 0f)
+        // Draw and fill: 180 ms on (0.35, 0, 0.1, 1), from nothing to all.
+        assertEquals(0f, MenuMotion.draw(0f), 0f)
+        assertEquals(1f, MenuMotion.draw(180f), 0f)
+        assertTrue(MenuMotion.draw(90f) in 0.4f..0.9f)
+        // Before its start a part isn't there at all.
+        assertEquals(0f, MenuMotion.fade(-10f), 0f)
+        assertEquals(0f, MenuMotion.pop(-10f, 0.9f).alpha, 0f)
+        assertEquals(0f, MenuMotion.draw(-10f), 0f)
+        // "No animations": no time at all, every part at rest.
+        assertEquals(1f, MenuMotion.fade(Float.POSITIVE_INFINITY), 0f)
+        assertEquals(1f, MenuMotion.pop(Float.POSITIVE_INFINITY, 0.8f).scale, 0f)
+        assertEquals(1f, MenuMotion.draw(Float.POSITIVE_INFINITY), 0f)
+    }
 }

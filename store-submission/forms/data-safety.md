@@ -42,8 +42,8 @@ The answers given:
 6. **"Shared"** (a transfer to a third party): **No**, under the form's exception for a transfer the
    user starts themselves after a prominent in-app disclosure. Both items show the words before the first
    request ("Weather comes from Open-Meteo…", "Flight times come from AirLabs…") and send nothing before the
-   user presses Search or saves a key. Read more strictly, the same three types would be declared as shared
-   for App functionality as well; nothing else would change.
+   user presses Search or Use my location, or saves a key. Read more strictly, the same three types would be
+   declared as shared for App functionality as well; nothing else would change.
 
 Not collected, and why: media titles and artwork (read on the device only, with notification access, never
 stored or sent); calendar events; device and battery readings; the layout.

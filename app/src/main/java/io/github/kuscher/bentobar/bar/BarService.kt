@@ -912,6 +912,7 @@ class BarController(private val service: AccessibilityService) {
             "barmenu" -> { events.chevronContext(placed["chevron"] ?: Rect(0, 0, 40, 40)); "ok" }
             "hover" -> { events.hover(cmd.getOrNull(1) == "on"); "ok" }
             "close" -> { closeMenu(); "ok" }
+            "solid" -> { MenuWindow.solid = cmd.getOrNull(1) != "off"; "solid=${MenuWindow.solid}" }
             "scan" -> { scan(); "snap=$snap" }
             "windows" -> service.windows.joinToString(" | ") { w ->
                 val r = Rect().also { w.getBoundsInScreen(it) }

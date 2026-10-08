@@ -106,7 +106,7 @@ class MenuWindow(
     private var onGone: (() -> Unit)? = null
     private var shown = false
 
-    private val blurListener = Consumer<Boolean> { on -> glass.blur = on; applyBlur() }
+    private val blurListener = Consumer<Boolean> { on -> glass.blur = on && !solid; applyBlur() }
     private val frameGlass = ViewTreeObserver.OnPreDrawListener { frame(); true }
     private val tick = Choreographer.FrameCallback { step(it) }
     private val removal = Runnable { remove() }
@@ -123,7 +123,7 @@ class MenuWindow(
         cardWidth = width
         windowX = x - cardLeft
         windowY = y - cardTop
-        glass.blur = wm.isCrossWindowBlurEnabled
+        glass.blur = wm.isCrossWindowBlurEnabled && !solid
         dialog.setCancelable(false)
         dialog.setTitle(title)
         dialog.setContentView(ComposeView(dialog.context).apply { setContent(content) })
@@ -343,6 +343,9 @@ class MenuWindow(
     }.getOrDefault(1f)
 
     companion object {
+        /** Debug builds (`./bento debug solid on`): popups as if the platform had no blur, to see the solid card. */
+        @Volatile var solid = false
+
         /** The glass's blur (visual.md: 24 dp, a little more than Booklight's 22 for small text under it). */
         const val BLUR_DP = 24f
         /** How long after its fold should have ended a closing window is taken away regardless. */

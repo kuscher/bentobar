@@ -81,6 +81,33 @@ class HereRulesTest {
         assertEquals(Locate.FINDING, HereRules.asked(Here(why = Locate.NOT_ALLOWED), start).why)
     }
 
+    @Test fun anAskThatFindsNothingWhileAFixIsStillGoodBacksOffToo() {
+        // The fix is half an hour old and Android has nothing new: asked after 1 and 2 minutes, not every
+        // minute; when the fix's 35 minutes are up the back-off goes on, and the item says Location not found.
+        var h = foundAt(start)
+        var now = start + 30 * min
+        val asked = ArrayList<Long>()
+        while (now <= start + 70 * min) {
+            val l = look(h, now)
+            h = l.here
+            if (l.ask) {
+                asked += (now - start) / min
+                h = HereRules.none(HereRules.asked(h, now))
+            }
+            if (now == start + 36 * min) assertEquals(Locate.NONE, HereRules.fresh(h, now).why)
+            now += 5 * sec
+        }
+        assertEquals(listOf(30L, 31L, 33L, 38L, 53L), asked)
+        // A fix found ends it.
+        h = HereRules.found(HereRules.asked(h, now), zurich, at = now, now = now)
+        assertEquals(0, h.misses)
+        // The same old fix again counts as nothing new: the waits grow as well.
+        val old = HereRules.found(HereRules.asked(Here(), start), zurich, at = start - 31 * min, now = start)
+        val again = HereRules.found(HereRules.asked(old, start + 1 * min), zurich, at = start - 31 * min, now = start + 1 * min)
+        assertFalse(look(again, start + 2 * min).ask)
+        assertTrue(look(again, start + 3 * min).ask)
+    }
+
     @Test fun aWakeAsksAtOnceWhereThereIsNoFix() {
         var h = HereRules.asked(Here(), start)
         repeat(3) { h = HereRules.none(HereRules.asked(h, start)) }

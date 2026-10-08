@@ -222,7 +222,8 @@ private projects and paths into their repos, and where signing keys are backed u
   The one location permission is `ACCESS_COARSE_LOCATION`, for Weather's My location, asked for only when
   an item chooses it, and Android is asked, and where the device is kept, only while such an item is outside
   Off and the switch is on (`HereRules.wanted`; else it is forgotten, with an ask on its way):
-  when the fix is half an hour old, and without one after 1, 2, 5 and 15 minutes, then every half hour.
+  when the fix is half an hour old, and without one after 1, 2, 5 and 15 minutes, then every half hour
+  (asks that find nothing new while a fix is still good wait the same way).
   A fix is good for 35 minutes, so after a night yesterday's place is never asked about (`HereRules` and
   `HereKeeper`, pure and unit-tested; `WeatherHere` is the keeper on Android's location service).
   `ManifestTest` pins the permissions, the backup rules, cleartext off and the listener's entry;

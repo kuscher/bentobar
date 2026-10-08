@@ -7,7 +7,7 @@ import io.github.kuscher.bentobar.data.Section
  * What My location knows, as one value: where the device is as Android said it ([fix]) and from when
  * ([foundAt]: the fix's own time, which can be older than the moment it came), why there is no fix
  * while there is none ([why]), when Android was last asked ([askedAt]; null: not since the last wake)
- * and how many asks in a row found nothing ([misses]). Times are the time since boot.
+ * and how many asks in a row found nothing new ([misses]). Times are the time since boot.
  */
 data class Here(val fix: Fix? = null, val foundAt: Long = 0, val why: Locate = Locate.FINDING, val askedAt: Long? = null, val misses: Int = 0) {
     /** For logs and dumps: never where the device is. */
@@ -35,7 +35,7 @@ object HereRules {
      */
     const val FIX_MS = EVERY_MS + 5 * MIN_MS
 
-    /** Without a fix, after Android had none: asked again after 1, 2, 5 and 15 minutes, then every half hour. */
+    /** After an ask that found nothing new: asked again after 1, 2, 5 and 15 minutes, then every half hour. */
     val BACK_OFF_MS = listOf(1L, 2L, 5L, 15L, 30L).map { it * MIN_MS }
 
     /** Whether to look at [now], having last looked at [lookedAt] (null: not since the last wake). */
@@ -57,19 +57,22 @@ object HereRules {
         return Look(fresh, ask = !asking && due(fresh, now))
     }
 
-    /** [h] at [now], with a fix past its time ([FIX_MS]) gone. What the source is given is this, never an older fix. */
+    /**
+     * [h] at [now], with a fix past its time ([FIX_MS]) gone. What the source is given is this, never an
+     * older fix. When the asks since found nothing, that is why there is none now.
+     */
     fun fresh(h: Here, now: Long): Here =
-        if (h.fix != null && now - h.foundAt > FIX_MS) h.copy(fix = null, foundAt = 0, why = Locate.FINDING) else h
+        if (h.fix != null && now - h.foundAt > FIX_MS) h.copy(fix = null, foundAt = 0, why = if (h.misses > 0) Locate.NONE else Locate.FINDING) else h
 
     /**
      * Whether Android is to be asked at [now]: not asked since the last wake; with a fix, once it is
-     * [EVERY_MS] old (and a minute after the last ask, should that bring the same old fix again); after
-     * Android had none, as [backOff] says; else (a fix that went, location back on) at once.
+     * [EVERY_MS] old, and after asks that found nothing new, as [backOff] says; without one after Android
+     * had none, as [backOff] says too; else (a fix that went, location back on) at once.
      */
     fun due(h: Here, now: Long): Boolean {
         val asked = h.askedAt ?: return true
         return when {
-            h.fix != null -> now - h.foundAt >= EVERY_MS && now - asked >= BACK_OFF_MS.first()
+            h.fix != null -> now - h.foundAt >= EVERY_MS && now - asked >= backOff(h.misses)
             h.why == Locate.NONE -> now - asked >= backOff(h.misses)
             else -> true
         }
@@ -86,12 +89,16 @@ object HereRules {
     fun asked(h: Here, now: Long): Here =
         h.copy(askedAt = now, why = if (h.fix == null && h.why != Locate.NONE) Locate.FINDING else h.why)
 
-    /** Android said where the device is: [fix], taken at [at]. One already past its time counts as none. */
+    /**
+     * Android said where the device is: [fix], taken at [at]. One already past its time counts as none;
+     * one that is [EVERY_MS] old already (the same old fix again) is kept, but is nothing new.
+     */
     fun found(h: Here, fix: Fix, at: Long, now: Long): Here =
-        if (now - at > FIX_MS) none(h) else h.copy(fix = fix, foundAt = at, why = Locate.FINDING, misses = 0)
+        if (now - at > FIX_MS) none(h)
+        else h.copy(fix = fix, foundAt = at, why = Locate.FINDING, misses = if (now - at >= EVERY_MS) h.misses + 1 else 0)
 
-    /** Android had no location: a fix known stays for its time; without one, that is why, and one miss more. */
-    fun none(h: Here): Here = if (h.fix != null) h else h.copy(why = Locate.NONE, misses = h.misses + 1)
+    /** Android had no location: one miss more; a fix known stays for its time, and without one, that is why. */
+    fun none(h: Here): Here = if (h.fix != null) h.copy(misses = h.misses + 1) else h.copy(why = Locate.NONE, misses = h.misses + 1)
 
     /** The user did something that may let a place be found now (answered the permission, chose My location): without a fix, Android is asked at once. */
     fun woken(h: Here): Here = if (h.fix == null) h.copy(askedAt = null) else h

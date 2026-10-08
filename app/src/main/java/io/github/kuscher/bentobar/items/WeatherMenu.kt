@@ -62,6 +62,7 @@ import io.github.kuscher.bentobar.ui.MenuEntry
 import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.ui.SearchField
 import io.github.kuscher.bentobar.ui.SectionLabel
+import io.github.kuscher.bentobar.ui.Setup
 import io.github.kuscher.bentobar.ui.TextRow
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Now
@@ -376,8 +377,8 @@ internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
     val city = WeatherRules.city(item)
     val here = WeatherRules.here(item)
     val by = "settings:" + item.id
-    // Whether location is allowed can change in Android's settings beside this window: looked at again with the tick.
-    rememberTick()
+    // Whether location is allowed can change in Android's settings beside this window: observed, like Setup's permissions.
+    val setup by Setup.state.collectAsState()
     // One card serves whichever item is selected: nothing typed or opened for one item stays for the next.
     key(item.id) {
         var changing by remember { mutableStateOf(false) }
@@ -414,7 +415,7 @@ internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
                 // A layout that came with a city, or the switch off in Setup: the same act as the menu's.
                 if (!on) TextButton(onClick = { source.turnOn(); Ticker.refresh() }) { Text(stringResource(R.string.weather_turn_on)) }
                 // My location without the permission (refused, or taken back in Android's settings): Android's question only.
-                if (here && !WeatherHere.allowed()) TextButton(onClick = { askLocation() }) { Text(stringResource(R.string.weather_allow_location)) }
+                if (here && !setup.location) TextButton(onClick = { askLocation() }) { Text(stringResource(R.string.weather_allow_location)) }
             }
         }
     }

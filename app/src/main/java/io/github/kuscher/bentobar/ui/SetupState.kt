@@ -26,6 +26,8 @@ data class SetupState(
     val usageAccess: Boolean = false,
     /** Optional: Android's notification access, which Now playing needs for titles and artwork. */
     val mediaAccess: Boolean = false,
+    /** Optional: Android's approximate location, which Weather's My location needs. */
+    val location: Boolean = false,
     /** Installed from a download: Android guards the accessibility and notification access switches until they are allowed in App info. */
     val sideloaded: Boolean = false,
 )
@@ -55,6 +57,7 @@ object Setup {
             advancedProtection = Env.advancedProtection(),
             usageAccess = Usage.granted(app),
             mediaAccess = MediaAccess.granted(app),
+            location = app.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED,
             sideloaded = Env.sideloaded(),
         )
         // A running timer's alarm is exact only while exact alarms are allowed and used: follow a change.

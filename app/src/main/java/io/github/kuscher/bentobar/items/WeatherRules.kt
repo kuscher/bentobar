@@ -168,7 +168,10 @@ sealed interface Status {
     data object NotSetUp : Status
     /** A city, but the service is switched off: in Setup ([everOn]), or it never was on here (a layout that came with a city). */
     data class Off(val everOn: Boolean) : Status
-    /** A city, and nothing to show yet: the first reading is on its way, or one too old to show is being asked again. */
+    /**
+     * Nothing to show yet: a city's or My location's first reading is on its way, one too old to show is
+     * asked again, or Android is asked where the device is for the first time.
+     */
     data object Loading : Status
     /** My location, and the device's location isn't known: not allowed, switched off, or Android has none. */
     data class NoLocation(val why: Locate) : Status

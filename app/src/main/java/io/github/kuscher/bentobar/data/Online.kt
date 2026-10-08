@@ -73,7 +73,7 @@ object Online {
 
     fun on(service: Service): Boolean = service in current.value.on
 
-    /** Set up on this install: a city was searched (Weather), a key is saved (Flight). */
+    /** Set up on this install: a city was searched or My location chosen (Weather), a key is saved (Flight). */
     fun setUp(service: Service): Boolean = service in current.value.setUp
 
     fun hasKey(service: Service): Boolean = service in current.value.keyed
@@ -81,8 +81,8 @@ object Online {
     fun serviceOf(host: Host): Service = Service.entries.first { host in it.hosts }
 
     /**
-     * On, by the user's own act: Search or "Turn on" in the item, or Setup's switch for a service that
-     * was set up here. False (and nothing changes) for a service that needs a key and has none.
+     * On, by the user's own act: Search, Use my location or "Turn on" in the item, or Setup's switch for a
+     * service that was set up here. False (and nothing changes) for a service that needs a key and has none.
      */
     @Synchronized
     fun turnOn(service: Service): Boolean {

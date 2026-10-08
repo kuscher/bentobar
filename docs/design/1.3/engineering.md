@@ -170,3 +170,7 @@ Smallest first; debug timings are an upper bound (release is 3–4× faster):
   of the strip goes to the highlighted item (`StripEvents.gapClick`).
 - Test builds on a device with a released BentoBar: `-PreleaseSignedDebug` (the debug build signed with the release
   key) instead of an id suffix, so the accessibility switch and the layout stay.
+- **v2 (8 October):** the phase clock advances by the time between frames, capped at 1.5 frames, so a late frame
+  (a part's first drawing) slows the motion instead of skipping ahead (motion review: the lip sat still, then the
+  glass leapt). Parts arrive on their own through `Modifier.fadeIn/popIn/drawIn` and `rememberPart` (ui/Glass.kt):
+  each finds its block by where it is in the card's column; a block with parts only drops.

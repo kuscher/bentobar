@@ -165,8 +165,8 @@ BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse
   any website does. With **My location** instead of a city, BentoBar asks Android for the device's
   approximate location (never the precise one) while that item is in the bar: every 30 minutes once it
   knows, and when Android doesn't, again after 1, 2, 5 and 15 minutes, then every 30. It sends
-  Open-Meteo that location rounded to about 10 km. Android's "while using the app" permission is
-  enough for that, since the status bar counts as in use. Where you are, and its forecast, are kept
+  Open-Meteo that location rounded to about 10 km. BentoBar asks only for Android's "while using the
+  app" permission, not for background location. Where you are, and its forecast, are kept
   in memory only: never on the device, in your layout or in its backup.
 - **Flight** sends [AirLabs](https://airlabs.co) the flight number and your own AirLabs key: when you
   track a flight, when you press Refresh, and while it follows the flight (about every 3 hours, then

@@ -7,9 +7,7 @@ import android.util.Log
 import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.BarConfig
 import io.github.kuscher.bentobar.data.ItemConfig
-import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
-import io.github.kuscher.bentobar.data.couldShow
 import io.github.kuscher.bentobar.util.Now
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -106,17 +104,8 @@ object Ticker {
     /** The item whose menu is open, sampled even when it's hidden. */
     @Volatile var focusItem: String? = null
 
-    /**
-     * Items worth sampling now: what the strip could draw ([couldShow], the same rule it draws by),
-     * revealed hidden items, an open menu, or everything while the settings preview is open. A
-     * folded-away battery or memory item costs nothing.
-     */
-    private fun needed(cfg: BarConfig): List<ItemConfig> {
-        val all = "settings" in users
-        return cfg.items.filter {
-            it.section != Section.OFF && (all || cfg.couldShow(it) || revealHidden || it.id == focusItem)
-        }
-    }
+    /** Items worth sampling now: [TickRules.needed]. */
+    private fun needed(cfg: BarConfig): List<ItemConfig> = TickRules.needed(cfg, "settings" in users, revealHidden, focusItem)
 
     private val loop = object : Runnable {
         override fun run() {

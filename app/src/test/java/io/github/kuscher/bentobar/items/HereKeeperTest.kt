@@ -1,5 +1,7 @@
 package io.github.kuscher.bentobar.items
 
+import io.github.kuscher.bentobar.data.BarConfig
+import io.github.kuscher.bentobar.data.HiddenMode
 import io.github.kuscher.bentobar.data.ItemConfig
 import io.github.kuscher.bentobar.data.Section
 import org.junit.Assert.assertEquals
@@ -172,13 +174,32 @@ class HereKeeperTest {
         assertEquals(drawn, changes)
     }
 
+    /** What the ticker samples of [items] in click to reveal, by its own rule: ‹ [open] or not, the settings window open or not. */
+    private fun sampled(items: List<ItemConfig>, open: Boolean = false, settings: Boolean = false) =
+        TickRules.needed(BarConfig(hiddenMode = HiddenMode.CLICK, items = items), settings, revealHidden = open, focusItem = null)
+
     @Test fun anItemOfMyLocationBehindTheChevronIsNotAskedForWhileAnotherWeatherItemShows() {
         // Click to reveal: the item of My location waits behind ‹, so the ticker samples only the city.
         val hidden = here.copy(section = Section.HIDDEN)
-        assertTrue(keeper.follow(listOf(hidden, city), sampled = listOf(city), on = true))
+        val layout = listOf(hidden, city)
+        assertEquals(listOf(city), sampled(layout))
+        assertTrue(keeper.follow(layout, sampled(layout), on = true))
         assertTrue(android.asks.isEmpty())
         // ‹ is opened: now it is on screen, and Android is asked.
-        keeper.follow(listOf(hidden, city), sampled = listOf(hidden, city), on = true)
+        keeper.follow(layout, sampled(layout, open = true), on = true)
+        assertEquals(1, android.asks.size)
+    }
+
+    @Test fun behindAClosedChevronAnItemOfMyLocationWithAShowWhenRuleIsAskedFor() {
+        // Its rule (rain or snow falling or coming) needs the forecast where the device is, so the ticker samples it while it waits.
+        val waiting = here.copy(section = Section.HIDDEN, whenActive = true)
+        keeper.follow(listOf(waiting, city), sampled(listOf(waiting, city)), on = true)
+        assertEquals(1, android.asks.size)
+    }
+
+    @Test fun theSettingsWindowOpenHasAnItemOfMyLocationBehindTheChevronAskedFor() {
+        val hidden = here.copy(section = Section.HIDDEN)
+        keeper.follow(listOf(hidden, city), sampled(listOf(hidden, city), settings = true), on = true)
         assertEquals(1, android.asks.size)
     }
 

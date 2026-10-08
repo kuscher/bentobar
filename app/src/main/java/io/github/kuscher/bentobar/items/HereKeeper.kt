@@ -50,7 +50,7 @@ class HereKeeper(private val android: Locator, private val clock: () -> Long, pr
     /** Everything held, a fix past its time included: for tests, which check that forgetting leaves nothing. */
     internal val held: Here get() = here
 
-    /** Whether an ask is on its way: for tests. */
+    /** Whether an ask is on its way (tests read it too). */
     internal val asking: Boolean get() = waiting != null
 
     /**
@@ -118,10 +118,11 @@ class HereKeeper(private val android: Locator, private val clock: () -> Long, pr
 
     /**
      * One tick of the Weather type: [layout] is every item, [sampled] the items the ticker samples now
-     * (in the bar, behind an opened ‹, in an open menu or the settings), [on] the switch. Where the
-     * device is is kept while the layout wants it ([keepFor]), and Android is asked only while an item of
-     * My location is among [sampled]; else an ask on its way is called off and the fix stays. When the
-     * type goes idle, [sampled] is empty. True while it is kept.
+     * ([TickRules.needed]: in the bar, behind an opened ‹ or waiting there for its Show when rule, in an
+     * open menu or the settings), [on] the switch. Where the device is is kept while the layout wants it
+     * ([keepFor]), and Android is asked only while an item of My location is among [sampled]; else an ask
+     * on its way is called off and the fix stays. When the type goes idle, [sampled] is empty. True while
+     * it is kept.
      */
     fun follow(layout: List<ItemConfig>, sampled: List<ItemConfig>, on: Boolean): Boolean {
         if (!keepFor(layout, on)) return false

@@ -19,6 +19,16 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 1.3 (2026-10-08): glass popups, motion, one highlight
+A visual and motion release (docs/design/1.3: brief, visual, motion, engineering with "as built"). PR #28, merged as
+a merge commit. Popups in a Dialog-hosted TYPE_ACCESSIBILITY_OVERLAY window with the platform's background blur
+(`bar/MenuWindow.kt`), the shadow in a window of its own, the motion and the contents' choreography on one clock
+(`ui/MenuMotion.kt`, `ui/Glass.kt`), the strip's one highlight (`bar/StripHighlight.kt`); three choices in Look, off
+by default: Switch popups on hover, No animations, Tint with system colors. Version code 15. Released on GitHub
+only (`PLAY_UPLOAD=off`), at Alex's word; Play has 1.2 (in review, then his Publish click). Checked on the Lenovo
+Googlebook 15 by the visual and motion designers (approved). Test builds on a device with a release:
+`-PreleaseSignedDebug`.
+
 ## 1.2 (2026-10-07): Shortcut, With conditions + Windy, and the health fixes
 Three PRs, merged in this order as merge commits: #27 (health fixes from a code-health review of 1.0.2:
 show-when hold for network/cpu/memory, the tick stamp, Flight's back-off, TextRow, Duplicate, Undo,

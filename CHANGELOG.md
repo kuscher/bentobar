@@ -1,19 +1,27 @@
 # Changelog
 
-## Unreleased
+## 1.3 (2026-10-08)
 
-- **Glass popups.** Every popup is frosted glass over a blur of what is behind it, like Booklight's panel, with a
-  thin white rim and rounder corners. Where the system has no blur (battery saver), a solid card with the same
-  rim, corners and shadow.
+- **Glass popups.** Every popup is frosted glass over a blur of what is behind it, with a thin white rim and
+  rounder corners. Where the system has no blur (battery saver), a solid card with the same rim, corners and
+  shadow. Text on the glass is tuned to stay readable over busy windows.
 - **A shadow that sits straight.** The shadow under a popup no longer leans to one side or stops short at an edge:
   it falls straight down, lighter, and never shows through the glass.
-- **Popups unfold from the bar.** A popup opens down from its item, its contents dropping into place one after
-  another, and folds back into the item when it closes. Clicking another item hands over: the open popup
-  dissolves while the new one unfolds; clicking an item again while its popup folds away turns it round.
+- **Popups unfold from the bar.** A popup opens down from its item and folds back into it when it closes, quickly:
+  about a quarter of a second to open, an eighth to close. Its contents arrive in turn, in reading order: the
+  header's icon pops in, rows fade in, the sparkline draws itself, meters and bars fill, tiles and the calendar's
+  days come in a diagonal wave, and a tracked flight's plane flies out along its route. Clicking another item hands
+  over: the open popup dissolves while the new one unfolds; clicking an item again while its popup folds away turns
+  it round.
 - **One highlight that follows the mouse.** Moving the pointer across the bar, a single highlight glides from item
-  to item, stretching across and gathering like Booklight's rows; it never drops out between items, and a click
-  between two items goes to the one it is on. It stays on the item whose popup is open.
-- With "Remove animations" on, popups appear and go at once and the highlight jumps.
+  to item, stretching across and gathering; it never drops out between items, and a click between two items goes
+  to the one it is on. It stays on the item whose popup is open.
+- **Three new choices in Look, all off unless you turn them on:**
+  - **Switch popups on hover:** with a popup open, pointing at another item opens its popup, as in a menu bar. It
+    never acts on items that do something on a click (Keep awake, a Shortcut).
+  - **No animations:** popups appear and go at once, and the highlight jumps from item to item. (The system's
+    "Remove animations" does the same.)
+  - **Tint with system colors:** popups take a soft tint of your system's colors, which follow your wallpaper.
 
 ## 1.2 (2026-10-07)
 

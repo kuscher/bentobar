@@ -122,22 +122,28 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         if (items === seenItems && here == seenHere) return
         seenItems = items
         seenHere = here
-        // Where the device is is forgotten with the last item of My location (and with the switch, see forgetFetched).
-        WeatherHere.keepFor(items, Online.on(online))
         val places = WeatherLoad.places(items, WeatherHere.fix)
         if (places == keptFor) return
         keptFor = places
         source.keepOnly(places, cities = WeatherLoad.places(items))
     }
 
+    /**
+     * Where the device is is kept, and Android asked, only for an item of My location outside Off while
+     * the switch is on ([HereRules.wanted]); else it is forgotten. True while it is wanted.
+     */
+    private fun keepHere(): Boolean = WeatherHere.keepFor(Store.config.value.items, Online.on(online))
+
     override fun sample(now: Long) {
+        if (keepHere()) WeatherHere.keepUp()
         tidy()
-        // Android is asked where the device is only for an item of My location outside Off, while the switch is on.
-        if (HereRules.asks(Store.config.value.items, Online.on(online))) WeatherHere.keepUp()
     }
 
-    // Also when the last Weather item went: nothing samples this type any more, so this is the moment that is left.
-    override fun onIdle() = tidy()
+    // Also when the last Weather item went, or the last of My location went to Off: nothing samples this type any more, so this is the moment that is left.
+    override fun onIdle() {
+        keepHere()
+        tidy()
+    }
 
     override val menu: @Composable (ItemConfig, MenuHost) -> Unit = { item, host -> WeatherMenu(item, host) }
 

@@ -1,6 +1,7 @@
 package io.github.kuscher.bentobar.items
 
 import io.github.kuscher.bentobar.data.ItemConfig
+import io.github.kuscher.bentobar.data.Section
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -113,14 +114,41 @@ class HereKeeperTest {
     @Test fun theLocationGoesWithTheLastItemOfMyLocationAndWithTheSwitch() {
         tick()
         android.answer(Located(zurich, age = 0))
-        keeper.keepFor(listOf(here, city), on = true)
+        assertTrue(keeper.keepFor(listOf(here, city), on = true))
         assertEquals(zurich, keeper.fix)
-        keeper.keepFor(listOf(city), on = true)
+        assertFalse(keeper.keepFor(listOf(city), on = true))
         assertEquals(Here(), keeper.held)
 
         tick(5 * sec)
         android.answer(Located(zurich, age = 0))
-        keeper.keepFor(listOf(here, city), on = false)
+        assertFalse(keeper.keepFor(listOf(here, city), on = false))
+        assertEquals(Here(), keeper.held)
+    }
+
+    @Test fun anItemOfMyLocationMovedToOffForgetsThePlace() {
+        tick()
+        android.answer(Located(zurich, age = 0))
+        // The tick that turns the last item of My location off runs the type's onIdle, which applies this.
+        keeper.keepFor(listOf(here.copy(section = Section.OFF), city), on = true)
+        assertEquals(Here(), keeper.held)
+    }
+
+    @Test fun anItemDeletedAfterItsFixWentPastItsTimeLeavesNothingHeld() {
+        tick()
+        android.answer(Located(zurich, age = 0))
+        // The bar was hidden for an hour: no tick, and the fix is past its time but still held.
+        now += HereRules.FIX_MS + 1
+        assertNull(keeper.fix)
+        keeper.keepFor(emptyList(), on = true)
+        assertEquals(Here(), keeper.held)
+    }
+
+    @Test fun anItemDeletedWhileAndroidIsAskedCallsTheAskOffAndDropsItsAnswer() {
+        tick()
+        assertTrue(keeper.asking)
+        keeper.keepFor(emptyList(), on = true)
+        assertEquals(1, android.calledOff)
+        android.answer(Located(zurich, age = 0))
         assertEquals(Here(), keeper.held)
     }
 }

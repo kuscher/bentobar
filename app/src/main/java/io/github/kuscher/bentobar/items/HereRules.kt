@@ -91,13 +91,11 @@ object HereRules {
     /** The user did something that may let a place be found now (answered the permission, chose My location): without a fix, Android is asked at once. */
     fun woken(h: Here): Here = if (h.fix == null) h.copy(askedAt = null) else h
 
-    /** Whether Android is asked where the device is: for an item of My location outside Off, while the Weather switch is on. */
-    fun asks(items: List<ItemConfig>, on: Boolean): Boolean =
-        on && items.any { it.type == "weather" && it.section != Section.OFF && WeatherRules.here(it) }
-
     /**
-     * Whether where the device is is kept at all: while the Weather switch is on and an item of My
-     * location is left (one in Off too, which keeps its settings). Else it is forgotten.
+     * Whether where the device is is wanted: for an item of My location outside Off, while the Weather
+     * switch is on. Only then is Android asked and a fix kept; else it is forgotten, with an ask on its
+     * way. An item in Off keeps its choice, and where the device is is found again when it comes back.
      */
-    fun keeps(items: List<ItemConfig>, on: Boolean): Boolean = on && items.any { it.type == "weather" && WeatherRules.here(it) }
+    fun wanted(items: List<ItemConfig>, on: Boolean): Boolean =
+        on && items.any { it.type == "weather" && it.section != Section.OFF && WeatherRules.here(it) }
 }

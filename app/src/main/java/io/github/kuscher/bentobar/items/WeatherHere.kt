@@ -41,8 +41,8 @@ object WeatherHere {
     fun keepFor(items: List<ItemConfig>, on: Boolean) = keeper.keepFor(items, on)
 
     /**
-     * Forgets where the device is, and calls off an ask on its way: the switch went off, the permission
-     * was taken back, or no item of My location is left ([HereRules.keeps]). Main thread.
+     * Forgets where the device is, and calls off an ask on its way: the switch went off (forgetFetched).
+     * The layout's items forget it through [keepFor]. Main thread.
      */
     fun forget() = keeper.forget()
 

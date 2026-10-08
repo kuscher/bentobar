@@ -44,10 +44,11 @@ private projects and paths into their repos, and where signing keys are backed u
     glyph icons, `Chips` for the Live Update chip), and the item types: several each in
     `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
     (`CpuItem`, `ClockItem`, `SoundItem`, `MediaItem`, `DevicesItem`, `HeatItem`, `WeatherItem`,
-    `FlightItem`, `ShortcutItem` with its pure `ShortcutRules`). `WeatherHere` is Weather's My location:
-    Android's approximate location, in memory only, rounded to 0.1° (`WeatherRules.nearby`, in
-    `WeatherLoad.place`) before anything is asked or held under it; its reading is never kept on the
-    device, and the layout holds `where=here` and never a place. A type gets `onLive()`,
+    `FlightItem`, `ShortcutItem` with its pure `ShortcutRules`). `WeatherHere` is Weather's My location
+    (what it does is the pure `HereKeeper`, on `HereRules`): Android's approximate location, in memory
+    only, rounded to 0.1° (`WeatherRules.nearby`, in `WeatherLoad.place`) before anything is asked or
+    held under it; its reading is never kept on the device, and the layout holds `where=here` and never
+    a place. A type gets `onLive()`,
     `sample(now)` once a second and `onIdle()` from the `Ticker`: listeners and polls hang on those,
     so none exists while the bar is hidden, the screen is off or no such item is outside Off.
   - `items/Refresher.kt` is `Calendar`'s way of loading as one class (a background thread, one load
@@ -219,10 +220,11 @@ private projects and paths into their repos, and where signing keys are backed u
   outside the layout, so a pasted layout or a restored backup turns nothing on. Off (Setup › Online
   services) stops requests at once and deletes what was fetched (`ItemType.forgetFetched`).
   The one location permission is `ACCESS_COARSE_LOCATION`, for Weather's My location, asked for only when
-  an item chooses it, and Android is asked only while such an item is outside Off and the switch is on:
+  an item chooses it, and Android is asked, and where the device is kept, only while such an item is outside
+  Off and the switch is on (`HereRules.wanted`; else it is forgotten, with an ask on its way):
   when the fix is half an hour old, and without one after 1, 2, 5 and 15 minutes, then every half hour.
-  A fix is good for 35 minutes, so after a night yesterday's place is never asked about (`HereRules`, pure
-  and unit-tested; `WeatherHere` does what it says).
+  A fix is good for 35 minutes, so after a night yesterday's place is never asked about (`HereRules` and
+  `HereKeeper`, pure and unit-tested; `WeatherHere` is the keeper on Android's location service).
   `ManifestTest` pins the permissions, the backup rules, cleartext off and the listener's entry;
   `HttpTest` and `HttpTransportTest` pin the three hosts and what a request may carry.
 - **A flight service's reply repeats the key it was asked with**, and the platform puts addresses

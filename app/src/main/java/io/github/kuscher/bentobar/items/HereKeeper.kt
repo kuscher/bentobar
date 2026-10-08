@@ -116,9 +116,15 @@ class HereKeeper(private val android: Locator, private val clock: () -> Long, pr
         here = HereRules.woken(here)
     }
 
-    /** The layout's [items] and the Weather switch ([on]) as they are now: where the device is goes with the last item of My location ([HereRules.keeps]). */
-    fun keepFor(items: List<ItemConfig>, on: Boolean) {
-        if (fix != null && !HereRules.keeps(items, on)) forget()
+    /**
+     * The layout's [items] and the Weather switch ([on]) as they are now. True while they want where the
+     * device is ([HereRules.wanted]); else it is forgotten ([forget]), a fix past its time and an ask on
+     * its way too.
+     */
+    fun keepFor(items: List<ItemConfig>, on: Boolean): Boolean {
+        if (HereRules.wanted(items, on)) return true
+        forget()
+        return false
     }
 
     /** Forgets where the device is, and calls off an ask on its way: its answer is dropped. */

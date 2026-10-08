@@ -121,26 +121,17 @@ class HereRulesTest {
         assertEquals(35 * min, HereRules.FIX_MS)
     }
 
-    @Test fun androidIsAskedForAnItemOfMyLocationOutsideOffWhileTheSwitchIsOn() {
+    @Test fun whereTheDeviceIsIsWantedForAnItemOfMyLocationOutsideOffWhileTheSwitchIsOn() {
         val here = WeatherRules.useHere(ItemConfig("w1", "weather"))
         val city = ItemConfig("w2", "weather", options = mapOf("city" to "Zurich", "lat" to "47.37", "lon" to "8.55"))
-        assertTrue(HereRules.asks(listOf(here, city), on = true))
-        assertFalse(HereRules.asks(listOf(here), on = false))
-        assertFalse(HereRules.asks(listOf(city), on = true))
-        assertFalse(HereRules.asks(listOf(here.copy(section = Section.OFF)), on = true))
-    }
-
-    @Test fun whereTheDeviceIsIsForgottenWithTheSwitchAndWithTheLastItemOfMyLocation() {
-        val here = WeatherRules.useHere(ItemConfig("w1", "weather"))
-        val city = ItemConfig("w2", "weather", options = mapOf("city" to "Zurich", "lat" to "47.37", "lon" to "8.55"))
-        assertTrue(HereRules.keeps(listOf(here, city), on = true))
+        assertTrue(HereRules.wanted(listOf(here, city), on = true))
         // The Weather switch goes off.
-        assertFalse(HereRules.keeps(listOf(here, city), on = false))
+        assertFalse(HereRules.wanted(listOf(here, city), on = false))
         // The last item of My location goes, or turns back to its city.
-        assertFalse(HereRules.keeps(listOf(city), on = true))
-        assertFalse(HereRules.keeps(listOf(WeatherRules.useCity(here), city), on = true))
-        // One in Off keeps its settings, and so the place, though Android is asked nothing for it.
-        assertTrue(HereRules.keeps(listOf(here.copy(section = Section.OFF)), on = true))
+        assertFalse(HereRules.wanted(listOf(city), on = true))
+        assertFalse(HereRules.wanted(listOf(WeatherRules.useCity(here), city), on = true))
+        // Or goes to Off: it keeps its choice, and where the device is is found again when it comes back.
+        assertFalse(HereRules.wanted(listOf(here.copy(section = Section.OFF), city), on = true))
     }
 
     @Test fun nothingPrintsWhereTheDeviceIs() {

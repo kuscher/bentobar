@@ -118,8 +118,8 @@ class HereKeeper(private val android: Locator, private val clock: () -> Long, pr
 
     /**
      * One tick of the Weather type: [layout] is every item, [sampled] the items the ticker samples now
-     * ([TickRules.needed]: in the bar, behind an opened ‹ or waiting there for its Show when rule, in an
-     * open menu or the settings), [on] the switch. Where the device is is kept while the layout wants it
+     * ([TickRules.needed]: in the bar, behind an opened ‹, waiting in Hidden for its Show when rule, in
+     * an open menu or the settings), [on] the switch. Where the device is is kept while the layout wants it
      * ([keepFor]), and Android is asked only while an item of My location is among [sampled]; else an ask
      * on its way is called off and the fix stays. When the type goes idle, [sampled] is empty. True while
      * it is kept.

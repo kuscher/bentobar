@@ -175,8 +175,8 @@ class HereKeeperTest {
     }
 
     /** What the ticker samples of [items] in click to reveal, by its own rule: ‹ [open] or not, the settings window open or not. */
-    private fun sampled(items: List<ItemConfig>, open: Boolean = false, settings: Boolean = false) =
-        TickRules.needed(BarConfig(hiddenMode = HiddenMode.CLICK, items = items), settings, revealHidden = open, focusItem = null)
+    private fun sampled(items: List<ItemConfig>, open: Boolean = false, settings: Boolean = false, mode: HiddenMode = HiddenMode.CLICK) =
+        TickRules.needed(BarConfig(hiddenMode = mode, items = items), settings, revealHidden = open, focusItem = null)
 
     @Test fun anItemOfMyLocationBehindTheChevronIsNotAskedForWhileAnotherWeatherItemShows() {
         // Click to reveal: the item of My location waits behind ‹, so the ticker samples only the city.
@@ -190,12 +190,18 @@ class HereKeeperTest {
         assertEquals(1, android.asks.size)
     }
 
-    @Test fun behindAClosedChevronAnItemOfMyLocationWithAShowWhenRuleIsAskedFor() {
-        // Its rule (rain or snow falling or coming) needs the forecast where the device is, so the ticker samples it while it waits.
+    @Test fun anItemOfMyLocationWaitingInHiddenForItsShowWhenRuleIsAskedForInEveryHiddenMode() {
+        // Its rule (rain or snow falling or coming) needs the forecast where the device is, so the ticker samples it while it waits:
+        // behind a closed ‹, and in Show everything, where there is no ‹ and it isn't drawn.
         val waiting = here.copy(section = Section.HIDDEN, whenActive = true)
-        keeper.follow(listOf(waiting, city), sampled(listOf(waiting, city)), on = true)
-        assertEquals(1, android.asks.size)
+        for (mode in HiddenMode.entries) {
+            val k = HereKeeper(FakeAndroid { now }.also { android -> asked[mode] = android }, { now }) {}
+            k.follow(listOf(waiting, city), sampled(listOf(waiting, city), mode = mode), on = true)
+            assertEquals("$mode", 1, asked.getValue(mode).asks.size)
+        }
     }
+
+    private val asked = HashMap<HiddenMode, FakeAndroid>()
 
     @Test fun theSettingsWindowOpenHasAnItemOfMyLocationBehindTheChevronAskedFor() {
         val hidden = here.copy(section = Section.HIDDEN)

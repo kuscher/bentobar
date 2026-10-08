@@ -148,7 +148,6 @@ fun Modifier.menuGlass(glass: MenuGlassState, look: GlassLook): Modifier = this.
         val p = glass.presence * glass.alpha
         if (p <= 0f) return@drawBehind
         val h = min(glass.heightDp.dp.toPx(), size.height)
-        if (android.util.Log.isLoggable("BentoBarMotion", android.util.Log.DEBUG)) android.util.Log.d("BentoBarMotion", "glass drawn=${h.toInt()}")
         val r = min(MenuMotion.RADIUS_DP.dp.toPx(), h / 2f)
         val px = 1f
         drawRoundRect(look.veil.copy(alpha = look.veil.alpha * p), size = Size(size.width, h), cornerRadius = CornerRadius(r))

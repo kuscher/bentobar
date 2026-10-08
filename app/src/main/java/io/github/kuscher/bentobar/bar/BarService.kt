@@ -26,6 +26,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
@@ -139,7 +140,8 @@ class BarController(private val service: AccessibilityService) {
         if (Store.config.value.pinnedOpen) Store.update { it.copy(pinnedOpen = false) }
     }
     private var menu: MenuWindow? = null
-    private var menuKey: String? = null
+    // Observable, so the strip's highlight can stay on the item whose popup is open (StripHost).
+    private var menuKey: String? by mutableStateOf(null)
     private var menuClosedKey: String? = null
     private var menuClosedAt = 0L
     /** Closed by a press outside it: that press's own click on the same item mustn't open it again. */
@@ -385,14 +387,18 @@ class BarController(private val service: AccessibilityService) {
         val p = strip.params
         p.height = s.bar.height()
         p.y = s.bar.top
+        // Without a pill the strip's ends are only room for the highlight's round ends: the window reaches that much
+        // further out, into the gap, so the items stay 6 dp from the free area's edges as they always were.
+        val ends = (STRIP_PILL_PADDING.value * density).toInt()
+        val out = if (cfg.pill == Pill.NONE) ends else 0
         when (cfg.position) {
-            Position.RIGHT -> { p.gravity = Gravity.TOP or Gravity.RIGHT; p.x = screenW - s.free.right + gap }
-            Position.LEFT -> { p.gravity = Gravity.TOP or Gravity.LEFT; p.x = s.free.left + gap }
+            Position.RIGHT -> { p.gravity = Gravity.TOP or Gravity.RIGHT; p.x = screenW - s.free.right + gap - out }
+            Position.LEFT -> { p.gravity = Gravity.TOP or Gravity.LEFT; p.x = s.free.left + gap - out }
             Position.CENTER -> { p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; p.x = s.free.centerX() - screenW / 2 }
         }
         // The whole strip fits the free area: items, the pill's own padding and (decided by the strip,
         // from what fits) room for ‹.
-        val pillPad = if (cfg.pill == Pill.NONE) 0 else (2 * STRIP_PILL_PADDING.value * density).toInt()
+        val pillPad = if (cfg.pill == Pill.NONE) 0 else 2 * ends
         maxWidth.intValue = (s.free.width() - 2 * gap - pillPad).coerceAtLeast(0)
         heightDp.value = (s.bar.height() / density).dp
         val where = "free=${s.free.toShortString()} x=${p.x} maxW=${maxWidth.intValue} [${s.summary}]"
@@ -570,6 +576,8 @@ class BarController(private val service: AccessibilityService) {
                 heightDp = heightDp.value,
                 events = events,
                 onOverflow = { ids -> main.post { if (BarOverflow.ids.value != ids) { BarOverflow.ids.value = ids; main.post(scanNow) } } },
+                // The item a popup belongs to: "item:<id>" and "ctx:<id>" (its right-click menu) are the item's, "bentobar" is ‹'s.
+                open = menuKey?.let { if (it == "bentobar") "chevron" else it.substringAfter(':', "").ifEmpty { null } },
             )
         }
     }

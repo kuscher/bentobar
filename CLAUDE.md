@@ -38,6 +38,11 @@ private projects and paths into their repos, and where signing keys are backed u
     `StripLook.route` what color they take). The Flight item has one from its countdown until an hour
     after landing (`FlightText.bar` says when), colored by `FlightRules.stands`; shown as text alone
     it has none (`Display.line`), and its words keep their tones.
+    The hover is one highlight for the whole strip, not a box per item (1.3): `bar/StripHighlight.kt`, pure and
+    unit-tested, says which item the pointer is over (gaps split at their middles, ‹ one more item), carries the pill
+    there like Booklight's rubber-band rows, and says when it comes and goes (an open popup's item, a held slider, a
+    drag, the animator scale). The strip reads the pointer for it on the Initial pass without consuming anything, runs
+    its frames only while it moves, and draws it in the Row's `drawBehind`; change its rules there, not in the strip.
   - `bar/Menus.kt`: the menu card, the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
     visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,

@@ -117,6 +117,19 @@ class HereKeeper(private val android: Locator, private val clock: () -> Long, pr
     }
 
     /**
+     * One tick of the Weather type: [layout] is every item, [sampled] the items the ticker samples now
+     * (in the bar, behind an opened ‹, in an open menu or the settings), [on] the switch. Where the
+     * device is is kept while the layout wants it ([keepFor]), and Android is asked only while an item of
+     * My location is among [sampled]; else an ask on its way is called off and the fix stays. When the
+     * type goes idle, [sampled] is empty. True while it is kept.
+     */
+    fun follow(layout: List<ItemConfig>, sampled: List<ItemConfig>, on: Boolean): Boolean {
+        if (!keepFor(layout, on)) return false
+        if (HereRules.wanted(sampled, on)) keepUp() else callOff()
+        return true
+    }
+
+    /**
      * The layout's [items] and the Weather switch ([on]) as they are now. True while they want where the
      * device is ([HereRules.wanted]); else it is forgotten ([forget]), a fix past its time and an ask on
      * its way too.

@@ -31,18 +31,15 @@ object WeatherHere {
 
     fun allowed(): Boolean = Android.allowed()
 
-    /** An item of My location is live: see [HereKeeper.keepUp]. Main thread. */
-    fun keepUp() = keeper.keepUp()
+    /** A tick of the Weather type: see [HereKeeper.follow]. Main thread. */
+    fun follow(layout: List<ItemConfig>, sampled: List<ItemConfig>, on: Boolean) = keeper.follow(layout, sampled, on)
 
     /** Something changed that could let a place be found now: the permission was answered, an item chose My location. Main thread. */
     fun wake() = keeper.wake()
 
-    /** The layout's items and the switch as they are now: see [HereKeeper.keepFor]. Main thread. */
-    fun keepFor(items: List<ItemConfig>, on: Boolean) = keeper.keepFor(items, on)
-
     /**
      * Forgets where the device is, and calls off an ask on its way: the switch went off (forgetFetched).
-     * The layout's items forget it through [keepFor]. Main thread.
+     * The layout's items forget it through [follow]. Main thread.
      */
     fun forget() = keeper.forget()
 

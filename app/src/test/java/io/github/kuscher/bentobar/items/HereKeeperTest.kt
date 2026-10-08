@@ -128,7 +128,7 @@ class HereKeeperTest {
     @Test fun anItemOfMyLocationMovedToOffForgetsThePlace() {
         tick()
         android.answer(Located(zurich, age = 0))
-        // The tick that turns the last item of My location off runs the type's onIdle, which applies this.
+        // With a city still in the bar the type's next tick applies this; with no Weather item left, its onIdle.
         keeper.keepFor(listOf(here.copy(section = Section.OFF), city), on = true)
         assertEquals(Here(), keeper.held)
     }
@@ -168,5 +168,37 @@ class HereKeeperTest {
         }
         assertEquals(7, android.asks.size)
         assertEquals(drawn, changes)
+    }
+
+    @Test fun anItemOfMyLocationBehindTheChevronIsNotAskedForWhileAnotherWeatherItemShows() {
+        // Click to reveal: the item of My location waits behind ‹, so the ticker samples only the city.
+        val hidden = here.copy(section = Section.HIDDEN)
+        assertTrue(keeper.follow(listOf(hidden, city), sampled = listOf(city), on = true))
+        assertTrue(android.asks.isEmpty())
+        // ‹ is opened: now it is on screen, and Android is asked.
+        keeper.follow(listOf(hidden, city), sampled = listOf(hidden, city), on = true)
+        assertEquals(1, android.asks.size)
+    }
+
+    @Test fun anAskOnItsWayIsCalledOffWhenNoItemOfMyLocationIsOnScreenAndTheFixStays() {
+        keeper.follow(listOf(here, city), sampled = listOf(here, city), on = true)
+        android.answer(Located(zurich, age = 0))
+        now += 30 * min
+        keeper.follow(listOf(here, city), sampled = listOf(here, city), on = true)
+        assertTrue(keeper.asking)
+        // ‹ is closed on it, or the bar goes away (the type's onIdle samples nothing).
+        assertTrue(keeper.follow(listOf(here, city), sampled = listOf(city), on = true))
+        assertEquals(1, android.calledOff)
+        assertFalse(keeper.asking)
+        assertEquals(zurich, keeper.fix)
+        assertTrue(keeper.follow(listOf(here, city), sampled = emptyList(), on = true))
+        assertEquals(zurich, keeper.fix)
+    }
+
+    @Test fun followForgetsAsKeepForDoes() {
+        keeper.follow(listOf(here), sampled = listOf(here), on = true)
+        android.answer(Located(zurich, age = 0))
+        assertFalse(keeper.follow(listOf(here.copy(section = Section.OFF)), sampled = emptyList(), on = true))
+        assertEquals(Here(), keeper.held)
     }
 }

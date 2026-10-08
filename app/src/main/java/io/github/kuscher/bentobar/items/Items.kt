@@ -93,6 +93,14 @@ object Ticker {
         if (type.online != null || type.discreet) Log.w(TAG, "$what: ${e.javaClass.simpleName}") else Log.w(TAG, what, e)
     }
 
+    /**
+     * The items sampled at this tick ([needed]), set before the types' samplers run: for a type whose
+     * sampler asks for something only while one of its items is on screen (Weather's My location).
+     * Main thread.
+     */
+    var sampled: List<ItemConfig> = emptyList()
+        private set
+
     /** Hidden items are on screen (bar expanded, or BentoBar's menu lists them): sample them too. */
     @Volatile var revealHidden = false
     /** The item whose menu is open, sampled even when it's hidden. */
@@ -196,6 +204,7 @@ object Ticker {
         val stamp = if (scheduled) now else TickRules.stamp(now, lastTickAt)
         val cfg = Store.config.value
         val live = needed(cfg)
+        sampled = live
         val types = live.mapTo(HashSet()) { it.type }
         // Only while something shows items: a refresh() with nothing on screen must not wake a type that nobody would put back to sleep.
         lifeCycle(if (users.isEmpty()) emptySet() else types)

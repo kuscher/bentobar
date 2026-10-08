@@ -128,20 +128,15 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         source.keepOnly(places, cities = WeatherLoad.places(items))
     }
 
-    /**
-     * Where the device is is kept, and Android asked, only for an item of My location outside Off while
-     * the switch is on ([HereRules.wanted]); else it is forgotten. True while it is wanted.
-     */
-    private fun keepHere(): Boolean = WeatherHere.keepFor(Store.config.value.items, Online.on(online))
-
     override fun sample(now: Long) {
-        if (keepHere()) WeatherHere.keepUp()
+        // Kept for an item of My location outside Off, while the switch is on; asked for only while such an item is sampled (on screen).
+        WeatherHere.follow(Store.config.value.items, Ticker.sampled, Online.on(online))
         tidy()
     }
 
     // Also when the last Weather item went, or the last of My location went to Off: nothing samples this type any more, so this is the moment that is left.
     override fun onIdle() {
-        keepHere()
+        WeatherHere.follow(Store.config.value.items, sampled = emptyList(), on = Online.on(online))
         tidy()
     }
 

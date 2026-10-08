@@ -18,6 +18,8 @@
     <string name="look_position_center">Centre</string>
     <string name="look_color">Colour</string>
     <string name="look_color_help">Matching reads the colour of the status bar clock</string>
+    <string name="look_system_tint">Tint with system colours</string>
+    <string name="look_system_tint_help">Popups take a tint of your system\'s colours, which follow your wallpaper.</string>
     <string name="setup_turn_on_copies">reads the colour of the status bar clock, so your items match it</string>
     <string name="about_tagline">Add, hide and organise items in your Googlebook\'s status bar.</string>
     <string name="about_privacy_text">BentoBar goes online for two items only, and only after you set them up: Weather asks Open-Meteo about the city you search for, and Flight asks AirLabs about the flight you enter, with a key of your own. BentoBar sends nothing else anywhere: not your layout, your calendar, what\'s playing or anything it measures. It has no accounts of its own, no ads and no analytics, and it sends its developer nothing. Its accessibility service reads only the status bar (its layout and its clock\'s colour), never other apps. With Usage access on, it also reads how much data and storage each app uses, for the Network and Storage menus, and nothing else.</string>

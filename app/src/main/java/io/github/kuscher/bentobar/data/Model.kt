@@ -105,6 +105,8 @@ data class BarConfig(
     val hoverSwitchesPopups: Boolean = false,
     /** "No animations": BentoBar's popups, highlight and items appear and go at once (`ui/Motion`). */
     val noAnimations: Boolean = false,
+    /** "Tint with system colors": the popups' glass takes a tint of the system's (wallpaper's) palette. Off: neutral glass. */
+    val systemTint: Boolean = false,
     /**
      * Mirror the running timer or next meeting as an Android Live Update chip: FALLBACK only
      * while BentoBar's own bar isn't showing (accessibility off, or hidden with the tile).

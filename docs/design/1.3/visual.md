@@ -162,3 +162,31 @@ Timing and order are the motion designer's; this is how each part looks on its w
 
 Shared values for the motion designer: rows −6 dp, small text −4 dp, objects 0.92, tile 0.84, artwork and big value
 0.96, disc 0.6; every start alpha 0.
+
+## 6. OS tint (option, off by default)
+
+A switch in Look ("Tint with system colours", off by default) gives the popup glass a little of the wallpaper's own
+palette, the way macOS tints windows. It uses the **secondary** palette, not primary: it comes from the same wallpaper
+but has about half the chroma, so the result is a tint rather than a colour wash. Each tint colour sits close to the
+veil's own tone (tone 90 mixed with white, tone 20 mixed with tone 4), so the change in brightness is small. A +0.04
+veil alpha recovers the rest.
+
+| Token | Light | Dark | Notes |
+|---|---|---|---|
+| `glass.tint.veil` | lerp(`surfaceContainerLowest`, `secondaryContainer`, **0.5**) × **0.60** | lerp(`surfaceContainerLowest`, `onSecondary`, **0.5**) × **0.66** | Off: 0.56 / 0.62 neutral. Over a white page or a dark window, a 8–19 / 8–33 sRGB-level tint |
+| `glass.tint.solid` | lerp(`surfaceContainerHigh`, `secondaryContainer`, 0.5) | lerp(`surfaceContainerHigh`, `onSecondary`, 0.5) | Opaque; text keeps ≥ 7:1 |
+| rim, hairline, shadow | unchanged | unchanged | Neutral white and black: a coloured edge or shadow is the gimmick to avoid |
+| row hover, wells, dividers | unchanged | unchanged | `onSurface` tints, so they take on the hue beneath them |
+| glass inks (§1) | unchanged | unchanged | The +0.04 alpha keeps their contrast |
+| header tile, chips | unchanged | unchanged | Chips read as a deeper step of the same tint |
+| strip pill | **not tinted** | **not tinted** | It sits on the system's bar, beside untinted system icons and over any bar colour. A tinted pill would read as a state or accent, so it stays `look.fg` × 0.14 / 0.18 / 0.22 |
+
+**Contrast with the tint on**, at the most saturated palettes tried (vibrant red, green, blue and orange) and the §1
+glass inks:
+
+| | Titles | Grey labels | Section labels |
+|---|---|---|---|
+| Light glass, over pure black | 5.4:1 | 4.1:1 | 3.5:1 |
+| Dark glass, over pure white | 4.7–4.8:1 | 3.6–3.7:1 | 3.6–3.7:1 |
+
+At the untinted 0.56 / 0.62 the tint alone would cost about 0.5:1 (dark titles 4.1:1). Hence the +0.04.

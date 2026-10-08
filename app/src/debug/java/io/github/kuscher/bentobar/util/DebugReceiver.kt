@@ -114,6 +114,7 @@ class DebugReceiver : BroadcastReceiver() {
                             "spacing" -> c.copy(spacing = args[2].toInt())
                             "switch" -> c.copy(hoverSwitchesPopups = args[2] == "on")
                             "animations" -> c.copy(noAnimations = args[2] == "off")
+                            "tint" -> c.copy(systemTint = args[2] == "on")
                             else -> c
                         }
                     }; "ok"

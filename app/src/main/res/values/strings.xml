@@ -653,6 +653,8 @@
     <string name="look_hover_switch_help">With a popup open, pointing at another item opens its popup, as in a menu bar.</string>
     <string name="look_no_animations">No animations</string>
     <string name="look_no_animations_help">Popups appear and go at once, and the highlight jumps from item to item.</string>
+    <string name="look_system_tint">Tint with system colors</string>
+    <string name="look_system_tint_help">Popups take a tint of your system\'s colors, which follow your wallpaper.</string>
     <string name="look_hidden_mode_help">Show everything puts all items in the bar when there\'s room. Items with a Show when… rule appear only while it applies.</string>
     <string name="section_when_active">When active</string>
     <string name="section_hidden_reveal_show_all">Shown while their Show when… rule applies. Items without a rule always show.</string>

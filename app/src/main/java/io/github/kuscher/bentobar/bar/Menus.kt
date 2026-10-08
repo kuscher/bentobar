@@ -67,8 +67,17 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
         val g = glass ?: remember { MenuGlassState().apply { presence = 1f; shadow = 1f; clockMs = Float.POSITIVE_INFINITY; heightDp = Float.MAX_VALUE } }
         val dark = isSystemInDarkTheme()
         val scheme = MaterialTheme.colorScheme
+        // "Tint with system colors" (visual.md §6): the veil, or the solid card, takes half of the palette's secondary
+        // container (onSecondary in dark theme): a tint, not a wash, and 0.04 more of it so text stays as readable.
+        val tint = Store.config.collectAsState().value.systemTint
+        val hue = if (dark) scheme.onSecondary else scheme.secondaryContainer
         val look = GlassLook(
-            veil = if (g.blur) scheme.surfaceContainerLowest.copy(alpha = if (dark) 0.62f else 0.56f) else scheme.surfaceContainerHigh,
+            veil = when {
+                g.blur && tint -> lerp(scheme.surfaceContainerLowest, hue, 0.5f).copy(alpha = if (dark) 0.66f else 0.60f)
+                g.blur -> scheme.surfaceContainerLowest.copy(alpha = if (dark) 0.62f else 0.56f)
+                tint -> lerp(scheme.surfaceContainerHigh, hue, 0.5f)
+                else -> scheme.surfaceContainerHigh
+            },
             rim = Color.White.copy(alpha = if (dark) 0.44f else 0.80f),
             hairline = Color.Black.copy(alpha = if (dark) 0.28f else 0.20f),
             dark = dark,

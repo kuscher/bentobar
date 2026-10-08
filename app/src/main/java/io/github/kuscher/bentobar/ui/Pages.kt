@@ -188,6 +188,9 @@ fun LookPage() {
         SwitchRow(stringResource(R.string.look_no_animations), cfg.noAnimations, help = stringResource(R.string.look_no_animations_help)) { on ->
             Store.update { it.copy(noAnimations = on) }
         }
+        SwitchRow(stringResource(R.string.look_system_tint), cfg.systemTint, help = stringResource(R.string.look_system_tint_help)) { on ->
+            Store.update { it.copy(systemTint = on) }
+        }
         PageLabel(stringResource(R.string.barmenu_hidden_items))
         ChoiceRow(stringResource(R.string.look_hidden_mode), listOf(HiddenMode.SHOW_ALL to stringResource(R.string.look_hidden_show_all),
             HiddenMode.CLICK to stringResource(R.string.look_hidden_click), HiddenMode.HOVER to stringResource(R.string.look_hidden_hover)),

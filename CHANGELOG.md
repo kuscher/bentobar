@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **An open popup no longer keeps BentoBar busy.** While a popup sat open, it drew its window again 60 times a
+  second with nothing changed: about a tenth of a CPU core for as long as it stayed open. Now it draws once a second
+  (for its live values) and is otherwise still.
+
 ## 1.3 (2026-10-08)
 
 - **Glass popups.** Every popup is frosted glass over a blur of what is behind it, with a thin white rim and

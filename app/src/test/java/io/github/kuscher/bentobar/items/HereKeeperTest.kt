@@ -1,0 +1,126 @@
+package io.github.kuscher.bentobar.items
+
+import io.github.kuscher.bentobar.data.ItemConfig
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/**
+ * What is done with Android's answers for My location ([HereKeeper], which [WeatherHere] is on
+ * Android): asking, taking a fix, calling an ask off, and forgetting. Android is a fake whose answers
+ * come when a test gives them; the clock is the time since boot.
+ */
+class HereKeeperTest {
+    private val sec = 1_000L
+    private val min = 60 * sec
+    private var now = 5_000_000L
+    private val zurich = Fix(47.376_887, 8.541_694)
+    private var changes = 0
+
+    /** Android as a test sets it: the permission, the location switch, a last known location, and the asks it was given. */
+    private class FakeAndroid : Locator {
+        var allowed = true
+        var on = true
+        var last: Located? = null
+        var provider = true
+        val asks = ArrayList<(Located?) -> Unit>()
+        var calledOff = 0
+        override fun allowed() = allowed
+        override fun on() = on
+        override fun last() = last
+        override fun current(answer: (Located?) -> Unit): Locator.Cancel? {
+            if (!provider) return null
+            asks += answer
+            return Locator.Cancel { calledOff++ }
+        }
+
+        /** Android answers the latest ask. */
+        fun answer(located: Located?) = asks.last()(located)
+    }
+
+    private val android = FakeAndroid()
+    private val keeper = HereKeeper(android, { now }) { changes++ }
+    private val here = WeatherRules.useHere(ItemConfig("w1", "weather"))
+    private val city = ItemConfig("w2", "weather", options = mapOf("city" to "Zurich", "lat" to "47.37", "lon" to "8.55"))
+
+    /** The tick of a live item of My location, [after] this long. */
+    private fun tick(after: Long = 0) {
+        now += after
+        keeper.keepUp()
+    }
+
+    @Test fun aLastKnownLocationUnderHalfAnHourOldIsTakenWithoutANewAsk() {
+        android.last = Located(zurich, age = 10 * min)
+        tick()
+        assertEquals(zurich, keeper.fix)
+        assertTrue(android.asks.isEmpty())
+        assertEquals(1, changes)
+    }
+
+    @Test fun aNewFixIsAskedForAndItsAnswerIsTaken() {
+        tick()
+        assertTrue(keeper.asking)
+        assertNull(keeper.fix)
+        assertEquals(Locate.FINDING, keeper.why)
+        android.answer(Located(zurich, age = 0))
+        assertEquals(zurich, keeper.fix)
+        assertFalse(keeper.asking)
+        // Asked again when the fix is half an hour old, not before.
+        tick(29 * min)
+        assertEquals(1, android.asks.size)
+        tick(1 * min)
+        assertEquals(2, android.asks.size)
+    }
+
+    @Test fun withNoProviderThereIsNoLocation() {
+        android.provider = false
+        tick()
+        assertEquals(Locate.NONE, keeper.why)
+        assertFalse(keeper.asking)
+    }
+
+    @Test fun switchingLocationOffCallsTheAskOffAndDropsItsAnswer() {
+        tick()
+        android.on = false
+        tick(5 * sec)
+        assertEquals(1, android.calledOff)
+        assertFalse(keeper.asking)
+        android.answer(Located(zurich, age = 0))
+        assertNull(keeper.held.fix)
+        assertEquals(Locate.OFF, keeper.why)
+    }
+
+    @Test fun takingThePermissionBackForgetsTheFixAndCallsTheAskOff() {
+        tick()
+        android.allowed = false
+        tick(5 * sec)
+        assertEquals(1, android.calledOff)
+        assertEquals(Locate.NOT_ALLOWED, keeper.why)
+        android.answer(Located(zurich, age = 0))
+        assertNull(keeper.held.fix)
+    }
+
+    @Test fun forgettingCallsTheAskOffAndDropsItsAnswer() {
+        tick()
+        keeper.forget()
+        assertEquals(1, android.calledOff)
+        android.answer(Located(zurich, age = 0))
+        assertEquals(Here(), keeper.held)
+    }
+
+    @Test fun theLocationGoesWithTheLastItemOfMyLocationAndWithTheSwitch() {
+        tick()
+        android.answer(Located(zurich, age = 0))
+        keeper.keepFor(listOf(here, city), on = true)
+        assertEquals(zurich, keeper.fix)
+        keeper.keepFor(listOf(city), on = true)
+        assertEquals(Here(), keeper.held)
+
+        tick(5 * sec)
+        android.answer(Located(zurich, age = 0))
+        keeper.keepFor(listOf(here, city), on = false)
+        assertEquals(Here(), keeper.held)
+    }
+}

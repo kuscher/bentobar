@@ -123,7 +123,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
         seenItems = items
         seenHere = here
         // Where the device is is forgotten with the last item of My location (and with the switch, see forgetFetched).
-        if (here != null && !HereRules.keeps(items, Online.on(online))) WeatherHere.forget()
+        WeatherHere.keepFor(items, Online.on(online))
         val places = WeatherLoad.places(items, WeatherHere.fix)
         if (places == keptFor) return
         keptFor = places

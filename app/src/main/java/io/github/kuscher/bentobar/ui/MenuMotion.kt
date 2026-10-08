@@ -15,8 +15,11 @@ import kotlin.math.sqrt
  * (`MenuMotionTest`). No Android types.
  */
 object MenuMotion {
-    /** Booklight's approved opening: a slow start, a fast middle and a slow landing, with no overshoot. */
-    val OPENS = Curve(0.55f, 0f, 0.1f, 1f)
+    /**
+     * The opening: a slow start, a fast middle and a slow landing, with no overshoot. v2 (motion.md §7): Booklight's
+     * approved shape with a shorter wait, (0.45, 0, 0.1, 1) rather than (0.55, 0, 0.1, 1).
+     */
+    val OPENS = Curve(0.45f, 0f, 0.1f, 1f)
     /** The glass coming into presence, early in the slow start so it doesn't pop. */
     val PRESENTS = Curve(0.2f, 0f, 0f, 1f)
     /** Booklight's fold, back into the item. */
@@ -26,21 +29,23 @@ object MenuMotion {
     const val LIP_DP = 20f
     /** The glass's corner radius (visual.md); a capsule while the glass is shorter than twice this. */
     const val RADIUS_DP = 24f
-    const val PRESENCE_MS = 100f
+    const val PRESENCE_MS = 80f
     /** How far above its place a block starts. */
-    const val DROP_DP = 8f
+    const val DROP_DP = 6f
     /** A popup left for another one dissolves in place in this time. */
-    const val DISSOLVE_MS = 90f
+    const val DISSOLVE_MS = 75f
 
-    private const val CONTENTS_OUT_MS = 50f
-    private const val PRESENCE_OUT_MS = 60f
+    private const val CONTENTS_OUT_MS = 40f
+    private const val PRESENCE_OUT_MS = 50f
+    /** Presence starts to fall this long before the fold ends, and is gone this long after. */
+    private const val FADE_LEAD_MS = 25f
     private const val CONTENTS_BACK_MS = 100f
 
     /** How long a popup [heightDp] tall takes to open: a fixed time would move a tall popup's edge too fast, a fixed speed take too long. */
-    fun openMs(heightDp: Float): Float = (240f + 20f * (heightDp - 200f) / 100f).coerceIn(240f, 340f)
+    fun openMs(heightDp: Float): Float = (160f + 0.16f * heightDp).coerceIn(190f, 270f)
 
     /** How long a popup [fromDp] tall of [heightDp] takes to fold away and fade: the fold, and the fade's last 30 ms. */
-    fun closeMs(fromDp: Float, heightDp: Float): Float = fold(fromDp, heightDp) + 30f
+    fun closeMs(fromDp: Float, heightDp: Float): Float = fold(fromDp, heightDp) + FADE_LEAD_MS
 
     private fun fold(fromDp: Float, heightDp: Float): Float = maxOf(50f, 0.45f * openMs(heightDp) * openness(fromDp, heightDp))
 
@@ -71,9 +76,9 @@ object MenuMotion {
     fun closing(ms: Float, fromDp: Float, heightDp: Float, presence: Float): Glass {
         val f = fold(fromDp, heightDp)
         val h = fromDp - (fromDp - LIP_DP).coerceAtLeast(0f) * FOLDS.at(ms / f)
-        val p = presence * (1f - ((ms - (f - 30f)) / PRESENCE_OUT_MS).coerceIn(0f, 1f))
+        val p = presence * (1f - ((ms - (f - FADE_LEAD_MS)) / PRESENCE_OUT_MS).coerceIn(0f, 1f))
         val contents = 1f - (ms / CONTENTS_OUT_MS).coerceIn(0f, 1f)
-        return Glass(h, p, shadow(p, h, heightDp), contents, done = ms >= f + 30f)
+        return Glass(h, p, shadow(p, h, heightDp), contents, done = ms >= f + FADE_LEAD_MS)
     }
 
     /**
@@ -106,18 +111,18 @@ object MenuMotion {
      * When block [index] of [count] starts: each 20 ms after the one above, closer together in a tall popup, so the
      * last still starts by 190 ms and none arrive in a clump (a fixed cap left the lower glass empty, then filled it at once).
      */
-    fun blockStartMs(index: Int, count: Int): Float = 30f + index * if (count <= 1) 20f else min(20f, 160f / (count - 1))
+    fun blockStartMs(index: Int, count: Int): Float = 24f + index * if (count <= 1) 16f else min(16f, 128f / (count - 1))
 
     /**
-     * Block [index] [ms] after the popup's first frame: it drops [DROP_DP] into place on Booklight's
-     * `place` spring (0.86, 520), which overshoots by less than 0.05 dp, so nothing shrinks back. It is
+     * Block [index] [ms] after the popup's first frame: it drops [DROP_DP] into place on a stiffer
+     * Booklight `place` spring (0.86, 700), which overshoots by about 0.03 dp, so nothing shrinks back. It is
      * readable well before the last few dp settle; the glass's edge already hides what it hasn't reached.
      */
     fun block(index: Int, ms: Float, count: Int): Block {
         val s = (ms - blockStartMs(index, count)) / 1000f
         if (s <= 0f) return Block(-DROP_DP, 0f, false)
         if (s > 1f) return Block(0f, 1f, true) // long settled (and "Remove animations": no time at all)
-        val x = spring(-DROP_DP, s, 0.86f, 520f)
+        val x = spring(-DROP_DP, s, 0.86f, 700f)
         if (abs(x) < 0.02f && s > 0.2f) return Block(0f, 1f, true)
         return Block(x, smoothstep(0f, 0.6f, 1f - abs(x) / DROP_DP), false)
     }

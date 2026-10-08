@@ -538,7 +538,10 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, gl
     // in instead of popping. Drawn in the graphics layer only: no relayout, so the window doesn't
     // resize per frame.
     val appear = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, Motion.spec(androidx.compose.animation.core.tween(220))) }
+    LaunchedEffect(Unit) {
+        appear.animateTo(1f, Motion.spec(androidx.compose.animation.core.tween(180,
+            easing = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0f, 0f, 1f))))
+    }
     val alert = s.tone == Tone.ALERT
     val color = when (s.tone) {
         Tone.ALERT -> look.alertFg

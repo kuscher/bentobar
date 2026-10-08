@@ -219,7 +219,7 @@ class StripHighlight {
         const val HELD = 0.18f
         const val PRESSED = 0.22f
         const val GRACE_MS = 150
-        const val FADE_MS = 120
+        const val FADE_MS = 100
         /** Out of the way at once when an item is lifted to be dragged. */
         const val LIFT_MS = 80
         private const val MS = 1_000_000L

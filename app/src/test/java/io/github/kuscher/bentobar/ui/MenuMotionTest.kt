@@ -18,16 +18,16 @@ class MenuMotionTest {
         // Slow, fast, slow: the opening barely moves in its first and last tenth.
         assertTrue(MenuMotion.OPENS.at(0.1f) < 0.05f)
         assertTrue(MenuMotion.OPENS.at(0.9f) > 0.97f)
-        // cubic-bezier(0.55, 0, 0.1, 1) at its middle, as a browser computes it.
-        assertEquals(0.79f, MenuMotion.OPENS.at(0.5f), 0.02f)
+        // v2's curve, cubic-bezier(0.45, 0, 0.1, 1): the same shape with a shorter wait, half open by a third of the time.
+        assertEquals(0.5f, MenuMotion.OPENS.at(0.33f), 0.06f)
     }
 
-    @Test fun aTallerPopupTakesALittleLongerToOpenUpToAThirdOfASecond() {
-        assertEquals(240f, MenuMotion.openMs(120f), 0f)
-        assertEquals(240f, MenuMotion.openMs(200f), 0f)
-        assertEquals(260f, MenuMotion.openMs(300f), 0.01f)
-        assertEquals(340f, MenuMotion.openMs(700f), 0.01f)
-        assertEquals(340f, MenuMotion.openMs(1400f), 0f)
+    @Test fun aTallerPopupTakesALittleLongerToOpenWithinAQuarterOfASecondOrSo() {
+        // v2: 160 + 0.16 × height, between 190 and 270 ms (a fifth quicker than v1).
+        assertEquals(190f, MenuMotion.openMs(120f), 0f)
+        assertEquals(208f, MenuMotion.openMs(300f), 0.01f)
+        assertEquals(258.56f, MenuMotion.openMs(616f), 0.01f)
+        assertEquals(270f, MenuMotion.openMs(1400f), 0f)
     }
 
     @Test fun itUnfoldsDownFromALipAndRestsAtItsFullHeight() {
@@ -37,26 +37,25 @@ class MenuMotionTest {
         assertEquals(0f, first.presence, 0f)
         assertEquals(0f, first.shadow, 0f)
         assertEquals(10f, first.cornerDp, 0f)                    // the lip is a capsule
-        // The timeline in motion.md, H = 300 dp: 50 dp at 60 ms, 175 dp at 100 ms, at rest at 260 ms.
-        assertEquals(50f, MenuMotion.opening(60f, h).heightDp, 10f)
-        assertEquals(175f, MenuMotion.opening(100f, h).heightDp, 15f)
-        assertEquals(h, MenuMotion.opening(260f, h).heightDp, 0f)
-        assertTrue(MenuMotion.opening(260f, h).done)
-        assertFalse(MenuMotion.opening(200f, h).done)
+        // motion.md §7, H = 300 dp: half open at 69 ms, at rest at 208 ms.
+        assertEquals(160f, MenuMotion.opening(69f, h).heightDp, 15f)
+        assertEquals(h, MenuMotion.opening(208f, h).heightDp, 0f)
+        assertTrue(MenuMotion.opening(208f, h).done)
+        assertFalse(MenuMotion.opening(180f, h).done)
         var last = 0f
         for (ms in 0..400 step 4) {
             val g = MenuMotion.opening(ms.toFloat(), h)
             assertTrue(g.heightDp >= last && g.heightDp <= h); last = g.heightDp
         }
-        assertEquals(MenuMotion.RADIUS_DP, MenuMotion.opening(260f, h).cornerDp, 0f)
+        assertEquals(MenuMotion.RADIUS_DP, MenuMotion.opening(208f, h).cornerDp, 0f)
     }
 
     @Test fun theGlassArrivesDuringTheSlowStartAndItsShadowOnceThereIsSomethingToCastIt() {
-        assertEquals(0.42f, MenuMotion.opening(17f, 300f).presence, 0.1f)
-        assertEquals(1f, MenuMotion.opening(100f, 300f).presence, 0f)
+        assertEquals(0.5f, MenuMotion.opening(17f, 300f).presence, 0.12f)
+        assertEquals(1f, MenuMotion.opening(80f, 300f).presence, 0f)
         // No dark line under the lip: the shadow comes with the opening, full by 60 % of the way.
         assertTrue(MenuMotion.opening(30f, 300f).shadow < 0.05f)
-        assertEquals(1f, MenuMotion.opening(160f, 300f).shadow, 0f)
+        assertEquals(1f, MenuMotion.opening(130f, 300f).shadow, 0f)
     }
 
     @Test fun aPopupNoTallerThanItsLipIsSimplyThere() {
@@ -66,53 +65,52 @@ class MenuMotionTest {
     }
 
     @Test fun eachBlockDropsIntoPlaceInTurnWithoutShrinkingBack() {
-        // In a popup of five blocks, block i starts at 30 + 20 × i ms, 8 dp above its place.
-        assertEquals(-8f, MenuMotion.block(0, 29f, 5).dy, 0f)
-        assertEquals(0f, MenuMotion.block(0, 29f, 5).alpha, 0f)
-        assertEquals(-8f, MenuMotion.block(3, 89f, 5).dy, 0f)
-        assertTrue(MenuMotion.block(3, 100f, 5).dy > -8f)
-        var most = -8f
-        for (ms in 30..700) { val b = MenuMotion.block(0, ms.toFloat(), 5); most = maxOf(most, b.dy) }
+        // v2: in a popup of five blocks, block i starts at 24 + 16 × i ms, 6 dp above its place.
+        assertEquals(-6f, MenuMotion.block(0, 23f, 5).dy, 0f)
+        assertEquals(0f, MenuMotion.block(0, 23f, 5).alpha, 0f)
+        assertEquals(-6f, MenuMotion.block(3, 71f, 5).dy, 0f)
+        assertTrue(MenuMotion.block(3, 80f, 5).dy > -6f)
+        var most = -6f
+        for (ms in 24..700) { val b = MenuMotion.block(0, ms.toFloat(), 5); most = maxOf(most, b.dy) }
         assertTrue("overshoot ${most} dp", most < 0.1f)
-        // Readable about 65 ms in; within half a dp by about 180 ms on that spring, so the last block is still by ~370 ms.
-        assertTrue(MenuMotion.block(0, 30f + 65f, 5).alpha > 0.85f)
-        assertEquals(0f, MenuMotion.block(8, 190f + 180f, 9).dy, 0.5f)
-        assertTrue(MenuMotion.block(8, 190f + 400f, 9).done)
-        assertEquals(0f, MenuMotion.block(8, 190f + 400f, 9).dy, 0f)
-        assertEquals(1f, MenuMotion.block(8, 190f + 400f, 9).alpha, 0f)
+        // Readable about 57 ms in; within half a dp by about 140 ms on spring(0.86, 700).
+        assertTrue(MenuMotion.block(0, 24f + 57f, 5).alpha > 0.85f)
+        assertEquals(0f, MenuMotion.block(8, 152f + 140f, 9).dy, 0.5f)
+        assertTrue(MenuMotion.block(8, 152f + 400f, 9).done)
+        assertEquals(0f, MenuMotion.block(8, 152f + 400f, 9).dy, 0f)
+        assertEquals(1f, MenuMotion.block(8, 152f + 400f, 9).alpha, 0f)
     }
 
     @Test fun aTallPopupsBlocksSpreadOverTheSameTimeRatherThanArrivingInAClump() {
-        // Sixteen blocks (the Weather popup): the last still starts at 190 ms, and no two start together, so the lower
-        // glass is never left empty while a clump waits (the motion review of the built 1.3).
-        assertEquals(190f, MenuMotion.blockStartMs(15, 16), 0.01f)
+        // Sixteen blocks (the Weather popup): the last starts at 152 ms, and no two start together, so the lower glass is
+        // never left empty while a clump waits (the motion review of the built 1.3; v2's numbers).
+        assertEquals(152f, MenuMotion.blockStartMs(15, 16), 0.01f)
         for (i in 1 until 16) assertTrue(MenuMotion.blockStartMs(i, 16) > MenuMotion.blockStartMs(i - 1, 16))
-        // Up to nine blocks, 20 ms apart as before.
-        assertEquals(30f + 20f * 4, MenuMotion.blockStartMs(4, 5), 0f)
-        assertEquals(190f, MenuMotion.blockStartMs(8, 9), 0f)
-        assertEquals(30f, MenuMotion.blockStartMs(0, 1), 0f)
-        assertEquals(590f, MenuMotion.blocksDoneMs(16), 0.01f)
+        // Up to nine blocks, 16 ms apart.
+        assertEquals(24f + 16f * 4, MenuMotion.blockStartMs(4, 5), 0f)
+        assertEquals(152f, MenuMotion.blockStartMs(8, 9), 0f)
+        assertEquals(24f, MenuMotion.blockStartMs(0, 1), 0f)
+        assertEquals(552f, MenuMotion.blocksDoneMs(16), 0.01f)
     }
 
     @Test fun closingFoldsBackIntoTheItemAndFadesAsItLands() {
-        val h = 300f                                          // T 260, so the fold takes 0.45 × 260 = 117 ms
+        val h = 300f                                          // T 208, so the fold takes 0.45 × 208 = 93.6 ms
         val c = MenuMotion.closing(0f, h, h, 1f)
         assertEquals(h, c.heightDp, 0f); assertEquals(1f, c.presence, 0f); assertEquals(1f, c.contents, 0f)
-        assertEquals(0f, MenuMotion.closing(50f, h, h, 1f).contents, 0f)    // the contents go first, in place
-        assertEquals(170f, MenuMotion.closing(50f, h, h, 1f).heightDp, 25f)
-        assertEquals(lip, MenuMotion.closing(117f, h, h, 1f).heightDp, 0.01f)
-        assertEquals(1f, MenuMotion.closing(87f, h, h, 1f).presence, 0f)    // presence falls from 30 ms before the fold ends
-        assertEquals(0.5f, MenuMotion.closing(117f, h, h, 1f).presence, 0.01f)
-        assertEquals(147f, MenuMotion.closeMs(h, h), 0.01f)
-        assertTrue(MenuMotion.closing(147f, h, h, 1f).done)
-        assertEquals(0f, MenuMotion.closing(147f, h, h, 1f).presence, 0f)
+        assertEquals(0f, MenuMotion.closing(40f, h, h, 1f).contents, 0f)    // the contents go first, in place, in 40 ms
+        assertEquals(lip, MenuMotion.closing(93.6f, h, h, 1f).heightDp, 0.01f)
+        assertEquals(1f, MenuMotion.closing(68f, h, h, 1f).presence, 0f)    // presence falls from 25 ms before the fold ends
+        assertEquals(0.5f, MenuMotion.closing(93.6f, h, h, 1f).presence, 0.01f)
+        assertEquals(118.6f, MenuMotion.closeMs(h, h), 0.01f)
+        assertTrue(MenuMotion.closing(118.6f, h, h, 1f).done)
+        assertEquals(0f, MenuMotion.closing(118.6f, h, h, 1f).presence, 0f)
     }
 
     @Test fun closedWhileStillOpeningItFoldsFromWhereItIsAndFaster() {
-        // Half open: the fold is half as long, but never under 50 ms.
-        val f = MenuMotion.closeMs(lip + (300f - lip) / 2, 300f) - 30f
-        assertEquals(117f / 2, f, 0.5f)
-        assertEquals(50f + 30f, MenuMotion.closeMs(lip + 4f, 300f), 0.01f)
+        // Three quarters open: the fold is three quarters as long, but never under 50 ms.
+        val f = MenuMotion.closeMs(lip + (300f - lip) * 0.75f, 300f) - 25f
+        assertEquals(93.6f * 0.75f, f, 0.5f)
+        assertEquals(50f + 25f, MenuMotion.closeMs(lip + 4f, 300f), 0.01f)
         // It starts from the presence it had.
         assertEquals(0.4f, MenuMotion.closing(0f, 100f, 300f, 0.4f).presence, 0f)
     }
@@ -128,16 +126,16 @@ class MenuMotionTest {
         assertTrue(most <= h + 0.01f)
         val end = MenuMotion.reopening(800f, 150f, -2f, h, 0.6f, 0.2f)
         assertEquals(h, end.heightDp, 0f); assertTrue(end.done)
-        // Presence comes back in 60 ms, the contents in 100 ms, both from where they were.
+        // Presence comes back in 60 ms, the contents in 100 ms, both from where they were (unchanged in v2).
         assertEquals(0.6f, start.presence, 0f); assertEquals(1f, MenuMotion.reopening(60f, 150f, -2f, h, 0.6f, 0.2f).presence, 0f)
         assertEquals(0.2f, start.contents, 0f); assertEquals(1f, MenuMotion.reopening(100f, 150f, -2f, h, 0.6f, 0.2f).contents, 0f)
     }
 
     @Test fun aPopupLeftForAnotherDissolvesInPlace() {
         assertEquals(1f, MenuMotion.dissolve(0f), 0f)
-        assertEquals(0.5f, MenuMotion.dissolve(45f), 0.01f)
-        assertEquals(0f, MenuMotion.dissolve(90f), 0f)
-        assertEquals(90f, MenuMotion.DISSOLVE_MS, 0f)
+        assertEquals(0.5f, MenuMotion.dissolve(37.5f), 0.01f)
+        assertEquals(0f, MenuMotion.dissolve(75f), 0f)
+        assertEquals(75f, MenuMotion.DISSOLVE_MS, 0f)
     }
 
     @Test fun theSystemsAnimationSpeedStretchesEverythingAndRemoveAnimationsSkipsIt() {

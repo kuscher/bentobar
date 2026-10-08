@@ -274,11 +274,12 @@ class StripHighlightTest {
         var last = -1f
         var halfway = -1f
         val start = now
-        run(130) {
+        // v2 (motion.md §7): it fades in 100 ms.
+        run(110) {
             isOn(net)
             assertTrue("fades up steadily", h.alpha >= last)
             last = h.alpha
-            if (halfway < 0 && now - start >= 60 * ms) halfway = h.alpha
+            if (halfway < 0 && now - start >= 50 * ms) halfway = h.alpha
         }
         assertEquals(1f, h.alpha, 0f)
         // cubic-bezier(0.4, 0, 0.2, 1) is well ahead of a straight line halfway.
@@ -311,7 +312,7 @@ class StripHighlightTest {
         val faded = now
         while (h.step(now)) { isOn(cpu); now += f }
         assertEquals(0f, h.alpha, 0f)
-        assertTrue("faded in ${(now - faded) / ms} ms", now - faded <= 130 * ms)
+        assertTrue("faded in ${(now - faded) / ms} ms", now - faded <= 110 * ms)
         isOn(cpu)
         assertNull(h.wakeAt)
     }
@@ -534,8 +535,8 @@ class StripHighlightTest {
         val start = now
         var full = -1L
         run(300) { if (full < 0 && h.alpha == 1f) full = (now - start) / ms }
-        // 120 ms at scale 1, twice that here (to the frame that reaches it).
-        assertTrue("faded in after $full ms", full in 240L..249L)
+        // 100 ms at scale 1 (v2), twice that here (to the frame that reaches it).
+        assertTrue("faded in after $full ms", full in 195L..209L)
     }
 
     @Test fun aTouchShowsThePillWhileTheFingerIsDown() = with(Hover()) {

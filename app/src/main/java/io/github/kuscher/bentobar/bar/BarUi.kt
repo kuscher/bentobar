@@ -200,6 +200,8 @@ interface StripEvents {
     fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {}
     /** The wheel over the strip, where no item uses it: [up] reveals hidden items, down folds them. */
     fun wheel(up: Boolean) {}
+    /** A click in a gap between items: it is the click of the item the highlight is on ([key]: an item's id, or "chevron"). */
+    fun gapClick(key: String) {}
     /** [item] dragged sideways by [dx] px; [done] on release, where it should land. */
     fun drag(item: ItemConfig, dx: Float, done: Boolean) {}
     /** [item]'s slider was set to [level] (0 to 1, on one of its steps); [done] when the pointer let go. */
@@ -255,9 +257,17 @@ fun Strip(
             .onPlaced { glow.row = it }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
+                    // A press no item took (it fell in a gap): its click goes to the item the highlight is on, which
+                    // never leaves the gaps (motion.md §4). Items take their own presses before this sees them.
+                    var gap = false
                     while (true) {
                         val e = awaitPointerEvent()
                         when (e.type) {
+                            PointerEventType.Press -> gap = e.changes.none { it.isConsumed } && !e.buttons.isSecondaryPressed
+                            PointerEventType.Release -> {
+                                if (gap && e.changes.none { it.isConsumed }) glow.model.under?.let { events.gapClick(it) }
+                                gap = false
+                            }
                             PointerEventType.Enter -> events.hover(true)
                             PointerEventType.Exit -> events.hover(false)
                             PointerEventType.Scroll -> e.changes.firstOrNull()?.takeIf { !it.isConsumed }?.let {

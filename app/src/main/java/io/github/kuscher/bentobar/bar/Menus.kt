@@ -72,7 +72,8 @@ fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Comp
             dark = dark,
         )
         val density = LocalDensity.current.density
-        Box(Modifier.padding(start = MenuRoom.side, end = MenuRoom.side, top = MenuRoom.top, bottom = MenuRoom.bottom)) {
+        // The window is the card: its shadow is drawn in a window of its own (MenuShadow).
+        Box {
             Box(
                 Modifier.width(width)
                     .onSizeChanged {

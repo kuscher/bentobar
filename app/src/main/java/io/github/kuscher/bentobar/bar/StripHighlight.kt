@@ -45,8 +45,9 @@ class StripHighlight {
     var on: String? = null
         private set
     private var aimed: Span? = null
-    /** The item under the pointer, as [target] reads it. */
-    private var under: String? = null
+    /** The item under the pointer, as [target] reads it: a click in a gap goes to it. */
+    var under: String? = null
+        private set
     private var inside = false
     /** When the pointer left the strip; the pill stays for [GRACE_MS] (a pointer slipping below the bar while scrubbing). */
     private var leftAt: Long? = null

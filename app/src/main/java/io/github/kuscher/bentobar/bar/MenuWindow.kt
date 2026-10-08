@@ -36,10 +36,12 @@ import kotlin.math.roundToInt
  * window: only a `Window` can blur what is behind it, and a dialog of type TYPE_ACCESSIBILITY_OVERLAY
  * made with the service's context gets the service's token from its WindowManager, as `addView` does.
  *
- * The window is the card plus room for its shadow ([MenuRoom]), added at its full size and never
- * resized while it moves: the card unfolds inside it. Before each frame its root view is framed to the
- * glass as far as it shows, because the platform blurs exactly the root view's rectangle (Booklight's
- * "the blur follows the glass"); what is in it is moved back so it stays where it is on screen.
+ * The window is exactly the card, added at its full size and never resized while it moves: the card
+ * unfolds inside it. Before each frame its root view is cut to the glass as far as it shows (its bottom
+ * edge only), because the platform blurs exactly the root view's rectangle (Booklight's "the blur
+ * follows the glass"). Only the bottom moves, so what is drawn and where touches land stay put: Compose
+ * places input by the root view's own top-left corner. The shadow, which lies outside the card, is drawn
+ * in a window of its own just below ([MenuRoom] around the card).
  *
  * One clock drives everything ([MenuMotion]), from the popup's first drawn frame: the glass, its blur
  * and shadow (read by the Compose content from [glass]), and its blocks. Closing folds the glass back
@@ -49,7 +51,8 @@ import kotlin.math.roundToInt
 class MenuWindow(
     private val service: Context,
     private val title: String,
-    private val onOutside: () -> Unit,
+    /** A press outside the popup (its coordinates are on screen only where it lands on one of BentoBar's own windows). */
+    private val onOutside: (MotionEvent) -> Unit,
     private val onEscape: () -> Unit,
 ) {
     val glass = MenuGlassState()
@@ -72,19 +75,14 @@ class MenuWindow(
         }
 
         override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-            if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) { onOutside(); return true }
-            // The room around the card is part of the window but not of the popup: a press there is outside too.
-            if (ev.actionMasked == MotionEvent.ACTION_DOWN && !onCard(ev)) { onOutside(); return true }
+            if (ev.actionMasked == MotionEvent.ACTION_OUTSIDE) { onOutside(ev); return true }
             return super.dispatchTouchEvent(ev)
         }
     }
 
-    /** Where the card sits in the window, in px. */
-    private val cardLeft = (MenuRoom.side.value * density).roundToInt()
-    private val cardTop = (MenuRoom.top.value * density).roundToInt()
-    private var cardWidth = 0
-    private var windowX = 0
-    private var windowY = 0
+    /** The room around the card in the shadow's window, in px. */
+    private val roomSide = (MenuRoom.side.value * density).roundToInt()
+    private val roomTop = (MenuRoom.top.value * density).roundToInt()
     private val blurPx = (BLUR_DP * density).roundToInt()
 
     private enum class Phase { OPENING, OPEN, CLOSING, REOPENING, DISSOLVING, GONE }
@@ -98,9 +96,11 @@ class MenuWindow(
     private var reopenSpeed = 0f
     private var reopenPresence = 1f
     private var reopenContents = 1f
-    /** The glass's height a frame ago and when, for its speed when it turns round. */
+    /** The glass's height in the last two frames and their times, for its speed when it turns round. */
     private var lastDp = 0f
     private var lastNanos = 0L
+    private var nowDp = 0f
+    private var nowNanos = 0L
     private var framed = false
     private var lastBlur = -1
     private var onGone: (() -> Unit)? = null
@@ -120,15 +120,11 @@ class MenuWindow(
      */
     fun show(x: Int, y: Int, width: Int, shadow: @Composable () -> Unit, content: @Composable () -> Unit): Boolean {
         val window = dialog.window ?: return false
-        cardWidth = width
-        windowX = x - cardLeft
-        windowY = y - cardTop
         glass.blur = wm.isCrossWindowBlurEnabled && !solid
         dialog.setCancelable(false)
         dialog.setTitle(title)
         dialog.setContentView(ComposeView(dialog.context).apply { setContent(content) })
         window.decorView.setViewTreeViewModelStoreOwner(models)
-        (window.decorView as? ViewGroup)?.clipChildren = false // the shadow lies outside the framed root view
         window.setType(WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY)
         window.setBackgroundDrawable(outline)
         window.setWindowAnimations(0)
@@ -141,9 +137,9 @@ class MenuWindow(
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
         )
         window.attributes = window.attributes.apply {
-            this.x = windowX
-            this.y = windowY
-            this.width = width + 2 * cardLeft
+            this.x = x
+            this.y = y
+            this.width = width
             height = WindowManager.LayoutParams.WRAP_CONTENT
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             setTitle(title)
@@ -154,9 +150,9 @@ class MenuWindow(
         window.decorView.viewTreeObserver.addOnPreDrawListener(frameGlass)
         // The shadow's window first, so the popup's own is above it (later windows of one type are higher).
         shade.params.gravity = Gravity.TOP or Gravity.LEFT
-        shade.params.x = windowX
-        shade.params.y = windowY
-        shade.params.width = width + 2 * cardLeft
+        shade.params.x = x - roomSide
+        shade.params.y = y - roomTop
+        shade.params.width = width + 2 * roomSide
         shade.show(shadow)
         try {
             dialog.show()
@@ -182,7 +178,8 @@ class MenuWindow(
      */
     fun close(dissolve: Boolean = false, now: Boolean = false, gone: (() -> Unit)? = null) {
         if (!shown) { gone?.invoke(); return }
-        onGone = gone
+        // Closed again at once (the screen going off mid-fold): what was to run after the first close still runs.
+        if (gone != null) onGone = gone
         if (now || scale() <= 0f) { remove(); return }
         if (phase == Phase.CLOSING || phase == Phase.DISSOLVING) return
         passThrough()
@@ -205,6 +202,8 @@ class MenuWindow(
         takeTouches()
         reopenFrom = glass.heightDp
         reopenSpeed = speed()
+        // Blocks that hadn't come in yet are simply there: the contents fade back in as a whole.
+        glass.clockMs = Float.POSITIVE_INFINITY
         reopenPresence = glass.presence
         reopenContents = glass.contents
         phase = Phase.REOPENING
@@ -246,7 +245,8 @@ class MenuWindow(
     }
 
     private fun put(g: MenuMotion.Glass, nanos: Long) {
-        lastDp = glass.heightDp; lastNanos = nanos
+        lastDp = nowDp; lastNanos = nowNanos
+        nowDp = g.heightDp; nowNanos = nanos
         glass.heightDp = g.heightDp
         glass.presence = g.presence
         glass.shadow = g.shadow
@@ -263,10 +263,14 @@ class MenuWindow(
         applyBlur()
     }
 
-    /** The glass's speed as it was last moving, in dp per ms (negative: folding up). */
+    /**
+     * The glass's speed between its last two frames, in dp per ms of motion time (negative: folding up): the
+     * motion runs in time the animator scale stretches, so a real dp per ms is that scale's dp per motion ms.
+     */
     private fun speed(): Float {
-        val dt = (System.nanoTime() - lastNanos) / 1e6f
-        return if (lastNanos == 0L || dt <= 0f || dt > 50f) 0f else (glass.heightDp - lastDp) / dt.coerceAtLeast(4f)
+        val dt = (nowNanos - lastNanos) / 1e6f
+        if (lastNanos == 0L || dt <= 0f || dt > 50f) return 0f
+        return (nowDp - lastDp) / dt * scale()
     }
 
     private fun fullDp(): Float = glass.fullHeightPx / density
@@ -280,16 +284,12 @@ class MenuWindow(
         if (w == 0 || h == 0) return
         val shownPx = min((glass.heightDp * density).roundToInt(), glass.fullHeightPx.takeIf { it > 0 } ?: Int.MAX_VALUE)
         val follow = glass.blur && glass.fullHeightPx > 0
-        val left = if (follow) cardLeft else 0
-        val top = if (follow) cardTop else 0
-        val right = if (follow) cardLeft + cardWidth else w
-        val bottom = if (follow) cardTop + shownPx.coerceAtLeast(1) else h
-        outline.corner = min(MenuMotion.RADIUS_DP * density, (bottom - top) / 2f)
+        val bottom = if (follow) shownPx.coerceIn(1, h) else h
+        outline.corner = min(MenuMotion.RADIUS_DP * density, bottom / 2f)
         if (follow || framed) {
             // A layout pass gives the root view the whole window again, so the frame is set anew every time.
             framed = follow
-            root.setLeftTopRightBottom(left, top, right, bottom)
-            for (i in 0 until root.childCount) root.getChildAt(i).apply { translationX = -left.toFloat(); translationY = -top.toFloat() }
+            root.setLeftTopRightBottom(0, 0, w, bottom)
             root.invalidateOutline()
         }
     }
@@ -299,12 +299,6 @@ class MenuWindow(
         val r = if (!glass.blur) 0
             else (blurPx * glass.presence * glass.alpha).roundToInt().coerceAtLeast(if (phase == Phase.CLOSING || phase == Phase.DISSOLVING) 0 else 1)
         if (r != lastBlur) { lastBlur = r; window.setBackgroundBlurRadius(r) }
-    }
-
-    private fun onCard(ev: MotionEvent): Boolean {
-        val x = ev.rawX - windowX
-        val y = ev.rawY - windowY
-        return x >= cardLeft && x < cardLeft + cardWidth && y >= cardTop && y < cardTop + glass.fullHeightPx
     }
 
     /** Leaving: touches and keys go to whatever is under it from now on. */

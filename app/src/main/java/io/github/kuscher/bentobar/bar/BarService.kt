@@ -17,6 +17,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -142,13 +143,18 @@ class BarController(private val service: AccessibilityService) {
     private var menu: MenuWindow? = null
     // Observable, so the strip's highlight can stay on the item whose popup is open (StripHost).
     private var menuKey: String? by mutableStateOf(null)
-    private var menuClosedKey: String? = null
-    private var menuClosedAt = 0L
-    /** Closed by a press outside it: that press's own click on the same item mustn't open it again. */
-    private var menuClosedByPress = false
+    /**
+     * The popup a press on its own item just closed: that press's click, which reaches the strip after the
+     * popup heard of the press, is spent (it would open the popup again). Only that one click, and only for a
+     * moment: a second click turns the popup round while it is still folding away.
+     */
+    private var spentKey: String? = null
+    private var spentAt = 0L
     /** A popup still folding away, and its key: clicked again meanwhile, it turns round. */
     private var leaving: MenuWindow? = null
     private var leavingKey: String? = null
+    /** It is folding away so that something can run once it is off the screen (a screenshot): it doesn't turn round. */
+    private var leavingThen = false
     private var snap: BarSnapshot? = null
     private var sampled: BarColors? = null
     private var overlayIds = emptySet<Int>()
@@ -634,7 +640,7 @@ class BarController(private val service: AccessibilityService) {
             toggleMenu("ctx:${item.id}", at, 280) { host ->
                 ItemContextMenu(item.id, host) {
                     val type = Items.of(item.type)
-                    if (type?.menu != null) { closeMenu(dissolve = true); menuClosedKey = null; toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
+                    if (type?.menu != null) { closeMenu(dissolve = true); toggleMenu("item:${item.id}", at, type.menuWidthDp) { h -> ItemMenu(item.id, h) } }
                 }
             }
         }
@@ -700,6 +706,12 @@ class BarController(private val service: AccessibilityService) {
             cancelDrag()
         }
 
+        override fun gapClick(key: String) {
+            val at = placed[key] ?: return
+            if (key == "chevron") { chevron(at); return }
+            click(Store.config.value.items.firstOrNull { it.id == key } ?: return, at)
+        }
+
         override fun wheel(up: Boolean) {
             val cfg = Store.config.value
             if (cfg.presenting || cfg.hiddenMode == HiddenMode.SHOW_ALL || hiddenItems().isEmpty()) return
@@ -728,7 +740,7 @@ class BarController(private val service: AccessibilityService) {
     private fun barMenu(at: Rect, everything: Boolean) = toggleMenu("bentobar", at, 290) { host ->
         BentoBarMenu(host, openItem = { item ->
             val type = Items.of(item.type)
-            closeMenu(dissolve = true); menuClosedKey = null
+            closeMenu(dissolve = true)
             // From the list of every item, an item's menu opens under the item itself.
             val anchor = placed[item.id]?.takeIf { everything } ?: at
             if (type != null && type.onClick(item)) Ticker.refresh()
@@ -768,10 +780,10 @@ class BarController(private val service: AccessibilityService) {
         val now = SystemClock.uptimeMillis()
         hideTip()
         if (menuKey == key) { closeMenu(); return }
-        // The press that closed this very popup (outside touch) shouldn't reopen it.
-        if (menuClosedByPress && menuClosedKey == key && now - menuClosedAt < 350) return
+        if (spentKey == key) { spentKey = null; if (now - spentAt < 1000) return }
+        spentKey = null
         val back = leaving
-        if (leavingKey == key && back != null && back.reopen()) {
+        if (menu == null && !leavingThen && leavingKey == key && back != null && back.reopen()) {
             leaving = null; leavingKey = null
             menu = back; menuKey = key
             focusMenu(key)
@@ -789,11 +801,34 @@ class BarController(private val service: AccessibilityService) {
         val x = left.coerceIn(side, (bounds.width() - w - side).coerceAtLeast(side))
         val y = s.bar.bottom + (MenuRoom.top.value * density).toInt()
         val maxH = ((bounds.height() - s.bar.bottom) / density - 170).toInt().coerceAtLeast(200)
-        val o = MenuWindow(service, "BentoBar menu", onOutside = { closeMenu(byPress = true) }, onEscape = { closeMenu() })
+        val o = MenuWindow(service, "BentoBar menu", onOutside = { outside(it) }, onEscape = { closeMenu() })
         if (!o.show(x, y, w, shadow = { MenuShadow(widthDp.dp, o.glass) }) { MenuSurface(widthDp.dp, maxH.dp, o.glass) { content(host) } }) return
         menu = o
         menuKey = key
         focusMenu(key)
+    }
+
+    /**
+     * A press outside the open popup. On the popup's own item it folds the popup away and that press's click is
+     * spent; on another item the popup dissolves, and the click opens that item's popup as it unfolds; anywhere
+     * else it folds. (A press on another app's window comes without coordinates: it is "anywhere else".)
+     */
+    private fun outside(ev: MotionEvent) {
+        val key = menuKey ?: return
+        val loc = strip.locationOnScreen()
+        val x = ev.rawX - loc[0]
+        val y = ev.rawY - loc[1]
+        val onStrip = (ev.rawX != 0f || ev.rawY != 0f) && strip.shown &&
+            x >= 0 && x < strip.params.width && y >= 0 && y < (snap?.bar?.height() ?: 0)
+        // The same rule as the highlight's: a press in a gap belongs to the item on its side of the gap's middle.
+        val hit = if (onStrip) StripHighlight.target(x, placed.map { (k, r) -> Span(k, r.left.toFloat(), r.right.toFloat()) }.sortedBy { it.left }, null)
+            else null
+        val own = if (key == "bentobar") "chevron" else key.substringAfter(':')
+        when (hit) {
+            null -> closeMenu()
+            own -> { spentKey = key; spentAt = SystemClock.uptimeMillis(); closeMenu() }
+            else -> closeMenu(dissolve = true)
+        }
     }
 
     private fun focusMenu(key: String) {
@@ -842,25 +877,22 @@ class BarController(private val service: AccessibilityService) {
     /**
      * Closes the open popup: it folds back into its item ([dissolve]: it dissolves in place, left for
      * another), or goes at once ([now]: the service stopping, the screen going off, the display
-     * changing). [then] runs once it is off the screen. [byPress]: a press outside it closed it.
+     * changing). [then] runs once it is off the screen.
      */
-    fun closeMenu(now: Boolean = false, dissolve: Boolean = false, byPress: Boolean = false, then: (() -> Unit)? = null) {
+    fun closeMenu(now: Boolean = false, dissolve: Boolean = false, then: (() -> Unit)? = null) {
         val o = menu
         if (o == null) {
-            if (now) { leaving?.close(now = true); leaving = null; leavingKey = null }
+            if (now) { leaving?.close(now = true); leaving = null; leavingKey = null; leavingThen = false }
             then?.invoke()
             return
         }
         menu = null
-        menuClosedKey = menuKey
-        menuClosedAt = SystemClock.uptimeMillis()
-        menuClosedByPress = byPress
         // An earlier one still leaving goes at once: only one popup is ever folding away.
         leaving?.close(now = true)
-        leaving = o; leavingKey = menuKey
+        leaving = o; leavingKey = menuKey; leavingThen = then != null
         menuKey = null
         o.close(dissolve = dissolve, now = now) {
-            if (leaving === o) { leaving = null; leavingKey = null }
+            if (leaving === o) { leaving = null; leavingKey = null; leavingThen = false }
             then?.invoke()
         }
         Ticker.focusItem = null

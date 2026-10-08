@@ -109,6 +109,8 @@ class MenuWindow(
     private var nowDp = 0f
     private var nowNanos = 0L
     private var framed = false
+    /** The blur's corner radius last given, in px. */
+    private var lastCorner = -1f
     private var lastBlur = -1
     private var onGone: (() -> Unit)? = null
     private var shown = false
@@ -336,14 +338,17 @@ class MenuWindow(
         val shownPx = min((glass.heightDp * density).roundToInt(), glass.fullHeightPx.takeIf { it > 0 } ?: Int.MAX_VALUE)
         val follow = glass.blur && glass.fullHeightPx > 0
         val bottom = if (follow) shownPx.coerceIn(1, h) else h
-        outline.corner = min(MenuMotion.RADIUS_DP * density, bottom / 2f)
+        val corner = min(MenuMotion.RADIUS_DP * density, bottom / 2f)
         if (Log.isLoggable(MOTION_TAG, Log.DEBUG)) Log.d(MOTION_TAG, "blur bottom=$bottom")
         if (follow || framed) {
-            // A layout pass gives the root view the whole window again, so the frame is set anew every time.
+            // A layout pass gives the root view the whole window again, so the frame is looked at every time; but set
+            // only when it differs: each change asks for another frame, and at rest that ran 60 frames a second.
             framed = follow
-            root.setLeftTopRightBottom(0, 0, w, bottom)
-            root.invalidateOutline()
-        }
+            val work = GlassFrame.work(root.right, root.bottom, w, bottom, corner, lastCorner)
+            outline.corner = corner
+            if (work.bounds) root.setLeftTopRightBottom(0, 0, w, bottom)
+            if (work.outline) { lastCorner = corner; root.invalidateOutline() }
+        } else outline.corner = corner
     }
 
     private fun applyBlur() {

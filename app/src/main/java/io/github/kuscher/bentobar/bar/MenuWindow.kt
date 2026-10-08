@@ -90,6 +90,13 @@ class MenuWindow(
     private var phase = Phase.OPENING
     /** The frame time the phase began, in ns; -1 until its first frame. */
     private var phaseStart = -1L
+    /**
+     * The phase's own clock, in ms of motion: it advances by the time between frames, but never by more than one and
+     * a half frames at once. A late frame (a part's first drawing) then slows the motion for a moment instead of
+     * skipping ahead: the glass never sits still and then leaps (the motion review of v2).
+     */
+    private var motionMs = 0f
+    private var lastStep = -1L
     private var closeFrom = 0f
     private var closePresence = 1f
     private var reopenFrom = 0f
@@ -243,12 +250,16 @@ class MenuWindow(
                 return
             }
         }
-        if (phaseStart < 0) phaseStart = nanos
-        val ms = MenuMotion.scaled((nanos - phaseStart) / 1e6f, scale())
+        if (phaseStart < 0) { phaseStart = nanos; motionMs = 0f; lastStep = nanos }
+        val frameMs = 1000f / refresh()
+        val stepMs = ((nanos - lastStep) / 1e6f).coerceIn(0f, 1.5f * frameMs)
+        lastStep = nanos
+        motionMs += stepMs
+        val ms = MenuMotion.scaled(motionMs, scale())
         when (phase) {
             Phase.OPENING -> {
                 val g = MenuMotion.opening(ms, full)
-                if (Log.isLoggable(MOTION_TAG, Log.DEBUG)) Log.d(MOTION_TAG, "open ms=${ms.roundToInt()} h=${g.heightDp.roundToInt()}/${full.roundToInt()} p=${"%.2f".format(g.presence)}")
+                if (Log.isLoggable(MOTION_TAG, Log.DEBUG)) Log.d(MOTION_TAG, "open ms=${ms.roundToInt()} h=${g.heightDp.roundToInt()}/${full.roundToInt()} p=${"%.2f".format(g.presence)} step=${"%.1f".format(stepMs)}")
                 put(g, nanos)
                 glass.clockMs = ms
                 sync()

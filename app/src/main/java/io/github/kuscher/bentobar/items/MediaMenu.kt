@@ -114,9 +114,9 @@ internal fun MediaMenu(item: ItemConfig, host: MenuHost) {
                 Spacer(Modifier.height(8.dp))
             }
         }
-        // The three pop in one after another, from 56 ms (§7.2).
+        // The three pop in one after another, from 36 ms, 10 ms apart (§7.2: a block's parts within 60 ms).
         MediaButtons(playing = view.playing, canPrevious = view.canPrevious, canPlayPause = view.canPlayPause, canNext = view.canNext,
-            arrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), entranceMs = 56f,
+            arrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), entranceMs = 36f,
             onPrevious = { NowPlaying.previous() }, onPlayPause = { NowPlaying.playPause() }, onNext = { NowPlaying.next() })
         if (player != null && track != null) {
             Spacer(Modifier.height(4.dp))
@@ -170,11 +170,11 @@ internal fun TrackBlock(art: Bitmap?, title: String, artist: String, album: Stri
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             if (title.isNotEmpty()) Text(title, style = MaterialTheme.typography.titleMedium.copy(textDirection = TextDirection.Content),
-                color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(24f))
+                color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(16f))
             if (artist.isNotEmpty()) Text(artist, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(40f))
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(28f))
             if (album.isNotEmpty()) Text(album, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Content),
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(56f))
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(36f))
         }
     }
 }
@@ -223,7 +223,7 @@ internal fun PositionBar(session: NowPlaying.Session) {
                     interactionSource = source,
                     // The menus' ring for what the keyboard is on: with a thumb of its own, Material's slider shows none. As the
                     // popup opens the bar draws in from its start, the thumb showing when the line reaches it.
-                    modifier = Modifier.drawIn(40f).fillMaxWidth().height(32.dp)
+                    modifier = Modifier.drawIn(36f).fillMaxWidth().height(32.dp)
                         .then(if (focused) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, ring) else Modifier)
                         .semantics { contentDescription = label; stateDescription = state },
                     track = {
@@ -247,7 +247,7 @@ internal fun PositionBar(session: NowPlaying.Session) {
         }
         // The two times are in what the bar itself says ("1:42 of 5:37"), so they are not read a second time. They fade in
         // with the bar.
-        Row(Modifier.fadeIn(40f).fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics {}) {
+        Row(Modifier.fadeIn(36f).fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics {}) {
             val style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum")
             Text(MediaText.time(shown), style = style, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             Spacer(Modifier.weight(1f))

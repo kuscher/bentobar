@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.text.font.FontWeight
@@ -163,9 +164,16 @@ fun Sparkline(
     max: Double? = null,
 ) {
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
-    // Its well fades in, then the line draws in from the oldest reading, its fill clipped to the line's head (§7.2).
-    Canvas(modifier.fadeIn(0f).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(10.dp)).background(track).drawIn(30f)) {
+    // Its well fades in, then the line draws in from its oldest reading to its newest, its fill clipped to the line's
+    // head (§7.2); from its first reading, not the well's edge: a short history would otherwise pop in at the end.
+    val part = rememberPart(30f)
+    Canvas(modifier.fadeIn(0f).fillMaxWidth().height(44.dp).clip(RoundedCornerShape(10.dp)).background(track).part(part)) {
         val top = max ?: maxOf(values.maxOrNull() ?: 0.0, second?.maxOrNull() ?: 0.0, 1e-9)
+        val drawn = if (part == null) 1f else MenuMotion.draw(part.ms())
+        if (drawn <= 0f) return@Canvas
+        val longest = maxOf(values.size, second?.size ?: 0)
+        val first = size.width - size.width / (60 - 1).coerceAtLeast(longest - 1) * (longest - 1).coerceAtLeast(0)
+        val head = if (drawn >= 1f) size.width else first + (size.width - first) * drawn
         fun series(vs: List<Double>, c: Color, fill: Boolean) {
             if (vs.size < 2) return
             val stepX = size.width / (60 - 1).coerceAtLeast(vs.size - 1)
@@ -182,8 +190,10 @@ fun Sparkline(
             }
             drawPath(path, c, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
-        series(values, color, true)
-        if (second != null) series(second, secondColor, false)
+        clipRect(right = head) {
+            series(values, color, true)
+            if (second != null) series(second, secondColor, false)
+        }
         drawLine(color.copy(alpha = 0.15f), Offset(0f, size.height - 1), Offset(size.width, size.height - 1))
     }
 }
@@ -260,11 +270,11 @@ fun MediaButtons(playing: Boolean, canPrevious: Boolean = true, canPlayPause: Bo
         FilledTonalIconButton(onClick = onPrevious, enabled = canPrevious, modifier = Modifier.popIn(entranceMs, 0.8f)) {
             SymIcon(Sym.SKIP_PREVIOUS, size = 22.sp, contentDescription = stringResource(R.string.sound_previous))
         }
-        FilledTonalIconButton(onClick = onPlayPause, enabled = canPlayPause, modifier = Modifier.popIn(entranceMs + 16f, 0.8f)) {
+        FilledTonalIconButton(onClick = onPlayPause, enabled = canPlayPause, modifier = Modifier.popIn(entranceMs + 10f, 0.8f)) {
             SymIcon(if (playing) Sym.PAUSE else Sym.PLAY_ARROW, size = 22.sp,
                 contentDescription = stringResource(if (playing) R.string.common_pause else R.string.sound_play))
         }
-        FilledTonalIconButton(onClick = onNext, enabled = canNext, modifier = Modifier.popIn(entranceMs + 32f, 0.8f)) {
+        FilledTonalIconButton(onClick = onNext, enabled = canNext, modifier = Modifier.popIn(entranceMs + 20f, 0.8f)) {
             SymIcon(Sym.SKIP_NEXT, size = 22.sp, contentDescription = stringResource(R.string.sound_next))
         }
     }

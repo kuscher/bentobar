@@ -78,7 +78,7 @@ hides when an app goes full screen or the screen locks.
 | **Now playing** | the title while something plays | artwork, position, previous, play and next, other players. The title needs notification access (optional); without it the item still shows that something plays and controls it |
 | **Device batteries** | the lowest of your mouse, keyboard, stylus or controller, when it's low | every device that reports a battery |
 | **Heat** | a word when Android slows a hot device | heat level, battery temperature |
-| **Weather** *(online)* | conditions and temperature of a city you pick; rain or snow that is coming; optionally a word for the sky ("Partly cloudy", "Windy") | the next hours and days, sunrise and sunset. From [Open-Meteo](https://open-meteo.com) |
+| **Weather** *(online)* | conditions and temperature of a city you pick or of where you are; rain or snow that is coming; optionally a word for the sky ("Partly cloudy", "Windy") | the next hours and days, sunrise and sunset. From [Open-Meteo](https://open-meteo.com) |
 | **Flight** *(online)* | a line with the plane where the flight is, a countdown to departure with the gate, then to landing, and delays | times at both airports, terminal, gate, baggage belt; a choice where a number flies more than once a day. From AirLabs, with a free key of your own |
 | **Tools** | toolbox | screenshot, lock, overview, all apps, power, settings shortcuts |
 | **Shortcut** | one action, as its icon, its name or both (📷 Screenshot) | none: a click does it. Screenshot, Report a bug (the Googlebook's Feedback app), lock, overview, all apps, notifications, Quick settings |
@@ -162,7 +162,13 @@ BentoBar doesn't read other apps' windows and doesn't watch your keyboard, mouse
 - **Weather** sends [Open-Meteo](https://open-meteo.com) the city you search for, and for the forecast
   the coordinates of the city you pick, rounded to about a kilometre: about every 30 minutes while the
   bar is on screen, and when you open its menu or press Refresh. Open-Meteo sees your IP address, as
-  any website does. There is no location permission.
+  any website does. With **My location** instead of a city, BentoBar asks Android for the device's
+  approximate location (never the precise one) while that item is in the bar or waits in Hidden to show for
+  rain or snow, or while BentoBar's settings window is open: every 30 minutes once it knows, and when
+  Android doesn't, again after 1, 2, 5 and 15 minutes, then every 30. It sends
+  Open-Meteo that location rounded to about 10 km. BentoBar asks only for Android's "while using the
+  app" permission, not for background location. Where you are, and its forecast, are kept
+  in memory only: never on the device, in your layout or in its backup.
 - **Flight** sends [AirLabs](https://airlabs.co) the flight number and your own AirLabs key: when you
   track a flight, when you press Refresh, and while it follows the flight (about every 3 hours, then
   every 30 minutes or sooner from 3 hours before departure until it lands). AirLabs sees your IP
@@ -195,6 +201,7 @@ show the whole system instead.
 | Accessibility service | drawing items on the status bar and running Tools actions |
 | Notifications *(optional)* | timer alerts, and the Live Update chip |
 | Calendar *(optional)* | Next meeting, and events in the month view |
+| Approximate location *(optional)* | Weather's My location, rounded to about 10 km before it is sent |
 | Alarms and reminders *(optional)* | timers that ring on the second while the Googlebook sleeps |
 | Usage access *(optional)* | the apps using the most data today and the largest apps, in the Network and Storage menus |
 | Internet | Weather (Open-Meteo) and Flight (AirLabs), only after you set them up; nothing else |

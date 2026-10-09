@@ -2,10 +2,10 @@
 <!-- Weather (Open-Meteo). Every name here starts with weather_, item_weather_ or trigger_weather. -->
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
     <string name="item_weather_title">Weather</string>
-    <string name="item_weather_desc">Temperature and conditions for a city you pick; forecast in its menu</string>
+    <string name="item_weather_desc">Temperature and conditions for a city you pick or where you are; forecast in its menu</string>
     <string name="trigger_weather">Show when rain or snow is falling, or likely within %1$s</string>
     <string name="trigger_weather_short">shows before rain or snow</string>
-    <string name="weather_consent">Weather comes from Open-Meteo, a free weather service. BentoBar sends it the city you search for and that city\'s coordinates, nothing else; like any website, it sees your IP address.</string>
+    <string name="weather_consent">Weather comes from Open-Meteo, a free weather service. BentoBar sends it the city you search for and that city\'s coordinates, or with My location where this device is, to about 10 km; nothing else. Like any website, it sees your IP address.</string>
     <!-- Also the button under the credits in About: keep its name. -->
     <string name="weather_open_site">Open-Meteo.com</string>
 
@@ -58,6 +58,21 @@
     <!-- Open-Meteo's licence asks for this line. %1$s: "updated 2:40 PM", or the same after "no connection," or "no answer,". -->
     <string name="weather_note">Weather data by Open-Meteo.com · %1$s</string>
     <string name="weather_change_city">Change city</string>
+
+    <!-- My location: where the device is, instead of a city (Android's approximate location, rounded to about 10 km) -->
+    <string name="weather_here">My location</string>
+    <string name="weather_use_here">Use my location</string>
+    <!-- Back from My location to the city the item had: "Use Zurich". -->
+    <string name="weather_use_city">Use %1$s</string>
+    <string name="weather_here_current">Place: My location, to about 10 km</string>
+    <string name="weather_allow_location">Allow location</string>
+    <string name="weather_location_settings">Location settings</string>
+    <string name="weather_here_not_allowed">Location not allowed</string>
+    <string name="weather_here_not_allowed_note">To show the weather where you are, BentoBar needs Android\'s approximate location. It sends Open-Meteo that location rounded to about 10 km, and nothing else.</string>
+    <string name="weather_here_off">Location is off</string>
+    <string name="weather_here_off_note">Location is turned off on this device. Turn it on in Android\'s settings, or pick a city.</string>
+    <string name="weather_here_none">Location not found</string>
+    <string name="weather_here_none_note">Android doesn\'t know where this device is right now. BentoBar asks again, less often each time, then every half hour; or pick a city.</string>
     <!-- Beside Refresh while it is dimmed because an answer came less than a minute ago. -->
     <string name="weather_up_to_date">up to date</string>
 
@@ -94,6 +109,7 @@
     <string name="weather_desc_loading">Weather: loading</string>
     <string name="weather_desc_off">Weather: off</string>
     <string name="weather_desc_no_reading">Weather: no reading</string>
+    <string name="weather_desc_no_location">Weather: no location</string>
 
     <!-- spoken: the menu ("72 degrees. High 78, low 61. Rain, 20 percent chance. Wind 9 miles per hour.") -->
     <string name="weather_high_low_desc">High %1$s, low %2$s.</string>

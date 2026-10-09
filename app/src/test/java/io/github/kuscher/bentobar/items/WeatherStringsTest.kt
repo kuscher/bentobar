@@ -17,7 +17,7 @@ class WeatherStringsTest {
     /** The copy deck, table 9.6: the resource and its US English text. */
     private val deck = mapOf(
         "item_weather_title" to "Weather",
-        "item_weather_desc" to "Temperature and conditions for a city you pick; forecast in its menu",
+        "item_weather_desc" to "Temperature and conditions for a city you pick or where you are; forecast in its menu",
         "trigger_weather" to "Show when rain or snow is falling, or likely within %1\$s",
         "trigger_weather_short" to "shows before rain or snow",
         "weather_clear" to "Clear",
@@ -62,7 +62,7 @@ class WeatherStringsTest {
         "weather_note" to "Weather data by Open-Meteo.com · %1\$s",
         "weather_change_city" to "Change city",
         "weather_open_site" to "Open-Meteo.com",
-        "weather_consent" to "Weather comes from Open-Meteo, a free weather service. BentoBar sends it the city you search for and that city's coordinates, nothing else; like any website, it sees your IP address.",
+        "weather_consent" to "Weather comes from Open-Meteo, a free weather service. BentoBar sends it the city you search for and that city's coordinates, or with My location where this device is, to about 10 km; nothing else. Like any website, it sees your IP address.",
         "weather_city_label" to "City or town",
         "weather_two_letters" to "Type at least two letters.",
         "weather_searching" to "Searching…",
@@ -122,6 +122,20 @@ class WeatherStringsTest {
         // Show "with conditions": the sky's word in the bar, and "Windy" where a strong wind is the news.
         "weather_show_sky" to "With conditions",
         "weather_windy" to "Windy",
+        // My location: where the device is instead of a city, and the three ways it can be unknown.
+        "weather_here" to "My location",
+        "weather_use_here" to "Use my location",
+        "weather_use_city" to "Use %1\$s",
+        "weather_here_current" to "Place: My location, to about 10 km",
+        "weather_allow_location" to "Allow location",
+        "weather_location_settings" to "Location settings",
+        "weather_here_not_allowed" to "Location not allowed",
+        "weather_here_not_allowed_note" to "To show the weather where you are, BentoBar needs Android's approximate location. It sends Open-Meteo that location rounded to about 10 km, and nothing else.",
+        "weather_here_off" to "Location is off",
+        "weather_here_off_note" to "Location is turned off on this device. Turn it on in Android's settings, or pick a city.",
+        "weather_here_none" to "Location not found",
+        "weather_here_none_note" to "Android doesn't know where this device is right now. BentoBar asks again, less often each time, then every half hour; or pick a city.",
+        "weather_desc_no_location" to "Weather: no location",
     )
 
     @Test fun everyStringOfTheCopyDeckIsThereToTheCharacter() {

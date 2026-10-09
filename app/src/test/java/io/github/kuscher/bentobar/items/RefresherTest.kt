@@ -168,6 +168,17 @@ class RefresherTest {
         assertEquals("oslo#2", r.peek("oslo"))
     }
 
+    @Test fun keepOnlyAlsoDropsAFirstLoadOnItsWay() {
+        val r = refresher()
+        held = true
+        r.want("lima")
+        r.keepOnly(setOf("oslo"))
+        run()
+        // Its key went while it ran, before it had a snapshot: what it brings counts for nothing.
+        assertNull(r.peek("lima"))
+        assertEquals(0, changes)
+    }
+
     @Test fun aLoadThatThrowsIsLeftAloneForAWhile() {
         var broken = true
         val r = refresher(load = { key, _ -> loads += key; if (broken) error("a bug") else "fine" })

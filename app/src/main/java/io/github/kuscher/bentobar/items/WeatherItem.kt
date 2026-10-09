@@ -106,7 +106,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     // ---- deleted with the item --------------------------------------------------------------------
 
     private var seenItems: List<ItemConfig>? = null
-    private var seenHere: Fix? = null
+    private var seenNear: Place? = null
     private var keptFor: Set<Place>? = null
 
     /**
@@ -119,9 +119,10 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     private fun tidy() {
         val items = Store.config.value.items
         val here = WeatherHere.fix
-        if (items === seenItems && here == seenHere) return
+        val near = here?.let { WeatherRules.nearby(it.lat, it.lon) }
+        if (items === seenItems && near == seenNear) return
         seenItems = items
-        seenHere = here
+        seenNear = near
         val places = WeatherLoad.places(items, here)
         if (places == keptFor) return
         keptFor = places

@@ -43,6 +43,7 @@ class DebugReceiver : BroadcastReceiver() {
                 }
                 "reset" -> { Store.update { Defaults.config().copy(onboarded = it.onboarded) }; "reset" }
                 "add" -> Store.add(args[1], args.getOrNull(2)?.let { Section.valueOf(it.uppercase()) } ?: Section.SHOWN)
+                "remove" -> { Store.remove(args[1]); "ok" }
                 "set" -> {
                     val (k, v) = args[2].split('=', limit = 2)
                     val item = Store.config.value.items.firstOrNull { it.id == args[1] || it.type == args[1] } ?: error("no item")
@@ -112,6 +113,9 @@ class DebugReceiver : BroadcastReceiver() {
                             "hover" -> c.copy(hiddenMode = if (args[2] == "on") io.github.kuscher.bentobar.data.HiddenMode.HOVER else io.github.kuscher.bentobar.data.HiddenMode.CLICK)
                             "collapse" -> c.copy(autoCollapseSec = args[2].toInt())
                             "spacing" -> c.copy(spacing = args[2].toInt())
+                            "switch" -> c.copy(hoverSwitchesPopups = args[2] == "on")
+                            "animations" -> c.copy(noAnimations = args[2] == "off")
+                            "tint" -> c.copy(systemTint = args[2] == "on")
                             else -> c
                         }
                     }; "ok"

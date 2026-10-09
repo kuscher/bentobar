@@ -6,6 +6,35 @@
   Android's approximate location only when you choose it, and sends Open-Meteo that location rounded
   to about 10 km. It is kept in memory only, never in your layout.
 
+## 1.3.1 (2026-10-08)
+
+- **An open popup no longer keeps BentoBar busy.** While a popup sat open, it drew its window again 60 times a
+  second with nothing changed: about a tenth of a CPU core for as long as it stayed open. Now it draws once a second
+  (for its live values) and is otherwise still.
+
+## 1.3 (2026-10-08)
+
+- **Glass popups.** Every popup is frosted glass over a blur of what is behind it, with a thin white rim and
+  rounder corners. Where the system has no blur (battery saver), a solid card with the same rim, corners and
+  shadow. Text on the glass is tuned to stay readable over busy windows.
+- **A shadow that sits straight.** The shadow under a popup no longer leans to one side or stops short at an edge:
+  it falls straight down, lighter, and never shows through the glass.
+- **Popups unfold from the bar.** A popup opens down from its item and folds back into it when it closes, quickly:
+  about a quarter of a second to open, an eighth to close. Its contents arrive in turn, in reading order: the
+  header's icon pops in, rows fade in, the sparkline draws itself, meters and bars fill, tiles and the calendar's
+  days come in a diagonal wave, and a tracked flight's plane flies out along its route. Clicking another item hands
+  over: the open popup dissolves while the new one unfolds; clicking an item again while its popup folds away turns
+  it round.
+- **One highlight that follows the mouse.** Moving the pointer across the bar, a single highlight glides from item
+  to item, stretching across and gathering; it never drops out between items, and a click between two items goes
+  to the one it is on. It stays on the item whose popup is open.
+- **Three new choices in Look, all off unless you turn them on:**
+  - **Switch popups on hover:** with a popup open, pointing at another item opens its popup, as in a menu bar. It
+    never acts on items that do something on a click (Keep awake, a Shortcut).
+  - **No animations:** popups appear and go at once, and the highlight jumps from item to item. (The system's
+    "Remove animations" does the same.)
+  - **Tint with system colors:** popups take a soft tint of your system's colors, which follow your wallpaper.
+
 ## 1.2 (2026-10-07)
 
 - **Shortcut.** A new item: one click, one action. Screenshot, Report a bug (opens the Googlebook's

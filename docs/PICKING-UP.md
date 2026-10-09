@@ -19,17 +19,33 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 1.3.1 (2026-10-08): an open popup at rest is still again
+PR #29, merged as a merge commit: `MenuWindow.frame()` set the root's bounds and invalidated its outline before every
+frame, and each asked for another frame, so an open popup ran 60 layout/draw passes a second at rest (a tenth of a
+core on the Lenovo). Now only when the glass's size or corners change (`bar/GlassFrame.kt`, `GlassFrameTest`). Version
+code 16. Released on GitHub only (`PLAY_UPLOAD=off`), at Alex's word. Measured on the Lenovo (release builds): openings
+58-59/59 frames on time, blur or solid alike; a popup's first frame blocks the main thread 15-30 ms (two new windows,
+composition), so a switch between popups hitches about 3 frames: the one known cost left.
+
+## 1.3 (2026-10-08): glass popups, motion, one highlight
+A visual and motion release (docs/design/1.3: brief, visual, motion, engineering with "as built"). PR #28, merged as
+a merge commit. Popups in a Dialog-hosted TYPE_ACCESSIBILITY_OVERLAY window with the platform's background blur
+(`bar/MenuWindow.kt`), the shadow in a window of its own, the motion and the contents' choreography on one clock
+(`ui/MenuMotion.kt`, `ui/Glass.kt`), the strip's one highlight (`bar/StripHighlight.kt`); three choices in Look, off
+by default: Switch popups on hover, No animations, Tint with system colors. Version code 15. Released on GitHub
+only (`PLAY_UPLOAD=off`), at Alex's word; Play has 1.2 (in review, then his Publish click). Checked on the Lenovo
+Googlebook 15 by the visual and motion designers (approved). Test builds on a device with a release:
+`-PreleaseSignedDebug`.
+
 ## 1.2 (2026-10-07): Shortcut, With conditions + Windy, and the health fixes
 Three PRs, merged in this order as merge commits: #27 (health fixes from a code-health review of 1.0.2:
 show-when hold for network/cpu/memory, the tick stamp, Flight's back-off, TextRow, Duplicate, Undo,
 `coerceInputValues`, no colour readings while the strip is empty, the `addView` guard, dead code), #26 (the
 Shortcut item; the disclosure, `a11y_description`, README and Play texts now say a Shortcut item runs system actions
-too) and #25 (Weather's With conditions and Windy). Version code 14. **Released on GitHub only**
-(`PLAY_UPLOAD=off`, docs/RELEASING.md) while 1.0.2's Play review is open; it goes to Play from the run's `bundle`
-artifact or with the next tag, when Alex says so. For that submission: the accessibility declaration's text
-(`store-submission/forms/app-content.md`) and the full description now mention the Shortcut item; Play's
-"What's new" is in `store-submission/listing/en-US/release-notes.txt`. Not tried on a device before the tag (none
-at hand).
+too) and #25 (Weather's With conditions and Windy). Version code 14. Released on GitHub first (`PLAY_UPLOAD=off`, docs/RELEASING.md) while 1.0.2 was in review.
+1.0.2 was approved and published on 2026-10-07; that night the tag run's Play job was re-run (a draft on closed
+testing) and 1.2 sent for review on closed testing and production. Managed publishing: Alex publishes after his
+own test. The repo's full description mentions the Shortcut item; Play's listing text is still 1.0.2's.
 Next, for 1.3: #23 (Weather: My location) and #24 (US stocks), both with changes requested on 2026-10-07. #23 adds
 BentoBar's first location permission (Data safety, privacy page, a possible background-location question); #24 adds
 Finnhub (privacy page, Play's financial-features answer) and must switch `WeatherRules.count` to `TextRules.count`

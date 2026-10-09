@@ -79,8 +79,12 @@ import io.github.kuscher.bentobar.ui.CopyEntry
 import io.github.kuscher.bentobar.ui.MenuCard
 import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
+import io.github.kuscher.bentobar.ui.MenuMotion
 import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.ui.SearchField
+import io.github.kuscher.bentobar.ui.fadeIn
+import io.github.kuscher.bentobar.ui.part
+import io.github.kuscher.bentobar.ui.rememberPart
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Fonts
 import io.github.kuscher.bentobar.util.Now
@@ -350,18 +354,21 @@ internal fun RouteLine(from: FlightText.End, to: FlightText.End, share: Double?)
     val spoken = from.spoken + " " + to.spoken
     Column(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = spoken }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(from.code, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+            // Codes, times and words fade in as rows; the line arrives on its own (FlightPath).
+            Text(from.code, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
+                modifier = Modifier.fadeIn(0f))
             Spacer(Modifier.width(8.dp))
             FlightPath(share, Modifier.weight(1f).height(24.dp))
             Spacer(Modifier.width(8.dp))
-            Text(to.code, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+            Text(to.code, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
+                modifier = Modifier.fadeIn(0f))
         }
         Spacer(Modifier.height(2.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fadeIn(0f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             EndTime(from, TextAlign.Start, Modifier.weight(1f))
             EndTime(to, TextAlign.End, Modifier.weight(1f))
         }
-        if (from.words.isNotEmpty() || to.words.isNotEmpty()) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (from.words.isNotEmpty() || to.words.isNotEmpty()) Row(Modifier.fadeIn(0f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             EndWords(from.words, TextAlign.Start, Modifier.weight(1f))
             EndWords(to.words, TextAlign.End, Modifier.weight(1f))
         }
@@ -387,7 +394,8 @@ private fun EndWords(words: String, align: TextAlign, modifier: Modifier) {
  * part flown a solid 3 dp line up to 4 dp behind the plane; the plane 20 sp, nose to the arrival,
  * its center half its length in at the start (10 dp, at the usual text size) and as far from the end
  * when it has landed. No dot stands under the plane or within 2 dp of its nose. It moves in steps, as
- * answers and minutes arrive: nothing glides.
+ * answers and minutes arrive: nothing glides, but for once as its popup opens (motion.md §7.2): the dots
+ * fade in, and the plane flies out from the departure to where it is, the part flown drawing behind it.
  * Where each of these stands is [FlightLine]'s arithmetic; this only draws it.
  */
 @Composable
@@ -398,18 +406,23 @@ private fun FlightPath(share: Double?, modifier: Modifier) {
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val plane = remember(measurer, density) { measurer.measure(Sym.FLIGHT, TextStyle(fontFamily = Fonts.symbolsFilled, fontSize = 20.sp, lineHeight = 20.sp)) }
-    Canvas(modifier) {
+    val part = rememberPart(30f)
+    Canvas(modifier.part(part)) {
+        val ms = part?.ms() ?: Float.POSITIVE_INFINITY
+        val shown = MenuMotion.fade(ms)
+        // The plane's flight takes 160 ms plus 160 times the share flown, on the glass's curve: one just off lands sooner.
+        val flying = share?.let { it * MenuMotion.OPENS.at(ms / (160f + 160f * it.coerceIn(0.0, 1.0).toFloat())) }
         val dot = 3.dp.toPx()
         // The plane is a symbol and grows with the text size: the line makes room for it as it is.
-        val line = FlightLine.of(size.width, share, dot = dot, apart = 8.dp.toPx(), plane = 20.sp.toPx(), behind = 4.dp.toPx(), ahead = 2.dp.toPx())
+        val line = FlightLine.of(size.width, flying, dot = dot, apart = 8.dp.toPx(), plane = 20.sp.toPx(), behind = 4.dp.toPx(), ahead = 2.dp.toPx())
         val y = size.height / 2
         // The line is reckoned from the departure's end, which is on the right where the language reads from there.
         fun x(along: Float) = if (rtl) size.width - along else along
         line.flownUntil?.let { drawLine(flown, Offset(x(line.start), y), Offset(x(it), y), strokeWidth = dot, cap = StrokeCap.Round) }
-        for (at in line.dots) drawCircle(ahead, dot / 2, Offset(x(at), y))
+        for (at in line.dots) drawCircle(ahead, dot / 2, Offset(x(at), y), alpha = shown)
         line.center?.let { center ->
             rotate(if (rtl) -90f else 90f, Offset(x(center), y)) {
-                drawText(plane, color = flown, topLeft = Offset(x(center) - plane.size.width / 2f, y - plane.size.height / 2f))
+                drawText(plane, color = flown, topLeft = Offset(x(center) - plane.size.width / 2f, y - plane.size.height / 2f), alpha = shown)
             }
         }
     }

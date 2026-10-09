@@ -20,7 +20,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,26 +36,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.isTertiaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.onPlaced
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import io.github.kuscher.bentobar.ui.Motion
 import io.github.kuscher.bentobar.ui.animatePlacement
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.semantics.Role
@@ -164,7 +177,11 @@ private val SLIDER_HANDLE_HEIGHT = 14.dp
 /** A finger held this long without moving asks for the item's menu (the same time the items use). */
 private const val LONG_PRESS_MS = 550L
 
-/** The pill's padding at each end (none without a pill); the controller counts it in the width budget. */
+/**
+ * The strip's padding at each end: the pill's own, and the room the highlight's round ends need (it reaches 4 dp past
+ * the end items' boxes, and keeps 2 dp to the strip's ends). With a pill the controller counts it in the width budget;
+ * without one it places the window that much further out, so the items stay where they were.
+ */
 val STRIP_PILL_PADDING = 6.dp
 
 @androidx.compose.runtime.Immutable
@@ -184,6 +201,8 @@ interface StripEvents {
     fun itemHover(item: ItemConfig, at: Rect, inside: Boolean) {}
     /** The wheel over the strip, where no item uses it: [up] reveals hidden items, down folds them. */
     fun wheel(up: Boolean) {}
+    /** A click in a gap between items: it is the click of the item the highlight is on ([key]: an item's id, or "chevron"). */
+    fun gapClick(key: String) {}
     /** [item] dragged sideways by [dx] px; [done] on release, where it should land. */
     fun drag(item: ItemConfig, dx: Float, done: Boolean) {}
     /** [item]'s slider was set to [level] (0 to 1, on one of its steps); [done] when the pointer let go. */
@@ -213,19 +232,43 @@ fun Strip(
     events: StripEvents,
     /** Ids of the items that didn't fit, each time that changes. */
     onOverflow: (Set<String>) -> Unit = {},
+    /** The item whose popup is open ("chevron" for the ‹ menu), or null: the highlight stays on it. */
+    open: String? = null,
 ) {
     val pillBg = when (look.pill) {
         Pill.NONE -> Color.Transparent
         Pill.SUBTLE -> look.fg.copy(alpha = 0.12f)
         Pill.SOLID -> if (look.lightText) Color(0xE6202124) else Color(0xE6F1F3F4)
     }
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val glow = remember(density) { Glow(density) }
+    val view = androidx.compose.ui.platform.LocalView.current
+    SideEffect {
+        glow.model.refresh = view.display?.refreshRate ?: 60f
+        glow.hold(open)
+    }
+    // The highlight's frames: none at rest, and a frame each while it moves or fades. The system's animator duration
+    // scale comes with the effect's context, as every animation of Compose's takes it.
+    LaunchedEffect(glow) {
+        val context = coroutineContext
+        glow.frames { if (Motion.off) 0f else context[MotionDurationScale]?.scaleFactor ?: 1f }
+    }
     Row(
         Modifier.height(heightDp)
+            .onPlaced { glow.row = it }
             .pointerInput(Unit) {
                 awaitPointerEventScope {
+                    // A press no item took (it fell in a gap): its click goes to the item the highlight is on, which
+                    // never leaves the gaps (motion.md §4). Items take their own presses before this sees them.
+                    var gap = false
                     while (true) {
                         val e = awaitPointerEvent()
                         when (e.type) {
+                            PointerEventType.Press -> gap = e.changes.none { it.isConsumed } && !e.buttons.isSecondaryPressed
+                            PointerEventType.Release -> {
+                                if (gap && e.changes.none { it.isConsumed }) glow.model.under?.let { events.gapClick(it) }
+                                gap = false
+                            }
                             PointerEventType.Enter -> events.hover(true)
                             PointerEventType.Exit -> events.hover(false)
                             PointerEventType.Scroll -> e.changes.firstOrNull()?.takeIf { !it.isConsumed }?.let {
@@ -235,25 +278,144 @@ fun Strip(
                     }
                 }
             }
+            // The highlight follows the pointer. Read on the Initial pass, before anything inside sees the event, and
+            // never consumed: clicks, sliders, dragging and the wheel get every event as they did. (The handler above
+            // stays on the Main pass: the wheel there must know whether an item took the scroll.)
+            .pointerInput(glow) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val e = awaitPointerEvent(PointerEventPass.Initial)
+                        val c = e.changes.firstOrNull() ?: continue
+                        // A pressed pointer is still reported once it has left the strip (a slider dragged past its end):
+                        // only the Exit counts there.
+                        val over = c.position.x >= 0f && c.position.y >= 0f && c.position.x < size.width && c.position.y < size.height
+                        when (e.type) {
+                            PointerEventType.Enter, PointerEventType.Move -> if (over) glow.move(c.position.x)
+                            PointerEventType.Press -> { if (over) glow.move(c.position.x); glow.press(true) }
+                            PointerEventType.Release -> {
+                                glow.press(e.changes.any { it.pressed })
+                                // A finger has no hover: lifted, it has left.
+                                if (c.type == PointerType.Touch) glow.leave()
+                            }
+                            PointerEventType.Exit -> glow.leave()
+                        }
+                    }
+                }
+            }
             .padding(vertical = 3.dp)
             .clip(RoundedCornerShape(50))
             .background(pillBg)
-            .padding(horizontal = if (look.pill == Pill.NONE) 0.dp else STRIP_PILL_PADDING),
+            // Over the strip's own pill and under every item (an alert's red capsule is drawn over it). Its place is
+            // read here, at draw time, so a frame of its way draws it again and recomposes nothing.
+            .drawBehind { with(glow) { draw(look.fg) } }
+            // Without a pill the ends are only room for the highlight: an empty strip stays 0 wide, which is how the
+            // controller knows to make its window invisible rather than leave transparent nothing on screen.
+            .padding(horizontal = if (look.pill == Pill.NONE && visible.isEmpty() && revealed.isEmpty() && !showChevron) 0.dp else STRIP_PILL_PADDING),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val chevron: @Composable () -> Unit = {
-            if (showChevron) Chevron(expanded, chevronOnLeft, look, events)
+            if (showChevron) Chevron(expanded, chevronOnLeft, look, events, glow)
         }
         val items = if (chevronOnLeft) revealed + visible else visible + revealed
         if (chevronOnLeft) chevron()
         FitRow(ids = items.map { it.item.id }, maxWidthPx = maxWidthPx, chevronAlways = chevronAlways, chevronPx = chevronReservePx,
-            keepEnd = chevronOnLeft, spacing = look.spacing, onDropped = onOverflow) {
+            keepEnd = chevronOnLeft, spacing = look.spacing, onDropped = { ids -> glow.dropped(ids); onOverflow(ids) }) {
             // key(): remembered state (hover, held width) belongs to the item, not to its position,
             // or an item popping in would inherit its neighbour's width.
-            items.forEach { androidx.compose.runtime.key(it.item.id) { ItemView(it, look, events) } }
+            items.forEach { androidx.compose.runtime.key(it.item.id) { ItemView(it, look, events, glow) } }
         }
         if (!chevronOnLeft) chevron()
     }
+}
+
+/**
+ * The strip's one highlight on the Compose side of [StripHighlight], which decides everything: this hands it the
+ * pointer and where each item is drawn, runs its frames, and draws it.
+ *
+ * Nothing runs at rest. A change that needs frames wakes [frames], which steps the model once a frame until it rests; the
+ * grace after the pointer leaves is one wait, not frames. Each frame bumps [drawn], which only the row's drawBehind
+ * reads: the strip draws again and recomposes nothing. Most pointer moves change nothing and cost one lookup.
+ */
+private class Glow(private val density: Float) {
+    val model = StripHighlight()
+    private val drawn = mutableIntStateOf(0)
+    private val wake = Channel<Unit>(Channel.CONFLATED)
+    /** The strip's row: x is measured from its left end, by the pointer, the items' boxes and the drawing alike. */
+    var row: LayoutCoordinates? = null
+    private val boxes = HashMap<String, Span>()
+    /** Items FitRow left out: not placed, so their last box would be stale. */
+    private var dropped: Set<String> = emptySet()
+    private var pinned: String? = null
+
+    private fun now() = System.nanoTime()
+    private fun did(changed: Boolean) { if (changed) { drawn.intValue++; wake.trySend(Unit) } }
+
+    fun move(xPx: Float) = did(model.move(xPx / density, now()))
+    fun leave() = did(model.leave(now()))
+    fun press(down: Boolean) = did(model.press(down, now()))
+    fun hold(key: String?) = did(model.hold(key, now()))
+    fun lift(up: Boolean) = did(model.lift(up, now()))
+
+    /** [id]'s slider is held ([on]) or let go; only its own let-go unpins. */
+    fun pin(id: String, on: Boolean) {
+        if (on) { pinned = id; did(model.pin(id, now())) }
+        else if (pinned == id) { pinned = null; did(model.pin(null, now())) }
+    }
+
+    /** [id] (an item, or "chevron") is drawn at [box]: the box it is drawn in, after any slide of its own. */
+    fun placed(id: String, box: LayoutCoordinates) {
+        val r = row?.takeIf { it.isAttached } ?: return
+        if (!box.isAttached) return
+        val b = r.localBoundingBoxOf(box, clipBounds = false)
+        val span = Span(id, b.left / density, b.right / density)
+        if (boxes.put(id, span) != span) relayout()
+    }
+
+    fun gone(id: String) { if (boxes.remove(id) != null) relayout() }
+
+    fun dropped(ids: Set<String>) { if (ids != dropped) { dropped = ids; relayout() } }
+
+    private fun relayout() = did(model.layout(boxes.values.filter { it.key !in dropped }, now()))
+
+    /** Runs the model's frames while it moves or fades, waits out its grace, and sleeps until the next change. */
+    suspend fun frames(scale: () -> Float) {
+        model.scale = scale()
+        for (change in wake) {
+            while (true) {
+                model.scale = scale()
+                if (!model.moving) {
+                    val at = model.wakeAt ?: break
+                    val ms = (at - System.nanoTime()) / 1_000_000
+                    if (ms > 0) delay(ms)
+                }
+                withFrameNanos { model.step(it) }
+                drawn.intValue++
+            }
+        }
+    }
+
+    /** One rounded rectangle, in the bar's text colour (visual.md §3); nothing while it is gone. */
+    fun DrawScope.draw(fg: Color) {
+        drawn.intValue
+        val a = model.alpha
+        if (a <= 0f) return
+        val h = StripHighlight.height(size.height / density) * density
+        if (h <= 0f) return
+        val l = model.left * density
+        val r = model.right * density
+        drawRoundRect(fg.copy(alpha = model.fill * a), Offset(l, (size.height - h) / 2), Size(r - l, h), CornerRadius(h / 2))
+    }
+}
+
+/**
+ * A stadium over this box, in a strip [room] dp tall: the highlight's shape for the tile a dragged item lifts on
+ * ([pill]), or an alert's red capsule, 4 dp lower and only 2 dp past the box, so the highlight shows round it as a ring.
+ */
+private fun DrawScope.capsule(color: Color, room: Float, pill: Boolean) {
+    val h = (if (pill) StripHighlight.height(room) else StripHighlight.alertHeight(room)).dp.toPx()
+    if (h <= 0f) return
+    val out = (if (pill) StripHighlight.OUTSET else StripHighlight.ALERT_OUTSET).dp.toPx()
+    drawRoundRect(color, Offset(-out, (size.height - h) / 2), Size(size.width + 2 * out, h), CornerRadius(h / 2))
 }
 
 /**
@@ -309,20 +471,17 @@ private fun FitRow(ids: List<String>, maxWidthPx: Int, chevronAlways: Boolean, c
 }
 
 @Composable
-private fun Chevron(expanded: Boolean, onLeft: Boolean, look: StripLook, events: StripEvents) {
-    val source = remember { MutableInteractionSource() }
-    val hovered by source.collectIsHoveredAsState()
+private fun Chevron(expanded: Boolean, onLeft: Boolean, look: StripLook, events: StripEvents, glow: Glow) {
     var bounds by remember { mutableStateOf(Rect()) }
+    DisposableEffect(glow) { onDispose { glow.gone("chevron") } }
     // Hidden items sit on the chevron's far side; the arrow points where they'll appear.
     val sym = if (onLeft != expanded) Sym.CHEVRON_LEFT else Sym.CHEVRON_RIGHT
     val label = androidx.compose.ui.res.stringResource(if (expanded) io.github.kuscher.bentobar.R.string.chevron_hide else io.github.kuscher.bentobar.R.string.chevron_show)
     val menuLabel = androidx.compose.ui.res.stringResource(io.github.kuscher.bentobar.R.string.chevron_menu)
     Box(
         Modifier.fillMaxHeight()
-            .onGloballyPositioned { bounds = it.boundsInWindow().toRect(); events.placed("chevron", bounds) }
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (hovered) look.fg.copy(alpha = 0.14f) else Color.Transparent)
-            .hoverable(source)
+            // ‹ is one more item to the strip's highlight, which is its hover: it draws none of its own.
+            .onGloballyPositioned { bounds = it.boundsInWindow().toRect(); events.placed("chevron", bounds); glow.placed("chevron", it) }
             .clicks({ events.chevron(bounds) }, { events.chevronContext(bounds) }, null)
             .semantics {
                 contentDescription = label; role = Role.Button
@@ -335,7 +494,7 @@ private fun Chevron(expanded: Boolean, onLeft: Boolean, look: StripLook, events:
 }
 
 @Composable
-private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
+private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents, glow: Glow) {
     val s = entry.state
     if (entry.item.type == "spacer") {
         Box(Modifier.width(s.gapDp.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
@@ -362,8 +521,14 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val settle = remember { androidx.compose.animation.core.Animatable(0f) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val lifted = grab != null
+    // Lifted, the item hides the strip's highlight; dropped (or gone mid-drag), the highlight waits for the pointer to move.
+    DisposableEffect(lifted) {
+        if (lifted) glow.lift(true)
+        onDispose { if (lifted) glow.lift(false) }
+    }
+    DisposableEffect(entry.item.id) { onDispose { glow.gone(entry.item.id) } }
     val liftScale by androidx.compose.animation.core.animateFloatAsState(if (lifted) 1.08f else 1f,
-        androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMedium), label = "lift")
+        Motion.spec(androidx.compose.animation.core.spring(stiffness = androidx.compose.animation.core.Spring.StiffnessMedium)), label = "lift")
     // Live numbers (speeds, percentages, clocks) sit in a fixed slot sized for their widest
     // reading (Fmt.widthTemplate), right-aligned, so nothing next to them moves as they change.
     val density = androidx.compose.ui.platform.LocalDensity.current
@@ -373,7 +538,10 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     // in instead of popping. Drawn in the graphics layer only: no relayout, so the window doesn't
     // resize per frame.
     val appear = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, androidx.compose.animation.core.tween(220)) }
+    LaunchedEffect(Unit) {
+        appear.animateTo(1f, Motion.spec(androidx.compose.animation.core.tween(180,
+            easing = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0f, 0f, 1f))))
+    }
     val alert = s.tone == Tone.ALERT
     val color = when (s.tone) {
         Tone.ALERT -> look.alertFg
@@ -390,6 +558,12 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
     val route = s.route?.takeIf { display.line }
     // While the pointer holds the slider: the level under it. Otherwise the item's own, which is the real one.
     var held by remember { mutableStateOf<Float?>(null) }
+    // A held slider keeps the strip's highlight on its item, wherever the pointer goes, until it lets go.
+    val sliding = held != null
+    DisposableEffect(sliding) {
+        if (sliding) glow.pin(entry.item.id, true)
+        onDispose { if (sliding) glow.pin(entry.item.id, false) }
+    }
     val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current == LayoutDirection.Rtl
     val context by rememberUpdatedState { events.context(entry.item, bounds) }
     val showIcon = route == null && (display != Display.TEXT || s.text.isNullOrEmpty())
@@ -415,28 +589,31 @@ private fun ItemView(entry: StripEntry, look: StripLook, events: StripEvents) {
                         dragLeft = null
                         scope.launch {
                             settle.snapTo(from)
-                            settle.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f,
-                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow))
+                            settle.animateTo(0f, Motion.spec(androidx.compose.animation.core.spring(dampingRatio = 0.8f,
+                                stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow)))
                         }
                     }
                 })
             // Neighbors slide to their new places like magnets; the lifted item follows the pointer instead.
             .then(if (lifted || settle.isRunning) Modifier else Modifier.animatePlacement())
+            // Where it is drawn, sliding included, for the strip's highlight, which sits on the item wherever it goes.
+            .onGloballyPositioned { glow.placed(entry.item.id, it) }
             .zIndex(if (lifted || settle.isRunning) 1f else 0f)
             .graphicsLayer {
                 alpha = appear.value
                 translationX = (1f - appear.value) * 6.dp.toPx() + (dragLeft?.let { it - slotX } ?: 0f) + settle.value
                 scaleX = liftScale; scaleY = liftScale
             }
-            .clip(RoundedCornerShape(10.dp))
-            .background(when {
-                alert -> look.alertBg
-                // Lifted, it's a solid tile in the bar's own colour, so text it passes over doesn't show through.
-                lifted -> look.fg.copy(alpha = 0.18f).compositeOver(look.background)
-                // The hover box stays while the slider is held, also when the pointer has left the item.
-                hovered || held != null -> look.fg.copy(alpha = 0.14f)
-                else -> Color.Transparent
-            })
+            // Hovering draws nothing here: the strip's one highlight is the hover (Strip, StripHighlight). An alert's
+            // red capsule lies over it; lifted, the item is a solid tile in the highlight's shape and the bar's own
+            // colour, so text it passes over doesn't show through.
+            .drawBehind {
+                when {
+                    alert -> capsule(look.alertBg, size.height.toDp().value, pill = false)
+                    lifted -> capsule(look.fg.copy(alpha = 0.18f).compositeOver(look.background), size.height.toDp().value, pill = true)
+                }
+            }
+            // For the tooltip and the slider's handle.
             .hoverable(source)
             .semantics(mergeDescendants = true) {
                 contentDescription = s.desc.ifEmpty { s.text.orEmpty() }
@@ -510,7 +687,7 @@ private fun VolumeTrack(slider: BarSlider, held: Float?, handle: Boolean, look: 
     // were still on its way when the pointer lets go would draw the fill a step back first.
     val glided by androidx.compose.animation.core.animateFloatAsState(slider.level.coerceIn(0f, 1f),
         if (held != null) androidx.compose.animation.core.snap()
-        else androidx.compose.animation.core.tween(120, easing = androidx.compose.animation.core.FastOutSlowInEasing), label = "level")
+        else Motion.spec(androidx.compose.animation.core.tween(120, easing = androidx.compose.animation.core.FastOutSlowInEasing)), label = "level")
     val level = held ?: glided
     val track = look.sliderTrack
     // Muted, the fill is drawn solid in the color its strength gives on the bar: its round end lies over the
@@ -560,7 +737,7 @@ private fun VolumeTrack(slider: BarSlider, held: Float?, handle: Boolean, look: 
  * (the Flight menu's line draws it the same way); the struck one stands upright.
  *
  * Not a control: it takes no pointer, so a click, a right-click and a drag on it are the item's own,
- * and hovering shows the item's usual box and no handle. Nothing glides either: the plane is drawn
+ * and hovering shows the strip's highlight and no handle. Nothing glides either: the plane is drawn
  * where the item says it stands, each time the item is drawn again.
  * Where each part stands is [SliderMath.route]'s arithmetic; this only draws it.
  */

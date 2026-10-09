@@ -25,8 +25,19 @@ private projects and paths into their repos, and where signing keys are backed u
     reading (pure, unit-tested).
   - `bar/ColorWatch.kt`: when the bar's colors are read after a cause, and when the readings stop
     (pure, unit-tested).
-  - `bar/Overlay.kt`: a Compose host in a TYPE_ACCESSIBILITY_OVERLAY window (outside-touch and
-    key callbacks for menus).
+  - `bar/Overlay.kt`: a Compose host in a TYPE_ACCESSIBILITY_OVERLAY window (the strip, the tooltip and a popup's
+    shadow).
+  - `bar/MenuWindow.kt`: a popup's window (1.3, docs/design/1.3): a `ComponentDialog` of type
+    TYPE_ACCESSIBILITY_OVERLAY, because only a `Window` can blur what is behind it. The window is exactly the card;
+    before each frame its root view is cut to the glass as far as it shows (bottom edge only), since the platform
+    blurs exactly the root view's rectangle (and Compose places input by its top-left corner, which never moves).
+    The shadow lies outside the card, which that cut would clip, so it is drawn in a second, untouchable `Overlay`
+    just below (`MenuShadow`). One clock drives the opening, the blocks, the fold and the turn-round
+    (`ui/MenuMotion.kt`, pure and unit-tested); it starts once the window's first frame is committed and frames come
+    on time, and each frame's values go to Compose at once (`Snapshot.sendApplyNotifications`) so the blur and the
+    drawn glass move together. Closing passes touches through at once; a timer removes the window regardless.
+  - `ui/Glass.kt`: the glass's per-frame state, its look (veil, rim, hairline; a solid card where the platform
+    has no blur), the drawn shadow, and `DropColumn`, in which `MenuCard`'s children drop into place as blocks.
   - `bar/BarUi.kt`: the strip (chevron, FitRow, items, clicks/right-clicks/wheel), and the slider an
     item can have in its text's place (`ItemState.slider`: `VolumeTrack` draws it, `Modifier.slides`
     takes the pointer in its zone and consumes the press, so `clicks` on the item around it sees
@@ -38,7 +49,13 @@ private projects and paths into their repos, and where signing keys are backed u
     `StripLook.route` what color they take). The Flight item has one from its countdown until an hour
     after landing (`FlightText.bar` says when), colored by `FlightRules.stands`; shown as text alone
     it has none (`Display.line`), and its words keep their tones.
-  - `bar/Menus.kt`: the menu card, the right-click item menu and the ‹ menu.
+    The hover is one highlight for the whole strip, not a box per item (1.3): `bar/StripHighlight.kt`, pure and
+    unit-tested, says which item the pointer is over (gaps split at their middles, ‹ one more item), carries the pill
+    there like Booklight's rubber-band rows, and says when it comes and goes (an open popup's item, a held slider, a
+    drag, the animator scale). The strip reads the pointer for it on the Initial pass without consuming anything, runs
+    its frames only while it moves, and draws it in the Row's `drawBehind`; change its rules there, not in the strip.
+  - `bar/Menus.kt`: the popup's surface (`MenuSurface`: glass, clip to the shown glass, text colour) and its shadow
+    (`MenuShadow`), the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
     visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
     glyph icons, `Chips` for the Live Update chip), and the item types: several each in
@@ -109,8 +126,13 @@ private projects and paths into their repos, and where signing keys are backed u
 
 ## Dev loop
 - `./bento app` builds the debug APK, installs it, enables the service and opens settings.
-- `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|set ID k=v|look KEY VALUE|windows`.
+- `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|remove ID|set ID k=v|look KEY VALUE|windows`.
   The receiver (`src/debug`, debug builds only) is guarded by DUMP, so only adb can call it.
+  `solid on|off`: popups as if the platform had no blur (the solid card). `look switch on|off`: "Switch popups on hover"; `look animations on|off`: "No animations". Each frame of a popup's opening and its
+  blur region go to the log with `adb shell setprop log.tag.BentoBarMotion DEBUG`.
+  On a test device with a released BentoBar, `./gradlew assembleDebug -PreleaseSignedDebug` signs the debug build
+  with the release key (from `~/.config/bentobar`): it installs over the release, same version code, and keeps its
+  layout and its accessibility switch.
   Also `now +3h|+90m|off` (moves the clock everything newer reads, `util/Now`), `net [reset]` (requests
   sent per host, and whether each service may be asked right now), `online weather|flights on|off`,
   and `TYPE …` or `item TYPE …`, which go to that item type's own `debug(args)`. What a hook prints
@@ -135,8 +157,8 @@ private projects and paths into their repos, and where signing keys are backed u
   `--ez close true` (closes it: on a desktop the Back key doesn't). On a Googlebook it only reaches the
   bar from full screen (the keyboard's full-screen key, sent to it while it has the focus).
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
-  the settings window. Menu crops include the menu's shadow margin, which can show other windows
-  behind it, so don't publish them.
+  the settings window. A menu's crop is its card; its shadow is in the window "BentoBar menu shadow" below it.
+  Behind the glass other windows show through, blurred: don't publish captures with private windows behind.
 - Release (`docs/RELEASING.md`): bump `versionCode` and `versionName`, add `docs/release-notes/<version>.md`
   and Play's "What's new" (`store-submission/listing/en-US/release-notes.txt`, 500 characters at most),
   commit, push, then `git tag v<version> && git push origin v<version>`. GitHub Actions

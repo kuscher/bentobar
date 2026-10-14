@@ -56,20 +56,31 @@ object WeatherLoad {
     fun searchRequest(text: String) = Request(Host.OPEN_METEO_GEOCODING, "/v1/search", listOf("name" to text, "count" to "5", "format" to "json"))
 
     /**
-     * The places a reading is kept for: those of the layout's Weather items that are not turned off.
-     * An item in Off keeps its settings and nothing else. Its reading goes while the type still has a
-     * live item to look at the layout (the tick that turns it off); kept with an item that is off, it
-     * would outlive the item, since nothing runs for a type whose last item is off when that is deleted.
+     * The places the layout's Weather items ask about, of those that are not turned off. An item in Off
+     * keeps its settings and nothing else. Its reading goes while the type still has a live item to look
+     * at the layout (the tick that turns it off); kept with an item that is off, it would outlive the
+     * item, since nothing runs for a type whose last item is off when that is deleted. [here]: where the
+     * device is, for the items of My location; without it, the cities alone, which are the places whose
+     * reading is kept on the device.
      */
-    fun places(items: List<ItemConfig>): Set<Place> =
-        items.filter { it.type == "weather" && it.section != Section.OFF }.mapNotNullTo(HashSet()) { WeatherRules.place(it) }
+    fun places(items: List<ItemConfig>, here: Fix? = null): Set<Place> =
+        items.filter { it.type == "weather" && it.section != Section.OFF }.mapNotNullTo(HashSet()) { place(it, here) }
+
+    /**
+     * The place [item] asks about: its city, or for one of My location where the device is ([here]),
+     * rounded to about ten kilometers ([WeatherRules.nearby]). This is where that rounding happens: what
+     * is asked and what a reading is held under is never the location as Android said it.
+     */
+    fun place(item: ItemConfig, here: Fix?): Place? =
+        if (WeatherRules.here(item)) here?.let { WeatherRules.nearby(it.lat, it.lon) } else WeatherRules.place(item)
 
     /**
      * Asks the service about [place]; blocks, so only a background load calls it. A good answer is a
      * new [Reading], kept on the device. A failure is a reading too: [last]'s numbers with what went
      * wrong, so the bar keeps what it shows. Null: it was not asked after all (the switch went off or
      * the bar hid under the load), which is neither. [now] is the wall clock and [up] the time since
-     * boot, both of this moment; [places]: the layout's places right now.
+     * boot, both of this moment; [places]: the layout's cities right now, the places a reading is kept
+     * for (where the device is, for My location, is not among them: it is held in memory only).
      */
     fun load(place: Place, last: Reading?, now: Long, up: Long = 0, places: () -> Set<Place>): Reading? {
         val before = Http.sent(Host.OPEN_METEO)
@@ -163,12 +174,18 @@ class WeatherSource(
     /** The wall clock, and the time since boot: a reading's age is asked of both ([WeatherRules.old]). */
     private val wall: () -> Long,
     private val up: () -> Long,
+    /** Where the device is, as Android said it ([WeatherLoad.place] rounds it), and why not where that isn't known: for the items of My location. */
+    private val here: () -> Fix? = { null },
+    private val locating: () -> Locate = { Locate.FINDING },
 ) {
     private val service = Online.Service.OPEN_METEO
 
+    /** The place [item] asks about: its city, or where the device is. Null: none yet. */
+    private fun place(item: ItemConfig): Place? = WeatherLoad.place(item, here())
+
     /** The place [item] may ask about right now, or null: no city, an item in Off, or the switch off. */
     private fun asked(item: ItemConfig): Place? =
-        if (item.section == Section.OFF || !Online.on(service)) null else WeatherRules.place(item)
+        if (item.section == Section.OFF || !Online.on(service)) null else place(item)
 
     /**
      * What is known for [item]'s place, loading it first if that is due. This is what the bar's state
@@ -176,7 +193,7 @@ class WeatherSource(
      */
     fun reading(item: ItemConfig): Reading? {
         if (!Online.on(service)) return null
-        val place = WeatherRules.place(item) ?: return null
+        val place = place(item) ?: return null
         if (item.section != Section.OFF) {
             readings.want(place)
             askIfOld(place)
@@ -198,16 +215,18 @@ class WeatherSource(
     }
 
     /** What there is for [item]'s place, asking nothing. Any thread. */
-    fun peek(item: ItemConfig): Reading? = WeatherRules.place(item)?.let { readings.peek(it) }
+    fun peek(item: ItemConfig): Reading? = place(item)?.let { readings.peek(it) }
 
     /** The state [item] is in, asking nothing. */
     fun status(item: ItemConfig, now: Long): Status {
         val on = Online.on(service)
-        return WeatherRules.status(hasPlace = WeatherRules.place(item) != null, on = on, setUp = Online.setUp(service),
-            reading = if (on) peek(item) else null, now = now, up = up())
+        val place = place(item)
+        return WeatherRules.status(hasPlace = place != null, on = on, setUp = Online.setUp(service),
+            reading = if (on) place?.let { readings.peek(it) } else null, now = now, up = up(),
+            locating = if (WeatherRules.here(item) && place == null) locating() else null)
     }
 
-    fun loading(item: ItemConfig): Boolean = WeatherRules.place(item)?.let { readings.loading(it) } ?: false
+    fun loading(item: ItemConfig): Boolean = place(item)?.let { readings.loading(it) } ?: false
 
     /**
      * The item's menu opened: a good reading older than ten minutes is asked again. One whose last
@@ -273,17 +292,19 @@ class WeatherSource(
         if (asker == by) asking.clear()
     }
 
-    /** "Turn on weather": for a layout that came with a city, or after the switch was turned off in Setup. */
+    /** "Turn on weather": for a layout that came with a city, or after the switch was turned off in Setup. Also "Use my location". */
     fun turnOn(): Boolean = Online.turnOn(service)
 
     /**
      * The layout's places are now [places]: readings of any other place go, from memory at once and
-     * from the device in the background ("deleted with the item"). On an install that never set
-     * Weather up nothing was ever fetched, so there is nothing to look for. Main thread.
+     * from the device in the background ("deleted with the item"). [cities]: those of them that are
+     * kept on the device, the cities; where the device is (My location) is held in memory only. On an
+     * install that never set Weather up nothing was ever fetched, so there is nothing to look for.
+     * Main thread.
      */
-    fun keepOnly(places: Set<Place>) {
+    fun keepOnly(places: Set<Place>, cities: Set<Place> = places) {
         readings.keepOnly(places)
-        if (Online.setUp(service)) background.execute { WeatherLoad.tidy(places) }
+        if (Online.setUp(service)) background.execute { WeatherLoad.tidy(cities) }
     }
 
     companion object {
@@ -292,6 +313,7 @@ class WeatherSource(
          * it here alike and differ only in where work runs and what time it is. [wall]: the wall
          * clock; [up]: the time since boot, which the loader counts by (the app's `Now.elapsed`);
          * [layout]: the layout's items right now (asked from the background thread).
+         * [here] and [locating]: where the device is, for My location ([WeatherHere]).
          * [staged]: a debug build's test hook; when it names a failure, the load that asked is not
          * sent and comes back as that failure, so the pace after an error can be watched on a device.
          */
@@ -303,15 +325,19 @@ class WeatherSource(
             up: () -> Long,
             layout: () -> List<ItemConfig>,
             staged: () -> Failure? = { null },
+            here: () -> Fix? = { null },
+            locating: () -> Locate = { Locate.FINDING },
         ): WeatherSource = WeatherSource(
-            refresher({ _, reading -> WeatherRules.every(reading) }, { place -> WeatherLoad.kept(place, wall()) },
+            // Only a city's reading is kept on the device and read back from it: where the device is (My location) is held in
+            // memory only, so a reading of that place is neither written nor looked for there.
+            refresher({ _, reading -> WeatherRules.every(reading) }, { place -> if (place in WeatherLoad.places(layout())) WeatherLoad.kept(place, wall()) else null },
                 { place, last ->
                     // "No connection" is what nothing-went-out looks like; the other two stand for a try that did.
                     staged()?.let { WeatherLoad.failed(place, last, it, went = it != Failure.OFFLINE) }
                         ?: WeatherLoad.load(place, last, wall(), up()) { WeatherLoad.places(layout()) }
                 }),
             ask { query -> WeatherLoad.search(query.text) },
-            background, wall, up,
+            background, wall, up, here, locating,
         )
 
         /** [state] as the field [by] shows it: an answer to another field's question is none of its business. */

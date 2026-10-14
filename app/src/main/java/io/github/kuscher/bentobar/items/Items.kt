@@ -7,9 +7,7 @@ import android.util.Log
 import io.github.kuscher.bentobar.R
 import io.github.kuscher.bentobar.data.BarConfig
 import io.github.kuscher.bentobar.data.ItemConfig
-import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
-import io.github.kuscher.bentobar.data.couldShow
 import io.github.kuscher.bentobar.util.Now
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -93,22 +91,21 @@ object Ticker {
         if (type.online != null || type.discreet) Log.w(TAG, "$what: ${e.javaClass.simpleName}") else Log.w(TAG, what, e)
     }
 
+    /**
+     * The items sampled at this tick ([needed]), set before the types' samplers run: for a type whose
+     * sampler asks for something only while one of its items is on screen (Weather's My location).
+     * Main thread.
+     */
+    var sampled: List<ItemConfig> = emptyList()
+        private set
+
     /** Hidden items are on screen (bar expanded, or BentoBar's menu lists them): sample them too. */
     @Volatile var revealHidden = false
     /** The item whose menu is open, sampled even when it's hidden. */
     @Volatile var focusItem: String? = null
 
-    /**
-     * Items worth sampling now: what the strip could draw ([couldShow], the same rule it draws by),
-     * revealed hidden items, an open menu, or everything while the settings preview is open. A
-     * folded-away battery or memory item costs nothing.
-     */
-    private fun needed(cfg: BarConfig): List<ItemConfig> {
-        val all = "settings" in users
-        return cfg.items.filter {
-            it.section != Section.OFF && (all || cfg.couldShow(it) || revealHidden || it.id == focusItem)
-        }
-    }
+    /** Items worth sampling now: [TickRules.needed]. */
+    private fun needed(cfg: BarConfig): List<ItemConfig> = TickRules.needed(cfg, "settings" in users, revealHidden, focusItem)
 
     private val loop = object : Runnable {
         override fun run() {
@@ -196,6 +193,7 @@ object Ticker {
         val stamp = if (scheduled) now else TickRules.stamp(now, lastTickAt)
         val cfg = Store.config.value
         val live = needed(cfg)
+        sampled = live
         val types = live.mapTo(HashSet()) { it.type }
         // Only while something shows items: a refresh() with nothing on screen must not wake a type that nobody would put back to sleep.
         lifeCycle(if (users.isEmpty()) emptySet() else types)

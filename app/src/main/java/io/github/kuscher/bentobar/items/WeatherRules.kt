@@ -45,7 +45,7 @@ enum class W(val res: String, val plural: Boolean = false) {
     DESC("weather_desc"), DESC_SHORT("weather_desc_short"), DESC_SOON("weather_desc_soon"), DESC_NOW("weather_desc_now"),
     DESC_THIS_HOUR("weather_likely_now_desc"),
     DESC_NOT_SET_UP("weather_desc_not_set_up"), DESC_LOADING("weather_desc_loading"), DESC_OFF("weather_desc_off"),
-    DESC_NO_READING("weather_desc_no_reading"), DEGREES("weather_degrees", plural = true),
+    DESC_NO_READING("weather_desc_no_reading"), DESC_NO_LOCATION("weather_desc_no_location"), DEGREES("weather_degrees", plural = true),
     SUBTITLE("weather_subtitle"), SUBTITLE_THERE("weather_subtitle_there"), HIGH_LOW("weather_high_low"),
     RAIN_WIND("weather_rain_wind"), SNOW_WIND("weather_snow_wind"), WIND_MPH("weather_wind_mph"), WIND_KMH("weather_wind_kmh"),
     CHANCE("weather_chance"), NOTE("weather_note"),
@@ -87,6 +87,21 @@ data class Place(val lat: String, val lon: String) {
     val key: String get() = "$lat,$lon"
     override fun toString() = "a place"
 }
+
+/**
+ * Where the device is, as Android said it (My location). Held in memory only, and never used as it
+ * is: [WeatherLoad.place] rounds it to a [Place] ([WeatherRules.nearby]) before anything is asked or
+ * held under it.
+ */
+data class Fix(val lat: Double, val lon: Double) {
+    override fun toString() = "a fix"
+}
+
+/**
+ * Why an item that shows the weather of where the device is has no place yet ([WeatherRules.status]).
+ * [FINDING]: Android was asked and hasn't answered. The others are states with words of their own.
+ */
+enum class Locate { FINDING, NOT_ALLOWED, OFF, NONE }
 
 /** A place a search found, with what tells it from others of its name. Coordinates are rounded already. */
 @Immutable
@@ -153,8 +168,13 @@ sealed interface Status {
     data object NotSetUp : Status
     /** A city, but the service is switched off: in Setup ([everOn]), or it never was on here (a layout that came with a city). */
     data class Off(val everOn: Boolean) : Status
-    /** A city, and nothing to show yet: the first reading is on its way, or one too old to show is being asked again. */
+    /**
+     * Nothing to show yet: a city's or My location's first reading is on its way, one too old to show is
+     * asked again, or Android is asked where the device is for the first time.
+     */
     data object Loading : Status
+    /** My location, and the device's location isn't known: not allowed, switched off, or Android has none. */
+    data class NoLocation(val why: Locate) : Status
     /** No numbers under three hours old, and the last try failed. */
     data class Missing(val failure: Failure) : Status
     /** Numbers under three hours old. With [Reading.failure] they are "not live": the last try failed. */
@@ -235,6 +255,32 @@ object WeatherRules {
 
     // ---- what a layout holds --------------------------------------------------------------------
 
+    /** Where "My location" is rounded to before it is sent or kept: one decimal, about ten kilometers. */
+    private const val HERE_DECIMALS = 1
+
+    /**
+     * The item shows the weather where the device is ("My location"), not a city's. The layout holds
+     * only that choice, never where the device is: a layout is copied and backed up, a location must not be.
+     */
+    fun here(item: ItemConfig): Boolean = item.options["where"] == "here"
+
+    /** [item] showing where the device is. Its city, if it has one, stays for a way back. */
+    fun useHere(item: ItemConfig): ItemConfig = item.with("where", "here")
+
+    /** [item] showing its city again (or asking for one, if it has none). */
+    fun useCity(item: ItemConfig): ItemConfig = item.with("where", null)
+
+    /**
+     * Where the device is, as it is sent and kept: rounded to one decimal, about ten kilometers ("47.4",
+     * "-122.4"); null for what is no location. Android's approximate location is already blurred to a few
+     * kilometers; this makes it the size of a town, which is all a forecast needs.
+     */
+    fun nearby(lat: Double, lon: Double): Place? {
+        if (!lat.isFinite() || !lon.isFinite() || abs(lat) > 90.0 || abs(lon) > 180.0) return null
+        fun round(v: Double) = BigDecimal.valueOf(v).setScale(HERE_DECIMALS, RoundingMode.HALF_UP).toPlainString().let { if (it == "-0.0") "0.0" else it }
+        return Place(round(lat), round(lon))
+    }
+
     /**
      * [value] with two decimals, as a coordinate is stored and sent ("47.37", "-122.42", "8.50"), or
      * null if it is none (beyond [limit] degrees, not a number).
@@ -262,13 +308,14 @@ object WeatherRules {
     /** A label as it is stored: one line, twelve characters at most. */
     fun label(text: String): String = oneLine(text, LABEL_CHARS)
 
-    fun look(item: ItemConfig, fahrenheit: Boolean, miles: Boolean, rainHours: Int): Look =
-        Look(city(item), label(item.opt("label", "")).ifEmpty { null }, item.opt("show", SHOW_TEMP), fahrenheit, miles, rainHours)
+    /** [hereName]: what My location is called, the name an item showing it goes by. */
+    fun look(item: ItemConfig, fahrenheit: Boolean, miles: Boolean, rainHours: Int, hereName: String? = null): Look =
+        Look(if (here(item)) hereName else city(item), label(item.opt("label", "")).ifEmpty { null }, item.opt("show", SHOW_TEMP), fahrenheit, miles, rainHours)
 
     private val PLACE_KEYS = setOf("city", "region", "lat", "lon", "zone")
 
-    /** [item] with [city] as its place; [region] is the line that told it from others of its name. Its other options stay. */
-    fun picked(item: ItemConfig, city: City, region: String?): ItemConfig = item.copy(options = item.options - PLACE_KEYS + listOfNotNull(
+    /** [item] with [city] as its place; [region] is the line that told it from others of its name. Its other options stay; My location ends. */
+    fun picked(item: ItemConfig, city: City, region: String?): ItemConfig = item.copy(options = item.options - PLACE_KEYS - "where" + listOfNotNull(
         "city" to city.name, region?.takeIf { it.isNotEmpty() }?.let { "region" to it }, "lat" to city.lat, "lon" to city.lon,
         city.zone.takeIf { it.isNotEmpty() }?.let { "zone" to it }))
 
@@ -490,13 +537,16 @@ object WeatherRules {
         r.fetchedAt == 0L || now - r.fetchedAt >= OLD_MS || (r.fetchedUp > 0 && up - r.fetchedUp >= OLD_MS)
 
     /**
-     * The state of an item. [hasPlace]: it has a city. [on], [setUp]: the service's switch, and
-     * whether it was ever turned on here. [reading]: what is known of the place, or null. [now] is
-     * the wall clock and [up] the time since boot (see [old]).
+     * The state of an item. [hasPlace]: it has a city, or My location knows where the device is. [on],
+     * [setUp]: the service's switch, and whether it was ever turned on here. [reading]: what is known of
+     * the place, or null. [now] is the wall clock and [up] the time since boot (see [old]). [locating]:
+     * an item of My location whose place isn't known, and why; null for any other.
      */
-    fun status(hasPlace: Boolean, on: Boolean, setUp: Boolean, reading: Reading?, now: Long, up: Long = 0): Status = when {
-        !hasPlace -> Status.NotSetUp
+    fun status(hasPlace: Boolean, on: Boolean, setUp: Boolean, reading: Reading?, now: Long, up: Long = 0, locating: Locate? = null): Status = when {
+        !hasPlace && locating == null -> Status.NotSetUp
         !on -> Status.Off(everOn = setUp)
+        locating == Locate.FINDING -> Status.Loading
+        locating != null -> Status.NoLocation(locating)
         reading == null -> Status.Loading
         reading.current != null && !old(reading, now, up) -> Status.Live(reading)
         reading.failure != null -> Status.Missing(reading.failure)
@@ -552,6 +602,7 @@ object WeatherRules {
         is Status.Off -> Bar(Sym.CLOUD, filled = false, desc = w.say(W.DESC_OFF))
         Status.Loading -> Bar(Sym.CLOUD, filled = false, desc = w.say(W.DESC_LOADING))
         is Status.Missing -> Bar(Sym.CLOUD_OFF, filled = false, desc = w.say(W.DESC_NO_READING))
+        is Status.NoLocation -> Bar(Sym.CLOUD_OFF, filled = false, desc = w.say(W.DESC_NO_LOCATION))
         is Status.Live -> live(status.reading, look, now, w, t)
     }
 

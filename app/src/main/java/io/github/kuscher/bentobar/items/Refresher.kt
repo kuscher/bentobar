@@ -123,9 +123,9 @@ class Refresher<K : Any, V : Any>(
         }
     }
 
-    /** Forgets every key that is not in [keys]: what the layout no longer has. Main thread. */
+    /** Forgets every key that is not in [keys]: what the layout no longer has, a first load on its way included. Main thread. */
     fun keepOnly(keys: Set<K>) {
-        for (k in slots.keys.toList()) if (k !in keys) forget(k)
+        for (k in (slots.keys + loading).toList()) if (k !in keys) forget(k)
     }
 
     private fun start(key: K, tryRestore: Boolean) {

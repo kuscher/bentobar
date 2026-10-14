@@ -1,6 +1,11 @@
 package io.github.kuscher.bentobar.items
 
-/** When the ticker computes an item again. No Android types, so the arithmetic is tested. */
+import io.github.kuscher.bentobar.data.BarConfig
+import io.github.kuscher.bentobar.data.ItemConfig
+import io.github.kuscher.bentobar.data.Section
+import io.github.kuscher.bentobar.data.couldShow
+
+/** When the ticker computes an item again, and which items it samples. No Android types, so the rules are tested. */
 object TickRules {
     /**
      * How much earlier than its type's interval an item may be computed again. Ticks aim at the start
@@ -40,4 +45,13 @@ object TickRules {
      */
     fun held(active: Boolean, lastActive: Long?, now: Long): Boolean =
         active || (lastActive != null && now - lastActive in 0 until HOLD_MS)
+
+    /**
+     * Items worth sampling now: what the strip could draw ([BarConfig.couldShow], the same rule it draws
+     * by, which includes a hidden item waiting for its Show when rule), revealed hidden items, an open
+     * menu ([focusItem]), or everything while the [settings] preview is open. A folded-away battery or
+     * memory item costs nothing.
+     */
+    fun needed(cfg: BarConfig, settings: Boolean, revealHidden: Boolean, focusItem: String?): List<ItemConfig> =
+        cfg.items.filter { it.section != Section.OFF && (settings || cfg.couldShow(it) || revealHidden || it.id == focusItem) }
 }

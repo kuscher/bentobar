@@ -17,6 +17,7 @@ server, no analytics, no crash reporting and no ads. Requests go from the device
 |---|---|---|---|
 | The text typed into the city search | Open-Meteo (geocoding) | On each press of Search | App activity › In-app search history |
 | The coordinates of the chosen city, rounded to 0.01° | Open-Meteo (forecast) | About every 30 minutes while the bar is on screen; on opening the menu; Refresh | Location › Approximate location (it is the city the user chose, often their own) |
+| With My location (since 1.4): the device's approximate location (`ACCESS_COARSE_LOCATION`), rounded to 0.1° | Open-Meteo (forecast) | The same; Android is asked for the location while such an item is on screen or waits in Hidden to show for rain or snow, or while BentoBar's settings window is open: every 30 minutes once it knows, and when it doesn't, after 1, 2, 5 and 15 minutes, then every 30 (asking Android sends nothing) | Location › Approximate location (the same type as above: no new answer, the label is unchanged) |
 | The flight number | AirLabs | When a flight is tracked and while it is followed | App activity › In-app search history |
 | The user's own AirLabs key | AirLabs | With each of those requests | Personal info › User IDs (the form has no type for a credential; this is the nearest: it identifies the user's account at that service) |
 | The IP address | both | With every request, as for any website | Not a declared type by itself; said in the app and on the privacy page |
@@ -41,8 +42,8 @@ The answers given:
 6. **"Shared"** (a transfer to a third party): **No**, under the form's exception for a transfer the
    user starts themselves after a prominent in-app disclosure. Both items show the words before the first
    request ("Weather comes from Open-Meteo…", "Flight times come from AirLabs…") and send nothing before the
-   user presses Search or saves a key. Read more strictly, the same three types would be declared as shared
-   for App functionality as well; nothing else would change.
+   user presses Search or Use my location, or saves a key. Read more strictly, the same three types would be
+   declared as shared for App functionality as well; nothing else would change.
 
 Not collected, and why: media titles and artwork (read on the device only, with notification access, never
 stored or sent); calendar events; device and battery readings; the layout.

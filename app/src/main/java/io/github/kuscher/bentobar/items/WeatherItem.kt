@@ -42,7 +42,7 @@ object WeatherItem : ItemType("weather", R.string.item_weather_title, Sym.PARTLY
     internal val source: WeatherSource = WeatherSource.make(
         refresher = { every, restore, load -> Background.refresher(type, online, every, restore, load) },
         ask = { work -> Background.ask(type, online, work) },
-        background = Background.wiring(type).background,
+        background = Background.executor(type),
         wall = Now::wall,
         up = Now::elapsed,
         layout = { Store.config.value.items },

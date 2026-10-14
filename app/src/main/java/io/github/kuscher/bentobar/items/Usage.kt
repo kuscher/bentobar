@@ -216,7 +216,10 @@ object Usage {
         pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
     }.getOrDefault(pkg)
 
-    private val icons = HashMap<String, ImageBitmap>()
+    private const val MAX_ICONS = 64
+    private val icons = object : LinkedHashMap<String, ImageBitmap>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?) = size > MAX_ICONS
+    }
 
     private fun icon(pm: PackageManager, pkg: String): ImageBitmap? = synchronized(icons) {
         icons[pkg] ?: runCatching {

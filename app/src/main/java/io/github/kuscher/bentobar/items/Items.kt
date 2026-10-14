@@ -119,6 +119,7 @@ object Ticker {
 
     /** [who] wants ticks (e.g. "bar", "menu", "settings"); idempotent. */
     fun start(who: String) {
+        if (Looper.myLooper() != Looper.getMainLooper()) { main.post { start(who) }; return }
         val wasIdle = users.isEmpty()
         users += who
         running = true
@@ -126,6 +127,7 @@ object Ticker {
     }
 
     fun stop(who: String) {
+        if (Looper.myLooper() != Looper.getMainLooper()) { main.post { stop(who) }; return }
         users -= who
         if (users.isEmpty()) {
             main.removeCallbacksAndMessages(TAG)
@@ -136,7 +138,10 @@ object Ticker {
     }
 
     /** Recomputes now (after a settings change or a click), without waiting for the next second. */
-    fun refresh() { lastRun.clear(); runOnce(scheduled = false) }
+    fun refresh() {
+        if (Looper.myLooper() != Looper.getMainLooper()) { main.post { refresh() }; return }
+        lastRun.clear(); runOnce(scheduled = false)
+    }
 
     /**
      * Recomputes one item now, and nothing else: no sampler runs. For what only that item shows and
@@ -144,6 +149,7 @@ object Ticker {
      * sampler a reading per pointer move.
      */
     fun refresh(item: ItemConfig) {
+        if (Looper.myLooper() != Looper.getMainLooper()) { main.post { refresh(item) }; return }
         val current = Store.config.value.items.firstOrNull { it.id == item.id } ?: return
         val type = Items.of(current.type) ?: return
         val now = SystemClock.elapsedRealtime()
@@ -158,6 +164,7 @@ object Ticker {
      * that isn't on screen asks for nothing; menus that redraw with the tick redraw now. Main thread.
      */
     fun refresh(type: String) {
+        if (Looper.myLooper() != Looper.getMainLooper()) { main.post { refresh(type) }; return }
         val t = Items.of(type) ?: return
         if (users.isEmpty()) return
         val mine = needed(Store.config.value).filter { it.type == type }
@@ -223,6 +230,15 @@ object Ticker {
         heldFor.keys.retainAll(ids)
         _states.value = next
         _tick.value = System.currentTimeMillis()
+    }
+
+    /**
+     * What [states] has for [item], or its icon while the next tick computes it: safe to call while
+     * composing, without running [ItemType.state] on the UI frame.
+     */
+    fun placeholder(item: ItemConfig): ItemState = _states.value[item.id] ?: run {
+        if (running) main.post { if (item.id !in _states.value) refresh(item) }
+        ItemState(icon = Items.of(item.type)?.icon)
     }
 
     fun stateOf(item: ItemConfig): ItemState = _states.value[item.id]

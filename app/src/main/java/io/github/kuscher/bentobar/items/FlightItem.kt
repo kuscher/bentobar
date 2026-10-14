@@ -328,12 +328,15 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     /** [found] becomes what the item [id] follows, if the item is still there: the lookup that brought it is over. */
     private fun take(id: String, found: Tracked): Boolean {
         search.clear()
-        if (id !in ids() || !FlightLoad.take(id, found, Now.wall())) return false
+        if (id !in ids()) return false
         fresh[id] = found
         takes++
-        reread(id)
+        val now = Now.wall()
+        tracker.forget(id)
+        Background.executor(type).execute { FlightLoad.take(id, found, now) }
+        tracker.want(id)
         // What Track found is the one-flight question's word or the timetable's plan; the coming hours' list has the flight as it is.
-        if (FlightRules.askAtOnce(found, Instant.ofEpochMilli(Now.wall()))) tracker.refresh(id, afterRunning = true)
+        if (FlightRules.askAtOnce(found, Instant.ofEpochMilli(now))) tracker.refresh(id, afterRunning = true)
         // The bar has the flight now, and an open menu draws again.
         Ticker.refresh(type)
         return true
@@ -360,9 +363,10 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
     /** Stop tracking: the item follows nothing, and what was kept for it is deleted. */
     internal fun stop(item: ItemConfig) {
         if (stagedFor(item) != null) { unstage(); return }
-        FlightLoad.stop(item.id)
         fresh[item.id] = Tracked()
-        reread(item.id)
+        tracker.forget(item.id)
+        Background.executor(type).execute { FlightLoad.stop(item.id) }
+        tracker.want(item.id)
         Ticker.refresh(type)
     }
 
@@ -402,7 +406,7 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
      */
     internal fun saveKey(key: String): Boolean {
         if (!Online.saveKey(online, key)) return false
-        FlightLoad.newKey()
+        Background.executor(type).execute { FlightLoad.newKey() }
         val now = Instant.ofEpochMilli(Now.wall())
         for (item in Store.config.value.items) {
             if (item.type != type) continue
@@ -445,7 +449,10 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
         tracker.keepOnly(items)
         fresh.keys.retainAll(items)
         if (items.isEmpty()) Background.later(FlightLoad.UNDO_MS) {
-            if (FlightLoad.clearWithout(ids())) { tracker.forget(); fresh.clear(); places.clear() }
+            if (ids().isEmpty()) {
+                tracker.forget(); fresh.clear(); places.clear()
+                Background.executor(type).execute { FlightLoad.clearWithout(ids()) }
+            }
         }
     }
 
@@ -456,12 +463,14 @@ object FlightItem : ItemType("flight", R.string.item_flight_title, Sym.FLIGHT, R
      * the process, so there is nothing to wait for here.
      */
     internal fun sweepAtStart() {
-        runCatching { FlightLoad.clearWithout(ids()) }
+        Background.executor(type).execute { runCatching { FlightLoad.clearWithout(ids()) } }
     }
 
     /** The service was switched off or its key removed: the loader and the lookup have forgotten already; this is the rest. */
     override fun forgetFetched() {
-        FlightLoad.forget(keyGone = !Online.hasKey(online))
+        val keyGone = !Online.hasKey(online)
+        FlightLoad.forget(keyGone = false)
+        if (keyGone) Background.executor(type).execute { FlightLoad.forget(keyGone = true) }
         fresh.clear()
         places.clear()
     }

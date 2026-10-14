@@ -196,7 +196,7 @@ private fun BarPreview(states: Map<String, ItemState>, selected: String?, onSele
     var expanded by remember { mutableStateOf(false) }
     val visible = cfg.items.filter { cfg.shows(it, states[it.id]?.active == true) }
     val hidden = cfg.behindChevron { states[it.id]?.active == true }
-    val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.stateOf(it)) } }
+    val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.placeholder(it)) } }
     // The preview uses the strip's real colours: the sampled bar when BentoBar is running and the
     // colour is automatic, else the forced Light or Dark choice.
     val live by io.github.kuscher.bentobar.bar.BarLook.current.collectAsState()

@@ -297,6 +297,7 @@ class BarController(private val service: AccessibilityService) {
         // Switched to Show everything (or presenting) with hidden items out: nothing can fold them back.
         Store.config.value.let { if ((it.hiddenMode == HiddenMode.SHOW_ALL || it.presenting) && expanded.value) { expanded.value = false; pinned = false } }
         applyLook()
+        if (Ticker.running) Ticker.refresh()
         scan()
         Chips.update(service)
     }
@@ -329,8 +330,8 @@ class BarController(private val service: AccessibilityService) {
                 service.clearCache()
                 runCatching { StatusBarScan.scan(barWindow) }.onFailure { Log.w(tag, "scan failed", it) }.getOrNull()
                     // No node tree (SystemUI mid-change): the whole bar would cover its icons. Keep the last
-                    // reading of this same bar; with none, stay hidden until a scan can read it.
-                    ?.let { if (it.summary != StatusBarScan.NO_TREE) it else prev?.takeIf { p -> p.windowId == it.windowId && p.bar == it.bar } }
+                    // reading of this same bar (without its cached node); with none, stay hidden until a scan can read it.
+                    ?.let { if (it.summary != StatusBarScan.NO_TREE) it else prev?.takeIf { p -> p.windowId == it.windowId && p.bar == it.bar }?.copy(spacerNode = null) }
             }
         }
         val newWindow = s?.windowId != snap?.windowId
@@ -553,7 +554,7 @@ class BarController(private val service: AccessibilityService) {
     private fun StripHost() {
         val cfg by Store.config.collectAsState()
         val states by Ticker.states.collectAsState()
-        val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.stateOf(it)) } }
+        val entries = { list: List<ItemConfig> -> list.map { StripEntry(it, states[it.id] ?: Ticker.placeholder(it)) } }
         // Presenting (screen sharing): only what matters on stage, whatever its section.
         // While dragging, the bar shows the order the item would land in.
         val items = dragPreview.value?.let { (id, at) -> cfg.items.moved(id, Section.SHOWN, at) } ?: cfg.items

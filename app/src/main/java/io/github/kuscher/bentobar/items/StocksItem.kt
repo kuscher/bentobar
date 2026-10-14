@@ -102,6 +102,7 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
     /** Saves the user's key and asks again for what the old one couldn't get. */
     internal fun saveKey(key: String): Boolean {
         if (!Online.saveKey(online, key)) return false
+        if ((search.state.value as? Ask.State.Done)?.answer is StockFound.Failed) search.clear()
         for (item in Store.config.value.items) if (item.type == type) for (s in StocksRules.stocks(item)) {
             val q = quotes.peek(s.symbol)
             if (q?.failure == Finnhub.Failure.REFUSED || q?.failure == Finnhub.Failure.NO_ACCESS) quotes.refresh(s.symbol)
@@ -255,4 +256,7 @@ fun stocksRes(word: SW): Int = when (word) {
     SW.NO_ACCESS -> R.string.stocks_no_access
     SW.NOT_FOUND -> R.string.stocks_not_found
     SW.WAITING -> R.string.stocks_waiting
+    SW.NOTHING_FOUND -> R.string.stocks_nothing_found
+    SW.SEARCH_NO_ANSWER -> R.string.stocks_search_no_answer
+    SW.SEARCH_SLOW -> R.string.stocks_search_slow
 }

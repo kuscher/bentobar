@@ -178,12 +178,7 @@ private fun StockSearch(item: ItemConfig, stocks: List<Stock>, set: (ItemConfig)
         is Ask.State.Busy -> SearchStatus(stringResource(R.string.stocks_searching))
         is Ask.State.Done -> when (val answer = state.answer) {
             StockFound.Unasked -> {}
-            is StockFound.Failed -> SearchStatus(stringResource(when (answer.failure) {
-                Finnhub.Failure.OFFLINE -> R.string.common_no_connection
-                Finnhub.Failure.REFUSED -> R.string.stocks_key_refused
-                Finnhub.Failure.SLOW_DOWN -> R.string.stocks_search_slow
-                else -> R.string.stocks_search_no_answer
-            }))
+            is StockFound.Failed -> SearchStatus(stringResource(stocksRes(StocksRules.searchProblem(answer.failure))))
             is StockFound.Listings -> if (found.isEmpty()) SearchStatus(stringResource(R.string.stocks_nothing_found)) else found.forEachIndexed { i, l ->
                 val following = stocks.any { it.symbol == l.symbol }
                 MenuEntry(if (following) Sym.CHECK else Sym.ADD, l.symbol, sub = l.name, enabled = !following,

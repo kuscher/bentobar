@@ -347,6 +347,16 @@ class StocksRulesTest {
         assertNull(refused.note)
     }
 
+    @Test fun aFailedSearchSaysWhy() {
+        fun msg(f: Finnhub.Failure) = w.say(StocksRules.searchProblem(f))
+        assertEquals("No connection", msg(Finnhub.Failure.OFFLINE))
+        assertEquals("Finnhub refused the key", msg(Finnhub.Failure.REFUSED))
+        assertEquals("Not in Finnhub's free plan", msg(Finnhub.Failure.NO_ACCESS))
+        assertEquals("Nothing found. Only US stocks and ETFs can be followed.", msg(Finnhub.Failure.NOT_FOUND))
+        assertEquals("Too many requests. Try again in a minute.", msg(Finnhub.Failure.SLOW_DOWN))
+        assertEquals("Finnhub didn't answer. Try again in a moment.", msg(Finnhub.Failure.NO_ANSWER))
+    }
+
     // ---- what a layout holds ---------------------------------------------------------------------------
 
     private val item = ItemConfig("s", "stocks")

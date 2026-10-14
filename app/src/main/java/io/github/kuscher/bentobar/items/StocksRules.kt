@@ -45,6 +45,7 @@ enum class SW(val res: String) {
     UPDATED_NOT_CURRENT("stocks_updated_not_current"),
     NOT_CURRENT("stocks_not_current"), OFFLINE("common_no_connection"), NO_ANSWER("stocks_no_answer"), SLOW_DOWN("stocks_slow_down"), REFUSED("stocks_key_refused"),
     NO_ACCESS("stocks_no_access"), NOT_FOUND("stocks_not_found"), WAITING("stocks_waiting"),
+    NOTHING_FOUND("stocks_nothing_found"), SEARCH_NO_ANSWER("stocks_search_no_answer"), SEARCH_SLOW("stocks_search_slow"),
 }
 
 /** Where the words come from: [say] is a text with its arguments put in. */
@@ -355,6 +356,16 @@ object StocksRules {
         Finnhub.Failure.REFUSED -> w.say(SW.REFUSED)
         Finnhub.Failure.NO_ACCESS -> w.say(SW.NO_ACCESS)
         Finnhub.Failure.NOT_FOUND -> w.say(SW.NOT_FOUND)
+    }
+
+    /** What a search that failed says: each failure has its own reason, so a refused or free-plan answer never reads as no answer. */
+    fun searchProblem(f: Finnhub.Failure): SW = when (f) {
+        Finnhub.Failure.OFFLINE -> SW.OFFLINE
+        Finnhub.Failure.REFUSED -> SW.REFUSED
+        Finnhub.Failure.NO_ACCESS -> SW.NO_ACCESS
+        Finnhub.Failure.NOT_FOUND -> SW.NOTHING_FOUND
+        Finnhub.Failure.SLOW_DOWN -> SW.SEARCH_SLOW
+        Finnhub.Failure.NO_ANSWER -> SW.SEARCH_NO_ANSWER
     }
 
     private fun sign(way: Int) = when (way) { 1 -> "+"; -1 -> "−"; else -> "" }

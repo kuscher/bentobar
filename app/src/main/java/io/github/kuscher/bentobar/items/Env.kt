@@ -51,7 +51,7 @@ object Env {
         if (::app.isInitialized) return
         app = context.applicationContext
         Store.init(app)
-        // The switches for the two online services and the user's key: in the no-backup directory, which
+        // The switches for the three online services and the user's keys: in the no-backup directory, which
         // Android leaves out of backups and device transfers. Then the rules for going online at all.
         Online.init(app.noBackupFilesDir)
         wireOnline()

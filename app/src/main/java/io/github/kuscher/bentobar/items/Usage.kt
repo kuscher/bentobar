@@ -60,9 +60,6 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.Executors
 
-/** Whether the user has turned on Usage access for BentoBar (Android settings › Special app access). */
-fun usageAccess(context: Context): Boolean = Usage.granted(context)
-
 /**
  * Usage access (PACKAGE_USAGE_STATS), an optional special app access the user turns on in Android
  * settings. Android can't show apps which other apps use the CPU or memory, but with Usage access
@@ -219,7 +216,10 @@ object Usage {
         pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
     }.getOrDefault(pkg)
 
-    private val icons = HashMap<String, ImageBitmap>()
+    private const val MAX_ICONS = 64
+    private val icons = object : LinkedHashMap<String, ImageBitmap>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap>?) = size > MAX_ICONS
+    }
 
     private fun icon(pm: PackageManager, pkg: String): ImageBitmap? = synchronized(icons) {
         icons[pkg] ?: runCatching {

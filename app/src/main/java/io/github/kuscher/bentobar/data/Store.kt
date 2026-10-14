@@ -17,7 +17,11 @@ import java.util.UUID
 object Store {
     private const val TAG = "BentoBar"
     private const val KEY = "bar"
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+    // A value this version doesn't know (a later version's enum constant) falls back to the field's default
+    // instead of making the whole layout unreadable.
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true }
+    /** A stored layout that could not be read is kept here as it was, not overwritten by the next edit. */
+    private const val KEY_UNREADABLE = "bar_unreadable"
     private lateinit var prefs: SharedPreferences
     private val state = MutableStateFlow(BarConfig())
     val config: StateFlow<BarConfig> get() = state.asStateFlow()
@@ -45,12 +49,13 @@ object Store {
         prefs = context.applicationContext.getSharedPreferences("bentobar", Context.MODE_PRIVATE)
         consentState.value = prefs.getString(KEY_CONSENT, null)?.let { runCatching { Consent.valueOf(it) }.getOrNull() } ?: Consent.NOT_ASKED
         val raw = prefs.getString(KEY, null)
-        state.value = raw?.let {
-            runCatching { json.decodeFromString(BarConfig.serializer(), it) }
-                // The exception's own message quotes the text around the fault, which can be a city or a note.
-                .onFailure { e -> Log.w(TAG, "settings unreadable (${e.javaClass.simpleName}), starting fresh") }
-                .getOrNull()
-        } ?: Defaults.config()
+        val read = raw?.let(::decode)
+        if (raw != null && read == null) {
+            // Not logged as it is: it can hold a city or a note. Kept, so that starting fresh loses nothing for good.
+            Log.w(TAG, "settings unreadable, starting fresh; kept as they were")
+            prefs.edit().putString(KEY_UNREADABLE, raw).apply()
+        }
+        state.value = read ?: Defaults.config()
         // v1 → v2: timed hiding of revealed items became opt-in; 8 s was only the old default.
         if (state.value.version < 2) {
             val c = state.value
@@ -91,6 +96,19 @@ object Store {
         return id
     }
 
+    /** A copy of [item] with all its settings, right after it; its new id. Duplicate in the item's settings. */
+    fun duplicate(item: ItemConfig): String {
+        val id = newId()
+        update { c -> c.copy(items = duplicated(c.items, item, id)) }
+        return id
+    }
+
+    /** [items] with a copy of [of] (every setting, the id [id]) right after it; as they were if it is gone. */
+    internal fun duplicated(items: List<ItemConfig>, of: ItemConfig, id: String): List<ItemConfig> {
+        val at = items.indexOfFirst { it.id == of.id }
+        return if (at < 0) items else items.toMutableList().apply { add(at + 1, items[at].copy(id = id)) }
+    }
+
     /** The item type kept at the bar's far left (see [add]). */
     const val PINNED_LEFT = "event"
 
@@ -100,6 +118,9 @@ object Store {
     fun move(id: String, section: Section, index: Int) = update { c -> c.copy(items = c.items.moved(id, section, index)) }
 
     fun newId(): String = UUID.randomUUID().toString().substring(0, 8)
+
+    /** A stored layout as this version reads it: a value it doesn't know is that field's default; null if it isn't a layout at all. */
+    internal fun decode(raw: String): BarConfig? = runCatching { json.decodeFromString(BarConfig.serializer(), raw) }.getOrNull()
 
     fun export(): String = json.encodeToString(BarConfig.serializer(), state.value)
 

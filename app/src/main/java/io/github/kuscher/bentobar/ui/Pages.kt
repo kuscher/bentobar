@@ -96,7 +96,7 @@ fun AddPage(onAdded: (String) -> Unit) {
     val groups = listOf(
         AddGroup(R.string.add_group_system, listOf("cpu", "network", "memory", "battery", "storage", "heat", "devices")),
         AddGroup(R.string.add_group_time, listOf("calendar", "event", "clock", "timer", "countdown")),
-        AddGroup(R.string.add_group_tools, listOf("caffeine", "media", "sound", "tools", "folder", "app", "text", "spacer")),
+        AddGroup(R.string.add_group_tools, listOf("caffeine", "media", "sound", "tools", "shortcut", "folder", "app", "text", "spacer")),
         // The only items that go online, in a group that says so.
         AddGroup(R.string.add_group_online, listOf("weather", "flight"), caption = R.string.add_group_online_caption),
     )
@@ -181,6 +181,15 @@ fun LookPage() {
         ChoiceRow(stringResource(R.string.look_background), listOf(Pill.NONE to stringResource(R.string.look_pill_none),
             Pill.SUBTLE to stringResource(R.string.look_pill_subtle), Pill.SOLID to stringResource(R.string.look_pill_solid)), cfg.pill) { v ->
             Store.update { it.copy(pill = v) }
+        }
+        SwitchRow(stringResource(R.string.look_hover_switch), cfg.hoverSwitchesPopups, help = stringResource(R.string.look_hover_switch_help)) { on ->
+            Store.update { it.copy(hoverSwitchesPopups = on) }
+        }
+        SwitchRow(stringResource(R.string.look_no_animations), cfg.noAnimations, help = stringResource(R.string.look_no_animations_help)) { on ->
+            Store.update { it.copy(noAnimations = on) }
+        }
+        SwitchRow(stringResource(R.string.look_system_tint), cfg.systemTint, help = stringResource(R.string.look_system_tint_help)) { on ->
+            Store.update { it.copy(systemTint = on) }
         }
         PageLabel(stringResource(R.string.barmenu_hidden_items))
         ChoiceRow(stringResource(R.string.look_hidden_mode), listOf(HiddenMode.SHOW_ALL to stringResource(R.string.look_hidden_show_all),

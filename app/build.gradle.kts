@@ -12,8 +12,8 @@ android {
         applicationId = "io.github.kuscher.bentobar"
         minSdk = 34
         targetSdk = 37
-        versionCode = 13
-        versionName = "1.0.2"
+        versionCode = 17
+        versionName = "1.4"
     }
 
     // Release signing from ~/.config/bentobar (never committed). Absent -> unsigned release build.
@@ -39,6 +39,9 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.findByName("release")
         }
+        // `-PreleaseSignedDebug`: a debug build signed with the release key, so it installs over a released BentoBar on
+        // a test device and keeps its layout and its accessibility switch (same id, same key, same version code).
+        if (project.hasProperty("releaseSignedDebug")) debug { signingConfig = signingConfigs.getByName("release") }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

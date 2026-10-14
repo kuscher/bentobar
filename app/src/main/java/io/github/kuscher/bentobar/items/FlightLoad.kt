@@ -4,6 +4,7 @@ import io.github.kuscher.bentobar.data.Kept
 import io.github.kuscher.bentobar.data.Online
 import io.github.kuscher.bentobar.items.AirLabs.Failure
 import io.github.kuscher.bentobar.items.FlightRules.Tracked
+import io.github.kuscher.bentobar.net.Host
 import io.github.kuscher.bentobar.net.Http
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -14,8 +15,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The Flight item's requests, and what it keeps. Everything here runs on a background thread (a
- * `Refresher`'s load and restore, an `Ask`'s work) except [take] and [stop], which are the user's own
- * act in the menu and touch two small files.
+ * `Refresher`'s load and restore, an `Ask`'s work) except [take], [stop], [clearWithout], [forget] and
+ * [newKey], which follow the user's own acts (the menu, the settings, the switch, a new key) on the
+ * main thread and touch a few small files.
  *
  * What leaves the device: the flight number and the user's own key, to airlabs.co, and nothing else.
  * Never without a key, never while the service is switched off: asked here before any request, though
@@ -234,7 +236,7 @@ object FlightLoad {
     }
 
     /**
-     * Asks again about what [item] follows: one request about the one flight ([AirLabs.again]). With
+     * Asks again about what [item] follows: [AirLabs.again], one request in the usual case. With
      * nothing heard of it yet (the service was switched off and on again, which deletes the answer and
      * keeps the note) it is the lookup for that number on its day from its airport, which finds the
      * flight that was followed and never asks which. [last]: what was known. The answer is a [Tracked]
@@ -264,14 +266,24 @@ object FlightLoad {
 
     private fun lookUp(asked: Following, number: FlightNumber, was: Tracked?, key: String, now: Long): Tracked? {
         val day = asked.day?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val before = Http.sent(Host.AIRLABS)
         val a = AirLabs.lookup(number, day, asked.from, key, Instant.ofEpochMilli(now)) { Http.get(it) } ?: return null
         said(a.left)
         val left = a.left ?: was?.left
-        val f = a.flight ?: return Tracked(asked.number, asked.day, failure = a.failure ?: Failure.NO_ANSWER, failures = (was?.failures ?: 0) + 1, askedAt = now, left = left, from = asked.from)
+        val f = a.flight ?: return Tracked(asked.number, asked.day, failure = a.failure ?: Failure.NO_ANSWER,
+            failures = counted(was?.failures ?: 0, before), askedAt = now, left = left, from = asked.from)
         return Tracked(asked.number, asked.day, f, askedAt = now, heardAt = now, left = left, alertSince = FlightRules.alertSince(f, null, now), from = asked.from)
     }
 
+    /**
+     * The failures in a row after one more, as for Weather: it counts only if a request left the device since [sentBefore]
+     * ([Http.sent]). Without a network nothing went out and the back-off doesn't grow; a connection that broke after the
+     * request was sent may have cost a lookup, and does.
+     */
+    private fun counted(failures: Int, sentBefore: Int): Int = if (Http.sent(Host.AIRLABS) != sentBefore) failures + 1 else failures
+
     private fun again(number: FlightNumber, was: Tracked, flight: Flight, key: String, now: Long): Tracked? {
+        val before = Http.sent(Host.AIRLABS)
         val r = AirLabs.again(number, key, flight, Instant.ofEpochMilli(now)) { Http.get(it) } ?: return null
         said(r.left)
         val left = r.left ?: was.left
@@ -284,7 +296,8 @@ object FlightLoad {
             AirLabs.Again.Gone -> (r.failure == Failure.REFUSED || r.failure == Failure.USED_UP).let { ofTheKey ->
                 was.copy(failure = r.failure.takeIf { ofTheKey }, failures = 0, askedAt = now, left = left, ended = !ofTheKey, waitSec = null)
             }
-            AirLabs.Again.Failed -> was.copy(failure = r.failure ?: Failure.NO_ANSWER, failures = was.failures + 1, askedAt = now, left = left, waitSec = r.retryAfterSec)
+            AirLabs.Again.Failed -> was.copy(failure = r.failure ?: Failure.NO_ANSWER, failures = counted(was.failures, before), askedAt = now,
+                left = left, waitSec = r.retryAfterSec)
         }
     }
 

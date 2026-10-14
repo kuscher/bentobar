@@ -21,8 +21,18 @@ class ManifestTest {
     private fun Element.attr(name: String): String = getAttributeNS(android, name)
     private val application = manifest.all("application").single()
 
+    @Test fun theOtherAppsBentoBarLooksForAreTheLaunchersAndTheFeedbackApp() {
+        // Package visibility, not a permission: the apps in the launcher (folders, app shortcuts) and, by name, the
+        // Googlebook's Feedback app (the Shortcut item's Report a bug). Nothing else is looked for.
+        val queries = manifest.all("queries").single()
+        assertEquals(listOf(io.github.kuscher.bentobar.items.ShortcutRules.FEEDBACK_PACKAGE), queries.all("package").map { it.attr("name") })
+        assertEquals(listOf("android.intent.action.MAIN"), queries.all("intent").flatMap { it.all("action") }.map { it.attr("name") })
+        assertEquals(listOf("android.intent.category.LAUNCHER"), queries.all("intent").flatMap { it.all("category") }.map { it.attr("name") })
+    }
+
     @Test fun thePermissionsAreTheseAndNoOthers() {
-        // No Bluetooth, no location, no reading of notifications as a permission: a new one is added here on purpose.
+        // No Bluetooth, no precise or background location, no reading of notifications as a permission: a new one is added here on purpose.
+        // Approximate location is Weather's My location, asked for only when an item chooses it.
         assertEquals(setOf(
             "android.permission.INTERNET",
             "android.permission.ACCESS_NETWORK_STATE",
@@ -30,6 +40,7 @@ class ManifestTest {
             "android.permission.WAKE_LOCK",
             "android.permission.POST_PROMOTED_NOTIFICATIONS",
             "android.permission.READ_CALENDAR",
+            "android.permission.ACCESS_COARSE_LOCATION",
             "android.permission.SCHEDULE_EXACT_ALARM",
             "android.permission.QUERY_ADVANCED_PROTECTION_MODE",
             "android.permission.PACKAGE_USAGE_STATS",

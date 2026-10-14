@@ -25,8 +25,19 @@ private projects and paths into their repos, and where signing keys are backed u
     reading (pure, unit-tested).
   - `bar/ColorWatch.kt`: when the bar's colors are read after a cause, and when the readings stop
     (pure, unit-tested).
-  - `bar/Overlay.kt`: a Compose host in a TYPE_ACCESSIBILITY_OVERLAY window (outside-touch and
-    key callbacks for menus).
+  - `bar/Overlay.kt`: a Compose host in a TYPE_ACCESSIBILITY_OVERLAY window (the strip, the tooltip and a popup's
+    shadow).
+  - `bar/MenuWindow.kt`: a popup's window (1.3, docs/design/1.3): a `ComponentDialog` of type
+    TYPE_ACCESSIBILITY_OVERLAY, because only a `Window` can blur what is behind it. The window is exactly the card;
+    before each frame its root view is cut to the glass as far as it shows (bottom edge only), since the platform
+    blurs exactly the root view's rectangle (and Compose places input by its top-left corner, which never moves).
+    The shadow lies outside the card, which that cut would clip, so it is drawn in a second, untouchable `Overlay`
+    just below (`MenuShadow`). One clock drives the opening, the blocks, the fold and the turn-round
+    (`ui/MenuMotion.kt`, pure and unit-tested); it starts once the window's first frame is committed and frames come
+    on time, and each frame's values go to Compose at once (`Snapshot.sendApplyNotifications`) so the blur and the
+    drawn glass move together. Closing passes touches through at once; a timer removes the window regardless.
+  - `ui/Glass.kt`: the glass's per-frame state, its look (veil, rim, hairline; a solid card where the platform
+    has no blur), the drawn shadow, and `DropColumn`, in which `MenuCard`'s children drop into place as blocks.
   - `bar/BarUi.kt`: the strip (chevron, FitRow, items, clicks/right-clicks/wheel), and the slider an
     item can have in its text's place (`ItemState.slider`: `VolumeTrack` draws it, `Modifier.slides`
     takes the pointer in its zone and consumes the press, so `clicks` on the item around it sees
@@ -38,16 +49,26 @@ private projects and paths into their repos, and where signing keys are backed u
     `StripLook.route` what color they take). The Flight item has one from its countdown until an hour
     after landing (`FlightText.bar` says when), colored by `FlightRules.stands`; shown as text alone
     it has none (`Display.line`), and its words keep their tones.
-  - `bar/Menus.kt`: the menu card, the right-click item menu and the ‹ menu.
+    The hover is one highlight for the whole strip, not a box per item (1.3): `bar/StripHighlight.kt`, pure and
+    unit-tested, says which item the pointer is over (gaps split at their middles, ‹ one more item), carries the pill
+    there like Booklight's rubber-band rows, and says when it comes and goes (an open popup's item, a held slider, a
+    drag, the animator scale). The strip reads the pointer for it on the Initial pass without consuming anything, runs
+    its frames only while it moves, and draws it in the Row's `drawBehind`; change its rules there, not in the strip.
+  - `bar/Menus.kt`: the popup's surface (`MenuSurface`: glass, clip to the shown glass, text colour) and its shadow
+    (`MenuShadow`), the right-click item menu and the ‹ menu.
   - `items/`: `ItemType` + `ItemState`, `Items` registry + `Ticker` (1 Hz while anything is
     visible), `Env` (samplers, launch helpers), `Timers`, `Calendar`, `Notify` (channels,
     glyph icons, `Chips` for the Live Update chip), `TextRules` (text from a layout or a reply as one line,
     counted as a reader counts it), and the item types: several each in
     `SystemItems.kt`, `TimeItems.kt` and `ToolItems.kt`, the newer ones in files of their own
     (`CpuItem`, `ClockItem`, `SoundItem`, `MediaItem`, `DevicesItem`, `HeatItem`, `WeatherItem`,
-    `FlightItem`, `StocksItem`). A type gets `onLive()`, `sample(now)` once a second and `onIdle()` from the
-    `Ticker`: listeners and polls hang on those, so none exists while the bar is hidden, the screen is
-    off or no such item is outside Off.
+    `FlightItem`, `ShortcutItem` with its pure `ShortcutRules`, `StocksItem`). `WeatherHere` is Weather's My location
+    (what it does is the pure `HereKeeper`, on `HereRules`): Android's approximate location, in memory
+    only, rounded to 0.1° (`WeatherRules.nearby`, in `WeatherLoad.place`) before anything is asked or
+    held under it; its reading is never kept on the device, and the layout holds `where=here` and never
+    a place. A type gets `onLive()`,
+    `sample(now)` once a second and `onIdle()` from the `Ticker`: listeners and polls hang on those,
+    so none exists while the bar is hidden, the screen is off or no such item is outside Off.
   - `items/Refresher.kt` is `Calendar`'s way of loading as one class (a background thread, one load
     per key, an immutable snapshot, a generation counter); `items/Ask.kt` is the same for one
     question at a time (a search). Both are pure Kotlin; `items/Background.kt` wires them to the app.
@@ -106,8 +127,13 @@ private projects and paths into their repos, and where signing keys are backed u
 
 ## Dev loop
 - `./bento app` builds the debug APK, installs it, enables the service and opens settings.
-- `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|set ID k=v|look KEY VALUE|windows`.
+- `./bento debug dump|open TYPE|ctx TYPE|chevron|barmenu|hover on|off|scroll TYPE N|timer MIN|awake [MIN|off]|bar on|off|finish|reset|add TYPE [section]|remove ID|set ID k=v|look KEY VALUE|windows`.
   The receiver (`src/debug`, debug builds only) is guarded by DUMP, so only adb can call it.
+  `solid on|off`: popups as if the platform had no blur (the solid card). `look switch on|off`: "Switch popups on hover"; `look animations on|off`: "No animations". Each frame of a popup's opening and its
+  blur region go to the log with `adb shell setprop log.tag.BentoBarMotion DEBUG`.
+  On a test device with a released BentoBar, `./gradlew assembleDebug -PreleaseSignedDebug` signs the debug build
+  with the release key (from `~/.config/bentobar`): it installs over the release, same version code, and keeps its
+  layout and its accessibility switch.
   Also `now +3h|+90m|off` (moves the clock everything newer reads, `util/Now`), `net [reset]` (requests
   sent per host, and whether each service may be asked right now), `online weather|flights|stocks on|off`,
   and `TYPE …` or `item TYPE …`, which go to that item type's own `debug(args)`. What a hook prints
@@ -132,8 +158,8 @@ private projects and paths into their repos, and where signing keys are backed u
   `--ez close true` (closes it: on a desktop the Back key doesn't). On a Googlebook it only reaches the
   bar from full screen (the keyboard's full-screen key, sent to it while it has the focus).
 - `./bento shot`, `./bento menushot` and `./bento appshot` capture the status bar, the open menu and
-  the settings window. Menu crops include the menu's shadow margin, which can show other windows
-  behind it, so don't publish them.
+  the settings window. A menu's crop is its card; its shadow is in the window "BentoBar menu shadow" below it.
+  Behind the glass other windows show through, blurred: don't publish captures with private windows behind.
 - Release (`docs/RELEASING.md`): bump `versionCode` and `versionName`, add `docs/release-notes/<version>.md`
   and Play's "What's new" (`store-submission/listing/en-US/release-notes.txt`, 500 characters at most),
   commit, push, then `git tag v<version> && git push origin v<version>`. GitHub Actions
@@ -216,6 +242,17 @@ private projects and paths into their repos, and where signing keys are backed u
   A service is asked only after its item was set up on this install: `data/Online.kt` records that
   outside the layout, so a pasted layout or a restored backup turns nothing on. Off (Setup › Online
   services) stops requests at once and deletes what was fetched (`ItemType.forgetFetched`).
+  The one location permission is `ACCESS_COARSE_LOCATION`, for Weather's My location, asked for only when
+  an item chooses it (the exported `MainActivity` asks it only for a layout with one: `HereRules.mayAsk`).
+  Where the device is is kept only while such an item is outside Off and the switch is on
+  (`HereRules.wanted`; else it is forgotten, with an ask on its way), and Android is asked only while
+  such an item is sampled (`TickRules.needed`, as `Ticker.sampled`): on screen, waiting in Hidden for its
+  Show when rule in any hidden mode (which needs the forecast where the device is), or while the settings window is open;
+  else an ask on its way is called off. Then when the fix is half an hour old, and without one after 1, 2,
+  5 and 15 minutes, then every half hour (asks that find nothing new while a fix is still good wait the
+  same way).
+  A fix is good for 35 minutes, so after a night yesterday's place is never asked about (`HereRules` and
+  `HereKeeper`, pure and unit-tested; `WeatherHere` is the keeper on Android's location service).
   `ManifestTest` pins the permissions, the backup rules, cleartext off and the listener's entry;
   `HttpTest` and `HttpTransportTest` pin the four hosts and what a request may carry; `OneWayOutTest` names
   the files that may ask a service (`items/Weather*`, `Flight*`, `AirLabs*`, `Stocks*`, `Finnhub*`) or read a key.

@@ -50,13 +50,23 @@ class WeatherSourceTest {
      * (which the fake leaves wide open). Here neither does, on purpose: what keeps a request from
      * going out in these tests is the item's own rule and nothing behind it.
      */
+    /** Where the device is, for My location, as Android says it (unrounded: the source rounds it), and why not while that isn't known: as WeatherHere would say. */
+    private var here: Fix? = null
+    private var locating = Locate.FINDING
+
+    /** Loads wait here until [runHeld] while [held]; otherwise they run at once, on this thread. */
+    private val waiting = ArrayDeque<Runnable>()
+    private var held = false
+    private fun runHeld() { held = false; while (waiting.isNotEmpty()) waiting.removeFirst().run() }
+
     private fun source(staged: () -> Failure? = { null }): WeatherSource {
-        val wiring = Refresher.Wiring(Executor { it.run() }, { it.run() }, { elapsed }, { changes++ }, minGapMs = 10_000, afterThrowMs = 60_000,
+        val wiring = Refresher.Wiring(Executor { r -> if (held) waiting.addLast(r) else r.run() }, { it.run() }, { elapsed }, { changes++ }, minGapMs = 10_000, afterThrowMs = 60_000,
             mayLoad = { shown })
         return WeatherSource.make(
             refresher = { every, restore, load -> Refresher(wiring, every, restore, load).also { readings = it } },
             ask = { work -> Ask(wiring, work).also { asking = it } },
-            background = Executor { backgroundRuns++; it.run() }, wall = { wall }, layout = { layout }, staged = staged, up = { elapsed })
+            background = Executor { backgroundRuns++; it.run() }, wall = { wall }, layout = { layout }, staged = staged, up = { elapsed },
+            here = { here }, locating = { locating })
     }
 
     /** How often something was handed to the background thread that tidies the device. */
@@ -197,6 +207,153 @@ class WeatherSourceTest {
         assertEquals("39.80", net.query("latitude"))
         assertEquals("-89.64", net.query("longitude"))
         assertTrue(s.status(item, wall) is Status.Live)
+    }
+
+    // ---- My location ---------------------------------------------------------------------------------
+
+    @Test fun myLocationAsksNothingUntilTheDeviceKnowsWhereItIs() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = WeatherRules.useHere(added)
+        layout = listOf(item)
+        s.turnOn()
+        // Android hasn't answered yet: loading, and nothing goes out.
+        assertNull(s.reading(item))
+        s.watch(item, 10 * min)
+        s.opened(item)
+        assertFalse(s.again(item))
+        assertEquals(Status.Loading, s.status(item, wall))
+        // Refused, switched off, or no location at all: each a state of its own, and still nothing goes out.
+        for (why in listOf(Locate.NOT_ALLOWED, Locate.OFF, Locate.NONE)) {
+            locating = why
+            s.watch(item, 10 * min)
+            assertEquals(Status.NoLocation(why), s.status(item, wall))
+        }
+        sentNothing(net)
+    }
+
+    @Test fun myLocationSendsWhereTheDeviceIsToAboutTenKilometersAndNothingElse() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = WeatherRules.useHere(added)
+        layout = listOf(item)
+        s.turnOn()
+        // Android says where the device is to a few meters; the source sends it, and holds its reading, to one decimal.
+        here = Fix(47.376_887, 8.541_694)
+        assertNotNull(s.reading(item))
+        assertEquals(1, net.asked.size)
+        assertEquals("47.4", net.query("latitude"))
+        assertEquals("8.5", net.query("longitude"))
+        assertTrue(net.asked.single().query.none { (_, v) -> "47.37" in v || "8.54" in v })
+        assertEquals("47.4,8.5", s.peek(item)!!.place)
+        assertTrue(s.status(item, wall) is Status.Live)
+        // The layout holds the choice, never the place.
+        assertEquals(mapOf("where" to "here"), item.options)
+        assertEquals(setOf(Place("47.4", "8.5")), WeatherLoad.places(layout, here))
+    }
+
+    @Test fun myLocationsReadingIsHeldInMemoryAndNeverWrittenToTheDevice() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = WeatherRules.useHere(added)
+        layout = listOf(item)
+        s.turnOn()
+        here = Fix(47.4, 8.5)
+        assertNotNull(s.reading(item))
+        assertEquals(1, net.asked.size)
+        assertTrue(s.status(item, wall) is Status.Live)
+        // In memory for the bar and the menu; on the device, nothing, under no name.
+        assertEquals(emptySet<String>(), Kept.fetched(OPEN_METEO).names())
+        // Beside a city, only the city's reading is kept.
+        val city = zurich("w2")
+        layout = listOf(item, city)
+        assertNotNull(s.reading(city))
+        assertEquals(setOf(Kept.safe("47.37,8.55")), Kept.fetched(OPEN_METEO).names())
+        // What an earlier version kept for where the device was: a restart doesn't read it back, but asks, and the
+        // answer's keeping removes it; so does a tidy.
+        fun planted() = Kept.fetched(OPEN_METEO).write("47.4,8.5", Kept.fetched(OPEN_METEO).read("47.37,8.55")!!.text.replace("47.37,8.55", "47.4,8.5"), wall)
+        planted()
+        val restarted = source()
+        assertNull(restarted.peek(item))
+        assertNotNull(restarted.reading(item))
+        assertEquals(2, net.asked.count { r -> ("latitude" to "47.4") in r.query })
+        assertEquals(setOf(Kept.safe("47.37,8.55")), Kept.fetched(OPEN_METEO).names())
+        planted()
+        restarted.keepOnly(WeatherLoad.places(layout, here), cities = WeatherLoad.places(layout))
+        assertEquals(setOf(Kept.safe("47.37,8.55")), Kept.fetched(OPEN_METEO).names())
+    }
+
+    @Test fun myLocationsFirstReadingStillOnItsWayWhenTheItemGoesIsNotHeld() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = WeatherRules.useHere(added)
+        layout = listOf(item)
+        s.turnOn()
+        here = Fix(47.4, 8.5)
+        held = true
+        s.reading(item)
+        // The item goes (deleted, Off, or back to its city) before the answer: the place is forgotten, and the tick tidies.
+        layout = emptyList()
+        here = null
+        s.keepOnly(WeatherLoad.places(layout, here), cities = WeatherLoad.places(layout))
+        runHeld()
+        assertEquals(1, net.asked.size)
+        // The answer came after: it is held under no place, so an item of My location added later finds nothing from before.
+        layout = listOf(item)
+        here = Fix(47.4, 8.5)
+        assertNull(s.peek(item))
+    }
+
+    @Test fun myLocationFromAPastedLayoutSendsNothingUntilTurnOnWeather() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = WeatherRules.useHere(added)
+        layout = listOf(item)
+        here = Fix(47.4, 8.5)
+        s.watch(item, 60 * min)
+        sentNothing(net)
+        assertEquals(Status.Off(everOn = false), s.status(item, wall))
+    }
+
+    @Test fun whenTheDeviceMovesTheNewPlaceIsAsked() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val item = WeatherRules.useHere(added)
+        layout = listOf(item)
+        s.turnOn()
+        here = Fix(47.4, 8.5)
+        s.watch(item, 5 * min)
+        assertEquals(1, net.asked.size)
+        // Moved within the same ten kilometers: the same place, nothing new is asked.
+        here = Fix(47.41, 8.52)
+        s.watch(item, 5 * min)
+        assertEquals(1, net.asked.size)
+        here = Fix(46.948, 7.447)
+        s.watch(item, 1 * min)
+        assertEquals(2, net.asked.size)
+        assertEquals("46.9", net.query("latitude"))
+        assertEquals("7.4", net.query("longitude"))
+    }
+
+    @Test fun aCityAndMyLocationSideBySide() = FakeHttp.use { net ->
+        net.forecasts()
+        val s = source()
+        val mine = WeatherRules.useHere(oslo("w1"))
+        val city = zurich("w2")
+        layout = listOf(mine, city)
+        s.turnOn()
+        // The item of My location keeps its city for a way back, and asks nothing for it.
+        s.watch(mine, 5 * min)
+        assertEquals(Status.Loading, s.status(mine, wall))
+        sentNothing(net)
+        s.reading(city)
+        assertEquals(1, net.asked.size)
+        assertEquals("47.37", net.query("latitude"))
+        // Back to its city.
+        val back = WeatherRules.useCity(mine)
+        layout = listOf(back, city)
+        s.reading(back)
+        assertEquals("59.91", net.query("latitude"))
     }
 
     @Test fun aPastedLayoutWithACitySendsNothingUntilTurnOnWeather() = FakeHttp.use { net ->

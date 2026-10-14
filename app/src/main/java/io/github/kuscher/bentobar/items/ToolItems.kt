@@ -63,7 +63,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Locale
 
 /**
- * Keep-awake: while on, BarService keeps a tiny window with FLAG_KEEP_SCREEN_ON on screen. [until]
+ * Keep-awake: while on, BarService sets FLAG_KEEP_SCREEN_ON on the visible strip (a wake lock while the strip is hidden). [until]
  * is wall time (it survives a restart); [anchor] keeps setting the clock from changing how long it lasts.
  */
 object Caffeine {
@@ -213,19 +213,39 @@ object ToolsItem : ItemType("tools", R.string.item_tools_title, Sym.HANDYMAN, R.
 object Apps {
     data class App(val component: ComponentName, val label: String)
 
-    private val icons = HashMap<String, Bitmap>()
+    private const val MAX_ICONS = 128
+    private const val MAX_LABELS = 256
+    private val icons = object : LinkedHashMap<String, Bitmap>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?) = size > MAX_ICONS
+    }
+    private val labels = object : LinkedHashMap<ComponentName, String>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ComponentName, String>?) = size > MAX_LABELS
+    }
 
     fun list(context: Context): List<App> {
         val pm = context.packageManager
         return pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-            .map { App(ComponentName(it.activityInfo.packageName, it.activityInfo.name), it.loadLabel(pm).toString()) }
+            .map {
+                val cn = ComponentName(it.activityInfo.packageName, it.activityInfo.name)
+                val l = it.loadLabel(pm).toString()
+                synchronized(labels) { labels[cn] = l }
+                App(cn, l)
+            }
             .filter { it.component.packageName != context.packageName }
             .sortedBy { it.label.lowercase(Locale.getDefault()) }
     }
 
-    fun label(context: Context, cn: ComponentName): String = runCatching {
-        context.packageManager.getActivityInfo(cn, 0).loadLabel(context.packageManager).toString()
-    }.getOrDefault(cn.packageName)
+    /** [label] if it's been read already: cheap enough to call while composing. */
+    fun cachedLabel(cn: ComponentName): String? = synchronized(labels) { labels[cn] }
+
+    fun label(context: Context, cn: ComponentName): String {
+        synchronized(labels) { labels[cn]?.let { return it } }
+        val resolved = runCatching {
+            context.packageManager.getActivityInfo(cn, 0).loadLabel(context.packageManager).toString()
+        }.getOrDefault(cn.packageName)
+        synchronized(labels) { labels[cn] = resolved }
+        return resolved
+    }
 
     /** [icon] if it's been drawn already: cheap enough to call while composing. */
     fun cachedIcon(cn: ComponentName, px: Int, mono: Boolean): Bitmap? = synchronized(icons) { icons["${cn.flattenToShortString()}/$px/$mono"] }
@@ -246,10 +266,6 @@ object Apps {
             b
         }.getOrNull()?.also { icons[key] = it }
     }
-
-    fun hasMono(context: Context, cn: ComponentName) = runCatching {
-        (context.packageManager.getActivityIcon(cn) as? AdaptiveIconDrawable)?.monochrome != null
-    }.getOrDefault(false)
 
     fun launch(cn: ComponentName) = Env.launch(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setComponent(cn))
 
@@ -287,12 +303,25 @@ fun AppPicker(selected: List<ComponentName>, multi: Boolean, onChange: (List<Com
 object AppItem : ItemType("app", R.string.item_app_title, Sym.ROCKET_LAUNCH, R.string.item_app_desc) {
     override val refreshMs = 60_000L
 
+    private data class Key(val cn: ComponentName, val mono: Boolean)
+    private data class Resolved(val label: String, val icon: Bitmap?)
+
+    /** Label and icon are resolved off the main thread, so a cold cache never stalls a status-bar tick. */
+    private val resolved = Background.refresher<Key, Resolved>(type, every = { _, _ -> null }) { key, _ ->
+        Resolved(Apps.label(Env.app, key.cn), Apps.icon(Env.app, key.cn, 64, key.mono))
+    }
+
     private fun cn(item: ItemConfig) = item.options["app"]?.let { ComponentName.unflattenFromString(it) }
 
     override fun state(item: ItemConfig): ItemState {
         val cn = cn(item) ?: return ItemState(icon = Sym.ROCKET_LAUNCH, text = Env.str(R.string.app_pick), desc = Env.str(R.string.app_no_app_desc))
-        val label = Apps.label(Env.app, cn)
-        return ItemState(image = Apps.icon(Env.app, cn, 64, item.optBool("mono", true)), text = label, desc = Env.str(R.string.app_open_desc, label))
+        val mono = item.optBool("mono", true)
+        val key = Key(cn, mono)
+        resolved.want(key)
+        val r = resolved.peek(key)
+        val label = r?.label ?: Apps.cachedLabel(cn) ?: cn.packageName
+        val icon = r?.icon ?: Apps.cachedIcon(cn, 64, mono)
+        return ItemState(image = icon, icon = if (icon == null) Sym.ROCKET_LAUNCH else null, text = label, desc = Env.str(R.string.app_open_desc, label))
     }
 
     override fun onClick(item: ItemConfig): Boolean {
@@ -319,12 +348,18 @@ object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW
             if (apps.isEmpty()) Text(stringResource(R.string.folder_no_apps), style = MaterialTheme.typography.bodyMedium)
             TileGrid {
                 apps.forEach { cn ->
+                    val label by produceState(Apps.cachedLabel(cn) ?: cn.packageName, cn) {
+                        if (Apps.cachedLabel(cn) == null) value = withContext(Dispatchers.IO) { Apps.label(Env.app, cn) }
+                    }
+                    val icon by produceState(Apps.cachedIcon(cn, 96, false), cn) {
+                        if (value == null) value = withContext(Dispatchers.IO) { Apps.icon(Env.app, cn, 96, false) }
+                    }
                     Column(Modifier.width(76.dp).padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Apps.icon(Env.app, cn, 96, false)?.let {
-                            Image(it.asImageBitmap(), Apps.label(Env.app, cn),
+                        icon?.let {
+                            Image(it.asImageBitmap(), label,
                                 Modifier.size(44.dp).clickableHand { host.close(); Apps.launch(cn) })
-                        }
-                        Text(Apps.label(Env.app, cn), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                        } ?: Spacer(Modifier.size(44.dp))
+                        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
                     }
                 }
             }
@@ -334,7 +369,10 @@ object FolderItem : ItemType("folder", R.string.item_folder_title, Sym.GRID_VIEW
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow(stringResource(R.string.folder_name), item.opt("label", stringResource(R.string.common_apps))) { set(item.with("label", it.take(16).ifBlank { null })) }
+        // The default name is the placeholder, not the text: emptied, the field stays empty while it is typed in.
+        TextRow(stringResource(R.string.folder_name), item.opt("label", ""), placeholder = stringResource(R.string.common_apps), maxLength = 16) {
+            set(item.with("label", it.take(16).ifBlank { null }))
+        }
         AppPicker(Apps.parse(item.opt("apps", "")), multi = true) { list ->
             set(item.with("apps", list.joinToString(",") { it.flattenToString() }.ifBlank { null }))
         }
@@ -362,7 +400,7 @@ object TextItem : ItemType("text", R.string.item_text_title, Sym.TEXT_FIELDS, R.
     }
 
     override val options: @Composable (ItemConfig, (ItemConfig) -> Unit) -> Unit = { item, set ->
-        TextRow(stringResource(R.string.text_text), item.opt("text", stringResource(R.string.text_default)), help = stringResource(R.string.text_text_help)) {
+        TextRow(stringResource(R.string.text_text), item.opt("text", stringResource(R.string.text_default)), help = stringResource(R.string.text_text_help), maxLength = 40) {
             set(item.with("text", it.take(40)))
         }
         ChoiceRow(stringResource(R.string.text_icon), iconChoices.map { it.first to stringResource(iconNames.getValue(it.first)) },

@@ -1,7 +1,9 @@
 package io.github.kuscher.bentobar.items
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,11 +32,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -42,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.kuscher.bentobar.R
@@ -51,6 +56,7 @@ import io.github.kuscher.bentobar.data.Section
 import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.ui.ChoiceRow
 import io.github.kuscher.bentobar.ui.InfoRow
+import io.github.kuscher.bentobar.ui.MainActivity
 import io.github.kuscher.bentobar.ui.MenuCard
 import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
@@ -58,7 +64,10 @@ import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.ui.SearchField
 import io.github.kuscher.bentobar.ui.SearchStatus
 import io.github.kuscher.bentobar.ui.SectionLabel
+import io.github.kuscher.bentobar.ui.Setup
 import io.github.kuscher.bentobar.ui.TextRow
+import io.github.kuscher.bentobar.ui.fadeIn
+import io.github.kuscher.bentobar.ui.popIn
 import io.github.kuscher.bentobar.ui.rememberTick
 import io.github.kuscher.bentobar.util.Now
 import io.github.kuscher.bentobar.util.Sym
@@ -81,9 +90,10 @@ internal fun HourStrip(cells: List<HourCell>) {
     val anyChance = cells.any { it.chance != null }
     Row(Modifier.fillMaxWidth()) {
         // Always six places, so the cells stand where they stood when fewer hours are left to show.
+        // Each pops in whole, 16 ms after the one to its left (motion.md §7.2).
         for (i in 0 until 6) {
             val cell = cells.getOrNull(i)
-            Column(Modifier.weight(1f).clearAndSetSemantics { if (cell != null) contentDescription = cell.desc },
+            Column(Modifier.popIn(10f * i, 0.9f).weight(1f).clearAndSetSemantics { if (cell != null) contentDescription = cell.desc },
                 horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(cell?.time.orEmpty(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
                 Spacer(Modifier.height(4.dp))
@@ -105,21 +115,44 @@ internal fun HourStrip(cells: List<HourCell>) {
 internal fun DayRow(line: DayLine) {
     Row(Modifier.fillMaxWidth().heightIn(min = 32.dp).clearAndSetSemantics { contentDescription = line.desc },
         verticalAlignment = Alignment.CenterVertically) {
+        // Left to right as it reads (motion.md §7.2): the day, its glyph popping, the chance, high, low.
         Text(line.day, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
-            modifier = Modifier.width(44.dp))
+            modifier = Modifier.fadeIn(0f).width(44.dp))
         // The glyph's place stays when the reply named no condition, so the chances stay in line.
-        Box(Modifier.widthIn(min = 20.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.popIn(12f, 0.8f).widthIn(min = 20.dp), contentAlignment = Alignment.Center) {
             SymIcon(line.glyph.orEmpty(), size = 18.sp, filled = true, color = MaterialTheme.colorScheme.onSurface)
         }
         Spacer(Modifier.width(8.dp))
-        if (line.chance != null) Text(line.chance, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+        if (line.chance != null) Text(line.chance, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1,
+            modifier = Modifier.fadeIn(24f))
         Spacer(Modifier.weight(1f))
         Text(line.high.orEmpty(), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"), fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(40.dp))
+            color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.fadeIn(36f).width(40.dp))
         Text(line.low.orEmpty(), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.width(40.dp))
+            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End, maxLines = 1, modifier = Modifier.fadeIn(48f).width(40.dp))
     }
 }
+
+/**
+ * After an item chose My location: that is the user's own act, like Search, so the Weather switch goes
+ * on; and Android asks for the approximate location if it isn't allowed yet. True: it asks, in
+ * BentoBar's settings window, which opens for it (a menu then closes).
+ */
+internal fun hereChosen(): Boolean {
+    WeatherItem.source.turnOn()
+    WeatherHere.wake()
+    Ticker.refresh()
+    if (WeatherHere.allowed()) return false
+    askLocation()
+    return true
+}
+
+/**
+ * Android's question for the approximate location, and nothing more: Allow location, in the menu and
+ * in the settings, leaves the Weather switch as it is (an item in Off may not turn it on). The answer
+ * wakes [WeatherHere] (MainActivity).
+ */
+internal fun askLocation() = MainActivity.requestPermission(Env.app, Manifest.permission.ACCESS_COARSE_LOCATION)
 
 /** The item's menu: one card for each state the item can be in. */
 @Composable
@@ -132,7 +165,7 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
     val source = WeatherItem.source
     val now = Now.wall()
     val staged = WeatherItem.staged(item) != null
-    val place = WeatherRules.place(item)
+    val place = WeatherLoad.place(item, WeatherHere.fix)
     // On opening (and when the city or the switch changes under the menu): a reading older than ten minutes is asked again.
     LaunchedEffect(item.id, place, on, staged) { if (!staged) source.opened(item) }
 
@@ -143,7 +176,8 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
     val again: () -> Unit = { WeatherItem.again(item); pressed++ }
 
     val name = stringResource(R.string.item_weather_title)
-    val city = WeatherRules.city(item) ?: if (staged) WeatherSamples.CITY else name
+    val here = WeatherRules.here(item)
+    val city = if (here) stringResource(R.string.weather_here) else WeatherRules.city(item) ?: if (staged) WeatherSamples.CITY else name
     val by = "menu:" + item.id
     val pick: (City, String?) -> Unit = { found, region ->
         Store.updateItem(item.id) { WeatherRules.picked(it, found, region) }
@@ -152,6 +186,25 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
         Ticker.refresh()
     }
     val changeCity: @Composable () -> Unit = { MenuEntry(Sym.LOCATION_ON, stringResource(R.string.weather_change_city)) { changing = true } }
+    // My location keeps the item's city for a way back: one press, and nothing to search for.
+    val kept = WeatherRules.city(item)
+    val useCity: @Composable () -> Unit = {
+        if (here && kept != null) MenuEntry(Sym.LOCATION_ON, stringResource(R.string.weather_use_city, kept)) {
+            Store.updateItem(item.id) { WeatherRules.useCity(it) }
+            source.typed(by)
+            changing = false
+            Ticker.refresh()
+        }
+    }
+    // My location instead of a city. Without the permission yet, the settings window opens to ask for it, and the menu closes.
+    val useHere: @Composable () -> Unit = {
+        MenuEntry(Sym.MY_LOCATION, stringResource(R.string.weather_use_here)) {
+            Store.updateItem(item.id) { WeatherRules.useHere(it) }
+            source.typed(by)
+            changing = false
+            if (hereChosen()) host.close()
+        }
+    }
 
     val status = WeatherItem.status(item, now)
     when {
@@ -159,11 +212,14 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
         status == Status.NotSetUp -> MenuCard(Sym.CLOUD, name, stringResource(R.string.common_not_set_up)) {
             MenuNote(stringResource(R.string.weather_consent))
             CitySearch(item, by, initial = WeatherRules.cityOf(ZoneId.systemDefault().id), onPick = pick)
+            MenuDivider()
+            useHere()
         }
         // The same card for another city: no note (it was read before), and a way back.
         changing -> MenuCard(Sym.CLOUD, city, stringResource(R.string.weather_change_city)) {
             CitySearch(item, by, initial = WeatherRules.city(item).orEmpty(), onPick = pick)
             MenuDivider()
+            if (!here) useHere() else useCity()
             MenuEntry(Sym.CLOSE, stringResource(R.string.common_cancel)) { source.typed(by); changing = false }
         }
         // A layout that came with a city, or the switch off in Setup: the words, and the one entry that turns it on. Nothing is sent before it.
@@ -171,8 +227,33 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
             MenuNote(stringResource(R.string.weather_consent))
             MenuEntry(Sym.TOGGLE_ON, stringResource(R.string.weather_turn_on)) { source.turnOn(); Ticker.refresh() }
         }
+        // My location, and where the device is isn't known: why, the one thing that helps, and a city instead.
+        status is Status.NoLocation -> MenuCard(Sym.CLOUD, city, stringResource(when (status.why) {
+            Locate.NOT_ALLOWED -> R.string.weather_here_not_allowed
+            Locate.OFF -> R.string.weather_here_off
+            else -> R.string.weather_here_none
+        })) {
+            MenuNote(stringResource(when (status.why) {
+                Locate.NOT_ALLOWED -> R.string.weather_here_not_allowed_note
+                Locate.OFF -> R.string.weather_here_off_note
+                else -> R.string.weather_here_none_note
+            }))
+            when (status.why) {
+                Locate.NOT_ALLOWED -> MenuEntry(Sym.MY_LOCATION, stringResource(R.string.weather_allow_location)) {
+                    host.close()
+                    askLocation()
+                }
+                Locate.OFF -> MenuEntry(Sym.SETTINGS, stringResource(R.string.weather_location_settings)) {
+                    host.close()
+                    Env.launch(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                }
+                else -> {}
+            }
+            useCity()
+            changeCity()
+        }
         // No spinner: the subtitle says it, and the body shows nothing that isn't known yet.
-        status == Status.Loading -> MenuCard(Sym.CLOUD, city, stringResource(R.string.usage_loading)) { changeCity() }
+        status == Status.Loading -> MenuCard(Sym.CLOUD, city, stringResource(R.string.usage_loading)) { useCity(); changeCity() }
         status is Status.Missing -> {
             val offline = status.failure == Failure.OFFLINE
             MenuCard(Sym.CLOUD, city, stringResource(if (offline) R.string.common_no_connection else R.string.weather_no_answer)) {
@@ -180,6 +261,7 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 6.dp))
                 // Dimmed for ten seconds after the try that failed (longer if the service asked for that), with no word of its own: the card says what went wrong.
                 MenuEntry(Sym.REFRESH, stringResource(R.string.common_try_again), enabled = entry == Again.READY, onClick = again)
+                useCity()
                 changeCity()
             }
         }
@@ -191,6 +273,7 @@ internal fun WeatherMenu(item: ItemConfig, host: MenuHost) {
                 // Dimmed for a minute after an answer (an automatic one too), and then it says why.
                 MenuEntry(Sym.REFRESH, stringResource(R.string.common_refresh),
                     detail = if (entry == Again.UP_TO_DATE) stringResource(R.string.weather_up_to_date) else null, enabled = entry == Again.READY, onClick = again)
+                useCity()
                 changeCity()
                 val site = stringResource(R.string.weather_open_site)
                 val opens = stringResource(R.string.common_opens_browser, site)
@@ -210,14 +293,18 @@ private fun ForecastBody(f: Forecast) {
         // One node for a screen reader: "72 degrees. High 78, low 61. Rain, 20 percent chance. Wind 9 miles per hour."
         Row(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = f.heroDesc }, verticalAlignment = Alignment.CenterVertically) {
             if (f.temp != null) {
-                Text(f.temp, style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+                // The big value grows from where it stands on its line, its bottom at the start (near enough its baseline).
+                val start = if (LocalLayoutDirection.current == LayoutDirection.Rtl) 1f else 0f
+                Text(f.temp, style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1, modifier = Modifier.popIn(0f, 0.94f, TransformOrigin(start, 1f)))
                 Spacer(Modifier.width(16.dp))
             }
+            // Its lines then fade in one after the other.
             Column {
                 if (f.highLow != null) Text(f.highLow, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(24f))
                 if (f.rainWind != null) Text(f.rainWind, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fadeIn(if (f.highLow != null) 40f else 24f))
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -288,40 +375,60 @@ internal fun CitySearch(item: ItemConfig, by: String, initial: String, canSubmit
     }
 }
 
-/** The item's settings: the city (the same search as in the menu), what the bar shows, the unit and a label. */
+/** The item's settings: the city (the same search as in the menu) or My location, what the bar shows, the unit and a label. */
 @Composable
 internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
     val online by Online.state.collectAsState()
     val on = Online.Service.OPEN_METEO in online.on
     val source = WeatherItem.source
     val city = WeatherRules.city(item)
+    val here = WeatherRules.here(item)
     val by = "settings:" + item.id
+    // Whether location is allowed can change in Android's settings beside this window: observed, like Setup's permissions.
+    val setup by Setup.state.collectAsState()
     // One card serves whichever item is selected: nothing typed or opened for one item stays for the next.
     key(item.id) {
         var changing by remember { mutableStateOf(false) }
+        // Like Search, an item in Off may not turn the service on: the Where row above says where it is.
+        val chooseHere: @Composable () -> Unit = {
+            TextButton(onClick = { set(WeatherRules.useHere(item)); source.typed(by); changing = false; hereChosen() }, enabled = item.section != Section.OFF) {
+                Text(stringResource(R.string.weather_use_here))
+            }
+        }
         Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-            Text(if (city != null) stringResource(R.string.weather_city_current, city) else stringResource(R.string.weather_city_none),
-                style = MaterialTheme.typography.labelLarge)
+            Text(when {
+                here -> stringResource(R.string.weather_here_current)
+                city != null -> stringResource(R.string.weather_city_current, city)
+                else -> stringResource(R.string.weather_city_none)
+            }, style = MaterialTheme.typography.labelLarge)
             // The words before the first request, here as in the menu.
             Text(stringResource(R.string.weather_consent), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (WeatherRules.place(item) == null || changing) {
-                // An item in Off may ask nothing: the Where row above says where it is.
+            if ((!here && WeatherRules.place(item) == null) || changing) {
                 CitySearch(item, by, initial = city ?: WeatherRules.cityOf(ZoneId.systemDefault().id), canSubmit = item.section != Section.OFF) { found, region ->
                     set(WeatherRules.picked(item, found, region))
                     source.typed(by)
                     changing = false
                 }
-                if (changing) TextButton(onClick = { source.typed(by); changing = false }) { Text(stringResource(R.string.common_cancel)) }
+                Row(Modifier.offset(x = (-12).dp)) {
+                    if (!here) chooseHere()
+                    if (changing) TextButton(onClick = { source.typed(by); changing = false }) { Text(stringResource(R.string.common_cancel)) }
+                }
             } else Row(Modifier.offset(x = (-12).dp)) { // a text button's own padding: its words then start where the lines above do
                 // The field appears on a click, as in the menu, and takes the focus then: not each time the item is selected.
                 TextButton(onClick = { changing = true }) { Text(stringResource(R.string.weather_change_city)) }
+                if (!here) chooseHere()
+                // Back from My location to the item's own city, which it kept.
+                else if (city != null) TextButton(onClick = { set(WeatherRules.useCity(item)); source.typed(by) }) { Text(stringResource(R.string.weather_use_city, city)) }
                 // A layout that came with a city, or the switch off in Setup: the same act as the menu's.
                 if (!on) TextButton(onClick = { source.turnOn(); Ticker.refresh() }) { Text(stringResource(R.string.weather_turn_on)) }
+                // My location without the permission (refused, or taken back in Android's settings): Android's question only.
+                if (here && !setup.location) TextButton(onClick = { askLocation() }) { Text(stringResource(R.string.weather_allow_location)) }
             }
         }
     }
     ChoiceRow(stringResource(R.string.option_show), listOf(WeatherRules.SHOW_TEMP to stringResource(R.string.weather_show_temp),
-        WeatherRules.SHOW_HIGH_LOW to stringResource(R.string.weather_show_high_low), WeatherRules.SHOW_FEELS to stringResource(R.string.weather_show_feels)),
+        WeatherRules.SHOW_HIGH_LOW to stringResource(R.string.weather_show_high_low), WeatherRules.SHOW_FEELS to stringResource(R.string.weather_show_feels),
+        WeatherRules.SHOW_SKY to stringResource(R.string.weather_show_sky)),
         item.opt("show", WeatherRules.SHOW_TEMP)) { set(item.with("show", it)) }
     // Converted on the device: switching redraws the bar and the menu at once, and nothing is asked.
     ChoiceRow(stringResource(R.string.option_temperature_unit), listOf("system" to stringResource(R.string.option_like_system),
@@ -329,5 +436,5 @@ internal fun WeatherOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
         set(item.with("unit", it))
     }
     TextRow(stringResource(R.string.option_label), item.opt("label", ""), help = stringResource(R.string.weather_label_help),
-        placeholder = stringResource(R.string.option_none)) { set(item.with("label", WeatherRules.label(it).ifEmpty { null })) }
+        placeholder = stringResource(R.string.option_none), maxLength = WeatherRules.LABEL_CHARS) { set(item.with("label", WeatherRules.label(it).ifEmpty { null })) }
 }

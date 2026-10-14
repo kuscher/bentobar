@@ -1,26 +1,31 @@
 package io.github.kuscher.bentobar.bar
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.pluralStringResource
@@ -35,6 +40,14 @@ import io.github.kuscher.bentobar.items.Items
 import io.github.kuscher.bentobar.items.MenuHost
 import io.github.kuscher.bentobar.items.Ticker
 import io.github.kuscher.bentobar.ui.BentoBarTheme
+import io.github.kuscher.bentobar.ui.GlassLook
+import io.github.kuscher.bentobar.ui.LocalMenuGlass
+import io.github.kuscher.bentobar.ui.MenuGlassState
+import io.github.kuscher.bentobar.ui.MenuMotion
+import io.github.kuscher.bentobar.ui.MenuRoom
+import io.github.kuscher.bentobar.ui.ShownGlass
+import io.github.kuscher.bentobar.ui.menuGlass
+import io.github.kuscher.bentobar.ui.menuShadow
 import io.github.kuscher.bentobar.ui.ChipRow
 import io.github.kuscher.bentobar.ui.MenuCard
 import io.github.kuscher.bentobar.ui.MenuDivider
@@ -42,29 +55,84 @@ import io.github.kuscher.bentobar.ui.MenuEntry
 import io.github.kuscher.bentobar.ui.SectionLabel
 import io.github.kuscher.bentobar.util.Sym
 
-/** Room around a menu card inside its window, for the shadow. */
-val MENU_MARGIN = 12.dp
-
-/** The card every BentoBar menu sits on, with a short drop-in animation. */
+/**
+ * The card every BentoBar popup sits on (docs/design/1.3): glass over a blur where the platform blurs
+ * behind windows, a solid card where it doesn't, with a shadow drawn below it. [glass] is the popup's
+ * state at this frame, from its window's clock: the card unfolds down from its top edge and its blocks
+ * drop into place ([DropColumn]); null draws it at rest (a preview).
+ */
 @Composable
-fun MenuSurface(width: Dp, maxHeight: Dp, content: @Composable () -> Unit) {
+fun MenuSurface(width: Dp, maxHeight: Dp, glass: MenuGlassState?, content: @Composable () -> Unit) {
     BentoBarTheme {
-        val anim = remember { Animatable(0f) }
-        LaunchedEffect(Unit) { anim.animateTo(1f, tween(140)) }
-        Box(Modifier.padding(MENU_MARGIN)) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 2.dp,
-                shadowElevation = 8.dp,
-                modifier = Modifier.width(width).graphicsLayer {
-                    alpha = anim.value
-                    translationY = (1f - anim.value) * -8.dp.toPx()
-                },
+        val g = glass ?: remember { MenuGlassState().apply { presence = 1f; shadow = 1f; clockMs = Float.POSITIVE_INFINITY; heightDp = Float.MAX_VALUE } }
+        val dark = isSystemInDarkTheme()
+        val scheme = MaterialTheme.colorScheme
+        // "Tint with system colors" (visual.md §6): the veil, or the solid card, takes half of the palette's secondary
+        // container (onSecondary in dark theme): a tint, not a wash, and 0.04 more of it so text stays as readable.
+        val tint = Store.config.collectAsState().value.systemTint
+        val hue = if (dark) scheme.onSecondary else scheme.secondaryContainer
+        val look = GlassLook(
+            veil = when {
+                g.blur && tint -> lerp(scheme.surfaceContainerLowest, hue, 0.5f).copy(alpha = if (dark) 0.66f else 0.60f)
+                g.blur -> scheme.surfaceContainerLowest.copy(alpha = if (dark) 0.62f else 0.56f)
+                tint -> lerp(scheme.surfaceContainerHigh, hue, 0.5f)
+                else -> scheme.surfaceContainerHigh
+            },
+            rim = Color.White.copy(alpha = if (dark) 0.44f else 0.80f),
+            hairline = Color.Black.copy(alpha = if (dark) 0.28f else 0.20f),
+            dark = dark,
+        )
+        val density = LocalDensity.current.density
+        // The window is the card: its shadow is drawn in a window of its own (MenuShadow).
+        Box {
+            Box(
+                Modifier.width(width)
+                    .onSizeChanged {
+                        g.fullHeightPx = it.height
+                        // Open and at rest: the glass follows its contents when they change (a city added, a flight found).
+                        if (g.clockMs.isInfinite() && glass != null) g.heightDp = it.height / density
+                    }
+                    .graphicsLayer {
+                        alpha = g.alpha
+                        clip = true
+                        shape = ShownGlass(g.heightDp * density, MenuMotion.RADIUS_DP * density)
+                    }
+                    .menuGlass(g, look),
             ) {
-                Column(Modifier.heightIn(max = maxHeight).verticalScroll(rememberScrollState())) { content() }
+                // On glass, text and fills are made for what shows through (visual.md §5): grey text halfway to the main
+                // text's colour, the main text in dark theme halfway to white, tracks and tiles see-through tints of it.
+                // The solid card keeps the scheme as it is.
+                val inks = if (!g.blur) scheme else scheme.copy(
+                    onSurface = if (dark) lerp(scheme.onSurface, Color.White, 0.5f) else scheme.onSurface,
+                    onSurfaceVariant = lerp(scheme.onSurfaceVariant, if (dark) lerp(scheme.onSurface, Color.White, 0.5f) else scheme.onSurface, 0.5f),
+                    surfaceContainerHigh = scheme.onSurface.copy(alpha = if (dark) 0.10f else 0.08f),
+                    surfaceContainerHighest = scheme.onSurface.copy(alpha = if (dark) 0.14f else 0.12f),
+                )
+                // Text with no colour of its own takes the glass's (Material's Surface did this; the glass is drawn here).
+                MaterialTheme(colorScheme = inks) {
+                CompositionLocalProvider(LocalMenuGlass provides glass, LocalContentColor provides inks.onSurface) {
+                    Column(
+                        Modifier.heightIn(max = maxHeight).verticalScroll(rememberScrollState())
+                            .graphicsLayer { alpha = g.contents },
+                    ) { content() }
+                }
+                }
             }
         }
+    }
+}
+
+/**
+ * A popup's shadow, in a window of its own just below the popup's (`MenuWindow`): the popup's window is
+ * framed to its glass for the blur, which clips whatever it draws outside the glass. Laid out exactly as
+ * [MenuSurface], so the shadow lies under the card, and drawn from the same [glass] every frame.
+ */
+@Composable
+fun MenuShadow(width: Dp, glass: MenuGlassState) {
+    val dark = isSystemInDarkTheme()
+    val density = LocalDensity.current.density
+    Box(Modifier.padding(start = MenuRoom.side, end = MenuRoom.side, top = MenuRoom.top, bottom = MenuRoom.bottom)) {
+        Box(Modifier.width(width).height((glass.fullHeightPx / density).dp).menuShadow(glass, dark))
     }
 }
 

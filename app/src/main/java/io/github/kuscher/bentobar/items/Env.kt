@@ -173,7 +173,6 @@ class History(val size: Int = 60) {
     fun add(v: Double) { values[head] = v; head = (head + 1) % size; if (count < size) count++ }
     fun toList(): List<Double> = List(count) { values[(head - count + it + size) % size] }
     fun last(): Double = if (count == 0) 0.0 else values[(head - 1 + size) % size]
-    fun max(): Double = toList().maxOrNull() ?: 0.0
 }
 
 /** Device-wide network throughput from TrafficStats (all interfaces since boot). */
@@ -359,23 +358,27 @@ class BatterySampler {
     val wattHistory = History()
     /** Watts into (+) or out of (−) the battery. */
     var watts = 0.0; private set
+    private var lastIntentAt = 0L
 
     fun sample(context: Context, now: Long) {
-        val i = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return
-        val lvl = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-        val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
-        level = if (lvl >= 0 && scale > 0) lvl.toDouble() / scale else 0.0
-        status = i.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
-        charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
-        plugged = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
-        voltageMv = i.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0)
-        tempC = i.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0
-        health = i.getIntExtra(BatteryManager.EXTRA_HEALTH, BatteryManager.BATTERY_HEALTH_UNKNOWN)
-        cycles = i.getIntExtra(BatteryManager.EXTRA_CYCLE_COUNT, -1)
         val bm = context.getSystemService(BatteryManager::class.java)
+        if (lastIntentAt == 0L || now - lastIntentAt >= 5_000) {
+            val i = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) ?: return
+            lastIntentAt = now
+            val lvl = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+            level = if (lvl >= 0 && scale > 0) lvl.toDouble() / scale else 0.0
+            status = i.getIntExtra(BatteryManager.EXTRA_STATUS, BatteryManager.BATTERY_STATUS_UNKNOWN)
+            charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+            plugged = i.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0)
+            voltageMv = i.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0)
+            tempC = i.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0
+            health = i.getIntExtra(BatteryManager.EXTRA_HEALTH, BatteryManager.BATTERY_HEALTH_UNKNOWN)
+            cycles = i.getIntExtra(BatteryManager.EXTRA_CYCLE_COUNT, -1)
+            chargeTimeMs = bm?.computeChargeTimeRemaining() ?: -1
+        }
         currentUa = bm?.getLongProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) ?: 0L
         if (currentUa == Long.MIN_VALUE) currentUa = 0
-        chargeTimeMs = bm?.computeChargeTimeRemaining() ?: -1
         // Sign conventions differ between devices; trust the charging status for the direction.
         val w = kotlin.math.abs(currentUa) / 1e6 * (voltageMv / 1000.0)
         watts = if (plugged != 0 && charging) w else -w
@@ -435,5 +438,4 @@ class StorageSampler {
         }
     }
 
-    fun refresh() { lastAt = 0; sample(SystemClock.elapsedRealtime()) }
 }

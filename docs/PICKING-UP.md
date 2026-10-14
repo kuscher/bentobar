@@ -19,15 +19,52 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 1.4 (2026-10-14): Weather's My location, plus stability and health fixes
+PR #23 (`weather-sky-and-location`) merged onto `main`, followed by five whole-app stability and health fixes (`f2a9cad`: bounded LRU icon/label caches and off-main-thread resolution in `Apps`/`AppItem`/`FolderItem`/`Usage`, main-thread `Ticker` confinement and `Ticker.placeholder` during composition, shared per-type `Background.executor`, off-main-thread `FlightLoad` disk writes in `FlightItem`, throttled sticky battery broadcast lookups in `BatterySampler`, and `spacerNode` cleanup on `NO_TREE` fallback in `BarService`). Version code 17. Released on GitHub (`v1.4`) and submitted to Google Play on both closed testing (`alpha`) and `production`.
+
+## 1.3.1 (2026-10-08): an open popup at rest is still again
+PR #29, merged as a merge commit: `MenuWindow.frame()` set the root's bounds and invalidated its outline before every
+frame, and each asked for another frame, so an open popup ran 60 layout/draw passes a second at rest (a tenth of a
+core on the Lenovo). Now only when the glass's size or corners change (`bar/GlassFrame.kt`, `GlassFrameTest`). Version
+code 16. Released on GitHub only (`PLAY_UPLOAD=off`), at Alex's word. Measured on the Lenovo (release builds): openings
+58-59/59 frames on time, blur or solid alike; a popup's first frame blocks the main thread 15-30 ms (two new windows,
+composition), so a switch between popups hitches about 3 frames: the one known cost left.
+
+## 1.3 (2026-10-08): glass popups, motion, one highlight
+A visual and motion release (docs/design/1.3: brief, visual, motion, engineering with "as built"). PR #28, merged as
+a merge commit. Popups in a Dialog-hosted TYPE_ACCESSIBILITY_OVERLAY window with the platform's background blur
+(`bar/MenuWindow.kt`), the shadow in a window of its own, the motion and the contents' choreography on one clock
+(`ui/MenuMotion.kt`, `ui/Glass.kt`), the strip's one highlight (`bar/StripHighlight.kt`); three choices in Look, off
+by default: Switch popups on hover, No animations, Tint with system colors. Version code 15. Released on GitHub
+only (`PLAY_UPLOAD=off`), at Alex's word; Play has 1.2 (in review, then his Publish click). Checked on the Lenovo
+Googlebook 15 by the visual and motion designers (approved). Test builds on a device with a release:
+`-PreleaseSignedDebug`.
+
+## 1.2 (2026-10-07): Shortcut, With conditions + Windy, and the health fixes
+Three PRs, merged in this order as merge commits: #27 (health fixes from a code-health review of 1.0.2:
+show-when hold for network/cpu/memory, the tick stamp, Flight's back-off, TextRow, Duplicate, Undo,
+`coerceInputValues`, no colour readings while the strip is empty, the `addView` guard, dead code), #26 (the
+Shortcut item; the disclosure, `a11y_description`, README and Play texts now say a Shortcut item runs system actions
+too) and #25 (Weather's With conditions and Windy). Version code 14. Released on GitHub first (`PLAY_UPLOAD=off`, docs/RELEASING.md) while 1.0.2 was in review.
+1.0.2 was approved and published on 2026-10-07; that night the tag run's Play job was re-run (a draft on closed
+testing) and 1.2 sent for review on closed testing and production. Managed publishing: Alex publishes after his
+own test. The repo's full description mentions the Shortcut item; Play's listing text is still 1.0.2's.
+Next, for 1.3: #23 (Weather: My location) and #24 (US stocks), both with changes requested on 2026-10-07. #23 adds
+BentoBar's first location permission (Data safety, privacy page, a possible background-location question); #24 adds
+Finnhub (privacy page, Play's financial-features answer) and must switch `WeatherRules.count` to `TextRules.count`
+in #25's tests, and rerun `tools/icons.py` with the Shortcut item's `bug_report`.
+
 ## 1.0.2 (2026-10-06): a new icon, after Play's rejection of 1.0's listing
 Play rejected 1.0's store listing under the Impersonation policy ("copyrighted or proprietary assets … from a
 third-party"), naming the hi-res icon and the title. The icon's rice, salmon, tamago and edamame on blue read as
 another brand's colours. Alex chose a new palette from five ("E · Deep teal"): `tools/logo.py` draws the same box in
 mint on deep teal (#133F43); the drawables, the splash background, `docs/images/icon.png`, the store's
 `icon-512.png` and `feature-graphic.png` were made anew (the feature graphic from the September capture, which has a
-plain wallpaper: no store image shows the Googlebook's own wallpaper). The title stays as it was. Version code 13;
-the tag uploads the bundle to closed testing as a draft, as usual, and the listing and review go through the Console
-with a note to the reviewer that the icon is original.
+plain wallpaper: no store image shows the Googlebook's own wallpaper). Version code 13;
+the tag uploaded the bundle to closed testing as a draft. Sent to Google Play the same afternoon from the Console:
+the store title "BentoBar: Customized Statusbar" (Alex's choice, 30 characters), the new icon and feature graphic,
+1.0.2 for closed testing and production (in 1.0's place), and an appeal on the rejected issue saying what changed and
+that the icon is original. Managed publishing is on, so an approval waits for a press of Publish.
 
 ## 1.0.1 (2026-10-06): a followed flight's delay shows again where its number flies more than once a day
 Released on GitHub only (tag `v1.0.1`, version code 12), with the Play job switched off for the tag

@@ -6,6 +6,75 @@
   each for 5 seconds or as long as you choose, and can pop out when one moves a lot in a day. Its menu has each stock's day and the market's hours.
   Prices come from Finnhub, with a free key of your own.
 
+## 1.4 (2026-10-14)
+
+- **Weather: My location.** The weather where you are, instead of a city you pick. BentoBar asks for
+  Android's approximate location only when you choose it, and sends Open-Meteo that location rounded
+  to about 10 km. It is kept in memory only, never in your layout.
+- **Smoother ticks and lower background overhead.** App shortcuts and folders now load their icons
+  and labels off the main thread with bounded caches; Flight file updates run in the background;
+  battery status lookups are throttled while keeping 1 Hz power readings; and item states are never
+  recomputed mid-frame while drawing.
+
+## 1.3.1 (2026-10-08)
+
+- **An open popup no longer keeps BentoBar busy.** While a popup sat open, it drew its window again 60 times a
+  second with nothing changed: about a tenth of a CPU core for as long as it stayed open. Now it draws once a second
+  (for its live values) and is otherwise still.
+
+## 1.3 (2026-10-08)
+
+- **Glass popups.** Every popup is frosted glass over a blur of what is behind it, with a thin white rim and
+  rounder corners. Where the system has no blur (battery saver), a solid card with the same rim, corners and
+  shadow. Text on the glass is tuned to stay readable over busy windows.
+- **A shadow that sits straight.** The shadow under a popup no longer leans to one side or stops short at an edge:
+  it falls straight down, lighter, and never shows through the glass.
+- **Popups unfold from the bar.** A popup opens down from its item and folds back into it when it closes, quickly:
+  about a quarter of a second to open, an eighth to close. Its contents arrive in turn, in reading order: the
+  header's icon pops in, rows fade in, the sparkline draws itself, meters and bars fill, tiles and the calendar's
+  days come in a diagonal wave, and a tracked flight's plane flies out along its route. Clicking another item hands
+  over: the open popup dissolves while the new one unfolds; clicking an item again while its popup folds away turns
+  it round.
+- **One highlight that follows the mouse.** Moving the pointer across the bar, a single highlight glides from item
+  to item, stretching across and gathering; it never drops out between items, and a click between two items goes
+  to the one it is on. It stays on the item whose popup is open.
+- **Three new choices in Look, all off unless you turn them on:**
+  - **Switch popups on hover:** with a popup open, pointing at another item opens its popup, as in a menu bar. It
+    never acts on items that do something on a click (Keep awake, a Shortcut).
+  - **No animations:** popups appear and go at once, and the highlight jumps from item to item. (The system's
+    "Remove animations" does the same.)
+  - **Tint with system colors:** popups take a soft tint of your system's colors, which follow your wallpaper.
+
+## 1.2 (2026-10-07)
+
+- **Shortcut.** A new item: one click, one action. Screenshot, Report a bug (opens the Googlebook's
+  Feedback app), lock, overview, all apps, notifications or Quick settings, shown as its icon, its name
+  or both, like any item. Report a bug is offered only where the Feedback app is.
+- **Weather: With conditions.** A new choice under Show puts a word for the sky beside the temperature
+  ("72° · Partly cloudy", "54° · Light rain"). A strong wind where nothing falls is "Windy": whatever
+  Show says, the icon is the wind's and the item says "Windy" to a screen reader; with this choice the
+  bar says it too. The menu keeps the sky and gives the wind's speed.
+- **Show when: no more blinking.** Network, CPU and Memory set to show when busy stay out for 20
+  seconds after their reading drops below your line, so a download in bursts no longer pops the item
+  in and out and shifts the bar each time. Items that end (a meeting, a timer) still go at once.
+- **A seconds clock that doesn't stall.** A click on an item, or a fresh answer from a service, could
+  hold a clock with seconds for a moment and then skip one.
+- **Flight: fewer lookups after a failure.** A failed lookup for a flight more than ten hours away is
+  tried again at the usual pace, every three hours, rather than within minutes. Without a connection
+  nothing is sent and the wait doesn't grow.
+- **Settings: typing.** A folder's, timer's or countdown's name, a label or a Text item's words no
+  longer change under the cursor (an emptied folder name came back as "Apps"), and a field stops at
+  the longest text the item keeps instead of cutting it afterwards. A field can't carry what you typed
+  into the next item you pick.
+- **Duplicate** keeps "Show when" and "Show as", and puts the copy next to the original.
+- **Undo** after deleting an item is offered for as long as its message shows, also when the window
+  is resized; it is no longer offered again when you open settings later.
+- **A layout from a later version opens.** A setting this version doesn't know falls back to its
+  default instead of the whole layout being reset; a layout that can't be read at all is kept aside,
+  not overwritten by your next change.
+- **Fewer screenshots.** The status bar's colours aren't read while BentoBar has nothing to show,
+  and are read once it has.
+
 ## 1.0.2 (2026-10-06)
 
 - **A new icon.** The same bento box seen from above, the status bar on top and three compartments

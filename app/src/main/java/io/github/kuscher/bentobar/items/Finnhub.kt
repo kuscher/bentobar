@@ -26,7 +26,7 @@ data class Listing(val symbol: String, val name: String) {
 /** The numbers of one quote reply, as the service sent them. [at]: the quote's own time, in seconds since 1970. */
 @Immutable
 data class QuoteNumbers(val price: Double, val change: Double?, val pct: Double?, val high: Double?, val low: Double?,
-                        val open: Double?, val prevClose: Double?, val at: Long)
+                        val prevClose: Double?, val at: Long)
 
 object Finnhub {
     /** Where a key is got: the user's own act, in the browser. */
@@ -99,7 +99,7 @@ object Finnhub {
             price == null && (o["c"].number() == 0.0) -> Read.Unknown
             price == null || at == null -> null
             else -> Read.Numbers(QuoteNumbers(price, o["d"].number()?.takeIf { kotlin.math.abs(it) < 1e9 },
-                o["dp"].number()?.takeIf { kotlin.math.abs(it) < 1e6 }, o["h"].price(), o["l"].price(), o["o"].price(), o["pc"].price(), at))
+                o["dp"].number()?.takeIf { kotlin.math.abs(it) < 1e6 }, o["h"].price(), o["l"].price(), o["pc"].price(), at))
         }
     } catch (e: Exception) {
         null

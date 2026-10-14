@@ -80,7 +80,6 @@ data class Quote(
     val pct: Double? = null,
     val high: Double? = null,
     val low: Double? = null,
-    val open: Double? = null,
     val prevClose: Double? = null,
     val at: Long = 0,
     val fetchedAt: Long = 0,

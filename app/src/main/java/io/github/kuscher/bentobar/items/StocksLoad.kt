@@ -62,7 +62,7 @@ object StocksLoad {
             is Reply.Ok -> when (val read = Finnhub.quote(reply.text)) {
                 is Finnhub.Read.Numbers -> {
                     val n = read.numbers
-                    Quote(sym, n.price, n.change, n.pct, n.high, n.low, n.open, n.prevClose, n.at, now).also { keep(it, symbols()) }
+                    Quote(sym, n.price, n.change, n.pct, n.high, n.low, n.prevClose, n.at, now).also { keep(it, symbols()) }
                 }
                 Finnhub.Read.Unknown -> failed(sym, last, Finnhub.Failure.NOT_FOUND, went)
                 // A reply that is no quote: a public network's sign-in page, half a reply.

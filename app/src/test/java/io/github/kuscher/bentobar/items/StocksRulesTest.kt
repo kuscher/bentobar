@@ -29,7 +29,7 @@ class StocksRulesTest {
     /** A quote read at [read], of a trade at [tradedAt]: price and change in percent, the change in dollars and the last close worked out from them. */
     private fun q(symbol: String, price: Double, pct: Double?, read: Long = wed11, tradedAt: Long = read - min, failure: Finnhub.Failure? = null): Quote {
         val prev = if (pct == null) null else price / (1 + pct / 100)
-        return Quote(symbol, price, prev?.let { price - it }, pct, price * 1.01, price * 0.98, prev, prev, tradedAt / 1000, read, failure)
+        return Quote(symbol, price, prev?.let { price - it }, pct, price * 1.01, price * 0.98, prev, tradedAt / 1000, read, failure)
     }
 
     private val aapl = Stock("AAPL", "APPLE INC")
@@ -302,8 +302,8 @@ class StocksRulesTest {
     // ---- the menu --------------------------------------------------------------------------------------
 
     @Test fun theMenuHasEachStocksDay() {
-        val aq = Quote("AAPL", 227.52, 2.70, 1.2, 229.4, 222.1, 224.0, 224.82, wed11 / 1000 - 60, wed11)
-        val mq = Quote("MSFT", 418.07, -1.68, -0.4, 421.0, 416.5, 419.9, 419.75, wed11 / 1000 - 60, wed11)
+        val aq = Quote("AAPL", 227.52, 2.70, 1.2, 229.4, 222.1, 224.82, wed11 / 1000 - 60, wed11)
+        val mq = Quote("MSFT", 418.07, -1.68, -0.4, 421.0, 416.5, 419.75, wed11 / 1000 - 60, wed11)
         val v = StocksRules.menu(look(aapl, msft, nvda), mapOf("AAPL" to aq, "MSFT" to mq), wed11, w, t)
         val a = v.lines[0]
         assertEquals("227.52", a.price)

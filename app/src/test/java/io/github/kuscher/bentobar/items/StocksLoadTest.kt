@@ -87,7 +87,7 @@ class StocksLoadTest {
     @Test fun aGoodAnswerIsAQuoteReadNow() = FakeHttp.use { net ->
         net.reply(Host.FINNHUB, Finnhub.QUOTE, quote)
         val q = load()!!
-        assertEquals(Quote("AAPL", 227.52, 2.7, 1.2, 229.4, 222.1, 224.0, 224.82, 1791392340, now), q)
+        assertEquals(Quote("AAPL", 227.52, 2.7, 1.2, 229.4, 222.1, 224.82, 1791392340, now), q)
         assertNull(q.failure)
     }
 

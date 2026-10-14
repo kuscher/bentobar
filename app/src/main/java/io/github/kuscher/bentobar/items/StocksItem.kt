@@ -61,22 +61,23 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
         return StocksTimes(ZoneId.systemDefault(), clock = { ms, zone -> Dates.format(time, ms, zone) }, dayClock = { ms, zone -> Dates.format("EEE$time", ms, zone) })
     }
 
-    internal fun look(item: ItemConfig): StocksLook = StocksLook(StocksRules.stocks(item), move.shown(item), Locale.getDefault(), StocksRules.turnSec(item))
+    internal fun look(item: ItemConfig, stocks: List<Stock> = StocksRules.stocks(item)): StocksLook =
+        StocksLook(stocks, move.shown(item), Locale.getDefault(), StocksRules.turnSec(item))
 
-    internal fun status(item: ItemConfig): StocksStatus =
-        staged?.takeIf { first()?.id == item.id }?.status ?: StocksRules.status(Online.hasKey(online), Online.on(online), StocksRules.stocks(item).isNotEmpty())
+    internal fun status(item: ItemConfig, stocks: List<Stock> = StocksRules.stocks(item)): StocksStatus =
+        staged?.takeIf { first()?.id == item.id }?.status ?: StocksRules.status(Online.hasKey(online), Online.on(online), stocks.isNotEmpty())
 
     /** The quotes of [item]'s stocks: the staged ones in a test, else the loader's, asking for those that are due. */
-    internal fun quotesFor(item: ItemConfig, ask: Boolean = true): Map<String, Quote> {
+    internal fun quotesFor(item: ItemConfig, stocks: List<Stock> = StocksRules.stocks(item), ask: Boolean = true): Map<String, Quote> {
         staged?.let { if (first()?.id == item.id) return it.quotes }
-        val stocks = StocksRules.stocks(item)
         if (ask && item.section != Section.OFF && Online.on(online) && Online.hasKey(online)) stocks.forEach { quotes.want(it.symbol) }
         return stocks.mapNotNull { s -> quotes.peek(s.symbol)?.let { s.symbol to it } }.toMap()
     }
 
     override fun state(item: ItemConfig): ItemState {
         val now = Now.wall()
-        val bar = StocksRules.bar(status(item), look(item), quotesFor(item), now, Words)
+        val stocks = StocksRules.stocks(item)
+        val bar = StocksRules.bar(status(item, stocks), look(item, stocks), quotesFor(item, stocks), now, Words)
         return ItemState(icon = bar.icon, filled = bar.filled, text = bar.text, desc = bar.desc, active = bar.active, tone = bar.tone,
             tooltip = bar.tooltip, textLimit = StocksRules.BAR_CHARS, turns = bar.turns)
     }
@@ -107,7 +108,7 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
             val q = quotes.peek(s.symbol)
             if (q?.failure == Finnhub.Failure.REFUSED || q?.failure == Finnhub.Failure.NO_ACCESS) quotes.refresh(s.symbol)
         }
-        Ticker.refresh()
+        Ticker.refresh(type)
         return true
     }
 
@@ -120,7 +121,7 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
     // ---- deleted with the item -----------------------------------------------------------------------
 
     private var seenItems: List<ItemConfig>? = null
-    private val tidying = Background.wiring(type).background
+    private val tidying = Background.executor(type)
 
     /**
      * The quotes of stocks no item follows any more are deleted: looked at whenever the layout's items
@@ -169,9 +170,10 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
             val items = Store.config.value.items.filter { it.type == type }
             "staged=${staged?.name ?: "none"} items=${items.size} symbols=${StocksLoad.symbols(items).size}" +
                 " on=${Online.on(online)} keyed=${Online.hasKey(online)}" + (first()?.let { f ->
-                    val q = quotesFor(f, ask = false)
-                    " first=${status(f).javaClass.simpleName} quotes=${q.size} failures=${q.values.mapNotNull { it.failure }.toSet()}" +
-                        " loading=${StocksRules.stocks(f).count { quotes.loading(it.symbol) }}"
+                    val stocks = StocksRules.stocks(f)
+                    val q = quotesFor(f, stocks, ask = false)
+                    " first=${status(f, stocks).javaClass.simpleName} quotes=${q.size} failures=${q.values.mapNotNull { it.failure }.toSet()}" +
+                        " loading=${stocks.count { quotes.loading(it.symbol) }}"
                 } ?: "")
         }
         "stage" -> {
@@ -182,7 +184,7 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
             fun q(i: Int, pct: Double, failure: Finnhub.Failure? = null): Quote {
                 val price = listOf(227.52, 418.07, 131.26, 64.18, 1834.5)[i % 5]
                 val prev = price / (1 + pct / 100)
-                return Quote(symbols[i], price, price - prev, pct, price * 1.01, price * 0.98, prev * 1.002, prev, at, now - 40_000, failure)
+                return Quote(symbols[i], price, price - prev, pct, price * 1.01, price * 0.98, prev, at, now - 40_000, failure)
             }
             val all = symbols.indices
             val name = args.getOrNull(1).orEmpty()
@@ -201,13 +203,13 @@ object StocksItem : ItemType("stocks", R.string.item_stocks_title, Sym.TRENDING_
             }
             if (made == null) "no such sample; there are: up down mixed big closed loading offline refused nokey none" else {
                 staged = made
-                Ticker.refresh()
+                Ticker.refresh(type)
                 "staged $name for the first Stocks item"
             }
         }
         "off" -> {
             staged = null
-            Ticker.refresh()
+            Ticker.refresh(type)
             "staging off"
         }
         else -> null

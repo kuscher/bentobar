@@ -18,10 +18,10 @@ class FinnhubTest {
 
     @Test fun aQuoteHasAPriceAndATime() {
         val read = Finnhub.quote("""{"c":227.52,"d":2.7,"dp":1.2,"h":229.4,"l":222.1,"o":224,"pc":224.82,"t":1791392340}""") as Finnhub.Read.Numbers
-        assertEquals(QuoteNumbers(227.52, 2.7, 1.2, 229.4, 222.1, 224.0, 224.82, 1791392340), read.numbers)
+        assertEquals(QuoteNumbers(227.52, 2.7, 1.2, 229.4, 222.1, 224.82, 1791392340), read.numbers)
         // A value that makes no sense is left out; the rest is read.
         val odd = Finnhub.quote("""{"c":10,"d":"x","dp":null,"h":-1,"l":0,"o":1e12,"pc":9,"t":1791392340}""") as Finnhub.Read.Numbers
-        assertEquals(QuoteNumbers(10.0, null, null, null, null, null, 9.0, 1791392340), odd.numbers)
+        assertEquals(QuoteNumbers(10.0, null, null, null, null, 9.0, 1791392340), odd.numbers)
     }
 
     @Test fun zerosAreAStockTheServiceDoesNotKnow() {

@@ -60,23 +60,24 @@ internal fun StocksMenu(item: ItemConfig, host: MenuHost) {
     rememberTick()
     // The switch and the key can change under an open menu (Setup's window beside it).
     val online by Online.state.collectAsState()
+    val stocks = remember(item) { StocksRules.stocks(item) }
     val title = stringResource(R.string.item_stocks_title)
     // On opening: while the market is open, quotes older than half a minute are asked again.
     LaunchedEffect(item.id, online) { StocksItem.opened(item) }
-    when (StocksItem.status(item)) {
+    when (StocksItem.status(item, stocks)) {
         StocksStatus.NoKey -> MenuCard(Sym.SHOW_CHART, title, stringResource(R.string.common_not_set_up)) {
             MenuNote(stringResource(R.string.stocks_consent))
             MenuEntry(Sym.KEY, stringResource(R.string.stocks_add_key)) { host.openItemSettings(item.id) }
         }
         StocksStatus.Off -> MenuCard(Sym.SHOW_CHART, title, stringResource(R.string.common_off_in_setup)) {
             MenuNote(stringResource(R.string.stocks_consent))
-            MenuEntry(Sym.TOGGLE_ON, stringResource(R.string.stocks_turn_on)) { Online.turnOn(Online.Service.FINNHUB); Ticker.refresh() }
+            MenuEntry(Sym.TOGGLE_ON, stringResource(R.string.stocks_turn_on)) { Online.turnOn(Online.Service.FINNHUB); Ticker.refresh(StocksItem.type) }
         }
         StocksStatus.NoStocks -> MenuCard(Sym.SHOW_CHART, title, stringResource(R.string.stocks_none_yet)) {
             MenuEntry(Sym.ADD, stringResource(R.string.stocks_add_stocks)) { host.openItemSettings(item.id) }
         }
         StocksStatus.Live -> {
-            val v = StocksRules.menu(StocksItem.look(item), StocksItem.quotesFor(item, ask = false), Now.wall(), StocksItem.Words, StocksItem.times())
+            val v = StocksRules.menu(StocksItem.look(item, stocks), StocksItem.quotesFor(item, stocks, ask = false), Now.wall(), StocksItem.Words, StocksItem.times())
             MenuCard(Sym.SHOW_CHART, title, v.market) {
                 v.lines.forEach { l -> StockRow(l.symbol, l.name.takeIf { it != l.symbol }, l.price, l.change, l.up, listOfNotNull(l.range, l.problem), l.desc) }
                 v.note?.let { MenuNote(it) }
@@ -128,7 +129,7 @@ internal fun StocksOptions(item: ItemConfig, set: (ItemConfig) -> Unit) {
     key(item.id) {
         Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
             Text(stringResource(R.string.stocks_section), style = MaterialTheme.typography.labelLarge)
-            val stocks = StocksRules.stocks(item)
+            val stocks = remember(item) { StocksRules.stocks(item) }
             if (keyed) {
                 if (stocks.size < StocksRules.MOST_STOCKS) StockSearch(item, stocks, set)
                 else MenuNote(stringResource(R.string.stocks_full))

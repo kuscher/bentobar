@@ -240,6 +240,8 @@ class StocksRulesTest {
 
     @Test fun whileTheMarketIsOpenEveryTwoMinutes() {
         assertEquals(2 * min, StocksRules.every(q("AAPL", 227.52, 1.2), wed11))
+        // A quote read right before the bell is asked again as soon as the market opens.
+        assertEquals(0L, StocksRules.every(q("AAPL", 227.52, 1.2, read = ny(7, 9, 29), tradedAt = ny(6, 16)), ny(7, 9, 30)))
         // Just after the opening, a quote with yesterday's time is the morning before the first trade.
         assertEquals(2 * min, StocksRules.every(q("AAPL", 227.52, 1.2, read = ny(7, 9, 35), tradedAt = ny(6, 16)), ny(7, 9, 36)))
     }
@@ -259,10 +261,14 @@ class StocksRulesTest {
         assertEquals(0L, StocksRules.every(before, ny(8, 8)))
     }
 
-    @Test fun aHolidayIsSeenInTheQuotesAndWaitsForTheNextDay() {
-        // Thanksgiving, Thursday 26 November: the clock says open, the quote still has Wednesday's close.
+    @Test fun aQuietOpeningOrHolidayAsksEveryHalfHour() {
+        // Thanksgiving, Thursday 26 November (or a stock halted in the morning): the clock says open, the quote still has Wednesday's close.
         val thanksgiving = q("AAPL", 227.52, 1.2, read = ny(26, 10, month = 11), tradedAt = ny(25, 16, month = 11))
-        assertEquals(ny(27, 9, 30, month = 11) - ny(26, 10, month = 11), StocksRules.every(thanksgiving, ny(26, 10, 1, month = 11)))
+        assertEquals(30 * min, StocksRules.every(thanksgiving, ny(26, 10, 1, month = 11)))
+        assertFalse(StocksRules.stale(thanksgiving, ny(26, 10, 25, month = 11)))
+        assertFalse(StocksRules.stale(thanksgiving.copy(failure = Finnhub.Failure.OFFLINE), ny(26, 10, 35, month = 11)))
+        assertTrue(StocksRules.stale(thanksgiving, ny(26, 10, 41, month = 11)))
+        assertFalse(StocksRules.stale(q("AAPL", 227.52, 1.2, read = ny(26, 15, 36, month = 11), tradedAt = ny(25, 16, month = 11)), ny(26, 16, 2, month = 11)))
     }
 
     @Test fun afterAFailureEachHasItsPace() {

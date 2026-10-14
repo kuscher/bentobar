@@ -169,8 +169,9 @@ object StocksRules {
     const val MENU_MS = 30_000L
     /** After the close the service settles the day's last price; the quote read after this is the day's. */
     const val SETTLE_MS = 5 * MIN_MS
-    /** A quote that still has yesterday's time this long after the opening: a holiday, and nothing to ask until the next day. */
+    /** A quote that still has yesterday's time this long after the opening: a holiday or a quiet morning, asked every half hour. */
     private const val HOLIDAY_MS = 15 * MIN_MS
+    const val QUIET_OPEN_MS = 30 * MIN_MS
     const val RETRY_MS = 5 * MIN_MS
     const val SLOW_MS = 5 * MIN_MS
     /** A stock the service doesn't know, or the free plan doesn't cover: asked again after six hours. */
@@ -273,18 +274,27 @@ object StocksRules {
     /** While the market is open, a quote not read for ten minutes (five two-minute turns) is not live. */
     const val STALE_MS = 10 * MIN_MS
 
+    private fun quietOpen(q: Quote, read: Instant, opened: Instant): Boolean =
+        !read.isBefore(opened.plusMillis(HOLIDAY_MS)) && q.at > 0 && Instant.ofEpochSecond(q.at).isBefore(opened)
+
     /**
      * Whether [q] is too old to show as a live quote at [now]: while the market is open, it was read
-     * before today's opening or more than [STALE_MS] ago. Closed, the last session's quote stays
-     * until the next opening.
+     * before today's opening or more than [STALE_MS] ago (plus [QUIET_OPEN_MS] on a holiday or quiet
+     * morning). Closed, the quote read after the last session's close stays until the next opening;
+     * one from before that close (offline since) is not current once [STALE_MS] has passed.
      */
     fun stale(q: Quote, now: Long): Boolean {
         if (q.fetchedAt <= 0L) return true
         val at = Instant.ofEpochMilli(now)
         val read = Instant.ofEpochMilli(q.fetchedAt)
-        if (!Market.open(at)) return read.isBefore(Market.lastClose(at)) && now - q.fetchedAt > STALE_MS
+        if (!Market.open(at)) {
+            val closed = Market.lastClose(at)
+            val limit = if (quietOpen(q, read, Market.opensOn(Market.day(closed)))) QUIET_OPEN_MS + STALE_MS else STALE_MS
+            return read.isBefore(closed) && now - q.fetchedAt > limit
+        }
         val opened = Market.opensOn(Market.day(at))
-        return read.isBefore(opened) || now - q.fetchedAt > STALE_MS
+        val limit = if (quietOpen(q, read, opened)) QUIET_OPEN_MS + STALE_MS else STALE_MS
+        return read.isBefore(opened) || now - q.fetchedAt > limit
     }
 
     /** The day's move of a quote whose own time is today in New York; an older one (a weekend's Friday) moved on another day. */
@@ -419,8 +429,8 @@ object StocksRules {
      * How long [q] stays as it is before the service is asked again, in milliseconds since it was
      * read; null: not by itself (a refused key waits for another key). While the market is open, two
      * minutes. Closed, the quote read once after the close is the day's last and stays until the next
-     * opening. A day the clock says is open but whose quotes keep yesterday's time is a holiday, and
-     * waits for the next day. After a failure: a minute without a network, and less and less often
+     * opening. A day the clock says is open but whose quotes keep yesterday's time is a holiday or a
+     * quiet morning, and asks every half hour. After a failure: a minute without a network, and less and less often
      * (up to five minutes) while tries go out and reach nothing (a sign-in page, a name that can't be
      * found); five after no answer or being told to slow down (or as long as the service said), six
      * hours for a stock that is not there or not in the free plan.
@@ -446,9 +456,8 @@ object StocksRules {
         val read = Instant.ofEpochMilli(q.fetchedAt)
         if (Market.open(at)) {
             val opened = Market.opensOn(Market.day(at))
-            val holiday = !read.isBefore(opened.plusMillis(HOLIDAY_MS)) && q.at > 0 && Instant.ofEpochSecond(q.at).isBefore(opened)
-            if (!holiday) return OPEN_MS
-            return Duration.between(read, Market.nextOpen(Market.closesOn(Market.day(at)))).toMillis()
+            if (read.isBefore(opened)) return 0
+            return if (quietOpen(q, read, opened)) QUIET_OPEN_MS else OPEN_MS
         }
         val settled = Market.lastClose(at).plusMillis(SETTLE_MS)
         if (read.isBefore(settled)) return if (at.isBefore(settled)) Duration.between(read, settled).toMillis() else 0

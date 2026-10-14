@@ -24,8 +24,7 @@
 </p>
 
 <p align="center"><sub>A personal hobby project by Fika Labs, proudly developed on a Googlebook.
-Not affiliated with or endorsed by any employer (<a href="#about-this-project">more</a>).
-Formerly DiscoBar (<a href="#coming-from-discobar">moving over</a>).</sub></p>
+Not affiliated with or endorsed by any employer (<a href="#about-this-project">more</a>).</sub></p>
 
 <p align="center">
   <img src="docs/images/hero.png" width="880" alt="BentoBar's items in the Googlebook status bar, with the CPU menu open under the CPU item">
@@ -130,15 +129,6 @@ for every app that uses an accessibility service. Keep BentoBar if you're happy 
 (below).
 
 To update, install a newer `BentoBar.apk` over the old one; your layout stays.
-
-### Coming from DiscoBar?
-
-BentoBar is DiscoBar's new name (from version 0.5). It's a new package, so it installs next to
-DiscoBar rather than over it. To bring your layout along:
-
-1. In **DiscoBar**, open **Look › Copy settings**.
-2. Install and open **BentoBar**, then **Look › Paste settings**.
-3. Turn BentoBar on in **Setup**, and uninstall DiscoBar (otherwise both draw in the status bar).
 
 <a id="privacy"></a>
 ## Privacy: why an accessibility service, and what BentoBar does with it

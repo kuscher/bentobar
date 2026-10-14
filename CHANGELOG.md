@@ -1,10 +1,14 @@
 # Changelog
 
-## Unreleased
+## 1.4 (2026-10-14)
 
 - **Weather: My location.** The weather where you are, instead of a city you pick. BentoBar asks for
   Android's approximate location only when you choose it, and sends Open-Meteo that location rounded
   to about 10 km. It is kept in memory only, never in your layout.
+- **Smoother ticks and lower background overhead.** App shortcuts and folders now load their icons
+  and labels off the main thread with bounded caches; Flight file updates run in the background;
+  battery status lookups are throttled while keeping 1 Hz power readings; and item states are never
+  recomputed mid-frame while drawing.
 
 ## 1.3.1 (2026-10-08)
 

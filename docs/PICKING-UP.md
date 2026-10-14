@@ -19,6 +19,9 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 1.4 (2026-10-14): Weather's My location, plus stability and health fixes
+PR #23 (`weather-sky-and-location`) merged onto `main`, followed by five whole-app stability and health fixes (`f2a9cad`: bounded LRU icon/label caches and off-main-thread resolution in `Apps`/`AppItem`/`FolderItem`/`Usage`, main-thread `Ticker` confinement and `Ticker.placeholder` during composition, shared per-type `Background.executor`, off-main-thread `FlightLoad` disk writes in `FlightItem`, throttled sticky battery broadcast lookups in `BatterySampler`, and `spacerNode` cleanup on `NO_TREE` fallback in `BarService`). Version code 17. Released on GitHub (`v1.4`) and submitted to Google Play on both closed testing (`alpha`) and `production`.
+
 ## 1.3.1 (2026-10-08): an open popup at rest is still again
 PR #29, merged as a merge commit: `MenuWindow.frame()` set the root's bounds and invalidated its outline before every
 frame, and each asked for another frame, so an open popup ran 60 layout/draw passes a second at rest (a tenth of a

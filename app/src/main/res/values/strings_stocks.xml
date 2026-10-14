@@ -44,6 +44,7 @@
     <string name="stocks_down">▼%1$s%%</string>
     <!-- No change in the bar: "0.0%", with no arrow. -->
     <string name="stocks_flat">%1$s%%</string>
+    <string name="stocks_tooltip_not_current">%1$s · not current</string>
 
     <!-- the menu -->
     <string name="stocks_none_yet">No stocks yet</string>
@@ -57,8 +58,10 @@
     <string name="stocks_range">Day %1$s – %2$s</string>
     <string name="stocks_market_open">Market open · closes %1$s</string>
     <string name="stocks_market_closed">Market closed · opens %1$s</string>
-    <!-- %1$s: "updated 2:40 PM", or the same after "no connection," or "no answer,". -->
+    <!-- %1$s: "updated 2:40 PM", or the same after "no connection,", "no answer," or "not current,". -->
     <string name="stocks_note">Prices by Finnhub · %1$s</string>
+    <string name="stocks_updated_not_current">not current, updated %1$s</string>
+    <string name="stocks_not_current">Not current</string>
     <string name="stocks_no_answer">Finnhub didn\'t answer</string>
     <string name="stocks_slow_down">Too many requests: asking again in a few minutes</string>
     <string name="stocks_key_refused">Finnhub refused the key</string>
@@ -69,6 +72,7 @@
     <!-- spoken: the item ("US stocks: AAPL 227.52, up 1.2 percent; MSFT 418.07, down 0.4 percent.") -->
     <string name="stocks_desc">%1$s %2$s, %3$s</string>
     <string name="stocks_desc_price">%1$s %2$s</string>
+    <string name="stocks_desc_not_current">%1$s %2$s, not current</string>
     <string name="stocks_desc_up">up %1$s percent</string>
     <string name="stocks_desc_down">down %1$s percent</string>
     <string name="stocks_desc_flat">unchanged</string>

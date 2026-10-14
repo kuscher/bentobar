@@ -224,8 +224,10 @@ fun stocksRes(word: SW): Int = when (word) {
     SW.DOWN -> R.string.stocks_down
     SW.FLAT -> R.string.stocks_flat
     SW.PERCENT -> R.string.stocks_percent
+    SW.TOOLTIP_NOT_CURRENT -> R.string.stocks_tooltip_not_current
     SW.DESC -> R.string.stocks_desc
     SW.DESC_PRICE -> R.string.stocks_desc_price
+    SW.DESC_NOT_CURRENT -> R.string.stocks_desc_not_current
     SW.DESC_UP -> R.string.stocks_desc_up
     SW.DESC_DOWN -> R.string.stocks_desc_down
     SW.DESC_FLAT -> R.string.stocks_desc_flat
@@ -244,6 +246,8 @@ fun stocksRes(word: SW): Int = when (word) {
     SW.UPDATED -> R.string.common_updated
     SW.UPDATED_OFFLINE -> R.string.common_updated_offline
     SW.UPDATED_NO_ANSWER -> R.string.common_updated_no_answer
+    SW.UPDATED_NOT_CURRENT -> R.string.stocks_updated_not_current
+    SW.NOT_CURRENT -> R.string.stocks_not_current
     SW.OFFLINE -> R.string.common_no_connection
     SW.NO_ANSWER -> R.string.stocks_no_answer
     SW.SLOW_DOWN -> R.string.stocks_slow_down

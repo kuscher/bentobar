@@ -33,14 +33,17 @@ import kotlin.math.round
  */
 enum class SW(val res: String) {
     BAR("stocks_bar"), BAR_SHORT("stocks_bar_short"), UP("stocks_up"), DOWN("stocks_down"), FLAT("stocks_flat"), PERCENT("stocks_percent"),
-    DESC("stocks_desc"), DESC_PRICE("stocks_desc_price"), DESC_UP("stocks_desc_up"), DESC_DOWN("stocks_desc_down"), DESC_FLAT("stocks_desc_flat"),
+    TOOLTIP_NOT_CURRENT("stocks_tooltip_not_current"),
+    DESC("stocks_desc"), DESC_PRICE("stocks_desc_price"), DESC_NOT_CURRENT("stocks_desc_not_current"),
+    DESC_UP("stocks_desc_up"), DESC_DOWN("stocks_desc_down"), DESC_FLAT("stocks_desc_flat"),
     DESC_ALL("stocks_desc_all"), LIST("stocks_list"),
     DESC_NO_KEY("stocks_desc_no_key"), DESC_OFF("stocks_desc_off"), DESC_NONE("stocks_desc_none"), DESC_LOADING("stocks_desc_loading"),
     DESC_NO_PRICES("stocks_desc_no_prices"),
     CHANGE("stocks_change"), RANGE("stocks_range"),
     MARKET_OPEN("stocks_market_open"), MARKET_CLOSED("stocks_market_closed"), NOTE("stocks_note"),
     UPDATED("common_updated"), UPDATED_OFFLINE("common_updated_offline"), UPDATED_NO_ANSWER("common_updated_no_answer"),
-    OFFLINE("common_no_connection"), NO_ANSWER("stocks_no_answer"), SLOW_DOWN("stocks_slow_down"), REFUSED("stocks_key_refused"),
+    UPDATED_NOT_CURRENT("stocks_updated_not_current"),
+    NOT_CURRENT("stocks_not_current"), OFFLINE("common_no_connection"), NO_ANSWER("stocks_no_answer"), SLOW_DOWN("stocks_slow_down"), REFUSED("stocks_key_refused"),
     NO_ACCESS("stocks_no_access"), NOT_FOUND("stocks_not_found"), WAITING("stocks_waiting"),
 }
 
@@ -267,11 +270,33 @@ object StocksRules {
         else -> StocksStatus.Live
     }
 
+    /** While the market is open, a quote not read for ten minutes (five two-minute turns) is not live. */
+    const val STALE_MS = 10 * MIN_MS
+
+    /**
+     * Whether [q] is too old to show as a live quote at [now]: while the market is open, it was read
+     * before today's opening or more than [STALE_MS] ago. Closed, the last session's quote stays
+     * until the next opening.
+     */
+    fun stale(q: Quote, now: Long): Boolean {
+        if (q.fetchedAt <= 0L) return true
+        val at = Instant.ofEpochMilli(now)
+        val read = Instant.ofEpochMilli(q.fetchedAt)
+        if (!Market.open(at)) return read.isBefore(Market.lastClose(at)) && now - q.fetchedAt > STALE_MS
+        val opened = Market.opensOn(Market.day(at))
+        return read.isBefore(opened) || now - q.fetchedAt > STALE_MS
+    }
+
     /** The day's move of a quote whose own time is today in New York; an older one (a weekend's Friday) moved on another day. */
     private fun todaysPct(q: Quote, now: Long): Double? =
         q.dayPct?.takeIf { q.at > 0 && Market.day(Instant.ofEpochSecond(q.at)) == Market.day(Instant.ofEpochMilli(now)) }
 
-    /** What the bar shows at [now]: one stock at a time, each for the item's [StocksLook.turnSec] ("AAPL 227.52 ▲1.2%"). A stock without a price yet has no turn. */
+    /**
+     * What the bar shows at [now]: one stock at a time, each for the item's [StocksLook.turnSec]
+     * ("AAPL 227.52 ▲1.2%"). A stock without a price yet has no turn; one whose quote is [stale]
+     * shows its price alone, with an outlined flat icon, no accent and a note in the tooltip and
+     * the spoken words.
+     */
     fun bar(status: StocksStatus, look: StocksLook, quotes: Map<String, Quote>, now: Long, w: StocksWords): StocksBar {
         fun quiet(desc: SW) = StocksBar(Sym.SHOW_CHART, filled = false, desc = w.say(desc))
         when (status) {
@@ -286,24 +311,28 @@ object StocksRules {
             val failed = look.stocks.any { quotes[it.symbol]?.failure != null }
             return quiet(if (failed) SW.DESC_NO_PRICES else SW.DESC_LOADING)
         }
-        val active = priced.any { (_, q) -> todaysPct(q, now)?.let { abs(it) >= look.movePct } == true }
+        val active = priced.any { (_, q) -> !stale(q, now) && todaysPct(q, now)?.let { abs(it) >= look.movePct } == true }
         val tone = if (active) Tone.ACCENT else Tone.NORMAL
 
-        // Longer than twenty characters: first the price goes, then the change.
+        // Longer than twenty characters: first the price goes, then the change. A quote that is not current shows no change.
         val texts = priced.map { (s, q) ->
-            val change = move(q.dayPct, w, l)
+            val change = if (stale(q, now)) null else move(q.dayPct, w, l)
             listOfNotNull(change?.let { w.say(SW.BAR, s.symbol, barPrice(q.price!!, l), it) }, w.say(SW.BAR_SHORT, s.symbol, barPrice(q.price!!, l)).takeIf { change == null },
                 change?.let { w.say(SW.BAR_SHORT, s.symbol, it) }).firstOrNull(::fits) ?: s.symbol
         }
         val i = ((now / (look.turnSec * 1000L)) % priced.size).toInt()
         val (shown, q) = priced[i]
+        val qStale = stale(q, now)
         // Spoken, every stock at once: a screen reader can't wait for the turns.
         val spoken = priced.map { (s, sq) ->
-            val m = spokenMove(sq.dayPct, w, l)
-            if (m != null) w.say(SW.DESC, s.symbol, price(sq.price!!, l), m) else w.say(SW.DESC_PRICE, s.symbol, price(sq.price!!, l))
+            if (stale(sq, now)) w.say(SW.DESC_NOT_CURRENT, s.symbol, price(sq.price!!, l))
+            else {
+                val m = spokenMove(sq.dayPct, w, l)
+                if (m != null) w.say(SW.DESC, s.symbol, price(sq.price!!, l), m) else w.say(SW.DESC_PRICE, s.symbol, price(sq.price!!, l))
+            }
         }.reduce { a, b -> w.say(SW.LIST, a, b) }
-        return StocksBar(glyph(q.dayPct), filled = true, text = texts[i], desc = w.say(SW.DESC_ALL, spoken), active = active, tone = tone,
-            tooltip = shown.name, turns = texts.takeIf { it.size > 1 })
+        return StocksBar(if (qStale) Sym.TRENDING_FLAT else glyph(q.dayPct), filled = !qStale, text = texts[i], desc = w.say(SW.DESC_ALL, spoken), active = active, tone = tone,
+            tooltip = if (qStale) w.say(SW.TOOLTIP_NOT_CURRENT, shown.name) else shown.name, turns = texts.takeIf { it.size > 1 })
     }
 
     // ---- the menu --------------------------------------------------------------------------------
@@ -354,22 +383,30 @@ object StocksRules {
         val l = look.locale
         val lines = look.stocks.map { s ->
             val q = quotes[s.symbol]
+            val stale = q?.price != null && stale(q, now)
             val price = q?.price?.let { price(it, l) }
             val range = if (q?.low != null && q.high != null) w.say(SW.RANGE, price(q.low, l), price(q.high, l)) else null
-            val problem = if (q == null) w.say(SW.WAITING) else problem(q.failure, w)
-            val m = q?.let { spokenMove(it.dayPct, w, l) }
+            val problem = when {
+                q == null -> w.say(SW.WAITING)
+                q.failure != null -> problem(q.failure, w)
+                stale -> w.say(SW.NOT_CURRENT)
+                else -> null
+            }
+            val m = q?.takeUnless { stale }?.let { spokenMove(it.dayPct, w, l) }
             val desc = listOfNotNull(
                 when { price != null && m != null -> w.say(SW.DESC, s.symbol, price, m); price != null -> w.say(SW.DESC_PRICE, s.symbol, price); else -> s.symbol },
                 s.name.takeIf { it != s.symbol }, problem).reduce { a, b -> w.say(SW.LIST, a, b) }
-            StockLine(s.symbol, s.name, price, q?.let { change(it, l, w) }, q?.takeIf { it.dayPct != null }?.let(::up), range, problem, desc)
+            StockLine(s.symbol, s.name, price, q?.let { change(it, l, w) }, q?.takeIf { it.dayPct != null && !stale }?.let(::up), range, problem, desc)
         }
         val newest = quotes.values.filter { it.symbol in look.stocks.map(Stock::symbol) && it.fetchedAt > 0 }.maxByOrNull { it.fetchedAt }
         val failed = look.stocks.mapNotNull { quotes[it.symbol]?.failure }.firstOrNull { it == Finnhub.Failure.OFFLINE || it == Finnhub.Failure.NO_ANSWER }
+        val anyStale = look.stocks.any { s -> quotes[s.symbol]?.let { it.price != null && stale(it, now) } == true }
         val note = newest?.let { q ->
             val time = t.clock(q.fetchedAt, t.here)
-            w.say(SW.NOTE, when (failed) {
-                Finnhub.Failure.OFFLINE -> w.say(SW.UPDATED_OFFLINE, time)
-                Finnhub.Failure.NO_ANSWER -> w.say(SW.UPDATED_NO_ANSWER, time)
+            w.say(SW.NOTE, when {
+                failed == Finnhub.Failure.OFFLINE -> w.say(SW.UPDATED_OFFLINE, time)
+                failed == Finnhub.Failure.NO_ANSWER -> w.say(SW.UPDATED_NO_ANSWER, time)
+                anyStale -> w.say(SW.UPDATED_NOT_CURRENT, time)
                 else -> w.say(SW.UPDATED, time)
             })
         }

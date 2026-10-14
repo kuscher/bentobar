@@ -174,6 +174,37 @@ class StocksRulesTest {
         assertEquals("AAPL 227.52 ▲6.0%", saturday.text)
     }
 
+    @Test fun anOldQuoteShowsAsNotCurrent() {
+        // Ten minutes is still live; past that while the market is open, or read before today's opening, it claims no move or tone.
+        assertFalse(StocksRules.stale(q("AAPL", 227.52, 5.0, read = wed11 - 10 * min), wed11))
+        val old = q("AAPL", 227.52, 5.0, read = wed11 - 10 * min - 1)
+        assertTrue(StocksRules.stale(old, wed11))
+        val b = bar(look(aapl), old)
+        assertEquals("AAPL 227.52", b.text)
+        assertEquals(Sym.TRENDING_FLAT, b.icon)
+        assertFalse(b.filled)
+        assertFalse(b.active)
+        assertEquals(Tone.NORMAL, b.tone)
+        assertEquals("APPLE INC · not current", b.tooltip)
+        assertEquals("US stocks: AAPL 227.52, not current.", b.desc)
+        // Yesterday's quote still there after today's opening is not current either, even if read a moment before the bell.
+        val beforeBell = q("AAPL", 227.52, 5.0, read = ny(7, 9, 28), tradedAt = ny(6, 16))
+        assertFalse(StocksRules.stale(beforeBell, ny(7, 9, 29)))
+        assertTrue(StocksRules.stale(beforeBell, ny(7, 9, 31)))
+        assertEquals("AAPL 227.52", bar(look(aapl), beforeBell, now = ny(7, 9, 31)).text)
+        // Closed, the quote read after the last close stays until the next opening; one from midday (offline since) is not the day's close.
+        assertFalse(StocksRules.stale(q("AAPL", 227.52, 5.0, read = ny(7, 15, 58)), ny(7, 16, 4)))
+        assertTrue(StocksRules.stale(old, ny(7, 18)))
+        assertFalse(bar(look(aapl), old, now = ny(7, 18)).active)
+        assertTrue(StocksRules.stale(old, ny(10, 12)))
+        // In the menu, a stale quote has no color on its change, and says that it is not current.
+        val v = StocksRules.menu(look(aapl), mapOf("AAPL" to old), wed11, w, t)
+        assertNull(v.lines[0].up)
+        assertEquals("Not current", v.lines[0].problem)
+        assertEquals("AAPL 227.52; APPLE INC; Not current", v.lines[0].desc)
+        assertEquals("Prices by Finnhub · not current, updated 10:49 AM", v.note)
+    }
+
     // ---- the market's hours ----------------------------------------------------------------------------
 
     @Test fun theMarketIsOpenFromHalfPastNineToFourOnWeekdays() {

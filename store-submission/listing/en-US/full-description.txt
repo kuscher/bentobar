@@ -1,12 +1,12 @@
 BentoBar puts your own items into the empty part of the status bar, right next to the system's icons, in the same font and colour. Items you don't need all the time go behind the ‹ button: one click reveals them, another folds them away. Like a bento box: everything in its compartment, and the whole thing neat.
 
 Items
-CPU load, network speed, memory, battery details, storage, the date with a month view of your calendar, your next meeting with a countdown, a second clock and world clocks, timers (countdown, stopwatch or Pomodoro), a countdown to a date, keep awake, sound, a Tools menu (screenshot, lock, overview, all apps, power), app folders and shortcuts, text, emoji and spacers.
+CPU load, network speed, memory, battery details, storage, external displays (resolution, refresh rate, HDR and keep awake while docked), the date with a month view of your calendar, your next meeting with a countdown, a second clock and world clocks, timers (countdown, stopwatch or Pomodoro), a countdown to a date, keep awake, sound, clipboard & scratchpad (pinned snippets and session clips with one-click paste), a Tools menu (screenshot, lock, overview, all apps, power), app folders and shortcuts, text, emoji and spacers.
 
-New: Now playing with its controls, the batteries of your mouse, keyboard and stylus, a Heat item that appears when Android slows a hot device, Weather for a city you pick, and a Flight tracker that counts down to departure with the gate. World clock takes more cities and has Plan a time: a slider that shows any time of day in every city. Sound can draw a volume slider right in the bar.
+New: Now playing with its controls, the batteries of your mouse, keyboard and stylus, a Heat item that appears when Android slows a hot device, External displays, Clipboard & scratchpad, Weather and Air quality & UV for a city you pick or My location, Exchange rates with an inline currency converter, US stocks, and a Flight tracker that counts down to departure with the gate. World clock takes more cities and has Plan a time: a slider that shows any time of day in every city. Sound can draw a volume slider right in the bar.
 
 Show when active
-A hidden item can pop out on its own while it has something to say, such as a running timer, a meeting about to start or a busy CPU, and disappear again after.
+A hidden item can pop out on its own while it has something to say, such as a running timer, a meeting about to start, an external monitor plugged in, high AQI/UV or a busy CPU, and disappear again after.
 
 Click, right-click, scroll
 Click any item for its menu: charts, details and actions. Right-click an item to hide it, move it or change how it looks. Scroll over the sound item to change the volume, or over the timer to add minutes.
@@ -18,10 +18,10 @@ Stays out of the way
 BentoBar moves aside when the system's icons or chips change, and hides when an app goes full screen or the screen locks. It uses about half a percent of one CPU core with its busiest items updating every second, and nothing while the screen is off.
 
 Why BentoBar uses an accessibility service
-Android lets an app draw on the status bar only through an accessibility service. BentoBar uses it to draw its items there, and to run the system actions you pick in the Tools menu or as a Shortcut item. It listens only for windows appearing, going or moving, not their content; it reads the status bar's layout and the color of its clock, and no other window; and it doesn't watch your keyboard, mouse or touches. Before you turn it on, BentoBar shows what the service does and asks whether you agree.
+Android lets an app draw on the status bar only through an accessibility service. BentoBar uses it to draw its items there, to run the system actions you pick in the Tools menu or as a Shortcut item, and optionally to paste a snippet you click in the Clipboard item into the active text field. It listens only for windows appearing, going or moving, not their content; it reads the status bar's layout and the color of its clock, and no other window; and it doesn't watch your keyboard, mouse or touches. Before you turn it on, BentoBar shows what the service does and asks whether you agree.
 
 Private
-BentoBar goes online for three items only, and only after you set them up: Weather asks Open-Meteo about the city you search for (or, if you choose My location, about where you are, rounded to about 10 km), Flight asks AirLabs about the flight you enter, and US stocks asks Finnhub about the stocks you follow, the last two with a free key of your own. BentoBar sends nothing else anywhere: not your layout, your calendar, what's playing or anything it measures. No accounts of its own, no ads, no analytics. Approximate location is asked for only if you choose My location for Weather. Now playing needs notification access for the title only, and BentoBar tells Android to send it no notifications.
+BentoBar goes online only for the online items you turn on in Setup: Weather and Air quality & UV ask Open-Meteo about the city you search for (or, if you choose My location, about where you are, rounded to about 10 km), Exchange rates asks Frankfurter for European Central Bank reference rates, Flight asks AirLabs about the flight you enter, and US stocks asks Finnhub about the stocks you follow (the last two with a free key of your own). BentoBar sends nothing else anywhere: not your layout, your calendar, your clipboard, what's playing or anything it measures. No accounts of its own, no ads, no analytics.
 
 Made for Android laptops with Android 17. Other devices with a status bar may work, but haven't been tested. The system's own icons stay where Android puts them: BentoBar organises its items next to them.
 

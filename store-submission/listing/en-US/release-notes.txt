@@ -1,1 +1,5 @@
-New item — US stocks: follow up to ten US stocks and ETFs in your status bar (AAPL 227.52 ▲1.2%), rotating at the pace you choose or popping out on big daily moves, with each stock's day and market hours in its menu (uses a free Finnhub key of your own). Weather can also show "My location" using approximate location rounded to ~10 km and kept in memory only, with frosted-glass popups and smoother background ticks.
+Four new items in 1.6:
+• Clipboard & scratchpad: pin up to 8 snippets and view recent session clips (in-memory only; skips sensitive password clips), with optional one-click paste into the active field.
+• External displays: monitor resolution & refresh rate (4K 60Hz), HDR status, and "Keep awake while connected".
+• Air quality & UV: US/EU AQI, PM2.5, PM10, Ozone and UV index from Open-Meteo.
+• Exchange rates: ECB currency pairs & inline converter via Frankfurter (no key needed).

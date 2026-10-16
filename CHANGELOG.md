@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6 (2026-10-15)
+
+- **Clipboard and scratchpad.** Keep up to eight pinned snippets and your recent session clips one click away. Clicking a snippet copies it and, when enabled, pastes it straight into the active input field. Recent clips stay in memory only and sensitive clips (such as password manager copies) are skipped.
+- **External displays.** Shows the resolution and refresh rate (`4K 60Hz`, `1440p 144Hz`) when an external monitor is plugged in, with each connected screen's resolution, refresh rate and HDR status in the menu, plus a **Keep awake while connected** switch for docked setups.
+- **Air quality and UV.** US or European AQI and UV index from Open-Meteo for your city or **My location**, with $\text{PM}_{2.5}$, $\text{PM}_{10}$, Ozone ($\text{O}_3$) and daily peak UV in the menu, and a threshold to pop out when smoke, smog or UV is high.
+- **Exchange rates.** Follow up to six currency pairs (`EUR/USD`, `USD/JPY`, `GBP/USD`, and 30+ currencies) rotating in the bar, with daily percent moves and an inline currency converter in the menu. Reference rates come from the European Central Bank via Frankfurter (no API key needed).
+
 ## 1.5 (2026-10-15)
 
 - **US stocks.** Follow up to ten US stocks and ETFs: the bar shows one at a time (`AAPL 227.52 ▲1.2%`),

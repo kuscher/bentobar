@@ -19,6 +19,9 @@ commit at every milestone.
 - Research: `docs/research/device-findings.md` (probe results on the HP Googlebook 14) and
   `docs/research/android-docs.md` (official docs with URLs).
 
+## 1.5 (2026-10-15): US stocks
+PR #24 (`stocks`) merged onto `main` after all six review follow-up commits landed (`0d82d39..0522206`: `TextRules.count` in `ItemTextTest`, `MenuWindow` keyboard interactivity toggle on stock input dialogs, `Finnhub` HTTP 429 retry-after backoff and response clipping, and `StockRules` ticker normalization). Adds the **US stocks** item (`StockItem`, `StockRules`, `Finnhub`, `StockLoad`), rotating up to 10 US stocks/ETFs in the bar with Finnhub quotes and market status. Version code 18. Released on GitHub (`v1.5`) and submitted to Google Play on both closed testing (`alpha`) and `production`, along with updated store listing description.
+
 ## 1.4 (2026-10-14): Weather's My location, plus stability and health fixes
 PR #23 (`weather-sky-and-location`) merged onto `main`, followed by five whole-app stability and health fixes (`f2a9cad`: bounded LRU icon/label caches and off-main-thread resolution in `Apps`/`AppItem`/`FolderItem`/`Usage`, main-thread `Ticker` confinement and `Ticker.placeholder` during composition, shared per-type `Background.executor`, off-main-thread `FlightLoad` disk writes in `FlightItem`, throttled sticky battery broadcast lookups in `BatterySampler`, and `spacerNode` cleanup on `NO_TREE` fallback in `BarService`). Version code 17. Released on GitHub (`v1.4`) and submitted to Google Play on both closed testing (`alpha`) and `production`.
 

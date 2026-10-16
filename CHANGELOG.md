@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.5 (2026-10-15)
 
 - **US stocks.** Follow up to ten US stocks and ETFs: the bar shows one at a time (`AAPL 227.52 ▲1.2%`),
   each for 5 seconds or as long as you choose, and can pop out when one moves a lot in a day. Its menu has each stock's day and the market's hours.

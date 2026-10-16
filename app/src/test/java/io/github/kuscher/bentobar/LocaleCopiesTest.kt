@@ -81,8 +81,8 @@ class LocaleCopiesTest {
     }
 
     @Test fun everyItemTypeHasItsTitleAndItsLineForTheCatalog() {
-        // The five new types each bring their own file; the names follow the old ones' pattern.
-        for (type in listOf("media", "devices", "heat", "weather", "flight")) {
+        // The six new types each bring their own file; the names follow the old ones' pattern.
+        for (type in listOf("media", "devices", "heat", "weather", "flight", "stocks")) {
             val f = files("values")["strings_$type.xml"]
             assertTrue("values/strings_$type.xml is missing", f != null)
             val known = names(f!!)

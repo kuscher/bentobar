@@ -40,10 +40,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +62,7 @@ import io.github.kuscher.bentobar.ui.MenuDivider
 import io.github.kuscher.bentobar.ui.MenuEntry
 import io.github.kuscher.bentobar.ui.MenuNote
 import io.github.kuscher.bentobar.ui.SearchField
+import io.github.kuscher.bentobar.ui.SearchStatus
 import io.github.kuscher.bentobar.ui.SectionLabel
 import io.github.kuscher.bentobar.ui.Setup
 import io.github.kuscher.bentobar.ui.TextRow
@@ -375,10 +374,6 @@ internal fun CitySearch(item: ItemConfig, by: String, initial: String, canSubmit
         }
     }
 }
-
-/** The line under the search field: read out when it changes, without taking the focus. */
-@Composable
-private fun SearchStatus(text: String) = Box(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) { MenuNote(text) }
 
 /** The item's settings: the city (the same search as in the menu) or My location, what the bar shows, the unit and a label. */
 @Composable

@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * What only reading the code can show: there is one way out of the device, and two item types use
+ * What only reading the code can show: there is one way out of the device, and three item types use
  * it. These rules hold for every file of the app, so a change that opens a second way, or lets
  * another item ask a service, fails here and not in a review.
  */
@@ -21,11 +21,12 @@ class OneWayOutTest {
     private fun code(f: File) = f.readText().replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), "").lines()
         .joinToString("\n") { it.substringBefore("//") }
 
-    /** The files of the two items that go online, by their names. */
-    private fun online(place: String, flightOnly: Boolean = false): Boolean {
+    /** The files of the three items that go online, by their names; with [keyed], of the two that ask with the user's own key. */
+    private fun online(place: String, keyed: Boolean = false): Boolean {
         val name = place.removePrefix("items/")
         if (!place.startsWith("items/")) return false
-        return name.startsWith("Flight") || name.startsWith("AirLabs") || (!flightOnly && name.startsWith("Weather"))
+        return name.startsWith("Flight") || name.startsWith("AirLabs") || name.startsWith("Stocks") || name.startsWith("Finnhub") ||
+            (!keyed && name.startsWith("Weather"))
     }
 
     @Test fun theSourcesAreThere() {
@@ -44,29 +45,29 @@ class OneWayOutTest {
         }
     }
 
-    @Test fun onlyWeatherAndFlightAskAService() {
+    @Test fun onlyWeatherFlightAndStocksAskAService() {
         // No road from what the accessibility service, the media players or a sampler read to a request.
         for (f in sources) {
             val place = f.place()
             if (place.startsWith("net/")) continue
-            if ("Http.get(" in code(f)) assertTrue("$place calls Http.get: only items/Weather*.kt, items/Flight*.kt and items/AirLabs*.kt may", online(place))
+            if ("Http.get(" in code(f)) assertTrue("$place calls Http.get: only items/Weather*.kt, items/Flight*.kt, items/AirLabs*.kt, items/Stocks*.kt and items/Finnhub*.kt may", online(place))
             // Nor is there a way around the gate in Http.get: the transport is net's own, to ask and to make.
             for (way in listOf("Http.transport", "HttpTransport(")) assertTrue("$place reaches for the transport: a request goes through Http.get", way !in code(f))
         }
         val declared = sources.filter { Regex("""override\s+val\s+online\b""").containsMatchIn(code(it)) }.map { it.place() }.sorted()
-        assertEquals("the item types that name an online service", listOf("items/FlightItem.kt", "items/WeatherItem.kt"), declared)
+        assertEquals("the item types that name an online service", listOf("items/FlightItem.kt", "items/StocksItem.kt", "items/WeatherItem.kt"), declared)
     }
 
-    @Test fun onlyTheFlightCodeReadsTheKey() {
+    @Test fun onlyFlightAndStocksReadTheirKeys() {
         for (f in sources) {
             val place = f.place()
             if (place == "data/Online.kt") continue
-            if ("Online.key(" in code(f)) assertTrue("$place reads the key: only items/Flight*.kt and items/AirLabs*.kt may", online(place, flightOnly = true))
+            if ("Online.key(" in code(f)) assertTrue("$place reads a key: only items/Flight*.kt, items/AirLabs*.kt, items/Stocks*.kt and items/Finnhub*.kt may", online(place, keyed = true))
         }
     }
 
     @Test fun theCodeThatGoesOnlineWritesNoLogLines() {
-        // A city, a flight number and a key pass through these files. What a request came to is logged in one place
+        // A city, a flight number, the stocks someone follows and a key pass through these files. What a request came to is logged in one place
         // (Http.log: host and path), so they need no log line of their own, and can then leak none.
         val writes = listOf("Log.", "println(", "printStackTrace", "System.out", "System.err")
         for (f in sources) {

@@ -94,7 +94,7 @@ class HttpTransport(
 
         private fun encode(text: String): String = URLEncoder.encode(text, "UTF-8")
 
-        /** The real opener: once more, only HTTPS and only the three hosts. Nothing is connected yet when it returns. */
+        /** The real opener: once more, only HTTPS and only BentoBar's hosts. Nothing is connected yet when it returns. */
         internal fun openChecked(address: String): HttpURLConnection {
             val url = URL(address)
             check(url.protocol == "https" && Host.entries.any { it.domain == url.host }) { "not one of BentoBar's hosts" }

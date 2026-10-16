@@ -58,6 +58,11 @@ ICONS += """
 bug_report
 """.split()
 
+# Added for the Stocks item: its glyph in the bar goes up, down or flat with the day's change.
+ICONS += """
+show_chart trending_down trending_up
+""".split()
+
 # Symbols also exported as vector drawables (tiles, notifications, launcher icon), from the filled font.
 DRAWABLES = ["coffee", "timer", "avg_pace", "event", "pause", "play_arrow", "add", "stop", "videocam", "open_in_new"]
 

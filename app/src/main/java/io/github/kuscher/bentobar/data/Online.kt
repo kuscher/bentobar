@@ -9,9 +9,9 @@ import kotlinx.serialization.json.Json
 import java.io.File
 
 /**
- * Whether BentoBar may ask an online service, and the user's own key for one that needs it. Two
- * items go online, Weather and Flight, and each only after the user set it up on this install: that
- * is what [turnOn] and [saveKey] record, and [turnOff] takes back.
+ * Whether BentoBar may ask an online service, and the user's own key for one that needs it. Three
+ * items go online, Weather, Flight and Stocks, and each only after the user set it up on this install:
+ * that is what [turnOn] and [saveKey] record, and [turnOff] takes back.
  *
  * All of it belongs to this install and never travels. It is kept in one small file in Android's
  * no-backup directory, beside the layout but no part of it: a pasted layout, a restored backup and a
@@ -23,6 +23,7 @@ object Online {
     enum class Service(val id: String, val hosts: Set<Host>, val needsKey: Boolean) {
         OPEN_METEO("openMeteo", setOf(Host.OPEN_METEO, Host.OPEN_METEO_GEOCODING), needsKey = false),
         AIRLABS("airLabs", setOf(Host.AIRLABS), needsKey = true),
+        FINNHUB("finnhub", setOf(Host.FINNHUB), needsKey = true),
     }
 
     /**

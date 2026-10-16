@@ -90,6 +90,12 @@ data class ItemState(
      * promise for wide scripts. 0: drawn as wide as it is.
      */
     val textLimit: Int = 0,
+    /**
+     * The texts an item takes turns showing (Stocks: one stock after another), [text] among them. Its
+     * place in the bar is as wide as the widest of them, so nothing next to it moves when the turn
+     * changes. Null: none.
+     */
+    val turns: List<String>? = null,
 ) {
     /** For logs and dumps: never the words themselves, which can be a track's title, a city or a flight. */
     override fun toString() = "ItemState(icon=${icon != null}, text of ${text?.length ?: 0}, active=$active, tone=$tone)"
@@ -137,8 +143,8 @@ abstract class ItemType(
     open val permissions: List<String> = emptyList()
 
     /**
-     * The online service this type asks, or null: the type never goes online (every type but Weather
-     * and Flight). A request reaches a service only while an item of a type that names it is outside
+     * The online service this type asks, or null: the type never goes online (every type but Weather,
+     * Flight and Stocks). A request reaches a service only while an item of a type that names it is outside
      * Off, the service is switched on for this install and something shows items (see `Http.allowed`).
      */
     open val online: Online.Service? = null

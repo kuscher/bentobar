@@ -10,7 +10,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.File
 
-/** The switches for the two online services and the user's key: off until set up here, and never anywhere but in their own file. */
+/** The switches for the three online services and the user's keys: off until set up here, and never anywhere but in their own file. */
 class OnlineTest {
     private val dir = File(System.getProperty("java.io.tmpdir"), "bentobar-online-${System.nanoTime()}")
     private val told = ArrayList<Online.Service>()

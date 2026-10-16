@@ -57,7 +57,10 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -138,6 +141,10 @@ fun InfoRow(label: String, value: String, valueColor: Color = MaterialTheme.colo
 @Composable
 fun MenuNote(text: String) = Text(text, style = MaterialTheme.typography.bodySmall,
     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 2.dp))
+
+/** The line under a search field ("Searching…", "Nothing found"): read out when it changes, without taking the focus. */
+@Composable
+fun SearchStatus(text: String) = Box(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) { MenuNote(text) }
 
 @Composable
 fun MenuDivider() = HorizontalDivider(

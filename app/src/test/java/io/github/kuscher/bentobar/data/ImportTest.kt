@@ -73,7 +73,7 @@ class ImportTest {
 
     @Test fun aLayoutHasNoPlaceForAKeyOrAnOnlineSwitch() {
         // What Copy settings puts on the clipboard, and what a backup carries: these fields and no others. A key and
-        // the two online switches are kept elsewhere (Online); a new field here should be a decision, so it is listed.
+        // the three online switches are kept elsewhere (Online); a new field here should be a decision, so it is listed.
         val fields = (0 until BarConfig.serializer().descriptor.elementsCount).map { BarConfig.serializer().descriptor.getElementName(it) }.toSet()
         assertEquals(setOf("version", "enabled", "items", "position", "hiddenMode", "chevron", "revealOnHover", "autoCollapseSec", "pinnedOpen",
             "presenting", "turnedOff", "textSize", "pill", "color", "spacing", "hoverSwitchesPopups", "noAnimations", "systemTint", "chipMode", "onboarded", "cities"), fields)

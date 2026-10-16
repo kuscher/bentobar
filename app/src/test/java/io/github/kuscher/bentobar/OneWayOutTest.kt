@@ -21,12 +21,12 @@ class OneWayOutTest {
     private fun code(f: File) = f.readText().replace(Regex("/\\*.*?\\*/", RegexOption.DOT_MATCHES_ALL), "").lines()
         .joinToString("\n") { it.substringBefore("//") }
 
-    /** The files of the three items that go online, by their names; with [keyed], of the two that ask with the user's own key. */
+    /** The files of the items that go online, by their names; with [keyed], of the two that ask with the user's own key. */
     private fun online(place: String, keyed: Boolean = false): Boolean {
         val name = place.removePrefix("items/")
         if (!place.startsWith("items/")) return false
         return name.startsWith("Flight") || name.startsWith("AirLabs") || name.startsWith("Stocks") || name.startsWith("Finnhub") ||
-            (!keyed && name.startsWith("Weather"))
+            (!keyed && (name.startsWith("Weather") || name.startsWith("Air") || name.startsWith("Fx")))
     }
 
     @Test fun theSourcesAreThere() {
@@ -50,12 +50,12 @@ class OneWayOutTest {
         for (f in sources) {
             val place = f.place()
             if (place.startsWith("net/")) continue
-            if ("Http.get(" in code(f)) assertTrue("$place calls Http.get: only items/Weather*.kt, items/Flight*.kt, items/AirLabs*.kt, items/Stocks*.kt and items/Finnhub*.kt may", online(place))
+            if ("Http.get(" in code(f)) assertTrue("$place calls Http.get: only items/Weather*.kt, items/Air*.kt, items/Flight*.kt, items/AirLabs*.kt, items/Stocks*.kt, items/Finnhub*.kt and items/Fx*.kt may", online(place))
             // Nor is there a way around the gate in Http.get: the transport is net's own, to ask and to make.
             for (way in listOf("Http.transport", "HttpTransport(")) assertTrue("$place reaches for the transport: a request goes through Http.get", way !in code(f))
         }
         val declared = sources.filter { Regex("""override\s+val\s+online\b""").containsMatchIn(code(it)) }.map { it.place() }.sorted()
-        assertEquals("the item types that name an online service", listOf("items/FlightItem.kt", "items/StocksItem.kt", "items/WeatherItem.kt"), declared)
+        assertEquals("the item types that name an online service", listOf("items/AirItem.kt", "items/FlightItem.kt", "items/FxItem.kt", "items/StocksItem.kt", "items/WeatherItem.kt"), declared)
     }
 
     @Test fun onlyFlightAndStocksReadTheirKeys() {

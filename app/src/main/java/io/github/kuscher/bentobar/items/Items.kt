@@ -15,10 +15,10 @@ import kotlinx.coroutines.flow.StateFlow
 /** Every item type, in catalog order. */
 object Items {
     val all: List<ItemType> = listOf(
-        CpuItem, NetworkItem, BatteryItem, MemoryItem, StorageItem, HeatItem, DevicesItem,
+        CpuItem, NetworkItem, BatteryItem, MemoryItem, StorageItem, HeatItem, DevicesItem, DisplaysItem,
         CalendarItem, EventItem, ClockItem, TimerItem, CountdownItem,
-        CaffeineItem, MediaItem, SoundItem, ToolsItem, ShortcutItem, FolderItem, AppItem, TextItem, SpacerItem,
-        WeatherItem, FlightItem, StocksItem,
+        CaffeineItem, MediaItem, SoundItem, ClipboardItem, ToolsItem, ShortcutItem, FolderItem, AppItem, TextItem, SpacerItem,
+        WeatherItem, AirItem, FlightItem, StocksItem, FxItem,
     )
     private val byType = all.associateBy { it.type }
 

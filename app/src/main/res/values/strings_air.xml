@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Air quality and UV (Open-Meteo). Every name here starts with air_, item_air_ or trigger_air. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="item_air_title">Air quality and UV</string>
+    <string name="item_air_desc">US or European AQI, PM2.5 and UV index for a city or where you are</string>
+    <string name="trigger_air">Show when AQI is %1$s or higher, or UV is 6 or higher</string>
+    <string name="trigger_air_short">shows from %1$s AQI or UV 6</string>
+
+    <string name="air_good">Good</string>
+    <string name="air_moderate">Moderate</string>
+    <string name="air_sensitive">Sensitive groups</string>
+    <string name="air_unhealthy">Unhealthy</string>
+    <string name="air_very_unhealthy">Very unhealthy</string>
+    <string name="air_hazardous">Hazardous</string>
+
+    <string name="air_uv_low">Low</string>
+    <string name="air_uv_moderate">Moderate</string>
+    <string name="air_uv_high">High</string>
+    <string name="air_uv_very_high">Very high</string>
+    <string name="air_uv_extreme">Extreme</string>
+
+    <string name="air_bar_aqi">AQI %1$d</string>
+    <string name="air_bar_eaqi">EAQI %1$d</string>
+    <string name="air_bar_uv">UV %1$s</string>
+    <string name="air_bar_both">%1$s · UV %2$s</string>
+    <string name="air_subtitle">%1$s · UV %2$s (%3$s)</string>
+    <string name="air_pm25">PM2.5</string>
+    <string name="air_pm10">PM10</string>
+    <string name="air_ozone">Ozone (O₃)</string>
+    <string name="air_uv_index">UV index</string>
+    <string name="air_uv_peak">Peak UV today</string>
+    <string name="air_ugm3">%1$s µg/m³</string>
+    <string name="air_scale_label">Scale</string>
+    <string name="air_scale_us">US AQI</string>
+    <string name="air_scale_eu">European AQI</string>
+    <string name="air_show_label">In the bar</string>
+    <string name="air_show_aqi">AQI</string>
+    <string name="air_show_aqi_uv">AQI and UV</string>
+    <string name="air_show_uv">UV index</string>
+    <string name="air_note">Air quality and UV by Open-Meteo · %1$s</string>
+    <string name="air_desc_live">%1$s: AQI %2$d (%3$s), UV %4$s</string>
+    <string name="air_desc_not_set_up">Air quality: not set up</string>
+    <string name="air_desc_off">Air quality: off</string>
+    <string name="air_desc_loading">Air quality: loading</string>
+    <string name="air_desc_no_reading">Air quality: unavailable</string>
+</resources>

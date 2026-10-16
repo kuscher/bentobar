@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exchange rates (Frankfurter / European Central Bank). Every name here starts with fx_, item_fx_ or trigger_fx. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="item_fx_title">Exchange rates</string>
+    <string name="item_fx_desc">Foreign exchange rates and an inline currency converter, from the European Central Bank</string>
+    <string name="trigger_fx">Show when a currency pair moves %1$s or more in a day</string>
+    <string name="trigger_fx_short">shows on a %1$s move</string>
+
+    <string name="fx_consent">Exchange rates come from Frankfurter (api.frankfurter.dev), which publishes reference rates from the European Central Bank. No key is needed. BentoBar asks for the table of rates at most once an hour while the bar is on screen; Frankfurter sees your IP address, as any website does.</string>
+    <string name="fx_turn_on">Turn on Exchange rates</string>
+    <string name="fx_section">Currency pairs</string>
+    <string name="fx_add_label">Add pair (such as EUR/USD or USD/JPY)</string>
+    <string name="fx_add_button">Add</string>
+    <string name="fx_invalid_pair">Write two 3-letter currencies like EUR/USD. Supported: USD, EUR, GBP, JPY, CHF, CAD, AUD and 24 more.</string>
+    <string name="fx_full">Six currency pairs is the most one item follows.</string>
+    <string name="fx_none_yet">No currency pairs yet</string>
+    <string name="fx_add_pairs">Add currency pairs…</string>
+    <string name="fx_edit">Edit currency pairs…</string>
+    <string name="fx_turn_label">Each pair shows for</string>
+    <string name="fx_turn_help">With more than one pair, the bar shows them in turn.</string>
+    <string name="fx_convert_label">Convert amount</string>
+    <string name="fx_converted">%1$s %2$s = %3$s %4$s</string>
+    <string name="fx_bar_up">%1$s %2$s ▲%3$s%%</string>
+    <string name="fx_bar_down">%1$s %2$s ▼%3$s%%</string>
+    <string name="fx_bar_flat">%1$s %2$s</string>
+    <string name="fx_note">Reference rates by the European Central Bank (Frankfurter) · %1$s</string>
+    <string name="fx_site">Frankfurter.dev</string>
+    <string name="fx_move_up">Move %1$s up</string>
+    <string name="fx_move_down">Move %1$s down</string>
+    <string name="fx_remove">Remove %1$s</string>
+    <string name="fx_desc_not_set_up">Exchange rates: not turned on</string>
+    <string name="fx_desc_off">Exchange rates: off</string>
+    <string name="fx_desc_loading">Exchange rates: loading</string>
+    <string name="fx_desc_no_rates">Exchange rates: unavailable</string>
+    <string name="fx_desc_live">Exchange rates: %1$s</string>
+</resources>

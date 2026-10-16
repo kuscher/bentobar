@@ -21,9 +21,10 @@ import java.io.File
 object Online {
     /** The services, each with the hosts it stands for (see [Host]). */
     enum class Service(val id: String, val hosts: Set<Host>, val needsKey: Boolean) {
-        OPEN_METEO("openMeteo", setOf(Host.OPEN_METEO, Host.OPEN_METEO_GEOCODING), needsKey = false),
+        OPEN_METEO("openMeteo", setOf(Host.OPEN_METEO, Host.OPEN_METEO_AIR, Host.OPEN_METEO_GEOCODING), needsKey = false),
         AIRLABS("airLabs", setOf(Host.AIRLABS), needsKey = true),
         FINNHUB("finnhub", setOf(Host.FINNHUB), needsKey = true),
+        FRANKFURTER("frankfurter", setOf(Host.FRANKFURTER), needsKey = false),
     }
 
     /**

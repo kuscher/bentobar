@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- External displays. Every name here starts with displays_, item_displays_ or trigger_displays. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="item_displays_title">Displays</string>
+    <string name="item_displays_desc">Connected external monitors, resolution and refresh rate; can keep the screen awake while docked</string>
+    <string name="trigger_displays">Show when an external display is connected</string>
+    <string name="trigger_displays_short">shows with an external display</string>
+
+    <string name="displays_none">Built-in display only</string>
+    <string name="displays_built_in">Built-in display</string>
+    <string name="displays_external">External display</string>
+    <string name="displays_keeping_awake">%1$s · keeping awake</string>
+    <string name="displays_mode">%1$d × %2$d · %3$d Hz</string>
+    <string name="displays_mode_hdr">%1$d × %2$d · %3$d Hz · HDR</string>
+    <string name="displays_keep_awake">Keep awake while connected</string>
+    <string name="displays_keep_awake_help">Keeps your Googlebook\'s screen from turning off while an external monitor is plugged in</string>
+    <string name="displays_bar_label">In the bar</string>
+    <string name="displays_bar_res_hz">Resolution and Hz (4K 60Hz)</string>
+    <string name="displays_bar_res">Resolution (4K)</string>
+    <string name="displays_bar_count">Count</string>
+    <string name="displays_settings">Display settings</string>
+    <string name="displays_cast_settings">Cast and wireless displays</string>
+    <string name="displays_desc_none">Displays: built-in display only</string>
+
+    <plurals name="displays_external_count">
+        <item quantity="one">%1$d external display</item>
+        <item quantity="other">%1$d external displays</item>
+    </plurals>
+    <plurals name="displays_desc_connected">
+        <item quantity="one">%1$d external display connected: %2$s</item>
+        <item quantity="other">%1$d external displays connected: %2$s</item>
+    </plurals>
+</resources>

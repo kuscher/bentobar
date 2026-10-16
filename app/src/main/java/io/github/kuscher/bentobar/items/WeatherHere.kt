@@ -21,7 +21,7 @@ import io.github.kuscher.bentobar.util.Now
  * changed (`Ticker.refresh("weather")`: no sampler runs, since this can come from the middle of a tick).
  */
 object WeatherHere {
-    private val keeper = HereKeeper(Android, Now::elapsed) { Ticker.refresh(WeatherItem.type) }
+    private val keeper = HereKeeper(Android, Now::elapsed) { Ticker.refresh(WeatherItem.type); Ticker.refresh(AirItem.type) }
 
     /** Where the device is, as Android said it; null until it did, and once that is past its time ([HereRules.FIX_MS]). Any thread. */
     val fix: Fix? get() = keeper.fix

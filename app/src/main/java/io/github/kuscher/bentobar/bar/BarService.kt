@@ -44,6 +44,7 @@ import io.github.kuscher.bentobar.data.Store
 import io.github.kuscher.bentobar.data.TextSize
 import io.github.kuscher.bentobar.items.Caffeine
 import io.github.kuscher.bentobar.items.Chips
+import io.github.kuscher.bentobar.items.DisplaysItem
 import io.github.kuscher.bentobar.items.Env
 import io.github.kuscher.bentobar.items.Items
 import io.github.kuscher.bentobar.items.MenuHost
@@ -241,6 +242,7 @@ class BarController(private val service: AccessibilityService) {
                 if (until != 0L && until != Caffeine.FOREVER) main.postDelayed(awakeExpiry, (until - System.currentTimeMillis()).coerceAtLeast(0) + 200)
             }
         }
+        scope.launch { DisplaysItem.keepingAwake.collect { updateAwake() } }
         scan()
         main.postDelayed(poll, 2_000)
     }
@@ -921,7 +923,7 @@ class BarController(private val service: AccessibilityService) {
      * keep the screen on themselves.
      */
     private fun updateAwake() {
-        val on = Caffeine.active()
+        val on = Caffeine.active() || DisplaysItem.keepingAwake.value
         val f = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         val flags = if (on) strip.params.flags or f else strip.params.flags and f.inv()
         if (flags != strip.params.flags) {

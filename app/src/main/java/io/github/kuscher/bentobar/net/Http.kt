@@ -9,12 +9,16 @@ import java.util.concurrent.atomic.AtomicIntegerArray
 enum class Host(val domain: String) {
     /** Weather forecasts (Open-Meteo). */
     OPEN_METEO("api.open-meteo.com"),
-    /** City search for the weather item (Open-Meteo). */
+    /** Air quality and UV forecasts (Open-Meteo). */
+    OPEN_METEO_AIR("air-quality-api.open-meteo.com"),
+    /** City search for the weather and air quality items (Open-Meteo). */
     OPEN_METEO_GEOCODING("geocoding-api.open-meteo.com"),
     /** Flight times (AirLabs), with the user's own key. */
     AIRLABS("airlabs.co"),
     /** Stock quotes and the stock search (Finnhub), with the user's own key. */
     FINNHUB("api.finnhub.io"),
+    /** Reference exchange rates from the European Central Bank (Frankfurter). */
+    FRANKFURTER("api.frankfurter.dev"),
 }
 
 /**
